@@ -5,6 +5,7 @@ import {
   type ResolvedSiteAccessScope,
 } from './site-access-scope.util';
 import { Role } from '../../modules/auth/enums/roles.enum';
+import type { TenantContext } from './tenant.service';
 
 // Helper para verificar se um site é visível para o escopo
 function isSiteVisibleToScope(
@@ -20,16 +21,10 @@ function isSiteVisibleToScope(
 describe('site-access-scope.util', () => {
   describe('resolveSiteAccessScope', () => {
     const makeTenantContext = (
-      overrides: {
-        companyId: string;
-        isSuperAdmin?: boolean;
-        userId?: string;
-        siteId?: string;
-        siteIds?: string[];
-        siteScope?: 'single' | 'all';
-      } = { companyId: 'company-1' },
-    ) => ({
+      overrides: Partial<TenantContext> = {},
+    ): TenantContext => ({
       companyId: 'company-1',
+      isSuperAdmin: false,
       ...overrides,
     });
 
@@ -125,8 +120,8 @@ describe('site-access-scope.util', () => {
     });
 
     it('isCompanyWideProfile retorna false para outros perfis', () => {
-      expect(isCompanyWideProfile(Role.TECHNICAL as string)).toBe(false);
-      expect(isCompanyWideProfile(Role.TST as string)).toBe(false);
+      expect(isCompanyWideProfile('TÉCNICO DE SEGURANÇA')).toBe(false);
+      expect(isCompanyWideProfile('TST')).toBe(false);
       expect(isCompanyWideProfile(undefined)).toBe(false);
       expect(isCompanyWideProfile(null)).toBe(false);
     });
