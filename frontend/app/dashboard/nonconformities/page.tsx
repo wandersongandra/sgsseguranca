@@ -205,7 +205,16 @@ export default function NonConformitiesPage() {
     } finally {
       setLoading(false);
     }
-  }, [deferredSearchTerm, page, statusFilter]);
+  }, [
+    page,
+    deferredSearchTerm,
+    statusFilter,
+    siteFilter,
+    tipoFilter,
+    causaFilter,
+    nrFilter,
+    riskFilter,
+  ]);
 
   const loadSummary = useCallback(async () => {
     try {
