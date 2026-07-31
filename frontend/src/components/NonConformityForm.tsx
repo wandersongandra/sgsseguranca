@@ -44,6 +44,14 @@ import { useFormAutosave } from "@/hooks/useFormAutosave";
 const nonConformitySchema = z.object({
   codigo_nc: z.string().min(1, "O código é obrigatório"),
   tipo: z.string().min(1, "O tipo é obrigatório"),
+  tipo_categoria: z.string().optional(),
+  tipo_subcategoria: z.string().optional(),
+  causa_categoria: z.string().optional(),
+  requisito_nr_categoria: z.string().optional(),
+  risco_categoria: z.string().optional(),
+  risco_fonte: z.string().optional(),
+  evidencia_descricao_foto: z.string().optional(),
+  verificacao_descricao_foto: z.string().optional(),
   data_identificacao: z.string(),
   site_id: z.string().optional(),
   local_setor_area: z.string().min(1, "O local/setor/área é obrigatório"),
@@ -179,7 +187,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     reValidateMode: "onBlur",
     defaultValues: {
       data_identificacao: new Date().toISOString().split("T")[0],
-      tipo: "Menor",
+      tipo: "NC_MENOR",
       risco_nivel: "Baixo",
       status: NcStatus.ABERTA,
       acao_imediata_status: "Não implementada",
@@ -374,6 +382,14 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           reset({
             ...nonConformity,
             checklist_id: nonConformity.checklist_id ?? undefined,
+            tipo_categoria: nonConformity.tipo_categoria ?? undefined,
+            tipo_subcategoria: nonConformity.tipo_subcategoria ?? undefined,
+            causa_categoria: nonConformity.causa_categoria ?? undefined,
+            requisito_nr_categoria: nonConformity.requisito_nr_categoria ?? undefined,
+            risco_categoria: nonConformity.risco_categoria ?? undefined,
+            risco_fonte: nonConformity.risco_fonte ?? undefined,
+            evidencia_descricao_foto: nonConformity.evidencia_descricao_foto ?? undefined,
+            verificacao_descricao_foto: nonConformity.verificacao_descricao_foto ?? undefined,
             status: normalizeNcStatus(nonConformity.status),
             data_identificacao: toInputDateValue(nonConformity.data_identificacao),
             acao_imediata_data: toInputDateValue(nonConformity.acao_imediata_data) || undefined,
@@ -520,7 +536,32 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
   ];
 
   const tiposNc = ["Crítica", "Maior", "Menor"];
+  const tiposNcCategorias = ["NC_MAIOR", "NC_MENOR", "OBSERVACAO", "MELHORIA"];
+  const tiposNcSubcategorias = [
+    "Segurança operacional",
+    "Condição insegura",
+    "Ato inseguro",
+    "Procedimento",
+    "Equipamento",
+    "Treinamento",
+    "Outro",
+  ];
+  const categoriasCausa = [
+    "ORGANIZACIONAL",
+    "PROCESSO",
+    "EQUIPAMENTO",
+    "HUMANO",
+    "AMBIENTE",
+    "GERENCIAL",
+  ];
+  const requisitosNrCategorias = [
+    "NR_4", "NR_5", "NR_6", "NR_7", "NR_10", "NR_11", "NR_12", "NR_15",
+    "NR_17", "NR_18", "NR_20", "NR_21", "NR_22", "NR_23", "NR_24", "NR_25",
+    "NR_26", "NR_28", "NR_30", "NR_31", "NR_32", "NR_33", "NR_34", "NR_35", "NR_36",
+  ];
+  const riscosCategoria = ["QUEDA", "CHOQUE", "INCENDIO", "CORTE", "ESMAGAMENTO", "INTOXICACAO", "RUIDO", "VIBRACAO", "ERGONOMIA", "OUTRO"];
   const niveisRisco = ["Baixo", "Médio", "Alto", "Crítico"];
+  const boolOptions = ["true", "false"];
   const statusOptions = Object.values(NcStatus);
   const statusAcao = ["Implementada", "Em andamento", "Não implementada"];
   const resultadoEficacia = ["Sim", "Parcialmente", "Não"];
@@ -782,7 +823,12 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               {...register("codigo_nc")}
               hasError={!!errors.codigo_nc}
               placeholder="Ex: NC-2024-001"
+              readOnly
             />
+
+            <p className="mt-1 text-xs text-[var(--ds-color-text-muted)]">
+              Código gerado pelo sistema para manter rastreabilidade e unicidade.
+            </p>
             {errors.codigo_nc && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.codigo_nc.message}
@@ -802,12 +848,42 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               aria-label="Tipo da não conformidade"
               hasError={!!errors.tipo}
             >
-              {tiposNc.map((tipo) => (
+              <option value="">Selecione o tipo</option>
+              {tiposNcCategorias.map((tipo) => (
                 <option key={tipo} value={tipo}>
-                  {tipo}
+                  {tipo.replaceAll("_", " ")}
                 </option>
               ))}
             </Select>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-xs font-bold text-[var(--ds-color-text-secondary)]">
+                  Categoria complementar
+                </label>
+                <Select {...register("tipo_subcategoria")}>
+                  <option value="">Selecione</option>
+                  {tiposNcSubcategorias.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold text-[var(--ds-color-text-secondary)]">
+                  Classe visual
+                </label>
+                <Select {...register("tipo_categoria")}>
+                  <option value="">Selecione</option>
+                  {tiposNcCategorias.map((item) => (
+                    <option key={item} value={item}>
+                      {item.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
             {errors.tipo && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">{errors.tipo.message}</p>
             )}
@@ -858,7 +934,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               id="nc-local-setor-area"
               {...register("local_setor_area")}
               hasError={!!errors.local_setor_area}
+              placeholder="Ex: Produção, Manutenção, Obra X"
             />
+            {errors.local_setor_area && (
+              <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
+                {errors.local_setor_area.message}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-[var(--ds-color-text-muted)]">
+              O campo permanece livre para suportar diferentes obras/empresas sem travar o fluxo.
+            </p>
             {errors.local_setor_area && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.local_setor_area.message}
@@ -872,11 +957,21 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             >
               Atividade envolvida
             </label>
-            <Input
+            <Select
               id="nc-atividade-envolvida"
               {...register("atividade_envolvida")}
               hasError={!!errors.atividade_envolvida}
-            />
+            >
+              <option value="">Selecione a atividade</option>
+              <option value="Trabalho em altura">Trabalho em altura</option>
+              <option value="Movimentação de cargas">Movimentação de cargas</option>
+              <option value="Intervenção elétrica">Intervenção elétrica</option>
+              <option value="Solda / corte">Solda / corte</option>
+              <option value="Uso de máquinas">Uso de máquinas</option>
+              <option value="Limpeza / organização">Limpeza / organização</option>
+              <option value="Outro">Outro</option>
+            </Select>
+            <input className="mt-2 w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-3 py-2.5 text-[13px] font-semibold text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] transition-colors duration-[120ms] focus:border-[var(--component-field-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-1" placeholder="Detalhe complementar da atividade" {...register("atividade_envolvida")} />
             {errors.atividade_envolvida && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.atividade_envolvida.message}

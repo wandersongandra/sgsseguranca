@@ -45,6 +45,12 @@ export class NonConformity extends BaseAuditEntity {
   @Column()
   tipo: string;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  tipo_categoria?: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  tipo_subcategoria?: string | null;
+
   @Column({ type: 'date' })
   data_identificacao: Date;
 
@@ -78,6 +84,40 @@ export class NonConformity extends BaseAuditEntity {
   @Column()
   requisito_nr: string;
 
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  requisito_nr_categoria?: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  risco_categoria?: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  risco_fonte?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  evidencia_descricao_foto?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  evidencia_foto1_key?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  evidencia_foto2_key?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  evidencia_foto3_key?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  verificacao_descricao_foto?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  verificacao_foto1_key?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  verificacao_foto2_key?: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  verificacao_foto3_key?: string | null;
+
+
   @Column()
   requisito_item: string;
 
@@ -101,6 +141,24 @@ export class NonConformity extends BaseAuditEntity {
 
   @Column({ type: 'jsonb', nullable: true })
   causa?: string[];
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  causa_categoria?: string | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  causa_fator_humano?: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  causa_fator_equipamento?: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  causa_fator_processo?: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  causa_fator_ambiente?: boolean | null;
+
+  @Column({ type: 'boolean', nullable: true })
+  causa_fator_gerencial?: boolean | null;
 
   @Column({ nullable: true })
   causa_outro?: string;

@@ -116,6 +116,16 @@ export default function NonConformitiesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const deferredSearchTerm = useDeferredValue(searchTerm);
   const [statusFilter, setStatusFilter] = useState<NcStatus | "">("");
+  const [siteFilter, setSiteFilter] = useState("");
+  const [tipoFilter, setTipoFilter] = useState("");
+  const [causaFilter, setCausaFilter] = useState("");
+  const [nrFilter, setNrFilter] = useState("");
+  const [riskFilter, setRiskFilter] = useState("");
+  const [availableSites, setAvailableSites] = useState<{ id: string; nome: string }[]>([]);
+  const [availableTypes, setAvailableTypes] = useState<string[]>([]);
+  const [availableCauses, setAvailableCauses] = useState<string[]>([]);
+  const [availableNrs, setAvailableNrs] = useState<string[]>([]);
+  const [availableRisks, setAvailableRisks] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
@@ -178,6 +188,11 @@ export default function NonConformitiesPage() {
         limit: 10,
         search: deferredSearchTerm || undefined,
         status: statusFilter || undefined,
+        site_id: siteFilter || undefined,
+        tipo_categoria: tipoFilter || undefined,
+        causa_categoria: causaFilter || undefined,
+        requisito_nr_categoria: nrFilter || undefined,
+        risco_categoria: riskFilter || undefined,
       });
 
       setItems(pageResult.data);
@@ -416,15 +431,15 @@ export default function NonConformitiesPage() {
           },
             ]
         }
-        toolbarTitle="Base de nao conformidades"
-        toolbarDescription={`${total} registro(s) encontrados com busca por codigo, local, tipo e status.`}
+        toolbarTitle="Não conformidades"
+        toolbarDescription={`${total} registro(s) encontrados com busca por código, local, tipo e status.`}
         toolbarContent={
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="ds-list-search ds-list-search--wide">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3 xl:grid-cols-6">
+            <div className="ds-list-search ds-list-search--wide md:col-span-2 xl:col-span-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-color-text-muted)]" />
               <input
                 type="text"
-                placeholder="Buscar por codigo, local, tipo..."
+                placeholder="Buscar por código, local, tipo ou status..."
                 className={cn(inputClassName, "pl-10")}
                 value={searchTerm}
                 onChange={(event) => {
@@ -448,6 +463,42 @@ export default function NonConformitiesPage() {
               <option value={NcStatus.AGUARDANDO_VALIDACAO}>{NC_STATUS_LABEL[NcStatus.AGUARDANDO_VALIDACAO]}</option>
               <option value={NcStatus.ENCERRADA}>{NC_STATUS_LABEL[NcStatus.ENCERRADA]}</option>
             </select>
+            <select value={siteFilter} onChange={(event) => { setSiteFilter(event.target.value); setPage(1); }} className={inputClassName} aria-label="Filtrar por obra/site">
+              <option value="">Todas as obras</option>
+              {availableSites.map((site) => <option key={site.id} value={site.id}>{site.nome}</option>)}
+            </select>
+            <select value={tipoFilter} onChange={(event) => { setTipoFilter(event.target.value); setPage(1); }} className={inputClassName} aria-label="Filtrar por tipo">
+              <option value="">Todos os tipos</option>
+              {availableTypes.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}
+            </select>
+            <select value={causaFilter} onChange={(event) => { setCausaFilter(event.target.value); setPage(1); }} className={inputClassName} aria-label="Filtrar por causa">
+              <option value="">Todas as causas</option>
+              {availableCauses.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}
+            </select>
+            <select value={nrFilter} onChange={(event) => { setNrFilter(event.target.value); setPage(1); }} className={inputClassName} aria-label="Filtrar por NR">
+              <option value="">Todas as NRs</option>
+              {availableNrs.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}
+            </select>
+            <select value={riskFilter} onChange={(event) => { setRiskFilter(event.target.value); setPage(1); }} className={inputClassName} aria-label="Filtrar por risco">
+              <option value="">Todos os riscos</option>
+              {availableRisks.map((item) => <option key={item} value={item}>{item.replaceAll("_", " ")}</option>)}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm("");
+                setStatusFilter("");
+                setSiteFilter("");
+                setTipoFilter("");
+                setCausaFilter("");
+                setNrFilter("");
+                setRiskFilter("");
+                setPage(1);
+              }}
+              className={cn(inputClassName, "font-semibold text-[var(--ds-color-text-secondary)]")}
+            >
+              Limpar filtros
+            </button>
           </div>
         }
         footer={

@@ -10,9 +10,11 @@ export interface NonConformity {
   id: string;
   codigo_nc: string;
   tipo: string;
+  tipo_categoria?: string | null;
+  tipo_subcategoria?: string | null;
   data_identificacao: string;
   local_setor_area: string;
-  checklist_id?: string | null; // linkage opcional para rastreabilidade de inspeção/checklist
+  checklist_id?: string | null;
   atividade_envolvida: string;
   responsavel_area: string;
   auditor_responsavel: string;
@@ -25,11 +27,20 @@ export interface NonConformity {
   requisito_item: string;
   requisito_procedimento?: string;
   requisito_politica?: string;
+  requisito_nr_categoria?: string | null;
   risco_perigo: string;
   risco_associado: string;
   risco_consequencias?: string[];
   risco_nivel: string;
+  risco_categoria?: string | null;
+  risco_fonte?: string | null;
   causa?: string[];
+  causa_categoria?: string | null;
+  causa_fator_humano?: boolean | null;
+  causa_fator_equipamento?: boolean | null;
+  causa_fator_processo?: boolean | null;
+  causa_fator_ambiente?: boolean | null;
+  causa_fator_gerencial?: boolean | null;
   causa_outro?: string;
   acao_imediata_descricao?: string;
   acao_imediata_data?: string;
@@ -47,8 +58,16 @@ export interface NonConformity {
   acao_preventiva_epc_epi?: string;
   verificacao_resultado?: string;
   verificacao_evidencias?: string;
+  verificacao_descricao_foto?: string;
   verificacao_data?: string;
   verificacao_responsavel?: string;
+  evidencia_descricao_foto?: string;
+  evidencia_foto1_key?: string | null;
+  evidencia_foto2_key?: string | null;
+  evidencia_foto3_key?: string | null;
+  verificacao_foto1_key?: string | null;
+  verificacao_foto2_key?: string | null;
+  verificacao_foto3_key?: string | null;
   status: string;
   observacoes_gerais?: string;
   anexos?: string[];
@@ -56,8 +75,6 @@ export interface NonConformity {
   assinatura_tecnico_auditor?: string;
   assinatura_gestao?: string;
   company_id: string;
-  // SECURITY NOTE: pdf_file_key, pdf_folder_path, pdf_original_name are NEVER present in main responses.
-  // They are internal only. Use /pdf and /attachments/:index/access for governed signed access.
   site_id?: string;
   site?: Site;
   created_at: string;
@@ -239,6 +256,11 @@ export const nonConformitiesService = {
     limit?: number;
     search?: string;
     status?: string;
+    tipo_categoria?: string;
+    causa_categoria?: string;
+    requisito_nr_categoria?: string;
+    risco_categoria?: string;
+    site_id?: string;
   }): Promise<PaginatedResponse<NonConformity>> => {
     const response = await api.get<PaginatedResponse<NonConformity>>(
       "/nonconformities",
@@ -248,6 +270,11 @@ export const nonConformitiesService = {
           limit: opts?.limit ?? 20,
           ...(opts?.search ? { search: opts.search } : {}),
           ...(opts?.status ? { status: opts.status } : {}),
+          ...(opts?.tipo_categoria ? { tipo_categoria: opts.tipo_categoria } : {}),
+          ...(opts?.causa_categoria ? { causa_categoria: opts.causa_categoria } : {}),
+          ...(opts?.requisito_nr_categoria ? { requisito_nr_categoria: opts.requisito_nr_categoria } : {}),
+          ...(opts?.risco_categoria ? { risco_categoria: opts.risco_categoria } : {}),
+          ...(opts?.site_id ? { site_id: opts.site_id } : {}),
         },
       },
     );
