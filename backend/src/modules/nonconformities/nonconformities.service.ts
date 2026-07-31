@@ -843,10 +843,14 @@ export class NonConformitiesService {
       payload.tipo_categoria = this.normalizeOptionalText(dto.tipo_categoria);
     }
     if (dto.tipo_subcategoria !== undefined) {
-      payload.tipo_subcategoria = this.normalizeOptionalText(dto.tipo_subcategoria);
+      payload.tipo_subcategoria = this.normalizeOptionalText(
+        dto.tipo_subcategoria,
+      );
     }
     if (dto.requisito_nr_categoria !== undefined) {
-      payload.requisito_nr_categoria = this.normalizeOptionalText(dto.requisito_nr_categoria);
+      payload.requisito_nr_categoria = this.normalizeOptionalText(
+        dto.requisito_nr_categoria,
+      );
     }
     if (dto.risco_categoria !== undefined) {
       payload.risco_categoria = this.normalizeOptionalText(dto.risco_categoria);
@@ -855,28 +859,44 @@ export class NonConformitiesService {
       payload.risco_fonte = this.normalizeOptionalText(dto.risco_fonte);
     }
     if (dto.evidencia_descricao_foto !== undefined) {
-      payload.evidencia_descricao_foto = this.normalizeOptionalText(dto.evidencia_descricao_foto);
+      payload.evidencia_descricao_foto = this.normalizeOptionalText(
+        dto.evidencia_descricao_foto,
+      );
     }
     if (dto.evidencia_foto1_key !== undefined) {
-      payload.evidencia_foto1_key = this.normalizeOptionalText(dto.evidencia_foto1_key);
+      payload.evidencia_foto1_key = this.normalizeOptionalText(
+        dto.evidencia_foto1_key,
+      );
     }
     if (dto.evidencia_foto2_key !== undefined) {
-      payload.evidencia_foto2_key = this.normalizeOptionalText(dto.evidencia_foto2_key);
+      payload.evidencia_foto2_key = this.normalizeOptionalText(
+        dto.evidencia_foto2_key,
+      );
     }
     if (dto.evidencia_foto3_key !== undefined) {
-      payload.evidencia_foto3_key = this.normalizeOptionalText(dto.evidencia_foto3_key);
+      payload.evidencia_foto3_key = this.normalizeOptionalText(
+        dto.evidencia_foto3_key,
+      );
     }
     if (dto.verificacao_descricao_foto !== undefined) {
-      payload.verificacao_descricao_foto = this.normalizeOptionalText(dto.verificacao_descricao_foto);
+      payload.verificacao_descricao_foto = this.normalizeOptionalText(
+        dto.verificacao_descricao_foto,
+      );
     }
     if (dto.verificacao_foto1_key !== undefined) {
-      payload.verificacao_foto1_key = this.normalizeOptionalText(dto.verificacao_foto1_key);
+      payload.verificacao_foto1_key = this.normalizeOptionalText(
+        dto.verificacao_foto1_key,
+      );
     }
     if (dto.verificacao_foto2_key !== undefined) {
-      payload.verificacao_foto2_key = this.normalizeOptionalText(dto.verificacao_foto2_key);
+      payload.verificacao_foto2_key = this.normalizeOptionalText(
+        dto.verificacao_foto2_key,
+      );
     }
     if (dto.verificacao_foto3_key !== undefined) {
-      payload.verificacao_foto3_key = this.normalizeOptionalText(dto.verificacao_foto3_key);
+      payload.verificacao_foto3_key = this.normalizeOptionalText(
+        dto.verificacao_foto3_key,
+      );
     }
     if (dto.acao_imediata_descricao !== undefined) {
       payload.acao_imediata_descricao = this.normalizeOptionalText(

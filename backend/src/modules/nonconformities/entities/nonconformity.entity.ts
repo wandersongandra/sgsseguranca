@@ -117,7 +117,6 @@ export class NonConformity extends BaseAuditEntity {
   @Column({ type: 'text', nullable: true })
   verificacao_foto3_key?: string | null;
 
-
   @Column()
   requisito_item: string;
 

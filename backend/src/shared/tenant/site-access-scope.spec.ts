@@ -5,7 +5,6 @@ import {
   type ResolvedSiteAccessScope,
 } from './site-access-scope.util';
 import { Role } from '../../modules/auth/enums/roles.enum';
-import { RequestContext } from '../middleware/request-context.middleware';
 
 // Helper para verificar se um site é visível para o escopo
 function isSiteVisibleToScope(
@@ -20,14 +19,16 @@ function isSiteVisibleToScope(
 
 describe('site-access-scope.util', () => {
   describe('resolveSiteAccessScope', () => {
-    const makeTenantContext = (overrides: {
-      companyId: string;
-      isSuperAdmin?: boolean;
-      userId?: string;
-      siteId?: string;
-      siteIds?: string[];
-      siteScope?: 'single' | 'all';
-    } = { companyId: 'company-1' }) => ({
+    const makeTenantContext = (
+      overrides: {
+        companyId: string;
+        isSuperAdmin?: boolean;
+        userId?: string;
+        siteId?: string;
+        siteIds?: string[];
+        siteScope?: 'single' | 'all';
+      } = { companyId: 'company-1' },
+    ) => ({
       companyId: 'company-1',
       ...overrides,
     });
@@ -91,7 +92,10 @@ describe('site-access-scope.util', () => {
 
     it('retorna escopo com siteIds específicos', () => {
       const scope = resolveSiteAccessScope(
-        makeTenantContext({ siteIds: ['site-x', 'site-y'], siteScope: 'single' }),
+        makeTenantContext({
+          siteIds: ['site-x', 'site-y'],
+          siteScope: 'single',
+        }),
         'APR',
       );
       expect(scope.hasCompanyWideAccess).toBe(false);
