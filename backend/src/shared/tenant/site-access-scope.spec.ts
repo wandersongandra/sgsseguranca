@@ -125,8 +125,8 @@ describe('site-access-scope.util', () => {
     });
 
     it('isCompanyWideProfile retorna false para outros perfis', () => {
-      expect(isCompanyWideProfile(Role.TECHNICAL)).toBe(false);
-      expect(isCompanyWideProfile(Role.TST)).toBe(false);
+      expect(isCompanyWideProfile(Role.TECHNICAL as string)).toBe(false);
+      expect(isCompanyWideProfile(Role.TST as string)).toBe(false);
       expect(isCompanyWideProfile(undefined)).toBe(false);
       expect(isCompanyWideProfile(null)).toBe(false);
     });
