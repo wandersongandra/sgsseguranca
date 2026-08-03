@@ -127,7 +127,7 @@ export default function PhotographicReportsPage() {
           {canCreate ? (
             <Button
               type="button"
-              onClick={() => router.push("/dashboard/relatorios/fotografico/new")}
+              onClick={() => router.push("/dashboard/photographic-reports/new")}
               leftIcon={<Plus className="h-4 w-4" />}
             >
               Novo relatório
@@ -231,7 +231,7 @@ export default function PhotographicReportsPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => router.push(`/dashboard/relatorios/fotografico/${report.id}`)}
+                        onClick={() => router.push(`/dashboard/photographic-reports/${report.id}`)}
                       >
                         Abrir
                       </Button>
