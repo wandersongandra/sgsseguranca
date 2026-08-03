@@ -127,9 +127,9 @@ export async function drawChecklistBlueprint(
 
   drawDocumentIdentityRail(ctx, {
     documentType: "Checklist",
-    criticality: naoConformes > 0 ? "high" : "low",
+    criticality: naoConformes > 0 ? "Alta" : "Baixa",
     validity: formatDate(checklist.data),
-    documentClass: "operational",
+    documentClass: "Operacional",
   });
 
   drawExecutiveSummaryStrip(ctx, {

@@ -41,7 +41,7 @@ export async function drawNcBlueprint(
     documentType: "NC",
     criticality: riscoLabel,
     validity: sanitize(nc.verificacao_data ? formatDate(nc.verificacao_data) : "Em aberto"),
-    documentClass: "compliance",
+    documentClass: "Conformidade",
   });
 
   drawExecutiveSummaryStrip(ctx, {
