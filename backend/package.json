@@ -40,6 +40,8 @@
     "dr:recover-environment:dry-run": "node -r ts-node/register/transpile-only scripts/dr-recover-environment.ts --dry-run",
     "dr:scan": "node -r ts-node/register/transpile-only scripts/dr-integrity-scan.ts",
     "dr:scan:dry-run": "node -r ts-node/register/transpile-only scripts/dr-integrity-scan.ts --dry-run",
+    "k6:clean": "node -r ts-node/register/transpile-only scripts/clean-k6-data.ts",
+    "k6:clean:dry-run": "node -r ts-node/register/transpile-only scripts/clean-k6-data.ts --dry-run",
     "rdo:preflight": "node scripts/rdo-pre-migration-check.js",
     "rdo:preflight:json": "node scripts/rdo-pre-migration-check.js --json",
     "rdo:perf:audit": "node scripts/rdo-performance-audit.js",

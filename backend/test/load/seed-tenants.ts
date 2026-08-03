@@ -309,6 +309,13 @@ async function bulkInsertAprs(
 // ─── Entrypoint ──────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  if (process.env.LOAD_TEST_ALLOW_SEED !== 'true') {
+    console.error(
+      '[seed-tenants] BLOQUEADO: defina LOAD_TEST_ALLOW_SEED=true para executar contra este banco.',
+    );
+    process.exit(1);
+  }
+
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const cleanOnly = args.includes('--clean');

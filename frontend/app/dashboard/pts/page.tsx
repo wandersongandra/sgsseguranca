@@ -93,6 +93,8 @@ export default function PtsPage() {
     setClosingPt,
     confirmFinalize,
     loadPts,
+    handleEmitGovernedPdf,
+    emittingPdfId,
   } = usePts();
 
   const handlePrevPage = useCallback(() => {
@@ -322,6 +324,8 @@ export default function PtsPage() {
             onDismissApprovalIssue={dismissApprovalIssue}
             onDismissApprovalReview={dismissApprovalReview}
             onUpdateApprovalChecklist={updateApprovalChecklist}
+            onEmitGovernedPdf={handleEmitGovernedPdf}
+            emittingPdfId={emittingPdfId}
           />
         </div>
       </ListPageLayout>

@@ -485,6 +485,7 @@ export function PtForm({ id }: PtFormProps) {
   >({});
   const [currentPt, setCurrentPt] = useState<Pt | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+  const [emittingPdf, setEmittingPdf] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [sophieSuggestedRisks, setSophieSuggestedRisks] = useState<SophieDraftRiskSuggestion[]>([]);
   const [sophieMandatoryChecklists, setSophieMandatoryChecklists] = useState<SophieDraftChecklistSuggestion[]>([]);
@@ -1880,6 +1881,35 @@ export function PtForm({ id }: PtFormProps) {
     setIsEmailModalOpen(true);
   };
 
+  const handleEmitGovernedPdfFromForm = async () => {
+    if (!id || !currentPt) return;
+    setEmittingPdf(true);
+    try {
+      const [fullPt, ptSignatures] = await Promise.all([
+        ptsService.findOne(id),
+        signaturesService.findByDocument(id, 'PT'),
+      ]);
+      const { generatePtPdf } = await import('@/lib/pdf/ptGenerator');
+      const result = (await generatePtPdf(fullPt, ptSignatures, {
+        save: false,
+        output: 'base64',
+        draftWatermark: false,
+      })) as { base64: string; filename: string } | undefined;
+      if (!result?.base64) throw new Error('Falha ao gerar PDF');
+      const { base64ToPdfBlob } = await import('@/lib/pdf/pdfFile');
+      const blob = base64ToPdfBlob(result.base64);
+      const file = new File([blob], result.filename, { type: 'application/pdf' });
+      await ptsService.attachFile(id, file);
+      toast.success('PDF final emitido e registrado com sucesso.');
+      await refetchCurrentPt();
+    } catch (err) {
+      const msg = extractApiErrorMessage(err) || 'Falha ao emitir PDF final da PT.';
+      toast.error(msg);
+    } finally {
+      setEmittingPdf(false);
+    }
+  };
+
   const handleConfirmSendEmail = async (email: string) => {
     if (!id || !email.trim()) return;
     return await mailService.sendStoredDocument(id, 'PT', email.trim());
@@ -2512,6 +2542,19 @@ export function PtForm({ id }: PtFormProps) {
                     Salvar rascunho
                   </Button>
                 ) : null}
+                {id && currentPt?.status === 'Aprovada' && !currentPt?.pdf_file_key ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    leftIcon={<FileText className="h-4 w-4" />}
+                    onClick={handleEmitGovernedPdfFromForm}
+                    loading={emittingPdf}
+                    className={cn(isFieldMode && "min-h-12")}
+                    title="Gera o PDF oficial governado e registra na PT"
+                  >
+                    Emitir PDF final
+                  </Button>
+                ) : null}
                 {id && canManageMail ? (
                   <Button
                     type="button"
@@ -2539,7 +2582,8 @@ export function PtForm({ id }: PtFormProps) {
                   <Button
                     type="submit"
                     loading={loading}
-                    disabled={isPtReadOnly}
+                    disabled={isPtReadOnly || (currentStep === 3 && selectedExecutanteIds.length === 0)}
+                    title={currentStep === 3 && selectedExecutanteIds.length === 0 ? 'Selecione e assine ao menos um executante antes de salvar' : undefined}
                     leftIcon={!loading ? <Save className="h-4 w-4" /> : undefined}
                     className={cn(isFieldMode && "min-h-12")}
                   >

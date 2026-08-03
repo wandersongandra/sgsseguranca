@@ -511,6 +511,9 @@ export async function drawPtBlueprint(
       { label: "Executantes", value: pt.executantes?.length || 0 },
       { label: "Risco inicial", value: riskInitial },
       { label: "Risco residual", value: riskResidual },
+      { label: "Probabilidade", value: pt.probability ?? "-" },
+      { label: "Severidade", value: pt.severity ?? "-" },
+      { label: "Exposição", value: pt.exposure ?? "-" },
       {
         label: "Evidência de controle",
         value: pt.control_evidence ? "Registrada" : "Não registrada",
@@ -545,7 +548,8 @@ export async function drawPtBlueprint(
   });
 
   const hasEmergencyInfo = Boolean(
-    pt.contato_emergencia ||
+    pt.trabalho_altura ||
+      pt.contato_emergencia ||
       pt.ponto_encontro ||
       vigiaLabel ||
       fireWatchLabel ||
@@ -817,6 +821,68 @@ export async function drawPtBlueprint(
       drawNarrativeSection(ctx, {
         title: "Observações de encerramento",
         content: pt.observacoes_encerramento,
+      });
+    }
+  }
+
+  if (pt.aprovado_por_id || pt.reprovado_por_id) {
+    const approvalFields = [
+      pt.aprovado_por_id
+        ? { label: "Aprovado por (ID)", value: pt.aprovado_por_id }
+        : null,
+      pt.aprovado_em
+        ? { label: "Aprovado em", value: formatDateTime(pt.aprovado_em) }
+        : null,
+      pt.aprovado_motivo
+        ? { label: "Motivo da aprovação", value: pt.aprovado_motivo }
+        : null,
+      pt.reprovado_por_id
+        ? { label: "Reprovado por (ID)", value: pt.reprovado_por_id }
+        : null,
+      pt.reprovado_em
+        ? { label: "Reprovado em", value: formatDateTime(pt.reprovado_em) }
+        : null,
+      pt.reprovado_motivo
+        ? { label: "Motivo da reprovação", value: pt.reprovado_motivo }
+        : null,
+    ].filter((f): f is { label: string; value: string } => Boolean(f));
+
+    if (approvalFields.length) {
+      drawMetadataGrid(ctx, {
+        title: "Cadeia de aprovação",
+        columns: 2,
+        fields: approvalFields,
+      });
+    }
+  }
+
+  if (pt.auditado_por_id || pt.data_auditoria) {
+    const auditFields = [
+      pt.auditado_por?.nome || pt.auditado_por_id
+        ? {
+            label: "Auditado por",
+            value: pt.auditado_por?.nome || pt.auditado_por_id,
+          }
+        : null,
+      pt.data_auditoria
+        ? { label: "Data da auditoria", value: formatDate(pt.data_auditoria) }
+        : null,
+      pt.resultado_auditoria
+        ? { label: "Resultado", value: pt.resultado_auditoria }
+        : null,
+    ].filter((f): f is { label: string; value: string } => Boolean(f));
+
+    if (auditFields.length) {
+      drawMetadataGrid(ctx, {
+        title: "Auditoria de segurança",
+        columns: 2,
+        fields: auditFields,
+      });
+    }
+    if (pt.notas_auditoria) {
+      drawNarrativeSection(ctx, {
+        title: "Notas de auditoria",
+        content: pt.notas_auditoria,
       });
     }
   }

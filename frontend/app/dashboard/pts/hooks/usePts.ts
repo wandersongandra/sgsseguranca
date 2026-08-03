@@ -112,6 +112,7 @@ export function usePts() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [emittingPdfId, setEmittingPdfId] = useState<string | null>(null);
 
   // Estados para o modal de e-mail
   const [isMailModalOpen, setIsMailModalOpen] = useState(false);
@@ -538,6 +539,27 @@ export function usePts() {
     })) as { base64: string; filename: string } | undefined;
   }, []);
 
+  const handleEmitGovernedPdf = useCallback(
+    async (id: string) => {
+      setEmittingPdfId(id);
+      try {
+        const pt = pts.find((item) => item.id === id) || (await ptsService.findOne(id));
+        const payload = await generatePtPdfPayload(pt, false);
+        if (!payload?.base64) throw new Error('Falha ao gerar PDF');
+        const blob = base64ToPdfBlob(payload.base64);
+        const file = new File([blob], payload.filename, { type: 'application/pdf' });
+        await ptsService.attachFile(pt.id, file);
+        toast.success('PDF final emitido e registrado com sucesso.');
+        await loadPts();
+      } catch (error) {
+        handleApiError(error, 'Emissão do PDF final da PT');
+      } finally {
+        setEmittingPdfId(null);
+      }
+    },
+    [generatePtPdfPayload, loadPts, pts],
+  );
+
   const handleDownloadPdf = useCallback(
     async (id: string) => {
       try {
@@ -850,6 +872,8 @@ export function usePts() {
     handleDownloadPdf,
     handleSendEmail,
     handlePrint,
+    handleEmitGovernedPdf,
+    emittingPdfId,
     handlePrepareApproval,
     handleApprove,
     handleReject,
