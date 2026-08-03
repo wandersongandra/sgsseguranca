@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Download, Mail, Pencil, Printer, Trash2 } from 'lucide-react';
+import { ArrowRight, Download, FileText, Mail, Pencil, Printer, Trash2 } from 'lucide-react';
 import { ptBR } from 'date-fns/locale';
 import { Pt, PtApprovalBlockedPayload } from '@/services/ptsService';
 import { useAuth } from '@/context/AuthContext';
@@ -41,6 +41,8 @@ type Props = {
     key: keyof PtApprovalChecklistState,
     checked: boolean,
   ) => void;
+  onEmitGovernedPdf?: (id: string) => void;
+  emittingPdfId?: string | null;
 };
 
 const statusClass: Record<string, string> = {
@@ -71,6 +73,8 @@ export function PtMobileCard({
   onDismissApprovalIssue,
   onDismissApprovalReview,
   onUpdateApprovalChecklist,
+  onEmitGovernedPdf,
+  emittingPdfId,
 }: Props) {
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.CAN_MANAGE_PT);
@@ -158,6 +162,17 @@ export function PtMobileCard({
         >
           <Download className="h-4 w-4" /> PDF
         </Button>
+        {pt.status === 'Aprovada' && !pt.pdf_file_key && onEmitGovernedPdf ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="min-h-11"
+            loading={emittingPdfId === pt.id}
+            onClick={() => onEmitGovernedPdf(pt.id)}
+          >
+            <FileText className="h-4 w-4" /> Emitir PDF
+          </Button>
+        ) : null}
         {canMail ? (
           <Button
             type="button"

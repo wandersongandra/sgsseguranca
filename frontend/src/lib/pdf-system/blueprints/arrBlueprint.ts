@@ -22,8 +22,21 @@ const ARR_STATUS_LABEL: Record<string, string> = {
 const ARR_RISCO_LABEL: Record<string, string> = {
   critico: "Crítico",
   alto: "Alto",
-  medio: "Moderado",
+  medio: "Médio",
   baixo: "Baixo",
+};
+
+const ARR_PROBABILITY_LABEL: Record<string, string> = {
+  baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
+};
+
+const ARR_SEVERITY_LABEL: Record<string, string> = {
+  leve: "Leve",
+  moderada: "Moderada",
+  grave: "Grave",
+  critica: "Crítica",
 };
 
 function buildStatusTone(status: string) {
@@ -79,12 +92,12 @@ export async function drawArrBlueprint(
       },
       {
         label: "Probabilidade",
-        value: sanitize(arr.probabilidade),
+        value: ARR_PROBABILITY_LABEL[arr.probabilidade] ?? sanitize(arr.probabilidade),
         tone: "default",
       },
       {
         label: "Severidade",
-        value: sanitize(arr.severidade),
+        value: ARR_SEVERITY_LABEL[arr.severidade] ?? sanitize(arr.severidade),
         tone: "default",
       },
       {

@@ -157,6 +157,8 @@ export const PtsTable = React.memo(
             onDismissApprovalIssue={onDismissApprovalIssue}
             onDismissApprovalReview={onDismissApprovalReview}
             onUpdateApprovalChecklist={onUpdateApprovalChecklist}
+            onEmitGovernedPdf={onEmitGovernedPdf}
+            emittingPdfId={emittingPdfId}
           />
         )}
       />
