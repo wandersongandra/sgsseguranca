@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -32,6 +33,7 @@ import { UpdatePhotographicReportImageDto } from './dto/update-photographic-repo
 import { ReorderPhotographicReportImagesDto } from './dto/reorder-photographic-report-images.dto';
 import { UploadPhotographicReportImagesDto } from './dto/upload-photographic-report-images.dto';
 import { PhotographicReportStatus } from './entities/photographic-report.entity';
+import { SendEmailDto } from './dto/send-email.dto';
 
 @Controller('photographic-reports')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
@@ -356,5 +358,20 @@ export class PhotographicReportsController {
   @Authorize('can_view_photographic_reports')
   getPdfAccess(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.photographicReportsService.getPdfAccess(id);
+  }
+
+  @Post(':id/send-email')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @Authorize('can_manage_photographic_reports')
+  sendEmail(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() body: SendEmailDto,
+  ) {
+    if (!body.to.length) {
+      throw new BadRequestException(
+        'Informe pelo menos um destinatário para envio.',
+      );
+    }
+    return this.photographicReportsService.sendEmail(id, body.to);
   }
 }

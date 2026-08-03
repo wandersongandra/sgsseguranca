@@ -101,6 +101,8 @@ describe('PhotographicReportsService', () => {
       aiAnalysisService as never,
       fileInspectionService as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
+      { sendStoredDocument: jest.fn().mockResolvedValue(undefined) } as never,
+      { add: jest.fn().mockResolvedValue(undefined) } as never,
     );
   });
 

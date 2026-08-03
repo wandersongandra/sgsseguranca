@@ -401,4 +401,8 @@ export const photographicReportsService = {
     );
     return response.data;
   },
+
+  sendEmail: async (reportId: string, to: string[]): Promise<void> => {
+    await api.post(`/photographic-reports/${reportId}/send-email`, { to });
+  },
 };

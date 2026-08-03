@@ -25,6 +25,7 @@ import { DdsService } from '../../modules/dds/dds.service';
 import { DidsService } from '../../modules/dids/dids.service';
 import { AuditsService } from '../../modules/audits/audits.service';
 import { RdosService } from '../../modules/rdos/rdos.service';
+import { PhotographicReportsService } from '../../modules/photographic-reports/photographic-reports.service';
 import { CompaniesService } from '../../modules/companies/companies.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import type { TenantContext } from '../../shared/tenant/tenant.service';
@@ -186,6 +187,8 @@ export class MailService {
     private auditsService: AuditsService,
     @Inject(forwardRef(() => RdosService))
     private rdosService: RdosService,
+    @Inject(forwardRef(() => PhotographicReportsService))
+    private photographicReportsService: PhotographicReportsService,
     private companiesService: CompaniesService,
     private tenantService: TenantService,
     private documentStorageService: DocumentStorageService,
@@ -508,6 +511,27 @@ export class MailService {
           fileKey = access.fileKey;
           docName = `RDO ${rdo.numero}`;
           subject = `${docName}`;
+          break;
+        }
+        case 'PHOTOGRAPHIC_REPORT': {
+          const report =
+            await this.photographicReportsService.findOne(documentId);
+          const pdfExports = (report.exports ?? []).filter(
+            (e) => e.export_type === 'pdf',
+          );
+          if (!pdfExports.length) {
+            throw new NotFoundException(
+              'O relatório fotográfico ainda não possui exportação em PDF.',
+            );
+          }
+          const latest = pdfExports.sort(
+            (a, b) =>
+              new Date(b.generated_at).getTime() -
+              new Date(a.generated_at).getTime(),
+          )[0];
+          fileKey = latest.file_url;
+          docName = `Relatório Fotográfico — ${report.client_name} / ${report.project_name}`;
+          subject = docName;
           break;
         }
         default:

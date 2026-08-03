@@ -1,10 +1,14 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { Repository, IsNull } from 'typeorm';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
@@ -59,6 +63,9 @@ import {
 } from './entities/photographic-report.entity';
 import { Company } from '../companies/entities/company.entity';
 import { escapeLikePattern } from '../../shared/utils/sql.util';
+import { MailService } from '../../infra/mail/mail.service';
+import { DocumentMailDispatchResponseDto } from '../../infra/mail/dto/document-mail-dispatch-response.dto';
+import { defaultJobOptions } from '../../infra/queue/default-job-options';
 
 type PhotographicReportWithCounts = PhotographicReport & {
   dayCount?: number;
@@ -96,6 +103,10 @@ export class PhotographicReportsService {
     private readonly fileInspectionService: FileInspectionService,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
+    @Inject(forwardRef(() => MailService))
+    private readonly mailService: MailService,
+    @InjectQueue('mail')
+    private readonly mailQueue: Queue,
   ) {}
 
   createUploadOptions(maxFileSize = DEFAULT_IMAGE_MAX_FILE_SIZE) {
@@ -1770,6 +1781,95 @@ export class PhotographicReportsService {
         registryEntry.file_key.split('/').pop() ||
         null,
       url,
+    };
+  }
+
+  async sendEmail(
+    id: string,
+    to: string[],
+  ): Promise<DocumentMailDispatchResponseDto & { recipients: number }> {
+    const report = await this.findOne(id);
+    if (!to.length) {
+      return {
+        success: true,
+        message: 'Nenhum destinatário informado para envio do relatório.',
+        deliveryMode: 'sent',
+        artifactType: 'governed_final_pdf',
+        isOfficial: false,
+        fallbackUsed: false,
+        documentId: report.id,
+        documentType: 'PHOTOGRAPHIC_REPORT',
+        recipients: 0,
+      };
+    }
+
+    const pdfExports = (report.exports ?? []).filter(
+      (e) => e.export_type === PhotographicReportExportType.PDF,
+    );
+    if (!pdfExports.length) {
+      throw new BadRequestException(
+        'Exporte o relatório em PDF antes de enviar por e-mail.',
+      );
+    }
+
+    const context = this.tenantService.getContext();
+    const companyId = context?.companyId ?? report.company_id;
+    const workerTenantContext = {
+      companyId,
+      isSuperAdmin: context?.isSuperAdmin ?? false,
+      siteScope: context?.siteScope,
+      ...(context?.siteScope === 'single' ? { siteIds: context.siteIds } : {}),
+    };
+
+    let queuedCount = 0;
+    let syncFallbackUsed = false;
+
+    for (const email of to) {
+      try {
+        await this.mailQueue.add(
+          'send-document',
+          {
+            documentId: report.id,
+            documentType: 'PHOTOGRAPHIC_REPORT',
+            email,
+            companyId,
+            tenantContext: workerTenantContext,
+          },
+          defaultJobOptions,
+        );
+        queuedCount++;
+      } catch (error) {
+        this.logger.warn(
+          `Fila de e-mail indisponível para relatório fotográfico ${report.id}, aplicando fallback síncrono: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        await this.mailService.sendStoredDocument(
+          report.id,
+          'PHOTOGRAPHIC_REPORT',
+          email,
+          companyId,
+        );
+        syncFallbackUsed = true;
+      }
+    }
+
+    const deliveryMode: 'queued' | 'sent' =
+      queuedCount === to.length ? 'queued' : 'sent';
+
+    return {
+      success: true,
+      message:
+        deliveryMode === 'queued'
+          ? `Relatório fotográfico enfileirado para envio a ${to.length} destinatário(s).`
+          : `Relatório fotográfico enviado a ${to.length} destinatário(s) via fallback síncrono.`,
+      deliveryMode,
+      artifactType: 'governed_final_pdf',
+      isOfficial: false,
+      fallbackUsed: syncFallbackUsed,
+      documentId: report.id,
+      documentType: 'PHOTOGRAPHIC_REPORT',
+      recipients: to.length,
     };
   }
 }

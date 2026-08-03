@@ -12,6 +12,7 @@ import {
   FileText,
   Image as ImageIcon,
   Loader2,
+  Mail,
   Plus,
   RefreshCw,
   Save,
@@ -24,6 +25,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SendMailModal } from "@/components/SendMailModal";
 import { extractApiErrorMessage } from "@/lib/error-handler";
 import { Permission } from "@/lib/permissions";
 import { openSafeExternalUrlInNewTab, safeExternalArtifactUrl } from "@/lib/security/safe-external-url";
@@ -265,6 +267,7 @@ export function PhotographicReportWorkspace({
   const [uploading, setUploading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [exporting, setExporting] = useState<"pdf" | "word" | null>(null);
+  const [isMailModalOpen, setIsMailModalOpen] = useState(false);
   const [newDayDate, setNewDayDate] = useState("");
   const [newDaySummary, setNewDaySummary] = useState("");
   const [uploadDayId, setUploadDayId] = useState("");
@@ -1047,6 +1050,20 @@ export function PhotographicReportWorkspace({
                 >
                   Exportar PDF
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsMailModalOpen(true)}
+                  leftIcon={<Mail className="h-4 w-4" />}
+                  disabled={!canManage || !report?.exports?.some((e) => e.export_type === "pdf")}
+                  title={
+                    !report?.exports?.some((e) => e.export_type === "pdf")
+                      ? "Exporte o relatório em PDF antes de enviar por e-mail"
+                      : undefined
+                  }
+                >
+                  Enviar por e-mail
+                </Button>
               </>
             )}
           </div>
@@ -1681,6 +1698,16 @@ export function PhotographicReportWorkspace({
           </div>
         </>
       ) : null}
+
+      {report && (
+        <SendMailModal
+          isOpen={isMailModalOpen}
+          onClose={() => setIsMailModalOpen(false)}
+          documentName={`Relatório Fotográfico — ${report.client_name} / ${report.project_name}`}
+          filename={buildExportFileName(report, "pdf")}
+          storedDocument={{ documentId: report.id, documentType: "PHOTOGRAPHIC_REPORT" }}
+        />
+      )}
     </div>
   );
 }
