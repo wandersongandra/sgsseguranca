@@ -156,7 +156,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1095.0",
     "@bull-board/api": "^6.20.3",
     "@bull-board/express": "^6.20.3",
-    "@bull-board/nestjs": "^6.20.3",
+    "@bull-board/nestjs": "^8.6.0",
     "@keyv/redis": "^5.1.6",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/bullmq": "^11.0.4",
