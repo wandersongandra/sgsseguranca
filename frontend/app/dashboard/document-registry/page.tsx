@@ -179,8 +179,8 @@ export default function DocumentRegistryPage() {
 
     return entries.filter((entry) => {
       return (
-        entry.title.toLowerCase().includes(normalizedTerm) ||
-        entry.module.toLowerCase().includes(normalizedTerm) ||
+        (entry.title ?? '').toLowerCase().includes(normalizedTerm) ||
+        (entry.module ?? '').toLowerCase().includes(normalizedTerm) ||
         (entry.document_code || '').toLowerCase().includes(normalizedTerm) ||
         (entry.original_name || '').toLowerCase().includes(normalizedTerm)
       );

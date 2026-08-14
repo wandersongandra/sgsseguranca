@@ -164,7 +164,7 @@ describe('LoginPageClient', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(expectedMessage);
   });
 
-  it('exibe a mensagem do servidor quando login retorna 400', async () => {
+  it('não vaza a mensagem do servidor quando login retorna 400 (anti-enumeração)', async () => {
     mockLogin.mockRejectedValue({
       isAxiosError: true,
       response: {
@@ -179,7 +179,10 @@ describe('LoginPageClient', () => {
 
     fillCredentialsAndSubmit();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('CPF inválido');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Dados inválidos. Verifique as informações e tente novamente.',
+    );
+    expect(screen.queryByText('CPF inválido')).not.toBeInTheDocument();
   });
 
   it('reseta turnstile e limpa token ao ocorrer erro no submit', async () => {

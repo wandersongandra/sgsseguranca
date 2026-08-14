@@ -16,6 +16,7 @@ import type { PublicValidationGrantService } from '../../shared/services/public-
 import { Signature } from '../signatures/entities/signature.entity';
 import { Site } from '../sites/entities/site.entity';
 import { User } from '../users/entities/user.entity';
+import { UserSite } from '../users/entities/user-site.entity';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -37,6 +38,13 @@ describe('DdsService', () => {
   };
   type UserFindArgs = {
     where?: UserFindWhere | UserFindWhere[];
+  };
+  type UserSiteFindArgs = {
+    where?: {
+      user_id?: unknown;
+      company_id?: unknown;
+      site_id?: string;
+    };
   };
   type MockManager = {
     getRepository: jest.Mock;
@@ -87,6 +95,9 @@ describe('DdsService', () => {
   let userRepository: {
     find: jest.Mock<Promise<User[]>, [UserFindArgs]>;
     createQueryBuilder: jest.Mock;
+  };
+  let userSiteRepository: {
+    find: jest.Mock<Promise<UserSite[]>, [UserSiteFindArgs]>;
   };
   let transactionalDdsRepository: {
     save: jest.Mock;
@@ -164,6 +175,11 @@ describe('DdsService', () => {
         return Promise.resolve(ids.map((id) => makeUser({ id })));
       }),
     };
+    userSiteRepository = {
+      find: jest.fn<Promise<UserSite[]>, [UserSiteFindArgs]>(() =>
+        Promise.resolve([]),
+      ),
+    };
     transactionalDdsRepository = {
       save: jest.fn((input) => Promise.resolve(input as Dds)),
       update: jest.fn(),
@@ -188,6 +204,9 @@ describe('DdsService', () => {
       }
       if (entity === User) {
         return userRepository;
+      }
+      if (entity === UserSite) {
+        return userSiteRepository;
       }
       if (entity === Dds) {
         return transactionalDdsRepository;
@@ -910,6 +929,31 @@ describe('DdsService', () => {
     expect(repository.save).toHaveBeenCalled();
   });
 
+  it('permite participante vinculado à obra via user_sites ao criar DDS', async () => {
+    userRepository.find
+      .mockResolvedValueOnce([makeUser({ id: 'facilitador-1' })])
+      .mockResolvedValueOnce([]);
+    userSiteRepository.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { user_id: 'participante-vinculado' },
+      ] as UserSite[]);
+
+    await service.create({
+      tema: 'DDS Integridade',
+      data: '2026-03-14',
+      site_id: 'site-1',
+      facilitador_id: 'facilitador-1',
+      participants: ['participante-vinculado'],
+    });
+
+    const participantSiteFindArgs = userSiteRepository.find.mock.calls[1]?.[0];
+    expect(participantSiteFindArgs?.where).toMatchObject({
+      site_id: 'site-1',
+    });
+    expect(repository.save).toHaveBeenCalled();
+  });
+
   it('bloqueia transicao de status quando ja existe PDF final anexado', async () => {
     repository.findOne.mockResolvedValue({
       id: 'dds-1',
@@ -946,6 +990,26 @@ describe('DdsService', () => {
     expect(
       documentGovernanceService.registerFinalDocument,
     ).not.toHaveBeenCalled();
+  });
+
+  // Regressão de SGS-DDS-INT-001: antes desta trava, `remove()` de um DDS já
+  // emitido chamava `removeFinalDocumentReference` com `cleanupStoredFile`,
+  // apagando o PDF final no storage e a entrada do document_registry — o que
+  // quebrava permanentemente todo QR/código de validação pública já
+  // distribuído. PT e NC já tinham a guarda equivalente; o DDS não.
+  it('recusa remover DDS que já possui PDF final emitido', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'dds-1',
+      company_id: 'company-1',
+      pdf_file_key: 'sgs/company-1/dds/dds-1/final.pdf',
+    });
+
+    await expect(service.remove('dds-1')).rejects.toThrow(BadRequestException);
+
+    expect(
+      documentGovernanceService.removeFinalDocumentReference,
+    ).not.toHaveBeenCalled();
+    expect(documentStorageService.deleteFile).not.toHaveBeenCalled();
   });
 
   it('remove o DDS via esteira central e aplica a policy de lifecycle', async () => {

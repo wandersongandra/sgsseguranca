@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 import { useApprovalWorkflow } from "@/hooks/useApprovalWorkflow";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { logger } from "@/lib/logger";
 
 type DdsApprovalPanelProps = {
@@ -64,6 +65,11 @@ export function DdsApprovalPanel({
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | "reopen" | null>(null);
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(confirmDialogRef, pendingAction !== null, () =>
+    setPendingAction(null),
+  );
 
   const ddsId = dds?.id;
   const locked = Boolean(
@@ -516,6 +522,7 @@ export function DdsApprovalPanel({
       {/* Modal de confirmação de segurança para ações irreversíveis */}
       {pendingAction ? (
         <div
+          ref={confirmDialogRef}
           role="dialog"
           aria-modal="true"
           aria-label="Confirmar ação de aprovação"

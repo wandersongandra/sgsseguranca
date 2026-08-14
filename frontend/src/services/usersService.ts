@@ -63,7 +63,7 @@ export interface User {
   id: string;
   nome: string;
   email: string;
-  cpf: string;
+  cpf: string | null;
   funcao?: string;
   role: string;
   company_id: string;

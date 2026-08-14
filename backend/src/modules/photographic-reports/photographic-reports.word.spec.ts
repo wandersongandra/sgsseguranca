@@ -41,6 +41,35 @@ function buildSampleReport(): PhotographicReportResponse {
       'Condição técnica satisfatória para execução da atividade.',
     ai_condition_classification: 'Muito satisfatória',
     ai_recommendations: ['Manter a organização atual'],
+    photo_conditions: [
+      'EPIs em uso pelos trabalhadores',
+      'Área devidamente sinalizada',
+    ],
+
+    is_nonconformity: false,
+    recommended_action: null,
+    action_deadline: null,
+    action_responsible: null,
+
+    original_name: 'frente-de-servico.jpg',
+    mime_type: 'image/jpeg',
+    file_size_bytes: 248_113,
+    hash_sha256:
+      'a3f1c9d24b7e8051f6c2a90d3e5b71482c6d0f9a1b3e5c7d9f0a2b4c6d8e0f12',
+    captured_at: '2026-05-15T10:08:00.000Z',
+    latitude: -23.56,
+    longitude: -46.64,
+    accuracy_m: 12.5,
+    exif_datetime: null,
+    integrity_flags: {
+      gps: true,
+      accuracy: true,
+      device: false,
+      ip: true,
+      exif: false,
+      client_reencoded: true,
+    },
+
     created_at: '2026-05-15T10:10:00.000Z',
     updated_at: '2026-05-15T10:12:00.000Z',
     day,
@@ -64,7 +93,16 @@ function buildSampleReport(): PhotographicReportResponse {
     start_time: '20:00:00',
     end_time: '22:00:00',
     responsible_name: 'Responsável Técnico',
+    responsible_registration_type: 'CREA',
+    responsible_registration_number: '123456',
+    responsible_registration_state: 'SP',
+    art_number: 'ART-2026-000123',
     contractor_company: 'Empresa Executora LTDA',
+    applicable_nrs: ['NR-06', 'NR-12', 'NR-35'],
+    inspection_methodology:
+      'Inspeção visual da frente de serviço com registro fotográfico sequencial.',
+    scope_and_limitations:
+      'Escopo limitado às áreas acessíveis no turno; não contempla ensaios instrumentais.',
     general_observations: 'Observações gerais do relatório.',
     ai_summary: 'Resumo consolidado do serviço fotográfico.',
     final_conclusion: 'Conclusão final aprovada.',
@@ -76,6 +114,10 @@ function buildSampleReport(): PhotographicReportResponse {
     image_count: 1,
     export_count: 1,
     last_exported_at: '2026-05-15T10:40:00.000Z',
+    verification_code: 'RFP-2026-REPORT01',
+    final_pdf_hash_sha256:
+      'b7e2d4f60a1c8395e2f4a6b8c0d2e4f60819a3b5c7d9e1f30527496a8b0c2d4e',
+    pdf_generated_at: '2026-05-15T10:40:00.000Z',
     days: [day],
     images: [image],
     exports: [
@@ -101,7 +143,12 @@ describe('buildPhotographicReportWordBuffer', () => {
       throw new Error('Imagem de teste ausente.');
     }
     const buffer = await buildPhotographicReportWordBuffer(report, {
-      companyName: 'SGS',
+      companyIdentity: {
+        razaoSocial: 'SGS Segurança LTDA',
+        cnpj: '12345678000190',
+      },
+      clientName: 'Cliente Exemplo',
+      documentCode: 'RFP-2026-REPORT01',
       generatedAt: '2026-05-15T10:45:00.000Z',
       renderableImages: [
         {
@@ -128,5 +175,90 @@ describe('buildPhotographicReportWordBuffer', () => {
     expect(documentXml).toContain('Organização da área de trabalho');
     expect(relationshipsXml).toContain('media/image1.png');
     expect(zip.file('word/media/image1.png')).not.toBeNull();
+  });
+
+  it('emite as seções de SST, o manifesto e a identidade correta da empresa', async () => {
+    const report = buildSampleReport();
+    const image = report.images[0];
+    if (!image) {
+      throw new Error('Imagem de teste ausente.');
+    }
+
+    const buffer = await buildPhotographicReportWordBuffer(report, {
+      companyIdentity: {
+        razaoSocial: 'SGS Segurança LTDA',
+        cnpj: '12345678000190',
+      },
+      clientName: 'Cliente Exemplo',
+      documentCode: 'RFP-2026-REPORT01',
+      generatedAt: '2026-05-15T10:45:00.000Z',
+      renderableImages: [
+        {
+          ...image,
+          data_url: null,
+          activity_date_label: '2026-05-15',
+        },
+      ],
+    });
+
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file('word/document.xml')!.async('string');
+
+    // A empresa EMITENTE é o tenant, não o cliente — era exatamente o bug.
+    expect(documentXml).toContain('SGS Segurança LTDA');
+    expect(documentXml).toContain('RFP-2026-REPORT01');
+
+    // Credencial técnica e escopo normativo.
+    expect(documentXml).toContain('Responsável técnico');
+    expect(documentXml).toContain('CREA-SP 123456');
+    expect(documentXml).toContain('ART-2026-000123');
+    expect(documentXml).toContain('Normas regulamentadoras aplicáveis');
+    expect(documentXml).toContain('NR-06 · NR-12 · NR-35');
+    expect(documentXml).toContain('Metodologia de inspeção');
+    expect(documentXml).toContain('Escopo e limitações');
+
+    // Resumo de NC aparece mesmo sem nenhuma, com estado explícito: o leitor
+    // precisa distinguir "nenhuma encontrada" de "não avaliado".
+    expect(documentXml).toContain('Resumo de não conformidades');
+    expect(documentXml).toContain(
+      'Nenhuma das evidências deste relatório foi marcada como não conformidade',
+    );
+
+    // Manifesto e a ressalva sobre o que o hash prova.
+    expect(documentXml).toContain('Manifesto de evidências');
+    expect(documentXml).toContain('não a autoria original da captura');
+    expect(documentXml).toContain('arredondadas para aproximadamente 1 km');
+
+    expect(documentXml).toContain('Validação pública');
+  });
+
+  it('numera as seções sem furos ao inserir blocos condicionais', async () => {
+    const report = buildSampleReport();
+    // Sem NRs, metodologia nem escopo: três seções condicionais somem e a
+    // numeração precisa continuar contígua.
+    report.applicable_nrs = null;
+    report.inspection_methodology = null;
+    report.scope_and_limitations = null;
+
+    const buffer = await buildPhotographicReportWordBuffer(report, {
+      companyIdentity: { razaoSocial: 'SGS', cnpj: null },
+      clientName: 'Cliente',
+      documentCode: 'RFP-2026-REPORT01',
+      renderableImages: [],
+    });
+
+    const zip = await JSZip.loadAsync(buffer);
+    const documentXml = await zip.file('word/document.xml')!.async('string');
+
+    const numbers = [...documentXml.matchAll(/>(\d+)\.\s[A-ZÁÉÍÓÚÂÊÔÃÕÇ]/g)]
+      .map((match) => Number(match[1]))
+      .filter((value) => Number.isFinite(value));
+
+    expect(numbers.length).toBeGreaterThan(0);
+    // Começa em 2 (a capa não é numerada) e cresce de um em um.
+    expect(numbers[0]).toBe(2);
+    numbers.forEach((value, index) => {
+      expect(value).toBe(index + 2);
+    });
   });
 });

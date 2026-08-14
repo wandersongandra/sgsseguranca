@@ -59,16 +59,14 @@ describe("offline capability policy", () => {
     expect(isOfflineActionAllowed("online-required", "write", true)).toBe(true);
   });
 
-  it("describes NC support at action level instead of treating every write as queued", () => {
-    expect(getNonConformityOfflineActionCapability("create")).toBe("queue");
-    expect(getNonConformityOfflineActionCapability("update")).toBe("queue");
-    for (const action of ["update-status", "remove", "capa", "email", "export"] as const) {
+  it("requires a connection for every NC mutation when there is no safe queue", () => {
+    for (const action of ["create", "update", "update-status", "remove", "upload", "generate-pdf", "capa", "email", "export"] as const) {
       expect(getNonConformityOfflineActionCapability(action)).toBe("online-required");
       expect(isNonConformityActionAllowed(action, false)).toBe(false);
       expect(nonConformityOfflineActionMessage(action)).toContain("não será colocada na fila");
       expect(() => assertNonConformityActionAvailable(action, false)).toThrow("exige conexão");
     }
-    expect(isNonConformityActionAllowed("create", false)).toBe(true);
+    expect(isNonConformityActionAllowed("create", true)).toBe(true);
     expect(isNonConformityActionAllowed("update-status", true)).toBe(true);
   });
 });

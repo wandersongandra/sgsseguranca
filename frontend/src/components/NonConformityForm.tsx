@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import type { FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Save, Plus, Trash2, Loader2, Camera, X, ShieldAlert } from "lucide-react";
+import { Save, Plus, Loader2, Camera, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import {
-  NC_ALLOWED_TRANSITIONS,
   NC_STATUS_LABEL,
   type NonConformity,
   NcStatus,
@@ -20,7 +19,6 @@ import {
 import { sitesService, Site } from "@/services/sitesService";
 import { getFormErrorMessage } from "@/lib/error-handler";
 import { logger } from "@/lib/logger";
-import { attachPdfIfProvided } from "@/lib/document-upload";
 import { readSophieNcPreview, SophieNcPreview } from "@/lib/sophie-draft-storage";
 import { useAuth } from "@/context/AuthContext";
 import { Permission } from "@/lib/permissions";
@@ -41,7 +39,17 @@ import { InlineCallout } from "@/components/ui/inline-callout";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import {
+  ModalBody,
+  ModalFooter,
+  ModalFrame,
+  ModalHeader,
+} from "@/components/ui/modal-frame";
 import { useFormAutosave } from "@/hooks/useFormAutosave";
+import {
+  assertNonConformityActionAvailable,
+  type NonConformityOfflineAction,
+} from "@/lib/offline-capabilities";
 
 const nonConformitySchema = z.object({
   codigo_nc: z.string().min(1, "O código é obrigatório"),
@@ -89,7 +97,14 @@ const nonConformitySchema = z.object({
   status: z.string().min(1, "O status é obrigatório"),
   observacoes_gerais: z.string().optional(),
   anexos: z
-    .array(z.object({ url: z.string().min(1, "Informe o anexo") }))
+    .array(
+      z.object({
+        // Registros antigos podem conter referências que não usam o formato
+        // governado atual. Eles são somente preservados durante a edição e
+        // nunca podem ser criados pelo formulário.
+        url: z.string().min(1, "Informe o anexo"),
+      }),
+    )
     .optional(),
   assinatura_responsavel_area: z.string().optional(),
   assinatura_tecnico_auditor: z.string().optional(),
@@ -98,6 +113,86 @@ const nonConformitySchema = z.object({
 
 type NonConformityFormData = z.infer<typeof nonConformitySchema>;
 
+const MAX_CAPTURE_DIMENSION = 1600;
+
+type NonConformityAttachmentFormValue = { url: string };
+
+function getGovernedAttachmentReferences(
+  attachments?: Array<{ url: string }> | null,
+): string[] {
+  return (attachments || [])
+    .map((attachment) => attachment.url)
+    .filter((url) => Boolean(parseGovernedNcAttachmentReference(url)));
+}
+
+function getLegacyAttachmentReferences(
+  attachments?: string[] | null,
+): string[] {
+  return (attachments || [])
+    .filter((url) => url.trim().length > 0)
+    .filter((url) => !parseGovernedNcAttachmentReference(url));
+}
+
+export function toNcAttachmentFormValues(
+  attachments?: string[] | null,
+): NonConformityAttachmentFormValue[] {
+  return (attachments || [])
+    .filter((url) => url.trim().length > 0)
+    .map((url) => ({ url }));
+}
+
+/**
+ * Only governed references and legacy references returned by the API can be
+ * persisted. This preserves older records without re-enabling manual URLs.
+ */
+export function getNcAttachmentReferencesForSave(
+  attachments: NonConformityAttachmentFormValue[] | null | undefined,
+  legacyAttachmentReferences: ReadonlySet<string>,
+): string[] {
+  return (attachments || [])
+    .map((attachment) => attachment.url)
+    .filter(
+      (url) =>
+        Boolean(parseGovernedNcAttachmentReference(url)) ||
+        legacyAttachmentReferences.has(url),
+    );
+}
+
+export function isCurrentNcAttachmentContext(
+  request: {
+    tenantGeneration: number;
+    companyId: string;
+    nonConformityId: string;
+  },
+  current: {
+    tenantGeneration: number;
+    companyId: string;
+    nonConformityId: string | undefined;
+  },
+): boolean {
+  return (
+    request.tenantGeneration === current.tenantGeneration &&
+    request.companyId === current.companyId &&
+    request.nonConformityId === current.nonConformityId
+  );
+}
+
+function createDefaultNonConformityFormValues(prefilledChecklistId: string) {
+  return {
+    data_identificacao: new Date().toISOString().split("T")[0],
+    tipo: "Menor",
+    risco_nivel: "Baixo",
+    status: NcStatus.ABERTA,
+    acao_imediata_status: "Não implementada",
+    verificacao_resultado: "Não",
+    classificacao: [],
+    risco_consequencias: [],
+    causa: [],
+    anexos: [],
+    checklist_id: prefilledChecklistId || undefined,
+  };
+}
+
 interface NonConformityFormProps {
   id?: string;
 }
@@ -105,7 +200,6 @@ interface NonConformityFormProps {
 function isImageAttachment(url?: string) {
   const normalized = String(url || "").trim().toLowerCase();
   return (
-    normalized.startsWith("data:image/") ||
     normalized.endsWith(".png") ||
     normalized.endsWith(".jpg") ||
     normalized.endsWith(".jpeg") ||
@@ -163,112 +257,390 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
   const canManageNc = hasPermission(Permission.CAN_MANAGE_NC);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const [online, setOnline] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState(
     () => selectedTenantStore.get()?.companyId || sessionStore.get()?.companyId || "",
   );
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [loadedStatus, setLoadedStatus] = useState<NcStatus | null>(null);
   const [generatingFinalPdf, setGeneratingFinalPdf] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const [sophiePreview, setSophiePreview] = useState<SophieNcPreview | null>(null);
   const [uploadingGovernedAttachment, setUploadingGovernedAttachment] =
     useState(false);
+  const [removingAttachmentIndex, setRemovingAttachmentIndex] = useState<
+    number | null
+  >(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cameraCancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
   const governedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const activeCompanyIdRef = useRef(activeCompanyId);
+  const tenantGenerationRef = useRef(0);
+  const attachmentMutationRequestIdRef = useRef(0);
+  const legacyAttachmentReferencesRef = useRef<ReadonlySet<string>>(new Set());
+  const pendingLegacyAttachmentRemovalsRef = useRef<ReadonlySet<string>>(
+    new Set(),
+  );
 
   const {
     register,
     handleSubmit,
-    control,
     reset,
     trigger,
     setFocus,
+    setValue,
     watch,
     formState: { errors, isValid, isSubmitting },
   } = useForm<NonConformityFormData>({
     resolver: zodResolver(nonConformitySchema),
     mode: "onBlur",
     reValidateMode: "onBlur",
-    defaultValues: {
-      data_identificacao: new Date().toISOString().split("T")[0],
-      tipo: "Menor",
-      risco_nivel: "Baixo",
-      status: NcStatus.ABERTA,
-      acao_imediata_status: "Não implementada",
-      verificacao_resultado: "Não",
-      classificacao: [],
-      risco_consequencias: [],
-      causa: [],
-      anexos: [],
-      checklist_id: prefilledChecklistId || undefined,
-    },
+    defaultValues: createDefaultNonConformityFormValues(prefilledChecklistId),
   });
 
-  const {
-    fields: anexosFields,
-    append: appendAnexo,
-    remove: removeAnexo,
-    replace: replaceAnexos,
-  } = useFieldArray({
-    control,
-    name: "anexos",
-  });
   const watchedAnexos = watch("anexos") || [];
+  const isClosedNc = loadedStatus === NcStatus.ENCERRADA;
+  const isMutatingAttachments =
+    uploadingGovernedAttachment || removingAttachmentIndex !== null;
+
+  const setAttachmentFormValues = (attachments: string[]) => {
+    legacyAttachmentReferencesRef.current = new Set(
+      getLegacyAttachmentReferences(attachments),
+    );
+    setValue(
+      "anexos",
+      toNcAttachmentFormValues(
+        attachments.filter(
+          (attachment) =>
+            !pendingLegacyAttachmentRemovalsRef.current.has(attachment),
+        ),
+      ),
+      { shouldDirty: false, shouldValidate: true },
+    );
+  };
 
   const currentValues = watch();
+  const autosaveValues: NonConformityFormData = {
+    ...currentValues,
+    // Referências legadas podem ser URLs privadas; o rascunho local mantém
+    // apenas os identificadores governados e a fonte original segue no servidor.
+    anexos: getGovernedAttachmentReferences(currentValues.anexos).map((url) => ({
+      url,
+    })),
+  };
   const { hasDraft, restoreDraft, discardDraft, clearDraft } =
     useFormAutosave<NonConformityFormData>({
-      formId: id ? `edit-${id}` : "new-nc",
-      currentValues,
+      formId: `${activeCompanyId || "session"}.${id ? `edit-${id}` : "new-nc"}`,
+      currentValues: autosaveValues,
+      enabled: canManageNc && online && !isClosedNc,
       onRestore: (draft) => {
-        reset(draft);
-        if (draft.anexos) {
-          replaceAnexos(draft.anexos);
-        }
+        const legacyAttachments = Array.from(
+          legacyAttachmentReferencesRef.current,
+        ).filter(
+          (attachment) =>
+            !pendingLegacyAttachmentRemovalsRef.current.has(attachment),
+        );
+        reset({
+          ...draft,
+          status: id
+            ? loadedStatus ?? normalizeNcStatus(draft.status)
+            : NcStatus.ABERTA,
+          anexos: toNcAttachmentFormValues([
+            ...legacyAttachments,
+            ...getGovernedAttachmentReferences(draft.anexos),
+          ]),
+        });
       },
     });
 
+  const formIsReadOnly = !canManageNc || !online || isClosedNc;
+
+  useEffect(() => {
+    const updateOnlineStatus = () => setOnline(navigator.onLine);
+    updateOnlineStatus();
+    window.addEventListener("online", updateOnlineStatus);
+    window.addEventListener("offline", updateOnlineStatus);
+    return () => {
+      window.removeEventListener("online", updateOnlineStatus);
+      window.removeEventListener("offline", updateOnlineStatus);
+    };
+  }, []);
+
+  const requireNcAction = (action: NonConformityOfflineAction): string | null => {
+    try {
+      assertNonConformityActionAvailable(action, online);
+      return null;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Esta ação exige conexão.";
+      toast.error(message);
+      return message;
+    }
+  };
+
+  const releaseCamera = useCallback(() => {
+    const stream = cameraStreamRef.current ||
+      (videoRef.current?.srcObject as MediaStream | null);
+    stream?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraReady(false);
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    releaseCamera();
+    setIsCameraOpen(false);
+  }, [releaseCamera]);
+
   const startCamera = async () => {
+    if (!id) {
+      toast.info("Salve a não conformidade primeiro para capturar e enviar a foto ao storage oficial.");
+      return;
+    }
+    if (!canManageNc || isClosedNc) {
+      toast.error("Não é possível anexar evidências a uma não conformidade em modo somente leitura.");
+      return;
+    }
+    if (requireNcAction("upload")) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast.error("A câmera não é suportada neste navegador.");
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      cameraStreamRef.current = stream;
+      setCameraReady(false);
       setIsCameraOpen(true);
     } catch {
       toast.error("Não foi possível acessar a câmera.");
     }
   };
 
-  const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach((t) => t.stop());
-      videoRef.current.srcObject = null;
+  useEffect(() => {
+    if (!isCameraOpen) {
+      return;
     }
-    setIsCameraOpen(false);
-  };
 
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 800;
-      canvas.height = video.videoHeight || 600;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-        appendAnexo({ url: dataUrl });
-        toast.success("Foto capturada e adicionada aos anexos");
+    const video = videoRef.current;
+    if (video && cameraStreamRef.current) {
+      video.srcObject = cameraStreamRef.current;
+      void video.play().catch(() => undefined);
+    }
+
+    return () => {
+      releaseCamera();
+    };
+  }, [isCameraOpen, releaseCamera]);
+
+  const uploadGovernedAttachment = async (
+    file: File,
+    source: "arquivo" | "foto",
+  ): Promise<boolean> => {
+    if (!id) {
+      toast.info("Salve a não conformidade primeiro para anexar evidências no storage oficial.");
+      return false;
+    }
+    if (!canManageNc || isClosedNc) {
+      toast.error("Não é possível anexar evidências a uma não conformidade em modo somente leitura.");
+      return false;
+    }
+    if (requireNcAction("upload")) return false;
+
+    const attachmentMutationRequestId =
+      attachmentMutationRequestIdRef.current + 1;
+    attachmentMutationRequestIdRef.current = attachmentMutationRequestId;
+    const uploadContext = {
+      tenantGeneration: tenantGenerationRef.current,
+      companyId: activeCompanyIdRef.current,
+      nonConformityId: id,
+    };
+    const isSameUploadContext = () =>
+      isCurrentNcAttachmentContext(uploadContext, {
+        tenantGeneration: tenantGenerationRef.current,
+        companyId: activeCompanyIdRef.current,
+        nonConformityId: id,
+      });
+    const canApplyUploadResult = () =>
+      attachmentMutationRequestId === attachmentMutationRequestIdRef.current &&
+      isSameUploadContext();
+
+    try {
+      setUploadingGovernedAttachment(true);
+      const result = await nonConformitiesService.attachAttachment(id, file);
+      if (!canApplyUploadResult()) {
+        if (!isSameUploadContext()) {
+          toast.info(
+            "O anexo foi salvo no contexto anterior e não será exibido nesta tela após a troca de empresa ou de registro.",
+          );
+        }
+        return false;
+      }
+
+      setAttachmentFormValues(result.attachments);
+      toast.success(
+        source === "foto"
+          ? "Foto capturada e salva no storage oficial."
+          : "Anexo governado salvo com sucesso.",
+      );
+      if (result.message) {
+        toast.info(result.message);
+      }
+      return true;
+    } catch (error) {
+      logger.error("Erro ao anexar evidência governada:", error);
+      if (canApplyUploadResult()) {
+        toast.error("Não foi possível salvar o anexo governado.");
+      }
+      return false;
+    } finally {
+      if (canApplyUploadResult()) {
+        setUploadingGovernedAttachment(false);
       }
     }
-    stopCamera();
+  };
+
+  const removeGovernedAttachment = async (index: number, url: string) => {
+    if (!id) {
+      return;
+    }
+    if (!canManageNc || isClosedNc) {
+      toast.error(
+        "Não é possível remover evidências de uma não conformidade em modo somente leitura.",
+      );
+      return;
+    }
+    if (requireNcAction("remove")) return;
+
+    const attachmentMutationRequestId =
+      attachmentMutationRequestIdRef.current + 1;
+    attachmentMutationRequestIdRef.current = attachmentMutationRequestId;
+    const mutationContext = {
+      tenantGeneration: tenantGenerationRef.current,
+      companyId: activeCompanyIdRef.current,
+      nonConformityId: id,
+    };
+    const isSameMutationContext = () =>
+      isCurrentNcAttachmentContext(mutationContext, {
+        tenantGeneration: tenantGenerationRef.current,
+        companyId: activeCompanyIdRef.current,
+        nonConformityId: id,
+      });
+    const canApplyMutationResult = () =>
+      attachmentMutationRequestId === attachmentMutationRequestIdRef.current &&
+      isSameMutationContext();
+
+    try {
+      setRemovingAttachmentIndex(index);
+      const persistedNc = await nonConformitiesService.findOne(id);
+      if (!canApplyMutationResult()) {
+        return;
+      }
+
+      const persistedIndex = (persistedNc.anexos || []).findIndex(
+        (attachment) => attachment === url,
+      );
+      if (persistedIndex < 0) {
+        toast.warning(
+          "Esse anexo já não está disponível para remoção. Recarregue a não conformidade.",
+        );
+        return;
+      }
+
+      const result = await nonConformitiesService.removeAttachment(
+        id,
+        persistedIndex,
+      );
+      if (!canApplyMutationResult()) {
+        return;
+      }
+
+      setAttachmentFormValues(result.attachments);
+      if (result.storageCleanup === "pending") {
+        toast.warning(result.message);
+      } else {
+        toast.success(result.message);
+      }
+    } catch (error) {
+      logger.error("Erro ao remover anexo governado:", error);
+      if (canApplyMutationResult()) {
+        toast.error("Não foi possível remover o anexo governado.");
+      }
+    } finally {
+      if (canApplyMutationResult()) {
+        setRemovingAttachmentIndex(null);
+      }
+    }
+  };
+
+  const handleRemoveAttachment = (index: number, url: string) => {
+    if (isMutatingAttachments) {
+      return;
+    }
+
+    if (parseGovernedNcAttachmentReference(url)) {
+      void removeGovernedAttachment(index, url);
+      return;
+    }
+
+    pendingLegacyAttachmentRemovalsRef.current = new Set([
+      ...pendingLegacyAttachmentRemovalsRef.current,
+      url,
+    ]);
+    setValue(
+      "anexos",
+      watchedAnexos.filter(
+        (_attachment, attachmentIndex) => attachmentIndex !== index,
+      ),
+      { shouldDirty: true, shouldValidate: true },
+    );
+    toast.info(
+      "Este anexo legado será removido quando a não conformidade for salva.",
+    );
+  };
+
+  const capturePhoto = async () => {
+    if (!cameraReady || !videoRef.current || !canvasRef.current) {
+      toast.info("Aguarde a prévia da câmera ficar pronta antes de capturar.");
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const largestDimension = Math.max(1, video.videoWidth, video.videoHeight);
+    const scale = Math.min(1, MAX_CAPTURE_DIMENSION / largestDimension);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    const context = canvas.getContext("2d");
+    if (!context) {
+      toast.error("Não foi possível processar a foto capturada.");
+      return;
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.8);
+    });
+    if (!blob) {
+      toast.error("Não foi possível preparar a foto para o upload governado.");
+      return;
+    }
+
+    const file = new File(
+      [blob],
+      `evidencia-nc-${Date.now()}.jpg`,
+      { type: blob.type || "image/jpeg" },
+    );
+    if (await uploadGovernedAttachment(file, "foto")) {
+      stopCamera();
+    }
   };
 
   const handleGovernedAttachmentUpload = async (
@@ -279,33 +651,9 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       return;
     }
 
-    if (!id) {
-      toast.info(
-        "Salve a não conformidade primeiro para anexar evidências no storage oficial.",
-      );
-      event.target.value = "";
-      return;
-    }
-
-    if (!canManageNc) {
-      toast.error("Você não tem permissão para anexar evidências nesta NC.");
-      event.target.value = "";
-      return;
-    }
-
     try {
-      setUploadingGovernedAttachment(true);
-      const result = await nonConformitiesService.attachAttachment(id, file);
-      replaceAnexos(result.attachments.map((url) => ({ url })));
-      toast.success("Anexo governado salvo com sucesso.");
-      if (result.message) {
-        toast.info(result.message);
-      }
-    } catch (error) {
-      logger.error("Erro ao anexar evidência governada:", error);
-      toast.error("Não foi possível salvar o anexo governado.");
+      await uploadGovernedAttachment(file, "arquivo");
     } finally {
-      setUploadingGovernedAttachment(false);
       event.target.value = "";
     }
   };
@@ -319,6 +667,11 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       toast.error("Você não tem permissão para gerar o PDF oficial desta NC.");
       return;
     }
+    if (loadedStatus !== NcStatus.ENCERRADA) {
+      toast.info("O PDF oficial só pode ser emitido após o encerramento da não conformidade.");
+      return;
+    }
+    if (requireNcAction("generate-pdf")) return;
 
     try {
       setGeneratingFinalPdf(true);
@@ -380,15 +733,38 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
 
   useEffect(() => {
     const unsubscribe = selectedTenantStore.subscribe((tenant) => {
-      setActiveCompanyId(tenant?.companyId || sessionStore.get()?.companyId || "");
+      const nextCompanyId =
+        tenant?.companyId || sessionStore.get()?.companyId || "";
+      if (nextCompanyId === activeCompanyIdRef.current) {
+        return;
+      }
+
+      tenantGenerationRef.current += 1;
+      attachmentMutationRequestIdRef.current += 1;
+      activeCompanyIdRef.current = nextCompanyId;
+      legacyAttachmentReferencesRef.current = new Set();
+      pendingLegacyAttachmentRemovalsRef.current = new Set();
+      stopCamera();
+      setUploadingGovernedAttachment(false);
+      setRemovingAttachmentIndex(null);
+      setActiveCompanyId(nextCompanyId);
+      setFetching(true);
+      setSites([]);
+      setSubmitError(null);
+      setLoadedStatus(null);
+      setSophiePreview(null);
+      reset(createDefaultNonConformityFormValues(prefilledChecklistId));
     });
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [prefilledChecklistId, reset, stopCamera]);
 
   useEffect(() => {
     const loadData = async () => {
+      const tenantGeneration = tenantGenerationRef.current;
+      const tenantAtRequest = activeCompanyId;
+      setFetching(true);
       try {
         const sitesPromise = activeCompanyId
           ? sitesService.findPaginated({
@@ -406,6 +782,13 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           nonConformityPromise,
         ]);
 
+        if (
+          tenantGeneration !== tenantGenerationRef.current ||
+          tenantAtRequest !== activeCompanyIdRef.current
+        ) {
+          return;
+        }
+
         setSites(sitesPage.data);
         if (sitesPage.lastPage > 1) {
           toast.warning(
@@ -416,6 +799,10 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         if (nonConformity) {
           const currentStatus = normalizeNcStatus(nonConformity.status);
           setLoadedStatus(currentStatus);
+          pendingLegacyAttachmentRemovalsRef.current = new Set();
+          legacyAttachmentReferencesRef.current = new Set(
+            getLegacyAttachmentReferences(nonConformity.anexos),
+          );
           reset({
             ...nullsToUndefined(nonConformity as unknown as Record<string, unknown>),
             checklist_id: nonConformity.checklist_id ?? undefined,
@@ -426,7 +813,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             acao_definitiva_data_prevista:
               toInputDateValue(nonConformity.acao_definitiva_data_prevista) || undefined,
             verificacao_data: toInputDateValue(nonConformity.verificacao_data) || undefined,
-            anexos: (nonConformity.anexos || []).map((url) => ({ url })),
+            anexos: toNcAttachmentFormValues(nonConformity.anexos),
           });
           // react-hook-form com resolver (zod) não computa formState.isValid
           // automaticamente após reset() — só roda validação em resposta a
@@ -436,10 +823,22 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           await trigger();
         }
       } catch (error) {
+        if (
+          tenantGeneration !== tenantGenerationRef.current ||
+          tenantAtRequest !== activeCompanyIdRef.current
+        ) {
+          return;
+        }
         logger.error("Error loading data:", error);
-        toast.error("Erro ao carregar dados");
+        setSubmitError("Não foi possível carregar os dados da não conformidade.");
+        toast.error("Erro ao carregar dados da não conformidade");
       } finally {
-        setFetching(false);
+        if (
+          tenantGeneration === tenantGenerationRef.current &&
+          tenantAtRequest === activeCompanyIdRef.current
+        ) {
+          setFetching(false);
+        }
       }
     };
 
@@ -463,31 +862,40 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       toast.error("Você não tem permissão para salvar esta não conformidade.");
       return;
     }
+    if (isClosedNc) {
+      toast.info(
+        "Esta não conformidade está encerrada e não pode ser alterada pelo formulário.",
+      );
+      return;
+    }
+
+    const offlineMessage = requireNcAction(id ? "update" : "create");
+    if (offlineMessage) {
+      setSubmitError(offlineMessage);
+      return;
+    }
 
     setLoading(true);
     setSubmitError(null);
     try {
+      const attachmentReferences = getNcAttachmentReferencesForSave(
+        data.anexos,
+        legacyAttachmentReferencesRef.current,
+      );
       const payload = {
         ...data,
-        anexos: data.anexos?.map((item) => item.url),
+        status: id
+          ? loadedStatus ?? normalizeNcStatus(data.status)
+          : NcStatus.ABERTA,
+        anexos: attachmentReferences,
         checklist_id: prefilledChecklistId || data.checklist_id || undefined,
       };
 
       if (id) {
-        const updated = await nonConformitiesService.update(id, payload);
-        await attachPdfIfProvided(
-          updated.id,
-          pdfFile,
-          nonConformitiesService.attachFile,
-        );
+        await nonConformitiesService.update(id, payload);
         toast.success("Não conformidade atualizada com sucesso");
       } else {
-        const created = await nonConformitiesService.create(payload);
-        await attachPdfIfProvided(
-          created.id,
-          pdfFile,
-          nonConformitiesService.attachFile,
-        );
+        await nonConformitiesService.create(payload);
         toast.success("Não conformidade criada com sucesso");
       }
       await clearDraft();
@@ -572,17 +980,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
 
   const tiposNc = ["Crítica", "Maior", "Menor"];
   const niveisRisco = ["Baixo", "Médio", "Alto", "Crítico"];
-  // Em edição, o status só pode ficar como está ou seguir para uma transição
-  // permitida (mesma regra de ALLOWED_TRANSITIONS aplicada no backend e já
-  // usada no combo "Mover status" da listagem) — evita que o formulário
-  // completo deixe o usuário pular etapas do fluxo (ex.: Aberta -> Encerrada
-  // direto) e só descobrir isso com um erro 422 ao salvar. Em criação (sem
-  // NC carregada ainda) todas as opções seguem disponíveis.
-  const statusOptions = loadedStatus
-    ? Array.from(
-        new Set([loadedStatus, ...(NC_ALLOWED_TRANSITIONS[loadedStatus] || [])]),
-      )
-    : Object.values(NcStatus);
   const statusAcao = ["Implementada", "Em andamento", "Não implementada"];
   const resultadoEficacia = ["Sim", "Parcialmente", "Não"];
 
@@ -591,7 +988,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       onSubmit={handleSubmit(onSubmit, onInvalid)}
       className="ds-form-page space-y-8 pb-12"
     >
-      {hasDraft && !fetching ? (
+      {hasDraft && !fetching && !formIsReadOnly ? (
         <InlineCallout
           title="Rascunho não salvo encontrado"
           description="Existe um rascunho salvo localmente para este formulário de Não Conformidade. Deseja recuperar os dados preenchidos anteriormente?"
@@ -599,10 +996,10 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           icon={<Save className="h-4 w-4" />}
           action={
             <div className="flex gap-2">
-              <Button size="sm" variant="primary" onClick={restoreDraft}>
+              <Button type="button" size="sm" variant="primary" onClick={restoreDraft}>
                 Recuperar
               </Button>
-              <Button size="sm" variant="outline" onClick={discardDraft}>
+              <Button type="button" size="sm" variant="outline" onClick={discardDraft}>
                 Descartar
               </Button>
             </div>
@@ -631,8 +1028,8 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             <StatusPill tone={id ? "warning" : "success"}>
               {id ? "Edição" : "Novo cadastro"}
             </StatusPill>
-            <StatusPill tone={canManageNc ? "success" : "warning"}>
-              {canManageNc ? "Edição liberada" : "Somente leitura"}
+            <StatusPill tone={canManageNc && !isClosedNc ? "success" : "warning"}>
+              {canManageNc && !isClosedNc ? "Edição liberada" : "Somente leitura"}
             </StatusPill>
           </div>
         }
@@ -666,7 +1063,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             { n: 9, label: "Ação Preventiva", anchor: "secao-9" },
             { n: 10, label: "Verificação", anchor: "secao-10" },
             { n: 11, label: "Status", anchor: "secao-11" },
-            { n: 12, label: "Anexos", anchor: "secao-12" },
+            { n: 12, label: "Observações e anexos", anchor: "secao-12" },
             { n: 13, label: "Assinaturas", anchor: "secao-13" },
           ] as const).map(({ n, label, anchor }) => (
             <li key={n} className="flex shrink-0 items-center">
@@ -696,6 +1093,22 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             Você está em modo somente leitura para não conformidades. Edição e emissão final exigem a permissão <code>{Permission.CAN_MANAGE_NC}</code>.
           </p>
         </div>
+      ) : null}
+      {isClosedNc ? (
+        <InlineCallout
+          tone="info"
+          icon={<ShieldAlert className="h-4 w-4" />}
+          title="Não conformidade encerrada"
+          description="Os dados, assinaturas e evidências desta NC permanecem em somente leitura. A eventual mudança de status é feita exclusivamente na listagem."
+        />
+      ) : null}
+      {!online ? (
+        <InlineCallout
+          tone="warning"
+          icon={<ShieldAlert className="h-4 w-4" />}
+          title="Não conformidades exigem conexão"
+          description="Os dados já carregados continuam visíveis, mas criar, editar, anexar evidências, alterar status e emitir o PDF oficial só podem ser feitos online. Nenhuma alteração será colocada em fila."
+        />
       ) : null}
       {submitError && (
         <div
@@ -784,14 +1197,18 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               <div className="mt-3 grid gap-3 md:grid-cols-3">
                 {sophiePreview.evidenceAttachments.map((item, index) => {
                   const safeEvidenceUrl = safeExternalArtifactUrl(item.url);
+                  const previewEvidenceUrl =
+                    safeEvidenceUrl && shouldRenderInlineImagePreview(safeEvidenceUrl)
+                      ? safeEvidenceUrl
+                      : null;
                   return (
                     <div
                       key={`${item.url}-${index}`}
                       className="overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-white/80"
                     >
-                      {safeEvidenceUrl && shouldRenderInlineImagePreview(safeEvidenceUrl) ? (
+                      {previewEvidenceUrl ? (
                       <Image
-                        src={safeEvidenceUrl}
+                        src={previewEvidenceUrl}
                         alt={item.label}
                         width={400}
                         height={160}
@@ -826,6 +1243,11 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           ) : null}
         </div>
       ) : null}
+      <fieldset
+        disabled={formIsReadOnly}
+        aria-readonly={formIsReadOnly}
+        className="contents border-0 p-0"
+      >
       <div id="secao-1" className="sst-card p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           1. Identificação da Não Conformidade
@@ -980,47 +1402,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               </p>
             )}
           </div>
-          <div className="md:col-span-2">
-            <label
-              htmlFor="nc-pdf-file"
-              className="mb-2 block text-sm font-bold text-[var(--ds-color-text-secondary)]"
-            >
-              Anexar PDF da NC (opcional)
-            </label>
-            <input
-              id="nc-pdf-file"
-              type="file"
-              accept="application/pdf"
-              aria-label="Selecionar PDF da não conformidade"
-              onChange={(event) => setPdfFile(event.target.files?.[0] || null)}
-              className="w-full rounded-md border px-3 py-2 text-sm file:mr-4 file:rounded-md file:border-0 file:bg-[var(--ds-color-surface-muted)] file:px-3 file:py-1.5 file:font-semibold file:text-[var(--ds-color-text-secondary)] hover:file:bg-[var(--ds-color-primary-subtle)]"
-            />
-          </div>
-          {id && (
-            <div className="md:col-span-1">
-              <label className="mb-2 block text-sm font-bold text-[var(--ds-color-text-secondary)]">
-                PDF oficial gerado pelo sistema
-              </label>
-              <button
-                type="button"
-                onClick={handleGenerateFinalPdf}
-                disabled={generatingFinalPdf || !canManageNc}
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-[var(--ds-color-action-primary)] bg-[var(--ds-color-action-primary)] px-3 py-2 text-sm font-medium text-[var(--ds-color-action-primary-foreground)] hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-60"
-              >
-                {generatingFinalPdf ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Gerando...</span>
-                  </>
-                ) : (
-                  <span>Gerar PDF oficial</span>
-                )}
-              </button>
-              <p className="mt-1 text-xs text-[var(--ds-color-text-secondary)]">
-                Monta o PDF com todos os dados preenchidos (descrição, riscos, ações e fotos).
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -1544,28 +1925,61 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           11. Status da Não Conformidade
         </h2>
-        <Select
-          {...register("status")}
-          hasError={!!errors.status}
-        >
-          {statusOptions.map((item) => (
-            <option key={item} value={item}>
-              {NC_STATUS_LABEL[item]}
-            </option>
-          ))}
-        </Select>
+        <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-3 py-2.5 text-sm font-semibold text-[var(--ds-color-text-primary)]">
+          {NC_STATUS_LABEL[loadedStatus || NcStatus.ABERTA]}
+        </div>
         {errors.status && (
           <p className="mt-1 text-xs text-[var(--ds-color-danger)]">{errors.status.message}</p>
         )}
+        <p className="mt-2 text-xs text-[var(--ds-color-text-secondary)]">
+          {id
+            ? "A mudança de status é feita exclusivamente na listagem."
+            : "Novas não conformidades são criadas sempre com o status Aberta."}
+        </p>
       </div>
+      </fieldset>
+
+      {id ? (
+        <div className="sst-card p-6">
+          <h2 className="mb-2 text-lg font-bold text-[var(--ds-color-text-primary)]">
+            Documento oficial
+          </h2>
+          {loadedStatus === NcStatus.ENCERRADA ? (
+            <button
+              type="button"
+              onClick={handleGenerateFinalPdf}
+              disabled={generatingFinalPdf || !canManageNc || !online}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-[var(--ds-color-action-primary)] bg-[var(--ds-color-action-primary)] px-3 py-2 text-sm font-medium text-[var(--ds-color-action-primary-foreground)] hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-60"
+            >
+              {generatingFinalPdf ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Gerando...</span>
+                </>
+              ) : (
+                <span>Emitir PDF oficial</span>
+              )}
+            </button>
+          ) : (
+            <p className="rounded-md border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-3 py-2 text-sm text-[var(--ds-color-text-secondary)]">
+              O PDF oficial fica disponível após o encerramento da não conformidade.
+            </p>
+          )}
+          <p className="mt-2 text-xs text-[var(--ds-color-text-secondary)]">
+            A emissão usa os dados registrados. Até 24 fotos podem ser incorporadas dentro do orçamento total de 8 MB; itens excedentes são relacionados no PDF.
+          </p>
+        </div>
+      ) : null}
 
       <div id="secao-12" className="sst-card p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
-          12. Observações Gerais
+          12. Observações e Anexos
         </h2>
         <Textarea
           {...register("observacoes_gerais")}
           rows={3}
+          aria-label="Observações gerais"
+          disabled={formIsReadOnly}
         />
         <div className="mt-4">
           <div className="mb-2 flex items-center justify-between">
@@ -1573,34 +1987,21 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               Fotos / registros anexos
             </label>
             <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => appendAnexo({ url: "" })}
-                disabled={!canManageNc}
-                className="flex items-center space-x-2 text-sm font-medium text-[var(--ds-color-text-primary)] hover:text-[var(--ds-color-text-primary)]"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Adicionar URL</span>
-              </button>
               <input
                 ref={governedAttachmentInputRef}
                 type="file"
                 accept=".pdf,image/png,image/jpeg,image/webp"
                 className="hidden"
                 onChange={handleGovernedAttachmentUpload}
+                disabled={formIsReadOnly}
               />
               <button
                 type="button"
                 onClick={() => {
-                  if (!id) {
-                    toast.info(
-                      "Salve a não conformidade primeiro para anexar arquivos governados.",
-                    );
-                    return;
-                  }
                   governedAttachmentInputRef.current?.click();
                 }}
-                disabled={!canManageNc || uploadingGovernedAttachment}
+                disabled={formIsReadOnly || !id || isMutatingAttachments}
+                title={!id ? "Salve a não conformidade antes de anexar evidências." : undefined}
                 className="inline-flex items-center space-x-2 rounded-md border border-[var(--ds-color-success-border)] bg-[var(--ds-color-success-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--ds-color-text-primary)] hover:bg-[var(--ds-color-success-subtle)] disabled:opacity-60"
               >
                 {uploadingGovernedAttachment ? (
@@ -1616,7 +2017,8 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             <button
               type="button"
               onClick={startCamera}
-              disabled={!canManageNc}
+              disabled={formIsReadOnly || !id || isMutatingAttachments}
+              title={!id ? "Salve a não conformidade antes de capturar uma foto." : undefined}
               className="inline-flex items-center space-x-2 rounded-md border border-[var(--ds-color-border-default)] bg-[var(--ds-color-primary-subtle)] px-3 py-1.5 text-sm font-medium text-[var(--ds-color-text-primary)] hover:bg-[var(--ds-color-primary-subtle)]"
             >
               <Camera className="h-4 w-4" />
@@ -1624,11 +2026,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             </button>
           </div>
           <p className="mb-3 text-xs text-[var(--ds-color-text-muted)]">
-            Para evidência oficial, prefira o upload governado no storage da plataforma. URLs manuais e fotos capturadas aqui permanecem como exceção operacional; o backend aceita anexos inline apenas dentro do limite de 1 MB por anexo.
+            Evidências novas são aceitas apenas pelo upload governado no storage da plataforma. O PDF incorpora até 24 fotos, com orçamento total de 8 MB; itens excedentes são listados individualmente no documento. Novas URLs manuais e fotos inline não são aceitas.
           </p>
+          {id ? (
+            <p className="mb-3 text-xs text-[var(--ds-color-text-muted)]">
+              Uploads e remoções de anexos governados são efetivados imediatamente no storage oficial. Anexos legados, identificados na tela como arquivos já existentes, são removidos quando a não conformidade for salva.
+            </p>
+          ) : null}
           {!id ? (
             <p className="mb-3 text-xs text-[var(--ds-color-warning)]">
-              Salve a não conformidade primeiro para anexar arquivos governados. Antes disso, apenas URL manual ou captura inline ficam disponíveis.
+              Salve a não conformidade primeiro para habilitar o upload e a captura de foto com armazenamento governado.
             </p>
           ) : null}
           <div className="space-y-2">
@@ -1637,6 +2044,10 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
                 {watchedAnexos.map((item, index) => {
                   const url = String(item?.url || "");
                   const safeAttachmentUrl = safeExternalArtifactUrl(url);
+                  const previewAttachmentUrl =
+                    safeAttachmentUrl && shouldRenderInlineImagePreview(safeAttachmentUrl)
+                      ? safeAttachmentUrl
+                      : null;
                   const governedAttachment =
                     parseGovernedNcAttachmentReference(url);
                   const previewLabel =
@@ -1654,9 +2065,9 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
                       key={`${url}-${index}`}
                       className="overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
                     >
-                      {safeAttachmentUrl && shouldRenderInlineImagePreview(safeAttachmentUrl) ? (
+                      {previewAttachmentUrl ? (
                         <Image
-                          src={safeAttachmentUrl}
+                          src={previewAttachmentUrl}
                           alt={previewLabel}
                           width={400}
                           height={128}
@@ -1683,6 +2094,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
                           <button
                             type="button"
                             onClick={() => void handleOpenGovernedAttachment(index, url)}
+                            aria-label={`Abrir anexo governado: ${previewLabel}`}
                             className="mt-2 inline-flex text-[11px] font-semibold text-[var(--ds-color-action-primary)] hover:underline"
                           >
                             Abrir anexo governado
@@ -1697,99 +2109,78 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
                             Abrir anexo
                           </a>
                         ) : null}
+                        {!formIsReadOnly ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveAttachment(index, url)}
+                            disabled={isMutatingAttachments}
+                            className="mt-2 inline-flex text-[11px] font-semibold text-[var(--ds-color-danger)] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {removingAttachmentIndex === index
+                              ? "Removendo..."
+                              : "Remover anexo"}
+                          </button>
+                        ) : null}
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : null}
-            {anexosFields.map((field, index) => {
-              const currentValue = String(watchedAnexos[index]?.url || "");
-              const governedAttachment =
-                parseGovernedNcAttachmentReference(currentValue);
-
-              return (
-                <div key={field.id} className="flex items-center space-x-2">
-                  {governedAttachment ? (
-                    <div className="flex flex-1 items-center justify-between rounded-md border border-[var(--ds-color-success-border)] bg-[var(--ds-color-success-subtle)] px-3 py-2 text-sm text-[var(--ds-color-success)]">
-                      <div>
-                        <p className="font-medium">{governedAttachment.originalName}</p>
-                        <p className="text-xs text-[var(--ds-color-success)]">
-                          Anexo governado salvo no storage oficial.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => void handleOpenGovernedAttachment(index, currentValue)}
-                        className="text-xs font-semibold text-[var(--ds-color-action-primary)] hover:underline"
-                      >
-                        Abrir
-                      </button>
-                    </div>
-                  ) : (
-                    <Input
-                      {...register(`anexos.${index}.url` as const)}
-                      className="flex-1"
-                      placeholder="URL ou identificação do anexo"
-                    />
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeAnexo(index)}
-                    disabled={!canManageNc}
-                    className="rounded-md p-2 text-[var(--ds-color-text-muted)] hover:bg-[var(--ds-color-danger-subtle)] hover:text-[var(--ds-color-danger)]"
-                    title="Remover anexo"
-                    aria-label={`Remover anexo ${index + 1}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              );
-            })}
           </div>
 
         </div>
       </div>
 
-      {isCameraOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-lg rounded-lg bg-white p-4 shadow-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                Capturar foto
-              </h3>
-              <button
-                type="button"
-                onClick={stopCamera}
-                className="rounded-md p-2 text-[var(--ds-color-text-muted)] hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-primary)]"
-                aria-label="Fechar"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="mb-3 overflow-hidden rounded-lg border">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                className="h-64 w-full bg-black"
-              />
-              <canvas ref={canvasRef} className="hidden" />
-            </div>
-            <div className="flex items-center justify-end space-x-2">
-              <button
-                type="button"
-                onClick={capturePhoto}
-                className="inline-flex items-center space-x-2 rounded-md bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-[var(--ds-color-action-primary-foreground)] hover:bg-[var(--ds-color-action-primary-hover)]"
-              >
-                <Camera className="h-4 w-4" />
-                <span>Capturar</span>
-              </button>
-            </div>
+      <ModalFrame
+        isOpen={isCameraOpen}
+        onClose={stopCamera}
+        initialFocusRef={cameraCancelButtonRef}
+        shellClassName="w-[calc(100vw-2rem)] max-w-lg overflow-hidden p-0"
+      >
+        <ModalHeader
+          title="Capturar foto"
+          description="Revise a prévia e capture a evidência para enviá-la ao storage oficial."
+          icon={<Camera className="h-5 w-5" />}
+          onClose={stopCamera}
+        />
+        <ModalBody className="space-y-3">
+          <div className="overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-black">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              aria-label="Prévia da câmera"
+              onLoadedMetadata={() => setCameraReady(true)}
+              className="aspect-video max-h-[20rem] w-full bg-black object-cover"
+            />
+            <canvas ref={canvasRef} className="hidden" />
           </div>
-        </div>
-      )}
+        </ModalBody>
+        <ModalFooter>
+          <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              ref={cameraCancelButtonRef}
+              type="button"
+              variant="secondary"
+              onClick={stopCamera}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={() => void capturePhoto()}
+              disabled={!cameraReady || isMutatingAttachments}
+              leftIcon={<Camera className="h-4 w-4" />}
+            >
+              {uploadingGovernedAttachment ? "Enviando..." : "Capturar"}
+            </Button>
+          </div>
+        </ModalFooter>
+      </ModalFrame>
 
+      <fieldset disabled={formIsReadOnly} aria-readonly={formIsReadOnly} className="contents border-0 p-0">
       <div id="secao-13" className="sst-card p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           13. Assinaturas
@@ -1824,6 +2215,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           </div>
         </div>
       </div>
+      </fieldset>
 
       <div className="flex items-center justify-end space-x-3">
         <button
@@ -1835,7 +2227,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </button>
         <button
           type="submit"
-          disabled={loading || isSubmitting || !isValid || !canManageNc}
+          disabled={loading || isSubmitting || !isValid || formIsReadOnly}
           className="flex items-center space-x-2 rounded-lg bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-[var(--ds-color-action-primary-foreground)] hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-60"
         >
           {loading ? (

@@ -1,25 +1,14 @@
 "use client";
 
+import { useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { PenLine, Send, X } from "lucide-react";
 import type { Rdo } from "@/services/rdosService";
 import { safeToLocaleDateString } from "@/lib/date/safeFormat";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { formatCpfInput } from "@/lib/format/cpf";
 import type { RdoSignModalState } from "@/components/rdos/rdo-modal-types";
 
-function formatCpfInput(value: string) {
-  const digits = value.replace(/\D/g, "").slice(0, 11);
-  const parts = [
-    digits.slice(0, 3),
-    digits.slice(3, 6),
-    digits.slice(6, 9),
-    digits.slice(9, 11),
-  ].filter(Boolean);
-
-  if (parts.length === 1) return parts[0] ?? "";
-  if (parts.length === 2) return `${parts[0]}.${parts[1]}`;
-  if (parts.length === 3) return `${parts[0]}.${parts[1]}.${parts[2]}`;
-  return `${parts[0]}.${parts[1]}.${parts[2]}-${parts[3]}`;
-}
 
 type RdoActionModalsProps = {
   signModal: RdoSignModalState;
@@ -62,10 +51,22 @@ export function RdoActionModals({
   onSendEmail,
   formInputClassName,
 }: RdoActionModalsProps) {
+  const signDialogRef = useRef<HTMLDivElement>(null);
+  const emailDialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(signDialogRef, signModal !== null, () => setSignModal(null));
+  useFocusTrap(emailDialogRef, emailModal !== null, () => setEmailModal(null));
+
   return (
     <>
       {signModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div
+          ref={signDialogRef}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Assinar RDO"
+        >
           <div className="w-full max-w-sm rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">
@@ -170,7 +171,13 @@ export function RdoActionModals({
       )}
 
       {emailModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+        <div
+          ref={emailDialogRef}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Enviar RDO por e-mail"
+        >
           <div className="w-full max-w-sm rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">

@@ -9,12 +9,14 @@ interface UseFormAutosaveOptions<T> {
   formId: string;
   currentValues: T;
   onRestore: (draft: T) => void;
+  enabled?: boolean;
 }
 
 export function useFormAutosave<T>({
   formId,
   currentValues,
   onRestore,
+  enabled = true,
 }: UseFormAutosaveOptions<T>) {
   const [hasDraft, setHasDraft] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
@@ -25,10 +27,24 @@ export function useFormAutosave<T>({
 
   // Verifica se há rascunho salvo no IndexedDB seguro no mount
   useEffect(() => {
+    let cancelled = false;
+    if (!enabled) {
+      draftRef.current = null;
+      isFirstMount.current = true;
+      setHasDraft(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    draftRef.current = null;
+    isFirstMount.current = true;
+    setHasDraft(false);
+
     async function checkDraft() {
       try {
         const savedDraft = await secureOfflineDB.get<T>("sgs-cache", draftKey);
-        if (savedDraft) {
+        if (savedDraft && !cancelled) {
           draftRef.current = savedDraft;
           setHasDraft(true);
         }
@@ -37,11 +53,18 @@ export function useFormAutosave<T>({
       }
     }
     void checkDraft();
-  }, [draftKey]);
+    return () => {
+      cancelled = true;
+    };
+  }, [draftKey, enabled]);
 
   // Hook de Debounce para salvar rascunhos de forma assíncrona ao mudar os valores
   useEffect(() => {
     // Evita salvar no primeiro render/mount
+    if (!enabled) {
+      isFirstMount.current = true;
+      return;
+    }
     if (isFirstMount.current) {
       isFirstMount.current = false;
       return;
@@ -61,7 +84,7 @@ export function useFormAutosave<T>({
     }, 1500); // 1.5s debounce
 
     return () => clearTimeout(timer);
-  }, [currentValues, draftKey]);
+  }, [currentValues, draftKey, enabled]);
 
   // Restaura o rascunho na tela
   const restoreDraft = () => {

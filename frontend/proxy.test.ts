@@ -57,13 +57,11 @@ describe("buildCsp", () => {
 });
 
 describe("proxy auth routing", () => {
-  it("redireciona dashboard sem refresh_csrf para /login com redirect param", () => {
+  it("redireciona dashboard sem refresh_csrf para /login sem redirect param", () => {
     const response = proxy(makeRequest("/dashboard")) as ProxyResult;
 
     expect(response.kind).toBe("redirect");
-    expect(response.url).toBe(
-      "https://app.sgsseguranca.com.br/login?redirect=%2Fdashboard",
-    );
+    expect(response.url).toBe("https://app.sgsseguranca.com.br/login");
   });
 
   it("não bloqueia a página de login quando refresh_csrf está stale", () => {

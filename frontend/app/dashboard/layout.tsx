@@ -78,10 +78,10 @@ function DashboardShell({
   }, []);
 
   useEffect(() => {
-    if (!loading && user && isAdminGeral && !selectedTenantStore.get()) {
+    if (!loading && user && isAdminGeral && !selectedTenant) {
       setSelectorOpen(true);
     }
-  }, [loading, user, isAdminGeral]);
+  }, [loading, user, isAdminGeral, selectedTenant]);
 
   useEffect(() => {
     const unsub = selectedTenantStore.subscribe((tenant) =>
@@ -171,6 +171,10 @@ function DashboardShell({
     }
     return true;
   })();
+
+  const tenantRequired = Boolean(
+    user && isAdminGeral && !selectedTenant,
+  );
 
   if (loading || !isMounted || (user && !isCurrentRouteAuthorized)) {
     return (
@@ -297,7 +301,16 @@ function DashboardShell({
             selectedSite && 'pt-10 md:pt-10',
           )}
         >
-          {children}
+          {tenantRequired ? (
+            <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
+              <Building2 className="h-8 w-8 text-[var(--ds-color-warning-fg)]" />
+              <p className="text-sm font-medium text-[var(--ds-color-text-primary)]">
+                Selecione uma empresa para operar como Administrador Geral.
+              </p>
+            </div>
+          ) : (
+            children
+          )}
         </main>
         <AIButton />
         <CommandPalette />

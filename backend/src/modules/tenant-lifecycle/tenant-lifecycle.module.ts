@@ -13,6 +13,11 @@ import { CompaniesModule } from '../companies/companies.module';
 
 @Module({
   imports: [
+    // As entidades continuam registradas aqui — não porque o serviço injete
+    // repositórios (ele não injeta mais; opera sobre o EntityManager da conexão
+    // de provisionamento), mas porque `autoLoadEntities` monta a lista de
+    // metadados a partir destes registros, e é dessa lista que o
+    // ProvisioningDataSourceService clona as entidades.
     TypeOrmModule.forFeature([
       TenantOnboardingInvite,
       Company,

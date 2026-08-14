@@ -61,6 +61,7 @@ export function persistAuthenticatedSession(params: {
     profileName: user.profile?.nome ?? null,
     roles,
   };
+  sessionStore.rotateGeneration();
   sessionStore.set(session);
 
   const isAdminGeralDetected = isAdminGeralAccount(session);

@@ -23,164 +23,197 @@ export const metadata: Metadata = {
     'Política de privacidade e tratamento de dados pessoais do SGS - Sistema de Gestão de Segurança.',
 };
 
-export const dynamic = 'force-dynamic';
+type PurposeRow = readonly [purpose: string, legalBasis: string];
+
+type SubprocessorRow = Readonly<{
+  name: string;
+  status: 'Ativo' | 'Condicional' | 'Opcional' | 'A confirmar';
+  purpose: string;
+  country: string;
+  safeguard: string;
+}>;
+
+type CookieRow = Readonly<{
+  name: string;
+  type: string;
+  purpose: string;
+  duration: string;
+  thirdParty: string;
+}>;
+
+type RetentionRow = Readonly<{
+  context: string;
+  period: string;
+  basis: string;
+}>;
 
 const purposeRows = [
   [
     'Autenticação, segurança da conta e prevenção a fraude',
-    'Execução do contrato (Art. 7, V), legítimo interesse (Art. 7, IX) e proteção ao crédito (Art. 7, X)',
+    'Execução do contrato (art. 7º, V), legítimo interesse (art. 7º, IX) e, quando houver dado sensível de autenticação, prevenção à fraude e segurança do titular (art. 11, II, “g”)',
   ],
   [
     'Gestão de documentos, treinamentos, evidências e rotinas de SST',
-    'Execução do contrato (Art. 7, V) e cumprimento de obrigação legal/regulatória do Cliente (Art. 7, II)',
+    'Execução do contrato (art. 7º, V) e cumprimento de obrigação legal ou regulatória pelo controlador (art. 7º, II)',
   ],
   [
-    'Exames médicos, laudos e dados de saúde ocupacional (Art. 11, LGPD)',
-    'Execução de contrato no contexto de saúde ocupacional (Art. 11, II, "b") e cumprimento de obrigação legal (Art. 11, II, "a")',
+    'Exames, laudos, atestados e demais dados de saúde ocupacional',
+    'Cumprimento de obrigação legal ou regulatória pelo controlador (art. 11, II, “a”) e exercício regular de direitos, inclusive em contrato (art. 11, II, “d”); tutela da saúde (art. 11, II, “f”) somente quando aplicável ao agente e ao contexto do tratamento',
   ],
   [
-    'Trilha de auditoria, logs e rastreabilidade',
-    'Legítimo interesse (Art. 7, IX), prevenção a fraudes e suporte à apuração de incidentes',
+    'Trilha de auditoria, logs, prevenção e apuração de incidentes',
+    'Legítimo interesse (art. 7º, IX), exercício regular de direitos (art. 7º, VI) e cumprimento de obrigações legais ou regulatórias, conforme o caso',
   ],
   [
     'Atendimento, suporte e continuidade do serviço',
-    'Execução do contrato (Art. 7, V) e legítimo interesse (Art. 7, IX)',
+    'Execução do contrato (art. 7º, V) e legítimo interesse (art. 7º, IX)',
   ],
   [
     'Faturamento, relacionamento comercial e comunicações institucionais',
-    'Execução do contrato (Art. 7, V), cumprimento de obrigação legal (Art. 7, II) e legítimo interesse (Art. 7, IX)',
+    'Execução do contrato (art. 7º, V), cumprimento de obrigação legal (art. 7º, II) e legítimo interesse (art. 7º, IX), conforme a finalidade',
   ],
   [
-    'Funcionalidades opcionais de IA, quando habilitadas pelo Cliente',
-    'Consentimento (Art. 7, I) ou execução do contrato com instrumento específico (Art. 7, V)',
+    'Funcionalidades opcionais de inteligência artificial',
+    'Base legal definida pelo controlador conforme a finalidade, o tipo de dado e o contexto. Dados sensíveis somente podem ser tratados nas hipóteses do art. 11 e com salvaguardas adicionais',
   ],
-];
+] satisfies readonly PurposeRow[];
 
 const dataCategories = [
-  'Dados cadastrais e profissionais: nome, CPF, e-mail, cargo, matrícula ou identificadores internos.',
-  'Credenciais de acesso: hash de senha, tokens de sessão, dados de MFA/segurança e sinais de dispositivo.',
-  'Registros operacionais de SST: treinamentos, APRs, PTAs, checklists, CATs, evidências fotográficas.',
-  'Dados de saúde ocupacional (dados sensíveis): exames médicos, laudos, atestados e resultados de avaliações (Art. 11 LGPD).',
-  'Logs de acesso: endereço IP, User-Agent, carimbos de data/hora e eventos de auditoria.',
-  'Dados de suporte: chamados, trocas de e-mail e interações comerciais ligadas ao uso da plataforma.',
-  'Dados de IA (quando habilitado): perguntas e respostas ao assistente SST, com minimização e pseudonimização antes do envio ao modelo quando tecnicamente viável.',
-];
+  'Dados cadastrais e profissionais: nome, CPF, e-mail, telefone, cargo, matrícula e identificadores internos.',
+  'Credenciais e sinais de segurança: hash de senha, tokens, dados de autenticação multifator, dispositivo e eventos de sessão. O SGS não armazena senhas em texto puro.',
+  'Registros operacionais de SST: treinamentos, APRs, PTAs, checklists, CATs, documentos, assinaturas e evidências fotográficas.',
+  'Dados de saúde ocupacional, quando inseridos pelo Cliente: exames, laudos, atestados e resultados de avaliações, classificados como dados pessoais sensíveis.',
+  'Registros técnicos: endereço IP, User-Agent, data e hora, identificadores de requisição, eventos de auditoria e informações necessárias à prevenção de abuso.',
+  'Dados de suporte e relacionamento: chamados, mensagens, e-mails e informações comerciais relacionadas ao uso da plataforma.',
+  'Conteúdo utilizado em recursos de IA, quando habilitados: perguntas, respostas, arquivos ou imagens enviados pelo usuário, limitados ao necessário para a funcionalidade e sujeitos às configurações do Cliente.',
+] as const;
 
 const subprocessors = [
   {
     name: 'Neon / PostgreSQL',
-    purpose: 'Banco de dados relacional — armazena todos os dados operacionais do tenant (SST, usuários, auditoria, documentos)',
-    country: 'Conforme região do projeto',
-    safeguard: 'DPA, região, backup e retenção devem ser confirmados no contrato vigente',
+    status: 'Ativo',
+    purpose: 'Banco de dados relacional para dados operacionais, usuários, auditoria e metadados de documentos.',
+    country: 'Conforme a região contratada',
+    safeguard: 'Criptografia em trânsito e em repouso conforme o serviço. DPA, região, backups e retenção devem corresponder ao contrato e à configuração de produção.',
   },
   {
     name: 'Backblaze B2',
-    purpose: 'Armazenamento de arquivos: documentos, evidências fotográficas, PDFs gerados, backups e DR storage (API S3-compatible)',
-    country: 'EUA (US West)',
-    safeguard: 'Dados criptografados em trânsito (TLS); sem processamento além do armazenamento; DPA e retenção devem ser confirmados no contrato',
+    status: 'Ativo',
+    purpose: 'Armazenamento de documentos, evidências, PDFs, backups e objetos por API compatível com S3.',
+    country: 'Conforme a região contratada',
+    safeguard: 'TLS, controles de acesso, política de retenção e DPA compatíveis com a categoria dos dados armazenados.',
   },
   {
     name: 'OpenAI',
-    purpose: 'Provedor de IA atualmente utilizado nas funcionalidades da Sophie (modelo gpt-4o), incluindo geração de linguagem natural e análise visual de imagens enviadas pelo usuário (ex.: análise de risco a partir de foto de obra)',
-    country: 'EUA',
-    safeguard: 'Minimização/pseudonimização pré-envio de dados textuais; imagens enviadas pelo usuário são transmitidas ao provedor para análise visual; DPA e retenção do provedor pendentes de evidência contratual',
+    status: 'Condicional',
+    purpose: 'Processamento de linguagem e, quando expressamente habilitado, análise de imagens em funcionalidades de IA da Sophie.',
+    country: 'Conforme a região e o produto contratados',
+    safeguard: 'Envio limitado ao conteúdo necessário; configurações de retenção, DPA e mecanismo de transferência internacional devem ser validados antes do uso em produção.',
   },
   {
     name: 'NVIDIA NIM',
-    purpose: 'Provedor de IA alternativo (modelo textual openai/gpt-oss-120b), disponível como opção de configuração; não é o provedor ativo por padrão',
-    country: 'Global / conforme a região de processamento do serviço',
-    safeguard: 'Minimização/pseudonimização pré-envio; quando ativo, é modelo textual e fotos não são enviadas a ele; ativação condicionada à base contratual e às salvaguardas de transferência internacional aplicáveis',
+    status: 'Opcional',
+    purpose: 'Provedor alternativo para inferência de modelos de IA, conforme configuração do Cliente e disponibilidade técnica.',
+    country: 'Conforme a região de processamento contratada',
+    safeguard: 'Minimização, controle de finalidade, DPA e mecanismo válido de transferência internacional quando houver processamento fora do Brasil.',
   },
   {
     name: 'Anthropic',
-    purpose: 'Raciocínio e geração de linguagem natural (modelos Claude) nas funcionalidades de IA Sophie (quando habilitadas)',
-    country: 'EUA',
-    safeguard: 'Minimização/pseudonimização pré-envio; DPA e retenção do provedor pendentes de evidência contratual',
+    status: 'Opcional',
+    purpose: 'Raciocínio e geração de linguagem natural em funcionalidades de IA, quando habilitadas.',
+    country: 'Conforme a região e o produto contratados',
+    safeguard: 'Minimização, DPA, configurações de retenção e mecanismo válido de transferência internacional.',
   },
   {
     name: 'Cloudflare',
-    purpose: 'CDN, proteção DDoS, WAF e bot mitigation',
-    country: 'EUA / Global',
-    safeguard: 'DPA/SCCs e escopo real devem ser confirmados quando o serviço estiver habilitado',
+    status: 'Condicional',
+    purpose: 'CDN, proteção contra DDoS, WAF e mitigação de bots, quando habilitados.',
+    country: 'Global',
+    safeguard: 'Escopo, logs, DPA e transferência internacional devem refletir os produtos efetivamente habilitados.',
   },
   {
     name: 'Sentry',
-    purpose: 'Monitoramento de erros e desempenho de aplicação',
-    country: 'EUA',
-    safeguard: 'PII scrubbing configurado; DPA e retenção de eventos devem ser confirmados',
+    status: 'Opcional',
+    purpose: 'Monitoramento de erros e desempenho da aplicação.',
+    country: 'Conforme a região contratada',
+    safeguard: 'Remoção ou mascaramento de dados pessoais, amostragem mínima, retenção limitada e DPA.',
   },
   {
     name: 'New Relic',
-    purpose: 'Observabilidade, métricas e rastreamento de performance',
-    country: 'EUA',
-    safeguard: 'Mascaramento de atributos; DPA e política de logs devem ser confirmados',
+    status: 'Opcional',
+    purpose: 'Observabilidade, métricas e rastreamento de desempenho.',
+    country: 'Conforme a região contratada',
+    safeguard: 'Mascaramento de atributos, exclusão de conteúdo sensível, retenção limitada e DPA.',
   },
   {
     name: 'Provedor de e-mail transacional',
-    purpose: 'Envio de notificações operacionais, redefinição de senha e alertas',
-    country: 'Variável conforme contrato',
-    safeguard: 'DPA, região e retenção devem ser confirmados por provedor contratado',
+    status: 'A confirmar',
+    purpose: 'Envio de notificações operacionais, redefinição de senha e alertas.',
+    country: 'Conforme o fornecedor contratado',
+    safeguard: 'DPA, região, autenticação de domínio e retenção devem ser confirmados antes da publicação definitiva.',
   },
   {
     name: 'Redis / BullMQ',
-    purpose: 'Filas de processamento assíncrono e cache de sessão',
-    country: 'Conforme provedor/configuração',
-    safeguard: 'TTL e provedor/região precisam ser confirmados na configuração de produção',
+    status: 'Ativo',
+    purpose: 'Cache, controle de sessão, filas e processamento assíncrono.',
+    country: 'Conforme o provedor e a região contratados',
+    safeguard: 'TTL, criptografia, isolamento de rede, autenticação e política de persistência compatíveis com a finalidade.',
   },
-];
+] satisfies readonly SubprocessorRow[];
 
 const cookieRows = [
   {
     name: 'refresh_token',
     type: 'Estritamente necessário',
-    purpose: 'Refresh token JWT — permite renovar a sessão sem nova autenticação. HttpOnly, SameSite=Strict, path=/auth/refresh.',
-    duration: '30 dias (renovável)',
+    purpose: 'Permite renovar a sessão sem nova autenticação. Deve ser configurado como HttpOnly, Secure em produção, SameSite=Strict e restrito ao caminho de renovação.',
+    duration: 'Até 30 dias, conforme a política de sessão',
     thirdParty: 'Não',
   },
   {
     name: 'refresh_csrf',
     type: 'Estritamente necessário',
-    purpose: 'Token CSRF dedicado ao endpoint de refresh, prevenindo CSRF na renovação de sessão.',
-    duration: '30 dias',
+    purpose: 'Token dedicado à proteção contra CSRF no fluxo de renovação de sessão.',
+    duration: 'Até 30 dias',
     thirdParty: 'Não',
   },
   {
     name: 'csrf-token',
     type: 'Estritamente necessário',
-    purpose: 'Proteção HMAC-SHA256 contra Cross-Site Request Forgery em todas as operações de escrita.',
+    purpose: 'Proteção contra Cross-Site Request Forgery nas operações de escrita.',
     duration: 'Sessão',
     thirdParty: 'Não',
   },
   {
     name: '__cf_bm',
-    type: 'Estritamente necessário',
-    purpose: 'Mitigação de bots e proteção Cloudflare',
-    duration: '30 minutos',
+    type: 'Estritamente necessário quando habilitado',
+    purpose: 'Mitigação de bots e proteção de borda da Cloudflare.',
+    duration: 'Conforme configuração da Cloudflare',
     thirdParty: 'Cloudflare',
   },
   {
     name: 'sgs_company_id',
     type: 'Estritamente necessário',
-    purpose: 'Isolamento multi-tenant durante a sessão',
+    purpose: 'Mantém o contexto da organização selecionada. A autorização e o isolamento do tenant são sempre validados no servidor e não dependem exclusivamente deste cookie.',
     duration: 'Sessão',
     thirdParty: 'Não',
   },
   {
     name: 'sgs_consent_ack',
     type: 'Funcional',
-    purpose: 'Registro local de exibição do modal de consentimento',
-    duration: '90 dias',
+    purpose: 'Registra localmente que o aviso de privacidade ou consentimento já foi apresentado.',
+    duration: 'Até 90 dias',
     thirdParty: 'Não',
   },
-];
+] satisfies readonly CookieRow[];
 
 const securityMeasures = [
-  'Criptografia TLS 1.2+ em trânsito, criptografia gerenciada dos provedores de infraestrutura e proteção específica para identificadores sensíveis como CPF quando aplicável.',
-  'Controles de sessão, cookies httpOnly/Secure/SameSite=Strict e isolamento multi-tenant por Row Level Security (RLS) no banco.',
-  'Trilha de auditoria imutável, monitoramento contínuo, rate limiting e proteção Cloudflare contra ataques automatizados.',
-  'Princípio de privilégios mínimos, segregação de ambientes, backups governados e procedimentos de continuidade.',
-  'Resposta a incidentes: contenção, análise forense, comunicação ao controlador e, quando exigido por lei, notificação à ANPD e aos titulares.',
-];
+  'Criptografia em trânsito por TLS e criptografia em repouso conforme os recursos dos provedores e a configuração de produção.',
+  'Sessões protegidas, cookies HttpOnly/Secure/SameSite, autenticação multifator quando habilitada e validação de autorização no servidor.',
+  'Isolamento multi-tenant por controles de aplicação e Row Level Security (RLS), sem confiar apenas em identificadores enviados pelo navegador.',
+  'Trilhas de auditoria com controles de acesso e integridade, monitoramento, rate limiting e proteção de borda quando habilitada.',
+  'Privilégio mínimo, segregação de ambientes, gestão de segredos, backups testados e procedimentos de continuidade e recuperação.',
+  'Processo de resposta a incidentes com contenção, preservação de evidências, avaliação de risco e comunicação aos agentes competentes.',
+] as const;
 
 const rightsList = [
   'Confirmação da existência de tratamento e acesso aos dados pessoais (Art. 18, I e II).',
@@ -194,14 +227,15 @@ const rightsList = [
 ];
 
 const retentionRows = [
-  { context: 'Conta ativa', period: 'Durante o vínculo contratual', basis: 'Execução do contrato' },
-  { context: 'Logs de auditoria e segurança', period: '2 anos após geração', basis: 'Legítimo interesse e obrigação legal' },
-  { context: 'Interações com IA (anonimizadas)', period: '1 ano após anonimização por solicitação LGPD', basis: 'Legítimo interesse' },
-  { context: 'Notificações e e-mails transacionais', period: '90 dias após envio', basis: 'Legítimo interesse' },
-  { context: 'Sessões expiradas', period: '30 dias após expiração', basis: 'Execução do contrato' },
-  { context: 'Documentos e evidências de SST', period: 'Conforme lei aplicável e instrução do Cliente', basis: 'Cumprimento de obrigação legal' },
-  { context: 'Dados após término do contrato', period: 'Exportação em até 30 dias; eliminação subsequente salvo retenção legal', basis: 'Execução do contrato e obrigação legal' },
-];
+  { context: 'Conta e cadastro ativos', period: 'Durante o vínculo contratual e pelo prazo necessário às obrigações aplicáveis', basis: 'Execução do contrato e obrigação legal' },
+  { context: 'Logs de auditoria e segurança', period: 'Prazo definido na matriz de retenção, considerando risco, contrato e obrigações legais', basis: 'Legítimo interesse, exercício regular de direitos e obrigação legal' },
+  { context: 'Registro de incidentes de segurança', period: 'Mínimo de 5 anos a partir do registro, salvo obrigação superior', basis: 'Regulamentação da ANPD' },
+  { context: 'Interações com IA', period: 'Pelo menor prazo necessário à funcionalidade e conforme configuração contratual do provedor', basis: 'Base legal aplicável à finalidade e ao tipo de dado' },
+  { context: 'Notificações e e-mails transacionais', period: 'Conforme necessidade operacional, comprovação de envio e obrigação aplicável', basis: 'Execução do contrato e legítimo interesse' },
+  { context: 'Identificadores de sessão e revogação', period: 'Até 30 dias após expiração, conforme arquitetura de autenticação', basis: 'Execução do contrato e segurança' },
+  { context: 'Documentos e evidências de SST', period: 'Conforme legislação aplicável, contrato e instrução do controlador', basis: 'Cumprimento de obrigação legal e exercício regular de direitos' },
+  { context: 'Dados após o término do contrato', period: 'Janela de exportação de até 30 dias; eliminação, bloqueio ou anonimização subsequente, ressalvadas retenções obrigatórias e ciclos de backup', basis: 'Execução do contrato e obrigação legal' },
+] satisfies readonly RetentionRow[];
 
 const quickLinks = [
   { id: 'escopo', label: 'Escopo e agentes' },
@@ -235,23 +269,29 @@ export default function PrivacidadePage() {
   const supportHref = legal.supportEmail ? `mailto:${legal.supportEmail}` : null;
   const showDedicatedSupportChannel =
     Boolean(supportChannel) && supportChannel !== legal.privacyEmail;
-  const dpoLabel = legal.dpoName || 'Encarregado de Proteção de Dados (DPO)';
+  const dpoLabel = legal.dpoName || 'Encarregado pelo tratamento de dados pessoais';
   const dpoEmail = legal.dpoEmail;
   const dpoPhone = legal.dpoPhone;
   const hasMissingLegalInfo = legal.missingRequiredFields.length > 0;
 
   return (
     <div className={`${styles.page} ${styles.privacyPage}`}>
-      <div className={`${styles.ambientGlow} ${styles.privacyAmbientGlow}`} />
-      <div className={`${styles.ambientGlowSecondary} ${styles.privacyAmbientGlowSecondary}`} />
+      <div className={`${styles.ambientGlow} ${styles.privacyAmbientGlow}`} aria-hidden="true" />
+      <div
+        className={`${styles.ambientGlowSecondary} ${styles.privacyAmbientGlowSecondary}`}
+        aria-hidden="true"
+      />
 
       <div className={styles.shell}>
         <Link href="/login" className={styles.backLink}>
-          <ArrowLeft size={16} />
+          <ArrowLeft size={16} aria-hidden="true" />
           Voltar ao login
         </Link>
 
-        <section className={`${styles.hero} ${styles.privacyHero}`}>
+        <section
+          className={`${styles.hero} ${styles.privacyHero}`}
+          aria-labelledby="privacy-policy-title"
+        >
           <div className={`${styles.heroBadge} ${styles.privacyHeroBadge}`}>
             <Sparkles size={14} />
             Privacidade, segurança e governança de dados
@@ -259,7 +299,10 @@ export default function PrivacidadePage() {
 
           <div className={`${styles.heroGrid} ${styles.privacyHeroGrid}`}>
             <div className={`${styles.heroMain} ${styles.privacyHeroMain}`}>
-              <h1 className={`${styles.heroTitle} ${styles.privacyHeroTitle}`}>
+              <h1
+                id="privacy-policy-title"
+                className={`${styles.heroTitle} ${styles.privacyHeroTitle}`}
+              >
                 Política de Privacidade
               </h1>
               <p className={`${styles.heroDescription} ${styles.privacyHeroDescription}`}>
@@ -280,7 +323,7 @@ export default function PrivacidadePage() {
                 </span>
                 <span className={`${styles.metaPill} ${styles.privacyMetaPill}`}>
                   <ShieldCheck size={14} />
-                  Estrutura alinhada à LGPD
+                  Transparência orientada pela LGPD
                 </span>
               </div>
 
@@ -297,9 +340,9 @@ export default function PrivacidadePage() {
 
             <aside className={`${styles.heroPanel} ${styles.privacyHeroPanel}`}>
               <p className={styles.panelEyebrow}>Visão executiva</p>
-              <h2 className={styles.panelTitle}>Uma política com postura enterprise</h2>
+              <h2 className={styles.panelTitle}>Governança de privacidade para ambiente corporativo</h2>
               <p className={styles.panelText}>
-                O SGS organiza o tratamento de dados com clareza de papéis, base legal,
+                A operação do SGS organiza o tratamento de dados com clareza de papéis, bases legais,
                 rastreabilidade, retenção e resposta a incidentes.
               </p>
 
@@ -379,12 +422,15 @@ export default function PrivacidadePage() {
             <Globe2 size={18} />
             <div>
               <strong>Postura corporativa</strong>
-              <p>Estrutura preparada para operações multiempresa.</p>
+              <p>Estrutura preparada para operações multiempresa e multi-tenant.</p>
             </div>
           </article>
         </section>
 
-        <section className={`${styles.quickNav} ${styles.privacyQuickNav}`}>
+        <nav
+          className={`${styles.quickNav} ${styles.privacyQuickNav}`}
+          aria-label="Navegação da Política de Privacidade"
+        >
           <div className={`${styles.quickNavHeader} ${styles.privacyQuickNavHeader}`}>
             <FileCheck2 size={18} />
             Navegação rápida
@@ -400,11 +446,11 @@ export default function PrivacidadePage() {
               </a>
             ))}
           </div>
-        </section>
+        </nav>
 
         <section className={`${styles.summaryGrid} ${styles.privacySummaryGrid}`}>
           <article className={`${styles.summaryCard} ${styles.privacySummaryCard}`}>
-            <p className={styles.summaryLabel}>Operadora da plataforma</p>
+            <p className={styles.summaryLabel}>Responsável pela plataforma</p>
             <h2 className={styles.summaryTitle}>
               {companyName}
               {companyDocument}
@@ -418,13 +464,13 @@ export default function PrivacidadePage() {
             <p className={styles.summaryLabel}>Atendimento ao titular</p>
             <h2 className={styles.summaryTitle}>Fluxo orientado por papel regulatório</h2>
             <p className={styles.summaryText}>
-              Quando a SGS atuar como operadora, pedidos do titular devem ser
+              Quando a empresa operadora do SGS atuar como operadora, pedidos do titular devem ser
               direcionados preferencialmente ao controlador (empresa contratante).
             </p>
           </article>
 
           <article className={`${styles.summaryCard} ${styles.privacySummaryCard}`}>
-            <p className={styles.summaryLabel}>Postura enterprise</p>
+            <p className={styles.summaryLabel}>Governança corporativa</p>
             <h2 className={styles.summaryTitle}>Segurança, retenção e governança</h2>
             <p className={styles.summaryText}>
               Controles de acesso, segregação multi-tenant por RLS, logs auditáveis
@@ -504,14 +550,16 @@ export default function PrivacidadePage() {
               O SGS pode processar dados de saúde inseridos pelo Cliente, como exames
               médicos periódicos, atestados, CATs (Comunicações de Acidente de Trabalho)
               e laudos ocupacionais. Esses dados são classificados como <strong>dados
-              sensíveis</strong> nos termos do art. 5, II e do art. 11 da LGPD.
+                sensíveis</strong> nos termos do art. 5, II e do art. 11 da LGPD.
             </p>
             <ul className={styles.bulletList}>
               <li>
-                <strong>Base legal aplicável:</strong> execução de contrato no contexto
-                de saúde ocupacional (Art. 11, II, &ldquo;b&rdquo;) e cumprimento de
-                obrigação legal (Art. 11, II, &ldquo;a&rdquo;), conforme NR-7 e demais
-                normas regulamentadoras.
+                <strong>Base legal aplicável:</strong> definida pelo controlador conforme
+                o caso concreto, normalmente com fundamento no cumprimento de obrigação
+                legal ou regulatória (art. 11, II, &ldquo;a&rdquo;) e no exercício regular
+                de direitos, inclusive em contrato (art. 11, II, &ldquo;d&rdquo;). A tutela
+                da saúde (art. 11, II, &ldquo;f&rdquo;) somente se aplica quando atendidos os
+                requisitos legais dessa hipótese.
               </li>
               <li>
                 <strong>Acesso restrito:</strong> os dados de saúde são acessíveis
@@ -519,9 +567,11 @@ export default function PrivacidadePage() {
                 (isolamento multi-tenant por RLS).
               </li>
               <li>
-                <strong>Anonimização em IA:</strong> quando funcionalidades de IA são
-                habilitadas, dados de saúde são anonimizados e sanitizados antes de
-                qualquer envio ao provedor de modelo.
+                <strong>Uso em IA:</strong> dados de saúde não devem ser enviados a
+                provedores de IA por padrão. Qualquer exceção depende de habilitação
+                expressa do Cliente, necessidade demonstrada, base legal adequada,
+                minimização e salvaguardas técnicas e contratuais. Pseudonimização não
+                equivale, por si só, à anonimização.
               </li>
               <li>
                 <strong>Retenção:</strong> conforme legislação trabalhista e de saúde
@@ -540,8 +590,8 @@ export default function PrivacidadePage() {
               <table className={styles.dataTable}>
                 <thead>
                   <tr>
-                    <th>Finalidade</th>
-                    <th>Base legal predominante (LGPD)</th>
+                    <th scope="col">Finalidade</th>
+                    <th scope="col">Base legal predominante (LGPD)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -570,7 +620,7 @@ export default function PrivacidadePage() {
                 <thead>
                   <tr>
                     <th>Suboperador</th>
-                    <th>Finalidade</th>
+                    <th scope="col">Finalidade</th>
                     <th>País</th>
                     <th>Salvaguarda</th>
                   </tr>
@@ -579,6 +629,7 @@ export default function PrivacidadePage() {
                   {subprocessors.map((sp) => (
                     <tr key={sp.name}>
                       <td><strong>{sp.name}</strong></td>
+                      <td>{sp.status}</td>
                       <td>{sp.purpose}</td>
                       <td>{sp.country}</td>
                       <td>{sp.safeguard}</td>
@@ -589,10 +640,9 @@ export default function PrivacidadePage() {
             </div>
 
             <p className={styles.callout}>
-              O backend mantém um registro técnico consultável em
-              {' '}<code>/privacy-governance/subprocessors</code>, usado para governança
-              interna e revisão periódica de DPA, transferência internacional e risco
-              por categoria de dado.
+              Mantemos internamente um inventário de suboperadores, com revisão
+              periódica de finalidade, categoria de dados, região, retenção, DPA e
+              mecanismo de transferência internacional.
             </p>
 
             <p className={styles.callout}>
@@ -610,22 +660,26 @@ export default function PrivacidadePage() {
             </p>
             <ul className={styles.bulletList}>
               <li>
-                <strong>Cláusulas Contratuais Padrão (SCCs):</strong> para provedores
-                em jurisdições sem decisão de adequação formal da ANPD.
+                <strong>Mecanismo jurídico válido:</strong> decisão de adequação da ANPD,
+                cláusulas-padrão contratuais aprovadas pela ANPD, cláusulas específicas,
+                normas corporativas globais ou outra hipótese admitida pelo art. 33 da
+                LGPD, conforme o caso.
               </li>
               <li>
-                <strong>Acordos de Processamento de Dados (DPAs):</strong> mantidos ou
-                exigidos conforme o provedor, o contrato aplicável e a criticidade do
-                tratamento.
+                <strong>Governança contratual:</strong> DPA, definição de papéis,
+                finalidade, subcontratação, retenção, segurança e apoio ao exercício de
+                direitos devem constar do instrumento aplicável.
               </li>
               <li>
-                <strong>Minimização técnica:</strong> dados de saúde e PII sensível são
-                anonimizados ou pseudonimizados antes de qualquer transmissão
-                internacional quando tecnicamente viável.
+                <strong>Minimização técnica:</strong> somente os dados necessários devem
+                ser transferidos. Dados sensíveis exigem avaliação reforçada e não devem
+                ser enviados quando a finalidade puder ser atendida por dados agregados,
+                anonimizados ou pseudonimizados.
               </li>
               <li>
-                <strong>Certificações reconhecidas:</strong> preferência a provedores
-                com SOC 2 Type II, ISO 27001 ou equivalente.
+                <strong>Segurança e diligência:</strong> certificações e relatórios de
+                auditoria podem apoiar a avaliação do fornecedor, mas não substituem o
+                mecanismo jurídico exigido para a transferência.
               </li>
             </ul>
           </section>
@@ -641,9 +695,9 @@ export default function PrivacidadePage() {
               <table className={styles.dataTable}>
                 <thead>
                   <tr>
-                    <th>Contexto</th>
-                    <th>Período</th>
-                    <th>Base</th>
+                    <th scope="col">Contexto</th>
+                    <th scope="col">Período</th>
+                    <th scope="col">Base</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -666,30 +720,31 @@ export default function PrivacidadePage() {
             </p>
 
             <p className={styles.callout}>
-              A matriz técnica de retenção e o checklist operacional de offboarding são
-              mantidos em <code>/privacy-governance/retention-matrix</code> e{' '}
-              <code>/privacy-governance/tenant-offboarding-checklist</code>, incluindo
-              itens ainda dependentes de evidência de storage, backup ou contrato.
+              A matriz interna de retenção e o checklist de encerramento contratual
+              devem permanecer alinhados aos prazos publicados, aos ciclos de backup e
+              às obrigações legais de cada categoria documental.
             </p>
           </section>
 
           <section className={styles.section} id="cookies">
             <h2>8. Cookies e tecnologias semelhantes</h2>
             <p>
-              Utilizamos apenas cookies estritamente necessários para autenticação,
-              segurança e continuidade de sessão. Não utilizamos cookies de rastreamento,
-              publicidade ou analytics de terceiros.
+              Utilizamos cookies e tecnologias semelhantes necessários à autenticação,
+              segurança, continuidade da sessão e registro de preferências funcionais.
+              Não utilizamos cookies de publicidade comportamental. Caso ferramentas de
+              analytics sejam habilitadas no futuro, esta política e o mecanismo de
+              consentimento serão atualizados antes da ativação.
             </p>
 
             <div className={styles.tableWrap}>
               <table className={styles.dataTable}>
                 <thead>
                   <tr>
-                    <th>Cookie</th>
-                    <th>Categoria</th>
-                    <th>Finalidade</th>
-                    <th>Duração</th>
-                    <th>Terceiro</th>
+                    <th scope="col">Cookie</th>
+                    <th scope="col">Categoria</th>
+                    <th scope="col">Finalidade</th>
+                    <th scope="col">Duração</th>
+                    <th scope="col">Terceiro</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -719,7 +774,7 @@ export default function PrivacidadePage() {
             <h2>9. Direitos dos titulares (Art. 18, LGPD)</h2>
             <p>
               Os direitos abaixo podem ser exercidos contra o controlador competente.
-              Quando a SGS atuar como operadora, auxiliaremos o Cliente na execução
+              Quando a empresa operadora do SGS atuar como operadora, auxiliaremos o Cliente na execução
               desses pedidos dentro dos limites do contrato.
             </p>
             <ul className={styles.bulletList}>
@@ -736,7 +791,9 @@ export default function PrivacidadePage() {
               ) : (
                 privacyChannel
               )}
-              . Respondemos em até 15 dias úteis.
+              . A confirmação de existência ou o acesso em formato simplificado é atendido
+              imediatamente quando possível; a declaração clara e completa é fornecida
+              em até 15 dias, contados do requerimento, nos termos do art. 19 da LGPD.
             </p>
           </section>
 
@@ -752,20 +809,23 @@ export default function PrivacidadePage() {
               ))}
             </ul>
             <p className={styles.callout}>
-              Em caso de incidente com potencial de risco ou dano relevante, aplicaremos
-              medidas de contenção, análise forense e comunicação ao controlador e às
-              autoridades competentes. Notificação à ANPD ocorrerá dentro do prazo legal
-              aplicável.
+              Em caso de incidente que possa acarretar risco ou dano relevante, a
+              operadora comunicará o controlador sem demora indevida e apoiará a apuração.
+              Compete ao controlador comunicar a ANPD e os titulares, quando aplicável,
+              em até 3 dias úteis contados do conhecimento de que o incidente afetou dados
+              pessoais, ressalvados prazos específicos e as regras aplicáveis a agentes de
+              pequeno porte.
             </p>
           </section>
 
           <section className={styles.section}>
             <h2>11. Atualizações desta política</h2>
             <p>
-              Esta política pode ser revisada para refletir mudanças legais, operacionais
-              ou tecnológicas. Alterações relevantes serão comunicadas pelos canais
-              adequados com antecedência razoável. A versão vigente é sempre identificada
-              pelo número de versão no cabeçalho desta página.
+              Esta política pode ser revisada para refletir mudanças legais,
+              operacionais, contratuais ou tecnológicas. Alterações materiais serão
+              comunicadas por meio adequado, e a versão vigente permanecerá identificada
+              no cabeçalho. Quando a mudança depender de consentimento, a nova manifestação
+              será solicitada antes do tratamento correspondente.
             </p>
           </section>
 
@@ -834,11 +894,11 @@ export default function PrivacidadePage() {
           </section>
         </div>
 
-        <div className={styles.footerNav}>
+        <nav className={styles.footerNav} aria-label="Links jurídicos">
           <Link href="/login">Login</Link>
           <Link href="/termos">Termos de Uso</Link>
           <Link href="/cookies">Política de Cookies</Link>
-        </div>
+        </nav>
 
         <p className={styles.footnote}>
           Esta política foi redigida para a operação padrão do SGS (versão {lastUpdated}) e deve ser

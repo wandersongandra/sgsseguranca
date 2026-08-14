@@ -64,14 +64,14 @@ function extractApiErrorMessage(err: unknown): string {
 
   const validationMessages = Array.isArray(payload.errors)
     ? payload.errors
-        .flatMap((item) =>
-          Array.isArray(item.errors)
-            ? item.errors.map((message) =>
-                item.field ? `${item.field}: ${message}` : message,
-              )
-            : [],
-        )
-        .filter(Boolean)
+      .flatMap((item) =>
+        Array.isArray(item.errors)
+          ? item.errors.map((message) =>
+            item.field ? `${item.field}: ${message}` : message,
+          )
+          : [],
+      )
+      .filter(Boolean)
     : [];
   if (validationMessages.length > 0) {
     return validationMessages.join(" ");

@@ -1,0 +1,82 @@
+[
+  {
+    "alias": "loadtest-baseline-001",
+    "login": "80000000167",
+    "user_id": "f84d7cd4-6fee-470c-9bc7-f882eb37d6f5",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Administrador da Empresa",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-002",
+    "login": "80000000248",
+    "user_id": "b07281e6-aba0-4ae0-8da2-1d6f3ab2c377",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Administrador da Empresa",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-003",
+    "login": "80000000329",
+    "user_id": "ae66c722-2d6c-448f-a975-f3b38408c9e7",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Técnico de Segurança do Trabalho (TST)",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-004",
+    "login": "80000000400",
+    "user_id": "2b4ccba6-028c-4ab7-9cf5-e32590ef7473",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Supervisor / Encarregado",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-005",
+    "login": "80000000590",
+    "user_id": "c9011a2c-58f6-43e6-acce-059fca3b4956",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Operador / Colaborador",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-006",
+    "login": "80000000671",
+    "user_id": "d9b3a1e7-2c48-4f91-9a63-0e7d5c1b2406",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Operador / Colaborador",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-007",
+    "login": "80000000752",
+    "user_id": "e4c7b2f8-3d59-4a02-8b74-1f8e6d2c3517",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Operador / Colaborador",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-008",
+    "login": "80000000833",
+    "user_id": "f5d8c309-4e6a-4b13-9c85-2a9f7e3d4628",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Operador / Colaborador",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-009",
+    "login": "80000000914",
+    "user_id": "a6e9d41a-5f7b-4c24-8d96-3b0a8f4e5739",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Operador / Colaborador",
+    "enabled": true
+  },
+  {
+    "alias": "loadtest-baseline-010",
+    "login": "80000001058",
+    "user_id": "b7fae52b-608c-4d35-9ea7-4c1b9f5a6840",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Operador / Colaborador",
+    "enabled": true
+  }
+]

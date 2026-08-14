@@ -1,3 +1,28 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ATENÇÃO — ESTE ARQUIVO NÃO É CARREGADO.
+
+   O projeto usa Tailwind v4, onde a configuração vem de CSS e não de JS.
+   `app/globals.css` faz `@import "tailwindcss"` SEM bloco `@theme` e SEM
+   diretiva `@config`, portanto este arquivo é ignorado pelo build.
+
+   Consequência prática: qualquer utilitário declarado APENAS aqui
+   (`bg-ds-primary`, `text-foreground`, `bg-card`, `border-border`, …) gera
+   ZERO CSS. Classes assim renderizam sem cor nenhuma, silenciosamente.
+
+   Fonte de verdade dos tokens:
+     - styles/tokens.css       (escala bruta)
+     - styles/theme-light.css  (camada semântica --ds-color-*)
+
+   Forma correta de consumir, usada no resto do app:
+     text-[var(--ds-color-text-primary)]
+     bg-[var(--ds-color-surface-elevated)]
+     border-[var(--ds-color-border-subtle)]
+
+   Mantido no repositório apenas como referência do mapeamento de tokens.
+   Para reativá-lo seria preciso adicionar `@config "../tailwind.config.ts";`
+   em globals.css — ou, preferencialmente, migrar para um bloco `@theme`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 import type { Config } from "tailwindcss";
 
 export default {

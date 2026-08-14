@@ -44,6 +44,7 @@ import { Site } from '../sites/entities/site.entity';
 import { Role } from '../auth/enums/roles.enum';
 import { RbacService, type RoleScope } from '../rbac/rbac.service';
 import { AuthRedisService } from '../../shared/redis/redis.service';
+import { AuthPrincipalService } from '../auth/auth-principal.service';
 import { resolvePasswordResetBaseUrl } from '../../shared/utils/password-reset-url.util';
 import { escapeLikePattern } from '../../shared/utils/sql.util';
 import { normalizeOptionalSearchQuery } from '../../shared/utils/query-normalization.util';
@@ -136,6 +137,7 @@ export class UsersService {
     private rbacService: RbacService,
     private redisService: AuthRedisService,
     private configService: ConfigService,
+    private readonly authPrincipalService: AuthPrincipalService,
     @Inject(forwardRef(() => MailService))
     private readonly mailService?: MailService,
   ) {}
@@ -1310,6 +1312,14 @@ export class UsersService {
       await this.syncRbacRoleFromProfile(id, nextProfileName);
     }
     await this.invalidateAuthSessionUserCache(id);
+    // Invalida o cache em memória do principal (bridge) para que o próximo
+    // request re-resolva no banco. Sem isto, mesmo com o banco correto
+    // (obra Y), o sistema continuaria enxergando o usuário na obra X por até
+    // 60-300s e bloqueando a emissão de documentos em Y (RLS/escopo).
+    this.authPrincipalService.invalidateBridgeCache({
+      appUserId: saved.id,
+      authUserId: saved.auth_user_id ?? undefined,
+    });
 
     return plainToClass(UserResponseDto, saved);
   }
@@ -1535,7 +1545,7 @@ export class UsersService {
       }
     }
 
-    await this.usersRepository.remove(user);
+    await this.usersRepository.softRemove(user);
     await this.rbacService.invalidateUserAccess(id);
     await this.invalidateAuthSessionUserCache(id);
   }
@@ -1567,6 +1577,7 @@ export class UsersService {
         cpf_ciphertext: null,
         funcao: null,
         status: false,
+        deletedAt: new Date(),
       });
 
       await userRepo.softDelete(user.id);

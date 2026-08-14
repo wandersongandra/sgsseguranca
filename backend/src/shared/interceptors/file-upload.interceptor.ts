@@ -132,6 +132,7 @@ function isCompatibleDetectedMime(
 
 export function createTemporaryUploadOptions(options?: {
   maxFileSize?: number;
+  maxFiles?: number;
   fileFilter?: MulterOptions['fileFilter'];
 }): MulterOptions {
   return {
@@ -147,9 +148,9 @@ export function createTemporaryUploadOptions(options?: {
       }),
     limits: {
       fileSize: options?.maxFileSize ?? 10 * 1024 * 1024,
-      files: 1,
+      files: options?.maxFiles ?? 1,
       fields: 20,
-      parts: 25,
+      parts: (options?.maxFiles ?? 1) + 24,
       fieldNameSize: 200,
       fieldSize: 100 * 1024,
     },

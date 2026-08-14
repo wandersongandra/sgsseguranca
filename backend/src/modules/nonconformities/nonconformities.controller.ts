@@ -12,6 +12,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  GoneException,
   Query,
   Header,
   StreamableFile,
@@ -26,7 +27,10 @@ import {
 import { NonConformityFilesQueryDto } from './dto/nonconformity-files-query.dto';
 import { NonConformityListQueryDto } from './dto/nonconformity-list-query.dto';
 import { NonConformityResponseDto } from './dto/nonconformity-response.dto';
-import type { NonConformityAttachmentAttachResponse } from './nonconformities.service';
+import type {
+  NonConformityAttachmentAttachResponse,
+  NonConformityAttachmentRemoveResponse,
+} from './nonconformities.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -40,7 +44,6 @@ import {
   inspectUploadedFileBuffer,
   readUploadedFileBuffer,
   validateFileMagicBytes,
-  validatePdfMagicBytes,
 } from '../../shared/interceptors/file-upload.interceptor';
 import { Authorize } from '../auth/authorize.decorator';
 import { AuditAction as ForensicAuditAction } from '../../shared/decorators/audit-action.decorator';
@@ -177,38 +180,23 @@ export class NonConformitiesController {
     return this.nonConformitiesService.getAttachmentAccess(id, index);
   }
 
+  @Delete(':id/attachments/:index')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @Authorize('can_manage_nc')
+  removeAttachment(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('index', ParseIntPipe) index: number,
+  ): Promise<NonConformityAttachmentRemoveResponse> {
+    return this.nonConformitiesService.removeAttachment(id, index);
+  }
+
   @Post(':id/file')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
-  @UseInterceptors(
-    FileInterceptor(
-      'file',
-      createTemporaryUploadOptions({ maxFileSize: 20 * 1024 * 1024 }),
-    ),
-  )
   @Authorize('can_manage_nc')
-  async attachFile(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @UploadedFile() file: Express.Multer.File,
-  ): Promise<NonConformityResponseDto> {
-    if (!file) {
-      throw new BadRequestException('Arquivo PDF não enviado');
-    }
-    const buffer = await readUploadedFileBuffer(file);
-
-    try {
-      // Segurança: valida PDF por magic bytes (não confiar apenas em mimetype)
-      validatePdfMagicBytes(buffer);
-      await inspectUploadedFileBuffer(buffer, file, this.fileInspectionService);
-
-      return await this.nonConformitiesService.attachPdf(
-        id,
-        buffer,
-        file.originalname,
-        file.mimetype,
-      );
-    } finally {
-      await cleanupUploadedTempFile(file);
-    }
+  attachFileDeprecated(): never {
+    throw new GoneException(
+      'O envio manual de PDF final foi desativado. Encerre a NC e use a geração oficial do sistema.',
+    );
   }
 
   @Post(':id/attachments')
@@ -243,7 +231,6 @@ export class NonConformitiesController {
         id,
         buffer,
         file.originalname,
-        file.mimetype,
       );
     } finally {
       await cleanupUploadedTempFile(file);

@@ -15,7 +15,21 @@ export type PhotographicReportWordImage = PhotographicReportImageResponse & {
 };
 
 type BuildPhotographicReportWordBufferOptions = {
-  companyName: string;
+  /**
+   * Empresa EMITENTE (o tenant). Antes chegava aqui preenchido com
+   * `report.client_name`, atribuindo a emissão ao cliente.
+   */
+  companyIdentity: {
+    razaoSocial: string | null;
+    cnpj: string | null;
+  };
+  /** Empresa CLIENTE, para quem o serviço foi prestado. */
+  clientName: string;
+  /**
+   * Mesmo identificador do PDF e do Document Registry, vindo de
+   * `buildPhotographicReportCode`. Ver photographic-reports.document-code.ts.
+   */
+  documentCode: string;
   generatedAt?: string;
   renderableImages: PhotographicReportWordImage[];
 };
@@ -68,6 +82,16 @@ function formatTime(value?: string | null): string {
   if (!value) return '-';
   const trimmed = value.trim();
   return trimmed.length >= 5 ? trimmed.slice(0, 5) : trimmed;
+}
+
+/** Bytes em KB/MB — bytes crus, como no manifesto do APR, não se leem. */
+function formatFileSize(bytes?: number | null): string {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes) || bytes <= 0) {
+    return '-';
+  }
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function buildPeriodLabel(report: PhotographicReportResponse): string {
@@ -350,6 +374,18 @@ function buildDocumentBody(
     report.days || [],
     options.renderableImages,
   );
+
+  /**
+   * Numeração automática das seções.
+   *
+   * Os números eram literais espalhados ("2. Dados da obra", "3. Objetivo"…),
+   * então inserir qualquer seção no meio exigia reescrever todas as seguintes
+   * — e um número esquecido só apareceria no documento entregue ao cliente.
+   * Começa em 2 porque a capa não é numerada.
+   */
+  let sectionCounter = 1;
+  const nextSection = (title: string): string =>
+    `${++sectionCounter}. ${title}`;
   const exportsList = (report.exports || [])
     .slice()
     .sort((left, right) => left.generated_at.localeCompare(right.generated_at))
@@ -378,7 +414,7 @@ function buildDocumentBody(
   );
   body.push(
     makeParagraph(
-      `${options.companyName} · documento profissional de registro visual, análise técnica e histórico operacional.`,
+      `${options.companyIdentity.razaoSocial || '-'} · documento profissional de registro visual, análise técnica e histórico operacional.`,
       { center: true, size: 11, spacingAfter: 150 },
     ),
   );
@@ -394,6 +430,9 @@ function buildDocumentBody(
   body.push(
     makeTable(
       [
+        ['Código do documento', options.documentCode],
+        ['Empresa emitente', options.companyIdentity.razaoSocial || '-'],
+        ['CNPJ', options.companyIdentity.cnpj || '-'],
         ['Cliente', report.client_name],
         ['Obra', report.project_name],
         ['Unidade', report.unit_name || '-'],
@@ -432,7 +471,7 @@ function buildDocumentBody(
   body.push(makePageBreak());
 
   body.push(
-    makeParagraph('2. Dados da obra', {
+    makeParagraph(nextSection('Dados da obra'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -452,8 +491,87 @@ function buildDocumentBody(
     ),
   );
 
+  // ── Responsável técnico ────────────────────────────────────────────────
   body.push(
-    makeParagraph('3. Objetivo do relatório', {
+    makeParagraph(nextSection('Responsável técnico'), {
+      bold: true,
+      size: 16,
+      spacingAfter: 80,
+    }),
+  );
+  body.push(
+    makeTable(
+      [
+        ['Nome', report.responsible_name],
+        [
+          'Registro profissional',
+          [
+            report.responsible_registration_type,
+            report.responsible_registration_state
+              ? `-${report.responsible_registration_state}`
+              : '',
+            report.responsible_registration_number
+              ? ` ${report.responsible_registration_number}`
+              : '',
+          ]
+            .filter(Boolean)
+            .join('') || '-',
+        ],
+        ['ART', report.art_number || '-'],
+        ['Empresa executora', report.contractor_company],
+      ],
+      { widths: [4200, 8800] },
+    ),
+  );
+
+  // ── NRs aplicáveis ─────────────────────────────────────────────────────
+  // Omitido quando vazio: declarar "nenhuma norma aplicável" seria uma
+  // afirmação técnica que o sistema não tem base para fazer.
+  if (report.applicable_nrs?.length) {
+    body.push(
+      makeParagraph(nextSection('Normas regulamentadoras aplicáveis'), {
+        bold: true,
+        size: 16,
+        spacingAfter: 80,
+      }),
+    );
+    body.push(
+      makeParagraph(report.applicable_nrs.join(' · '), { spacingAfter: 140 }),
+    );
+  }
+
+  if (report.inspection_methodology) {
+    body.push(
+      makeParagraph(nextSection('Metodologia de inspeção'), {
+        bold: true,
+        size: 16,
+        spacingAfter: 80,
+      }),
+    );
+    body.push(
+      makeParagraph(toText(report.inspection_methodology), {
+        spacingAfter: 140,
+      }),
+    );
+  }
+
+  if (report.scope_and_limitations) {
+    body.push(
+      makeParagraph(nextSection('Escopo e limitações'), {
+        bold: true,
+        size: 16,
+        spacingAfter: 80,
+      }),
+    );
+    body.push(
+      makeParagraph(toText(report.scope_and_limitations), {
+        spacingAfter: 140,
+      }),
+    );
+  }
+
+  body.push(
+    makeParagraph(nextSection('Objetivo do relatório'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -467,7 +585,7 @@ function buildDocumentBody(
   );
 
   body.push(
-    makeParagraph('4. Descrição geral da atividade', {
+    makeParagraph(nextSection('Descrição geral da atividade'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -482,7 +600,7 @@ function buildDocumentBody(
   );
 
   body.push(
-    makeParagraph('5. Condições gerais observadas', {
+    makeParagraph(nextSection('Condições gerais observadas'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -496,7 +614,7 @@ function buildDocumentBody(
   );
 
   body.push(
-    makeParagraph('6. Registro fotográfico separado por data', {
+    makeParagraph(nextSection('Registro fotográfico separado por data'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -637,7 +755,7 @@ function buildDocumentBody(
   });
 
   body.push(
-    makeParagraph('7. Detalhamento de cada foto', {
+    makeParagraph(nextSection('Detalhamento de cada foto'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -695,7 +813,7 @@ function buildDocumentBody(
   });
 
   body.push(
-    makeParagraph('8. Avaliação consolidada', {
+    makeParagraph(nextSection('Avaliação consolidada'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -713,7 +831,7 @@ function buildDocumentBody(
   );
 
   body.push(
-    makeParagraph('9. Parecer técnico', {
+    makeParagraph(nextSection('Parecer técnico'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -728,7 +846,7 @@ function buildDocumentBody(
   );
 
   body.push(
-    makeParagraph('10. Conclusão final', {
+    makeParagraph(nextSection('Conclusão final'), {
       bold: true,
       size: 16,
       spacingAfter: 80,
@@ -741,6 +859,121 @@ function buildDocumentBody(
       { size: 10.5, spacingAfter: 120 },
     ),
   );
+
+  // ── Resumo de não conformidades ────────────────────────────────────────
+  // Renderizado MESMO vazio, com estado explícito: o leitor precisa distinguir
+  // "nenhuma encontrada" de "não avaliado".
+  const flaggedImages = options.renderableImages.filter(
+    (image) => image.is_nonconformity,
+  );
+  body.push(
+    makeParagraph(nextSection('Resumo de não conformidades'), {
+      bold: true,
+      size: 16,
+      spacingAfter: 80,
+    }),
+  );
+  if (flaggedImages.length) {
+    body.push(
+      makeTable(
+        [
+          ['#', 'Evidência', 'Ação recomendada', 'Prazo', 'Responsável'],
+          ...flaggedImages.map((image, index) => [
+            String(index + 1),
+            toText(image.ai_title || image.manual_caption),
+            toText(image.recommended_action),
+            image.action_deadline ? formatDate(image.action_deadline) : '-',
+            toText(image.action_responsible),
+          ]),
+        ],
+        { widths: [700, 3400, 5200, 1800, 1900], header: true },
+      ),
+    );
+  } else {
+    body.push(
+      makeParagraph(
+        'Nenhuma das evidências deste relatório foi marcada como não conformidade pelo responsável pela inspeção.',
+        { size: 10.5, spacingAfter: 120 },
+      ),
+    );
+  }
+
+  // ── Manifesto de evidências ────────────────────────────────────────────
+  if (options.renderableImages.length) {
+    body.push(
+      makeParagraph(nextSection('Manifesto de evidências'), {
+        bold: true,
+        size: 16,
+        spacingAfter: 80,
+        pageBreakBefore: true,
+      }),
+    );
+    body.push(
+      makeTable(
+        [
+          ['#', 'Data', 'Arquivo', 'Tamanho', 'Captura', 'Hash', 'Geo'],
+          ...options.renderableImages.map((image, index) => [
+            String(index + 1),
+            formatDate(image.activity_date_label),
+            toText(image.original_name),
+            formatFileSize(image.file_size_bytes),
+            image.captured_at
+              ? formatDateTime(image.captured_at)
+              : formatDateTime(image.created_at),
+            image.hash_sha256 ? `${image.hash_sha256.slice(0, 16)}...` : '-',
+            typeof image.latitude === 'number' &&
+            typeof image.longitude === 'number'
+              ? `${image.latitude.toFixed(2)}, ${image.longitude.toFixed(2)}`
+              : '-',
+          ]),
+        ],
+        { widths: [600, 1500, 2800, 1300, 2400, 2600, 1800], header: true },
+      ),
+    );
+
+    // A ressalva é obrigatória: um manifesto que exibe hash sem qualificar o
+    // que ele prova induz o leitor a concluir que a foto está atrelada à
+    // câmera de origem, o que é falso.
+    if (
+      options.renderableImages.some(
+        (image) =>
+          (image.integrity_flags as { client_reencoded?: boolean } | null)
+            ?.client_reencoded === true,
+      )
+    ) {
+      body.push(
+        makeParagraph(
+          'O hash SHA-256 refere-se ao arquivo recebido e armazenado pelo SGS. Imagens capturadas por dispositivo móvel são otimizadas no navegador antes do envio; o hash comprova a integridade do arquivo desde o recebimento, não a autoria original da captura.',
+          { size: 8, spacingAfter: 60 },
+        ),
+      );
+    }
+    body.push(
+      makeParagraph(
+        'Coordenadas são arredondadas para aproximadamente 1 km por proteção de privacidade.',
+        { size: 8, spacingAfter: 120 },
+      ),
+    );
+  }
+
+  // ── Validação pública ──────────────────────────────────────────────────
+  // Sem QR embutido: a plumbing de mídia do .docx só está ligada para fotos, e
+  // threadar um data URI por ali seria desproporcional. Texto basta.
+  if (report.verification_code) {
+    body.push(
+      makeParagraph(nextSection('Validação pública'), {
+        bold: true,
+        size: 16,
+        spacingAfter: 80,
+      }),
+    );
+    body.push(
+      makeParagraph(
+        `Código de validação: ${report.verification_code}. Confira a autenticidade deste documento informando o código no portal público do SGS.`,
+        { size: 10.5, spacingAfter: 120 },
+      ),
+    );
+  }
 
   body.push(
     makeParagraph('Histórico de exportações', {

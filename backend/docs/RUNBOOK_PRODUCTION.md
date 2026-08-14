@@ -280,7 +280,7 @@ psql ... -c "SELECT indexname FROM pg_indexes WHERE indexname = 'idx_checklists_
 
 ### 4.5 Janela de Produção — Hardening RLS (migration 361)
 
-Data: 2026-07-25 | Operador: complianceX via Claude Code
+Data: 2026-07-25 | Operador: wandersongandra (antigo @complianceX) via Claude Code
 
 #### Ações executadas
 

@@ -45,11 +45,7 @@ export async function generateAprPdf(
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const ctx = createPdfContext(doc, "compliance");
 
-  const code = buildDocumentCode(
-    "APR",
-    apr.id || apr.numero || apr.titulo,
-    apr.data_inicio,
-  );
+  const code = buildDocumentCode("APR", apr.id || apr.numero || apr.titulo, apr.data_inicio);
 
   // Fetch company logo if available
   const logoUrl = await resolveCompanyLogoDataUrl(apr.company);
@@ -75,24 +71,28 @@ export async function generateAprPdf(
     buildValidationUrl(code),
     options?.evidences,
     async (item) => {
-      const sources = [item.watermarked_url, item.url].filter(
-        (source): source is string => Boolean(source),
+      const sources = [item.watermarked_url, item.url].filter((source): source is string =>
+        Boolean(source),
       );
       for (const source of sources) {
         try {
           const response = await fetch(source);
           if (!response.ok) {
             logger.warn(
-              "[APR PDF] Falha ao carregar evidência (HTTP %s): %s",
+              "[APR PDF] Falha ao carregar evidência (HTTP %s), evidenceId=%s",
               response.status,
-              source,
+              item.id ?? "desconhecida",
             );
             continue;
           }
           const blob = await response.blob();
           return blobToDataUrl(blob);
         } catch (err) {
-          logger.warn("[APR PDF] Erro ao buscar evidência: %s", source, err);
+          logger.warn(
+            "[APR PDF] Erro ao buscar evidência, evidenceId=%s: %s",
+            item.id ?? "desconhecida",
+            err instanceof Error ? err.message : "erro desconhecido",
+          );
           continue;
         }
       }

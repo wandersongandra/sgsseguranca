@@ -20,6 +20,7 @@ import {
 import styles from './login.module.css';
 import { authService } from '@/services/authService';
 import { useAuth } from '@/context/AuthContext';
+import { formatCpfInput } from '@/lib/format/cpf';
 import Image from 'next/image';
 
 // Versão do app, injetada no build a partir de frontend/package.json
@@ -44,29 +45,6 @@ type LoginPageClientProps = {
   nonce?: string;
   supportHref: string;
 };
-
-function extractErrorMessage(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map(extractErrorMessage).filter(Boolean).join(' ');
-  }
-
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    return [
-      extractErrorMessage(record.message),
-      extractErrorMessage(record.error),
-      extractErrorMessage(record.details),
-    ]
-      .filter(Boolean)
-      .join(' ');
-  }
-
-  return '';
-}
 
 function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageClientProps) {
   const searchParams = useSearchParams();
@@ -135,14 +113,6 @@ function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageCli
     };
   }, [currentTurnstileTheme, shouldRenderTurnstile, turnstileScriptReady, turnstileSiteKey]);
 
-  const formatCpf = (value: string) => {
-    let v = value.replace(/\D/g, '').slice(0, 11);
-    if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-    else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{3})/, '$1.$2.$3');
-    else if (v.length > 3) v = v.replace(/(\d{3})(\d{3})/, '$1.$2');
-    return v;
-  };
-
   const clearError = () => {
     if (error) setError('');
   };
@@ -200,10 +170,7 @@ function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageCli
         if (status === 401) {
           setError('CPF, senha ou código MFA inválido.');
         } else if (status === 400) {
-          setError(
-            extractErrorMessage(err.response?.data) ||
-              'Verifique os dados informados e tente novamente.',
-          );
+          setError('Dados inválidos. Verifique as informações e tente novamente.');
         } else if (status === 429) {
           setError('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
         } else if (status === 503) {
@@ -281,7 +248,7 @@ function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageCli
                   value={cpf}
                   onChange={(e) => {
                     clearError();
-                    setCpf(formatCpf(e.target.value));
+                    setCpf(formatCpfInput(e.target.value));
                   }}
                   disabled={loading}
                   aria-describedby={error ? 'login-error' : undefined}

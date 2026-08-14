@@ -5,11 +5,16 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash, createHmac } from 'crypto';
+import { createHash } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import pLimit from 'p-limit';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { cleanupUploadedFile } from '../../../shared/storage/storage-compensation.util';
+import {
+  hashDeviceId,
+  maskIpAddress,
+  roundCoordinate,
+} from '../../../shared/security/evidence-integrity.util';
 import { DocumentStorageService } from '../../../shared/services/document-storage.service';
 import { TenantService } from '../../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../../shared/tenant/site-access-scope.util';
@@ -26,22 +31,11 @@ type AprEvidenceResponse = {
   apr_risk_item_id: string;
   uploaded_by_id?: string;
   uploaded_by_name?: string;
-  file_key: string;
   original_name?: string;
-  mime_type: string;
-  file_size_bytes: number;
   hash_sha256: string;
-  watermarked_file_key?: string;
   watermarked_hash_sha256?: string;
-  watermark_text?: string;
   captured_at?: string;
   uploaded_at?: string;
-  latitude?: number;
-  longitude?: number;
-  accuracy_m?: number;
-  device_id?: string;
-  ip_address?: string;
-  exif_datetime?: string;
   integrity_flags?: Record<string, unknown>;
   risk_item_ordem?: number;
   url?: string;
@@ -61,28 +55,21 @@ export class AprsEvidenceService {
     private readonly documentStorageService: DocumentStorageService,
   ) {}
 
+  // Os três normalizadores abaixo vivem em shared/security/evidence-integrity.util.ts
+  // desde que o Relatório Fotográfico passou a gravar os mesmos metadados. São
+  // mantidos como métodos privados delegando para o util: os call sites e
+  // qualquer teste que os alcance continuam válidos, e a implementação passa a
+  // ter uma fonte única.
   private maskIpAddress(ip: string | null | undefined): string | null {
-    if (!ip) return null;
-    // Reduz IPv4 para /24 (último octeto zerado). IPv6: trunca ao /48.
-    const ipv4 = ip.replace(/^(\d+\.\d+\.\d+\.)\d+$/, '$10');
-    if (ipv4 !== ip) return ipv4;
-    // IPv6: manter só os primeiros 3 grupos
-    const ipv6 = ip.replace(/^([0-9a-fA-F:]+:){3}[0-9a-fA-F:]+$/, (m) => {
-      const parts = m.split(':');
-      return parts.slice(0, 3).join(':') + '::';
-    });
-    return ipv6 !== ip ? ipv6 : ip.replace(/[^:]+$/, '0');
+    return maskIpAddress(ip);
   }
 
   private hashDeviceId(deviceId: string | null | undefined): string | null {
-    if (!deviceId?.trim()) return null;
-    const key = process.env.FIELD_ENCRYPTION_KEY ?? 'default-device-hash-key';
-    return createHmac('sha256', key).update(deviceId.trim()).digest('hex');
+    return hashDeviceId(deviceId);
   }
 
   private roundCoordinate(value: number | null | undefined): number | null {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-    return Math.round(value * 100) / 100; // 2 casas decimais (~1km precision)
+    return roundCoordinate(value);
   }
 
   private ensureAprStatus(status: string): AprStatus {
@@ -190,13 +177,33 @@ export class AprsEvidenceService {
     ipAddress?: string,
   ): Promise<{
     id: string;
-    fileKey: string;
     originalName: string;
     hashSha256: string;
   }> {
     const apr = await this.findOneForWrite(aprId);
     this.assertAprFormMutable(apr);
     this.assertEvidenceUploadAllowed(apr, userId);
+
+    const manager = this.aprsRepository
+      .manager as typeof this.aprsRepository.manager & {
+      query?: <T>(sql: string, params?: unknown[]) => Promise<T>;
+    };
+    const signedRows = manager.query
+      ? await manager.query<Array<{ count: string }>>(
+          `SELECT COUNT(*)::text AS count
+             FROM "signatures"
+            WHERE "document_id" = $1
+              AND UPPER("document_type") = 'APR'
+              AND "company_id" = $2
+              AND "deleted_at" IS NULL`,
+          [apr.id, apr.company_id],
+        )
+      : [];
+    if (Number(signedRows[0]?.count ?? 0) > 0) {
+      throw new BadRequestException(
+        'APR com assinatura registrada é imutável. Gere uma nova versão para adicionar evidências.',
+      );
+    }
 
     const riskItem = await this.aprsRepository.manager
       .getRepository(AprRiskItem)
@@ -275,13 +282,11 @@ export class AprsEvidenceService {
       await this.addLog(apr.id, userId, {
         evidenceId: saved.id,
         riskItemId: riskItem.id,
-        fileKey,
         hashSha256,
       });
 
       return {
         id: saved.id,
-        fileKey,
         originalName,
         hashSha256,
       };
@@ -400,31 +405,11 @@ export class AprsEvidenceService {
         apr_risk_item_id: evidence.apr_risk_item_id,
         uploaded_by_id: evidence.uploaded_by_id ?? undefined,
         uploaded_by_name: evidence.uploaded_by?.nome ?? undefined,
-        file_key: evidence.file_key,
         original_name: evidence.original_name ?? undefined,
-        mime_type: evidence.mime_type,
-        file_size_bytes: evidence.file_size_bytes,
         hash_sha256: evidence.hash_sha256,
-        watermarked_file_key: evidence.watermarked_file_key ?? undefined,
         watermarked_hash_sha256: evidence.watermarked_hash_sha256 ?? undefined,
-        watermark_text: evidence.watermark_text ?? undefined,
         captured_at: evidence.captured_at?.toISOString(),
         uploaded_at: evidence.uploaded_at?.toISOString(),
-        latitude:
-          evidence.latitude !== null && evidence.latitude !== undefined
-            ? Number(evidence.latitude)
-            : undefined,
-        longitude:
-          evidence.longitude !== null && evidence.longitude !== undefined
-            ? Number(evidence.longitude)
-            : undefined,
-        accuracy_m:
-          evidence.accuracy_m !== null && evidence.accuracy_m !== undefined
-            ? Number(evidence.accuracy_m)
-            : undefined,
-        device_id: evidence.device_id ?? undefined,
-        ip_address: evidence.ip_address ?? undefined,
-        exif_datetime: evidence.exif_datetime?.toISOString(),
         integrity_flags: evidence.integrity_flags ?? undefined,
         risk_item_ordem: evidence.apr_risk_item?.ordem ?? undefined,
         url: urls?.url,

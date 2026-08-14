@@ -3,8 +3,18 @@ import { usersService, User, UserIdentityType } from '@/services/usersService';
 import { handleApiError } from '@/lib/error-handler';
 import { toast } from 'sonner';
 import { authService } from '@/services/authService';
+import { selectedTenantStore } from '@/lib/selectedTenantStore';
+import { sessionStore } from '@/lib/sessionStore';
 
 type PendingDeleteAction = 'gdpr_erasure' | 'hard_delete';
+
+function resolveActiveCompanyId(): string | undefined {
+  return (
+    selectedTenantStore.get()?.companyId ||
+    sessionStore.get()?.companyId ||
+    undefined
+  );
+}
 
 export function useUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -78,11 +88,19 @@ export function useUsers() {
             });
 
       if (pendingDeleteAction === 'hard_delete') {
-        await usersService.delete(confirmDeleteId, stepUp.stepUpToken);
+        await usersService.delete(
+          confirmDeleteId,
+          stepUp.stepUpToken,
+          resolveActiveCompanyId(),
+        );
         setUsers((prev) => prev.filter((u) => u.id !== confirmDeleteId));
         toast.success('Usuário excluído definitivamente.');
       } else {
-        await usersService.gdprErasure(confirmDeleteId, stepUp.stepUpToken);
+        await usersService.gdprErasure(
+          confirmDeleteId,
+          stepUp.stepUpToken,
+          resolveActiveCompanyId(),
+        );
         setUsers((prev) => prev.filter((u) => u.id !== confirmDeleteId));
         toast.success('Dados anonimizados e usuário desativado!');
       }
@@ -98,9 +116,9 @@ export function useUsers() {
   const filteredUsers = useMemo(() => {
     const term = searchTerm.toLowerCase();
     return users.filter(user =>
-      user.nome.toLowerCase().includes(term) ||
-      user.cpf.includes(term) ||
-      (user.email && user.email.toLowerCase().includes(term))
+      (user.nome ?? '').toLowerCase().includes(term) ||
+      (user.cpf ?? '').includes(term) ||
+      (user.email ?? '').toLowerCase().includes(term)
     );
   }, [users, searchTerm]);
 

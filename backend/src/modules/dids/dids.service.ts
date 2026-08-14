@@ -24,6 +24,7 @@ import {
 } from '../../shared/dto/governed-pdf-access-response.dto';
 import { Site } from '../sites/entities/site.entity';
 import { User } from '../users/entities/user.entity';
+import { UserSite } from '../users/entities/user-site.entity';
 import { Did, DidStatus, DID_ALLOWED_TRANSITIONS } from './entities/did.entity';
 import { CreateDidDto } from './dto/create-did.dto';
 import { UpdateDidDto } from './dto/update-did.dto';
@@ -670,7 +671,19 @@ export class DidsService {
       select: ['id'],
     });
 
+    const siteLinks = await this.didRepository.manager
+      .getRepository(UserSite)
+      .find({
+        where: {
+          user_id: In(uniqueUserIds),
+          company_id: companyId,
+          site_id: siteId,
+        },
+        select: ['user_id'],
+      });
+
     const foundIds = new Set(users.map((user) => user.id));
+    siteLinks.forEach((link) => foundIds.add(link.user_id));
     const missingIds = uniqueUserIds.filter((userId) => !foundIds.has(userId));
 
     if (missingIds.length > 0) {

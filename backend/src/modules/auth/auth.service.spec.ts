@@ -21,6 +21,7 @@ import { SecurityAuditService } from '../../shared/security/security-audit.servi
 import { LoginAnomalyService } from './services/login-anomaly.service';
 import { PwnedPasswordService } from './services/pwned-password.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
+import { AuthPrincipalService } from './auth-principal.service';
 
 type UserSessionRepositoryMock = {
   insert: jest.Mock<Promise<unknown>, [Partial<UserSession>]>;
@@ -242,6 +243,13 @@ describe('AuthService', () => {
             run: jest.fn((_ctx: unknown, callback: () => unknown) =>
               callback(),
             ),
+          },
+        },
+        {
+          provide: AuthPrincipalService,
+          useValue: {
+            resolveCurrentUserContext: jest.fn().mockResolvedValue(null),
+            invalidateBridgeCache: jest.fn(),
           },
         },
       ],
@@ -797,6 +805,32 @@ describe('AuthService', () => {
       expect(redisClient.eval).toHaveBeenCalledTimes(1);
     });
 
+    it('busca o usuário pela função SECURITY DEFINER, não por SELECT com flag de sessão', async () => {
+      // Regressão da migration 361: a CTE com
+      // `set_config('app.is_super_admin','true')` que existia aqui virou letra
+      // morta — a RLS de `users` devolvia 0 linhas, nenhum e-mail era enviado, e
+      // a resposta genérica antienumeração escondia a falha de todo mundo.
+      dataSource.query.mockResolvedValueOnce([
+        {
+          id: 'user-1',
+          email: 'user@example.com',
+          nome: 'Usuário Teste',
+          status: true,
+        },
+      ]);
+
+      await service.forgotPassword('12345678900');
+
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('find_login_user'),
+        expect.any(Array),
+      );
+      expect(dataSource.query).not.toHaveBeenCalledWith(
+        expect.stringContaining('app.is_super_admin'),
+        expect.anything(),
+      );
+    });
+
     it('should keep a successful public response if e-mail delivery fails', async () => {
       dataSource.query.mockResolvedValueOnce([
         {
@@ -938,6 +972,9 @@ describe('AuthService', () => {
         'user-1',
         String(Date.now()),
       ]);
+      dataSource.query.mockResolvedValueOnce([
+        { user_id: 'user-1', company_id: 'company-1' },
+      ]);
 
       const result = await service.resetPassword(
         'valid-reset-token',
@@ -947,15 +984,53 @@ describe('AuthService', () => {
       expect(result.message).toContain('Senha redefinida com sucesso');
       expect(redisClient.eval).toHaveBeenCalledTimes(1);
       expect(redisService.clearAllRefreshTokens).toHaveBeenCalledWith('user-1');
-      expect(manager.update).toHaveBeenCalledWith(
-        User,
-        { id: 'user-1' },
-        { password: expect.any(String), must_change_password: false },
-      );
       expect(userSessionRepository.update).toHaveBeenCalledWith(
         { user_id: 'user-1', is_active: true },
         { is_active: false, revoked_at: expect.any(Date) },
       );
+    });
+
+    it('grava a senha pela função SECURITY DEFINER, não por UPDATE direto', async () => {
+      // Regressão da migration 361: `UPDATE users` na conexão de runtime é
+      // descartado pela RLS com 0 linhas afetadas e sem erro — o fluxo
+      // respondia "senha alterada" com a senha antiga intacta.
+      redisClient.eval.mockResolvedValueOnce([
+        'CONSUMED',
+        '1',
+        'user-1',
+        String(Date.now()),
+      ]);
+      dataSource.query.mockResolvedValueOnce([
+        { user_id: 'user-1', company_id: 'company-1' },
+      ]);
+
+      await service.resetPassword('valid-reset-token', 'Nova@Senha123');
+
+      expect(dataSource.query).toHaveBeenCalledWith(
+        expect.stringContaining('reset_login_user_password'),
+        ['user-1', expect.any(String)],
+      );
+      expect(manager.update).not.toHaveBeenCalledWith(
+        User,
+        { id: 'user-1' },
+        expect.anything(),
+      );
+    });
+
+    it('falha alto quando nenhuma linha é atualizada', async () => {
+      // Sem esta guarda, um usuário inexistente ou excluído recebia
+      // "senha redefinida com sucesso" sem que nada tivesse mudado.
+      redisClient.eval.mockResolvedValueOnce([
+        'CONSUMED',
+        '1',
+        'user-inexistente',
+        String(Date.now()),
+      ]);
+      dataSource.query.mockResolvedValueOnce([]);
+
+      await expect(
+        service.resetPassword('valid-reset-token', 'Nova@Senha123'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('bloqueia reuso de token e registra auditoria', async () => {

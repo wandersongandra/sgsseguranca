@@ -40,7 +40,9 @@ async function main() {
     }
 
     console.log('[MIGRATIONS] Pending migrations found. Applying...');
-    const applied = await dataSource.runMigrations({ transaction: 'all' });
+    // Respeita migrations que declaram transaction = false (por exemplo,
+    // operações DDL que precisam liberar locks entre tabelas).
+    const applied = await dataSource.runMigrations({ transaction: 'each' });
     console.log(`[MIGRATIONS] Applied ${applied.length} migration(s).`);
   } catch (error) {
     console.error(

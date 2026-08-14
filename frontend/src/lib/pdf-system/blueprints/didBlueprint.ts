@@ -2,7 +2,7 @@ import type { Did } from '@/services/didsService';
 import {
   getDidStatusLabel,
   getDidTurnoLabel,
-} from '@/app/dashboard/dids/didMeta';
+} from '../../../../app/dashboard/dids/didMeta';
 import type { AutoTableFn, PdfContext } from '../core/types';
 import { formatDate, formatDateTime, sanitize } from '../core/format';
 import {

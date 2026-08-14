@@ -1,3 +1,5 @@
+'use client';
+
 import React, { memo, useCallback, useState } from 'react';
 import { Mail, Send, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';

@@ -15,12 +15,14 @@ import { SecurityAuditModule } from '../../shared/security/security-audit.module
 import { ConsentsModule } from '../consents/consents.module';
 import { PwnedPasswordService } from '../auth/services/pwned-password.service';
 import { MailModule } from '../../infra/mail/mail.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
   imports: [
     SecurityAuditModule,
     ConsentsModule,
     forwardRef(() => MailModule),
+    forwardRef(() => AuthModule),
     TypeOrmModule.forFeature([
       User,
       UserSite,

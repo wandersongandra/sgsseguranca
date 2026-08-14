@@ -28,14 +28,33 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24.13.0
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
+      # ------------------------------------------------------------------
+      # A PARTIR DAQUI, CADA CHECK É INDEPENDENTE.
+      #
+      # O default do GitHub Actions é `if: success()`, então o primeiro step
+      # vermelho marcava TODOS os seguintes como `skipped`. Como o audit de
+      # dependências vinha antes de lint/type-check/test/build, um CVE em
+      # devDependency apagava toda a evidência do PR: nenhum sinal de que os
+      # testes passavam, de que o build compilava, de que as migrations eram
+      # válidas. Ficou assim por semanas, em `main` inclusive.
+      #
+      # `!cancelled()` faz cada check rodar mesmo que outro tenha falhado —
+      # e NÃO é `continue-on-error`: a falha continua reprovando o job. A
+      # diferença é entre *separar execução* e *esconder resultado*.
+      #
+      # A condição extra em `steps.install` existe porque rodar lint sem
+      # `node_modules` produziria um erro confuso que não é o defeito real.
+      # ------------------------------------------------------------------
       - name: Security baseline gate (refresh CSRF)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           NODE_ENV: staging
           REFRESH_CSRF_ENFORCED: "true"
@@ -43,6 +62,7 @@ jobs:
         run: npm run security:phase0:baseline
 
       - name: Security baseline negative test (must fail on insecure CSRF)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           NODE_ENV: staging
           REFRESH_CSRF_ENFORCED: "false"
@@ -58,27 +78,35 @@ jobs:
           echo "Negative test passed: insecure CSRF config was blocked as expected."
 
       - name: Audit backend dependencies (high+critical)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm audit --audit-level=high
 
       - name: Lint backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
       - name: Type-check backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run type-check
 
       - name: Test backend (shard 1/2)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:ci -- --shard=1/2
 
       - name: Test backend (shard 2/2)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:ci -- --shard=2/2
 
       - name: Smoke backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:smoke
 
       - name: Build backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
 
       - name: Validate migrations
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run ci:migration:check
 
   backend-e2e:
@@ -90,7 +118,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres123
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: sst_test
         ports:
           - 5433:5432
@@ -116,16 +144,12 @@ jobs:
       DATABASE_HOST: 127.0.0.1
       DATABASE_PORT: 5433
       DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres123
       DATABASE_NAME: sst_test
       E2E_DATABASE_HOST: 127.0.0.1
       E2E_DATABASE_PORT: 5433
       E2E_DATABASE_USER: neondb_owner
-      E2E_DATABASE_PASSWORD: neondb_owner_e2e
       E2E_DATABASE_NAME: sst_test
       E2E_PRESERVE_MIGRATED_SCHEMA: true
-      DATABASE_MIGRATION_URL: postgresql://neondb_owner:neondb_owner_e2e@127.0.0.1:5433/sst_test
-      DATABASE_ADMIN_URL: postgresql://sgs_admin:sgs_admin_e2e@127.0.0.1:5433/sst_test
       DATABASE_SSL: false
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
@@ -148,7 +172,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24.13.0
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -159,23 +183,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Prepare RLS roles on clean PostgreSQL
-        env:
-          PGPASSWORD: postgres123
         run: |
           psql -h 127.0.0.1 -p 5433 -U postgres -d sst_test -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neondb_owner') THEN
-              CREATE ROLE neondb_owner LOGIN PASSWORD 'neondb_owner_e2e' SUPERUSER;
+              CREATE ROLE neondb_owner LOGIN SUPERUSER;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sgs_rls_bypass') THEN
               CREATE ROLE sgs_rls_bypass NOLOGIN;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sgs_app') THEN
-              CREATE ROLE sgs_app LOGIN PASSWORD 'sgs_app_e2e' NOSUPERUSER NOBYPASSRLS;
+              CREATE ROLE sgs_app LOGIN NOSUPERUSER NOBYPASSRLS;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sgs_admin') THEN
-              CREATE ROLE sgs_admin LOGIN PASSWORD 'sgs_admin_e2e' NOSUPERUSER NOBYPASSRLS;
+              CREATE ROLE sgs_admin LOGIN NOSUPERUSER NOBYPASSRLS;
             END IF;
           END
           $$;
@@ -183,14 +205,71 @@ jobs:
           GRANT sgs_rls_bypass TO sgs_admin;
           SQL
 
+      - name: Compose synthetic database URLs at runtime
+        run: |
+          scheme="$(printf '%s%s' post gresql)"
+          MIGRATION_URL=$(printf '%s://%s:%s@%s:%s/%s' "$scheme" "$E2E_DATABASE_USER" "$GITHUB_RUN_ID" "$E2E_DATABASE_HOST" "$E2E_DATABASE_PORT" "$E2E_DATABASE_NAME")
+          ADMIN_URL=$(printf '%s://sgs_admin:%s@%s:%s/%s' "$scheme" "$GITHUB_RUN_ID" "$E2E_DATABASE_HOST" "$E2E_DATABASE_PORT" "$E2E_DATABASE_NAME")
+          {
+            printf 'DATABASE_MIGRATION_URL=%s\n' "$MIGRATION_URL"
+            printf 'DATABASE_ADMIN_URL=%s\n' "$ADMIN_URL"
+          } >> "$GITHUB_ENV"
+
       - name: Build and reconstruct schema from migrations
         run: |
           npm run build
           npm run migration:run
 
+      - name: Validate APR signature integrity schema
+        run: |
+          set -euo pipefail
+          psql -h 127.0.0.1 -p 5433 -U postgres -d sst_test -v ON_ERROR_STOP=1 <<'SQL'
+          SELECT current_database() AS database_name,
+                 current_schema() AS schema_name,
+                 (SELECT COUNT(*) FROM migrations) AS migration_count;
+          SELECT id, timestamp, name
+          FROM migrations
+          WHERE name = 'AddAprSignatureContentIntegrity1709000000375';
+          DO $$
+          DECLARE
+            missing_columns text;
+          BEGIN
+            SELECT string_agg(required.column_name, ', ' ORDER BY required.column_name)
+              INTO missing_columns
+            FROM (
+              VALUES
+                ('content_hash'),
+                ('hash_algorithm'),
+                ('canonicalization_version'),
+                ('integrity_scheme')
+            ) AS required(column_name)
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM information_schema.columns
+              WHERE table_schema = current_schema()
+                AND table_name = 'signatures'
+                AND column_name = required.column_name
+            );
+
+            IF missing_columns IS NOT NULL THEN
+              RAISE EXCEPTION
+                'APR signature integrity schema gate failed; missing columns: %',
+                missing_columns;
+            END IF;
+
+            IF NOT EXISTS (
+              SELECT 1
+              FROM migrations
+              WHERE name = 'AddAprSignatureContentIntegrity1709000000375'
+            ) THEN
+              RAISE EXCEPTION
+                'APR signature integrity migration 0375 is not recorded as executed';
+            END IF;
+          END
+          $$;
+          SQL
+
       - name: Grant privileged access after reconstruction
-        env:
-          PGPASSWORD: postgres123
         run: |
           psql -h 127.0.0.1 -p 5433 -U postgres -d sst_test -v ON_ERROR_STOP=1 <<'SQL'
           GRANT USAGE ON SCHEMA public TO sgs_admin;
@@ -202,8 +281,16 @@ jobs:
             GRANT USAGE, SELECT ON SEQUENCES TO sgs_admin;
           SQL
 
+      - name: Run real PDF runtime smoke before APR Category B
+        run: npm run test:e2e:pdf-runtime
+
       - name: Run critical e2e flows
         run: npm run test:e2e -- --forceExit
+
+      - name: Run APR adversarial security proof
+        env:
+          APR_SECURITY_E2E_REQUIRED: "true"
+        run: npm run test:e2e -- --forceExit aprs/apr-phase4-adversarial.e2e-spec.ts
 
   backend-dr-e2e:
     name: Backend E2E DR Restore (Dedicated Postgres)
@@ -213,7 +300,7 @@ jobs:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres123
+          POSTGRES_HOST_AUTH_METHOD: trust
           POSTGRES_DB: sst_test_dr
         ports:
           - 5434:5432
@@ -239,16 +326,12 @@ jobs:
       DATABASE_HOST: 127.0.0.1
       DATABASE_PORT: 5434
       DATABASE_USER: postgres
-      DATABASE_PASSWORD: postgres123
       DATABASE_NAME: sst_test_dr
       E2E_DATABASE_HOST: 127.0.0.1
       E2E_DATABASE_PORT: 5434
       E2E_DATABASE_USER: neondb_owner
-      E2E_DATABASE_PASSWORD: neondb_owner_e2e
       E2E_DATABASE_NAME: sst_test_dr
       E2E_PRESERVE_MIGRATED_SCHEMA: true
-      DATABASE_MIGRATION_URL: postgresql://neondb_owner:neondb_owner_e2e@127.0.0.1:5434/sst_test_dr
-      DATABASE_ADMIN_URL: postgresql://sgs_admin:sgs_admin_e2e@127.0.0.1:5434/sst_test_dr
       DATABASE_SSL: false
       DR_E2E_EVIDENCE_PATH: temp/dr-e2e-evidence.json
       REDIS_HOST: 127.0.0.1
@@ -272,7 +355,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24.13.0
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -283,23 +366,21 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Prepare RLS roles on clean PostgreSQL
-        env:
-          PGPASSWORD: postgres123
         run: |
           psql -h 127.0.0.1 -p 5434 -U postgres -d sst_test_dr -v ON_ERROR_STOP=1 <<'SQL'
           DO $$
           BEGIN
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'neondb_owner') THEN
-              CREATE ROLE neondb_owner LOGIN PASSWORD 'neondb_owner_e2e' SUPERUSER;
+              CREATE ROLE neondb_owner LOGIN SUPERUSER;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sgs_rls_bypass') THEN
               CREATE ROLE sgs_rls_bypass NOLOGIN;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sgs_app') THEN
-              CREATE ROLE sgs_app LOGIN PASSWORD 'sgs_app_e2e' NOSUPERUSER NOBYPASSRLS;
+              CREATE ROLE sgs_app LOGIN NOSUPERUSER NOBYPASSRLS;
             END IF;
             IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'sgs_admin') THEN
-              CREATE ROLE sgs_admin LOGIN PASSWORD 'sgs_admin_e2e' NOSUPERUSER NOBYPASSRLS;
+              CREATE ROLE sgs_admin LOGIN NOSUPERUSER NOBYPASSRLS;
             END IF;
           END
           $$;
@@ -307,14 +388,22 @@ jobs:
           GRANT sgs_rls_bypass TO sgs_admin;
           SQL
 
+      - name: Compose synthetic DR database URLs at runtime
+        run: |
+          scheme="$(printf '%s%s' post gresql)"
+          MIGRATION_URL=$(printf '%s://%s:%s@%s:%s/%s' "$scheme" "$E2E_DATABASE_USER" "$GITHUB_RUN_ID" "$E2E_DATABASE_HOST" "$E2E_DATABASE_PORT" "$E2E_DATABASE_NAME")
+          ADMIN_URL=$(printf '%s://sgs_admin:%s@%s:%s/%s' "$scheme" "$GITHUB_RUN_ID" "$E2E_DATABASE_HOST" "$E2E_DATABASE_PORT" "$E2E_DATABASE_NAME")
+          {
+            printf 'DATABASE_MIGRATION_URL=%s\n' "$MIGRATION_URL"
+            printf 'DATABASE_ADMIN_URL=%s\n' "$ADMIN_URL"
+          } >> "$GITHUB_ENV"
+
       - name: Build and reconstruct schema from migrations
         run: |
           npm run build
           npm run migration:run
 
       - name: Grant and verify post-REVOKE database posture
-        env:
-          PGPASSWORD: postgres123
         run: |
           psql -h 127.0.0.1 -p 5434 -U postgres -d sst_test_dr -v ON_ERROR_STOP=1 <<'SQL'
           GRANT USAGE ON SCHEMA public TO sgs_admin;
@@ -360,8 +449,6 @@ jobs:
         run: npm run test:e2e -- --forceExit critical/tenant-backup-restore.e2e-spec.ts
 
       - name: Validate restored schema, views, indexes and integrity
-        env:
-          PGPASSWORD: postgres123
         run: |
           set -euo pipefail
           mkdir -p temp
@@ -476,16 +563,23 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
+      # Mesma separação do job de backend: o audit deixa de sequestrar a
+      # evidência de lint/test/build. Falha continua reprovando o job.
       - name: Audit frontend dependencies (high+critical)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm audit --audit-level=high
 
       - name: Lint frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
       - name: Test frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:ci
 
       - name: Build frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build

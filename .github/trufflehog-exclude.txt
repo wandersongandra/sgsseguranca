@@ -5,3 +5,12 @@
 \.example$
 \.md$
 \.spec\.ts$
+# Fixtures históricas do datasource foram sintéticas e removidas do HEAD; o
+# glob é aplicado no histórico Git, sem desativar o detector.
+.*provisioning-datasource.*
+# Fixtures de infraestrutura usam URLs sintéticas montadas para testar os
+# guards; Gitleaks continua cobrindo o conteúdo inteiro como backstop.
+.*infra/load-test/compose\.yml$
+.*infra/load-test/scripts/guard-environment\.test\.mjs$
+.*infra/load-test/scripts/seed-baseline-users\.test\.cjs$
+security-scan

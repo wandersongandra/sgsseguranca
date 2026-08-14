@@ -320,6 +320,7 @@ useEffect(() => {
                       src={previewImage}
                       alt="Preview"
                       fill
+                      sizes="(min-width: 640px) 480px, 100vw"
                       className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] object-contain p-2"
                     />
                   </div>
@@ -349,6 +350,7 @@ useEffect(() => {
                     src={previewImage}
                     alt="Foto Capturada"
                     fill
+                    sizes="(min-width: 640px) 480px, 100vw"
                     className="object-cover"
                   />
                 ) : (

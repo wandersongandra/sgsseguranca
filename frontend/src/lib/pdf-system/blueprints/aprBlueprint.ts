@@ -68,14 +68,14 @@ type AprStructuredRiskRow = {
 
 type AprParticipantLike = { id?: string; nome?: string; funcao?: string | null };
 
-const APR_TEAL: [number, number, number] = [0, 128, 128];
-const APR_TEAL_SOFT: [number, number, number] = [255, 255, 255];
-const APR_HEADER_GRAY: [number, number, number] = [217, 217, 217];
-const APR_ACCEPTABLE: [number, number, number] = [0, 176, 80];
-const APR_ATTENTION: [number, number, number] = [0, 112, 192];
-const APR_SUBSTANTIAL: [number, number, number] = [255, 192, 0];
-const APR_CRITICAL: [number, number, number] = [255, 0, 0];
-const APR_DARK: [number, number, number] = [0, 0, 0];
+const APR_TEAL: [number, number, number] = [31, 78, 121];
+const APR_TEAL_SOFT: [number, number, number] = [248, 250, 252];
+const APR_HEADER_GRAY: [number, number, number] = [226, 232, 240];
+const APR_ACCEPTABLE: [number, number, number] = [22, 101, 52];
+const APR_ATTENTION: [number, number, number] = [31, 95, 149];
+const APR_SUBSTANTIAL: [number, number, number] = [180, 83, 9];
+const APR_CRITICAL: [number, number, number] = [185, 28, 28];
+const APR_DARK: [number, number, number] = [15, 23, 42];
 const APR_WHITE: [number, number, number] = [255, 255, 255];
 
 function normalizeRiskLabel(value: unknown): string {
@@ -1061,6 +1061,7 @@ export async function drawAprBlueprint(
 
   drawRiskTable(ctx, autoTable, riskRows, {
     semanticRules: { profile: "apr" },
+    layout: "cards",
   });
 
   drawAprComplementaryInfo(ctx, autoTable, apr);
@@ -1132,6 +1133,4 @@ export async function drawAprBlueprint(
     accentSoftColor: [240, 249, 248],
   });
 }
-
-
 

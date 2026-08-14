@@ -1,14 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import {
-  ChangeEvent,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-  useRef,
-} from "react";
+import { ChangeEvent, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type {
   Apr,
   AprActivityTemplate,
@@ -69,10 +62,11 @@ import { cn } from "@/lib/utils";
 import { downloadExcel } from "@/lib/download-excel";
 import type { AprLogEntry } from "./AprTimeline";
 import { useAuth } from "@/context/AuthContext";
-import { Permission } from '@/lib/permissions';
-import type {
-  SophieDraftChecklistSuggestion,
-  SophieDraftRiskSuggestion,
+import { Permission } from "@/lib/permissions";
+import {
+  readSophieAprDraft,
+  type SophieDraftChecklistSuggestion,
+  type SophieDraftRiskSuggestion,
 } from "@/lib/sophie-draft-storage";
 import { applyAprImportPreview } from "@/lib/apr-import";
 import { aprSchema, type AprFormData } from "./aprForm.schema";
@@ -129,29 +123,23 @@ import {
   SummaryMetaCard,
   WizardMetric,
 } from "./AprFormPresentation";
+import { AprDocumentHero } from "./AprDocumentHero";
 
 const SignatureModal = dynamic(
   () =>
-    import("../../checklists/components/SignatureModal").then(
-      (module) => module.SignatureModal,
-    ),
+    import("../../checklists/components/SignatureModal").then((module) => module.SignatureModal),
   { ssr: false },
 );
 
-const AprTimeline = dynamic(
-  () => import("./AprTimeline").then((module) => module.AprTimeline),
-  {
-    loading: () => (
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--component-card-border)] bg-[color:var(--component-card-bg)] p-4 text-sm text-[var(--ds-color-text-secondary)]">
-        Carregando histórico da APR...
-      </div>
-    ),
-  },
-);
+const AprTimeline = dynamic(() => import("./AprTimeline").then((module) => module.AprTimeline), {
+  loading: () => (
+    <div className="rounded-[var(--ds-radius-xl)] border border-[var(--component-card-border)] bg-[color:var(--component-card-bg)] p-4 text-sm text-[var(--ds-color-text-secondary)]">
+      Carregando histórico da APR...
+    </div>
+  ),
+});
 
-const AprRiskRow = dynamic(() =>
-  import("./AprRiskRow").then((module) => module.AprRiskRow),
-);
+const AprRiskRow = dynamic(() => import("./AprRiskRow").then((module) => module.AprRiskRow));
 
 const AprExecutiveSummary = dynamic(() =>
   import("./AprExecutiveSummary").then((module) => module.AprExecutiveSummary),
@@ -240,12 +228,13 @@ const APR_STEPS = [
 
 const aprBackButtonClass =
   "group rounded-full p-2 text-[var(--ds-color-text-secondary)] transition-none hover:bg-transparent hover:text-[var(--ds-color-text-secondary)]";
-const aprSectionTitleClass =
-  "mb-3 text-sm font-bold text-[var(--ds-color-text-primary)]";
+const aprSectionTitleClass = "mb-3 text-sm font-bold text-[var(--ds-color-text-primary)]";
 const aprLabelClass =
   "mb-1.5 block text-[13px] font-semibold text-[var(--ds-color-text-secondary)]";
 const AprRequiredMark = () => (
-  <span aria-hidden="true" className="ml-0.5 text-[var(--color-danger)]">*</span>
+  <span aria-hidden="true" className="ml-0.5 text-[var(--color-danger)]">
+    *
+  </span>
 );
 const aprLabelCompactClass =
   "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]";
@@ -288,7 +277,6 @@ const aprFieldStatCardClass =
   "rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[color:var(--ds-color-surface-muted)]/28 px-3 py-3";
 const renderLegacyAprContext = false;
 
-
 /* function getCategoriaBadgeClass(categoria?: string) {
   switch (categoria) {
     case "Aceitável":
@@ -319,8 +307,7 @@ export function AprForm({ id }: AprFormProps) {
   const isCreateMode = !id;
   const canWriteApr = isCreateMode ? canCreate : canUpdate;
   const lacksWritePermission = !canWriteApr;
-  const isUnauthorized =
-    (!canView && !canCreate && !canUpdate) || (isCreateMode && !canCreate);
+  const isUnauthorized = (!canView && !canCreate && !canUpdate) || (isCreateMode && !canCreate);
 
   // Guard de acesso sem quebrar a ordem dos hooks.
   useEffect(() => {
@@ -332,19 +319,11 @@ export function AprForm({ id }: AprFormProps) {
   const { getActionCriteriaText } = useAprCalculations();
   const prefillCompanyIdParam = searchParams.get("company_id");
   const prefillSiteIdParam = searchParams.get("site_id");
-  const prefillUserIdParam =
-    searchParams.get("elaborador_id") || searchParams.get("user_id");
-  const prefillCompanyId = isUuidLike(prefillCompanyIdParam)
-    ? String(prefillCompanyIdParam)
-    : "";
-  const prefillSiteId = isUuidLike(prefillSiteIdParam)
-    ? String(prefillSiteIdParam)
-    : "";
-  const prefillUserId = isUuidLike(prefillUserIdParam)
-    ? String(prefillUserIdParam)
-    : "";
-  const prefillTitle = searchParams.get("title") || "";
-  const prefillDescription = searchParams.get("description") || "";
+  const prefillUserIdParam = searchParams.get("elaborador_id") || searchParams.get("user_id");
+  const prefillCompanyId = isUuidLike(prefillCompanyIdParam) ? String(prefillCompanyIdParam) : "";
+  const prefillSiteId = isUuidLike(prefillSiteIdParam) ? String(prefillSiteIdParam) : "";
+  const prefillUserId = isUuidLike(prefillUserIdParam) ? String(prefillUserIdParam) : "";
+  const isSophieDraft = searchParams.get("apr_draft") === "sophie";
   const isFieldMode = searchParams.get("field") === "1";
   const [fetching, setFetching] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -391,8 +370,7 @@ export function AprForm({ id }: AprFormProps) {
   >([]);
   const [suggestingControls, setSuggestingControls] = useState(false);
   const [importingExcel, setImportingExcel] = useState(false);
-  const [excelPreview, setExcelPreview] =
-    useState<AprExcelImportPreview | null>(null);
+  const [excelPreview, setExcelPreview] = useState<AprExcelImportPreview | null>(null);
   const [activityTemplates, setActivityTemplates] = useState<
     Array<Pick<AprActivityTemplate, "tipo_atividade" | "label" | "descricao">>
   >([]);
@@ -411,12 +389,8 @@ export function AprForm({ id }: AprFormProps) {
 
   // Signature States
   const [isSignatureModalOpen, setIsSignatureModalOpen] = useState(false);
-  const [currentSigningUser, setCurrentSigningUser] = useState<User | null>(
-    null,
-  );
-  const [signatures, setSignatures] = useState<
-    Record<string, { data: string; type: string }>
-  >({});
+  const [currentSigningUser, setCurrentSigningUser] = useState<User | null>(null);
+  const [signatures, setSignatures] = useState<Record<string, { data: string; type: string }>>({});
   const [persistedSignatures, setPersistedSignatures] = useState<
     Record<string, { id?: string; data: string; type: string }>
   >({});
@@ -424,12 +398,9 @@ export function AprForm({ id }: AprFormProps) {
   const submitIntentRef = useRef<"save" | "save_and_print">("save");
   const excelInputRef = useRef<HTMLInputElement | null>(null);
   const compliancePanelRef = useRef<HTMLDivElement | null>(null);
-  const [complianceResult, setComplianceResult] =
-    useState<AprValidationResult | null>(null);
+  const [complianceResult, setComplianceResult] = useState<AprValidationResult | null>(null);
   const [formVersion, setFormVersion] = useState(0);
-  const [formActionModal, setFormActionModal] = useState<
-    "approve" | "finalize" | null
-  >(null);
+  const [formActionModal, setFormActionModal] = useState<"approve" | "finalize" | null>(null);
   const [formActionModalLoading, setFormActionModalLoading] = useState(false);
   // C01 — Confirmar descarte de sync offline
   const [confirmDiscardOpen, setConfirmDiscardOpen] = useState(false);
@@ -460,8 +431,8 @@ export function AprForm({ id }: AprFormProps) {
     defaultValues: {
       pdf_signed: false,
       numero: "",
-      titulo: prefillTitle,
-      descricao: prefillDescription,
+      titulo: "",
+      descricao: "",
       tipo_atividade: "",
       frente_trabalho: "",
       area_risco: "",
@@ -473,9 +444,7 @@ export function AprForm({ id }: AprFormProps) {
       is_modelo: false,
       is_modelo_padrao: false,
       data_inicio: new Date().toISOString().split("T")[0],
-      data_fim: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split("T")[0],
+      data_fim: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
       company_id: prefillCompanyId,
       site_id: prefillSiteId,
       elaborador_id: prefillUserId,
@@ -488,6 +457,16 @@ export function AprForm({ id }: AprFormProps) {
       itens_risco: [],
     },
   });
+
+  useEffect(() => {
+    if (id || !isSophieDraft || !prefillCompanyId) return;
+    const values = readSophieAprDraft(prefillCompanyId)?.values;
+    if (!values) return;
+    if (typeof values.titulo === "string") setValue("titulo", values.titulo);
+    if (typeof values.descricao === "string") {
+      setValue("descricao", values.descricao);
+    }
+  }, [id, isSophieDraft, prefillCompanyId, setValue]);
 
   const getValuesRef = useRef(getValues);
   useEffect(() => {
@@ -515,11 +494,8 @@ export function AprForm({ id }: AprFormProps) {
   });
   const isModelo = watch("is_modelo");
   const approvalSteps = currentApr?.approval_steps || [];
-  const pendingApprovalStep =
-    approvalSteps.find((step) => step.status === "pending") || null;
-  const approvalProgressStarted = approvalSteps.some(
-    (step) => step.status !== "pending",
-  );
+  const pendingApprovalStep = approvalSteps.find((step) => step.status === "pending") || null;
+  const approvalProgressStarted = approvalSteps.some((step) => step.status !== "pending");
   const isApproved = currentApr?.status === "Aprovada";
   const hasFinalPdf = Boolean(currentApr?.has_final_pdf);
   const isReadOnly =
@@ -604,39 +580,24 @@ export function AprForm({ id }: AprFormProps) {
     currentStep,
     getValues: () => getValues(),
   });
-  const filteredSites = sites.filter(
-    (site) => site.company_id === selectedCompanyId,
-  );
+  const filteredSites = sites.filter((site) => site.company_id === selectedCompanyId);
   const filteredUsers = users.filter((user) =>
     isUserVisibleForSite(user, selectedCompanyId, selectedSiteId),
   );
   const signatureChanges = useMemo(() => {
-    const signaturesToDelete = Object.entries(persistedSignatures).filter(
-      ([userId, persisted]) => {
-        const current = signatures[userId];
-        return (
-          !current ||
-          current.data !== persisted.data ||
-          current.type !== persisted.type
-        );
-      },
-    );
-    const signaturesToCreate = Object.entries(signatures).filter(
-      ([userId, current]) => {
-        const persisted = persistedSignatures[userId];
-        return (
-          !persisted ||
-          current.data !== persisted.data ||
-          current.type !== persisted.type
-        );
-      },
-    );
+    const signaturesToDelete = Object.entries(persistedSignatures).filter(([userId, persisted]) => {
+      const current = signatures[userId];
+      return !current || current.data !== persisted.data || current.type !== persisted.type;
+    });
+    const signaturesToCreate = Object.entries(signatures).filter(([userId, current]) => {
+      const persisted = persistedSignatures[userId];
+      return !persisted || current.data !== persisted.data || current.type !== persisted.type;
+    });
 
     return {
       signaturesToDelete,
       signaturesToCreate,
-      hasPendingChanges:
-        signaturesToDelete.length > 0 || signaturesToCreate.length > 0,
+      hasPendingChanges: signaturesToDelete.length > 0 || signaturesToCreate.length > 0,
     };
   }, [persistedSignatures, signatures]);
   const offlineSyncIdentity = useMemo(() => {
@@ -672,14 +633,8 @@ export function AprForm({ id }: AprFormProps) {
     name: "participants",
     defaultValue: [],
   });
-  const selectedRiskIds = useMemo(
-    () => selectedRiskIdsRaw ?? [],
-    [selectedRiskIdsRaw],
-  );
-  const selectedEpiIds = useMemo(
-    () => selectedEpiIdsRaw ?? [],
-    [selectedEpiIdsRaw],
-  );
+  const selectedRiskIds = useMemo(() => selectedRiskIdsRaw ?? [], [selectedRiskIdsRaw]);
+  const selectedEpiIds = useMemo(() => selectedEpiIdsRaw ?? [], [selectedEpiIdsRaw]);
   const selectedParticipantIds = useMemo(
     () => selectedParticipantIdsRaw ?? [],
     [selectedParticipantIdsRaw],
@@ -693,8 +648,7 @@ export function AprForm({ id }: AprFormProps) {
       case "syncing":
         return {
           badge: "Sincronizando base",
-          summary:
-            "A APR base já foi salva localmente e está em sincronização com o servidor.",
+          summary: "A APR base já foi salva localmente e está em sincronização com o servidor.",
           nextStep:
             "Aguarde a confirmação da sincronização para continuar assinaturas, PDF final e emissão governada.",
         };
@@ -703,16 +657,14 @@ export function AprForm({ id }: AprFormProps) {
           badge: "Falha na sincronização",
           summary:
             "A APR base segue salva localmente, mas a sincronização falhou e exige ação do operador.",
-          nextStep:
-            "Tente sincronizar novamente ou descarte este envio local antes de reenviar.",
+          nextStep: "Tente sincronizar novamente ou descarte este envio local antes de reenviar.",
         };
       case "synced_base":
         return {
           badge: "Base sincronizada",
           summary:
             "A APR base já alcançou o servidor. O que falta agora é concluir assinaturas e emissão final online.",
-          nextStep:
-            "Libere o rascunho para continuar a conclusão operacional com conexão ativa.",
+          nextStep: "Libere o rascunho para continuar a conclusão operacional com conexão ativa.",
         };
       case "orphaned":
         return {
@@ -742,16 +694,10 @@ export function AprForm({ id }: AprFormProps) {
     [readOnlyReason],
   );
   const aiEnabled = isAiEnabled();
-  const selectedCompany = companies.find(
-    (company) => company.id === selectedCompanyId,
-  );
-  const selectedElaborador = users.find(
-    (user) => user.id === selectedElaboradorId,
-  );
+  const selectedCompany = companies.find((company) => company.id === selectedCompanyId);
+  const selectedElaborador = users.find((user) => user.id === selectedElaboradorId);
   const selectedActivityTemplateSummary =
-    activityTemplates.find(
-      (template) => template.tipo_atividade === selectedTipoAtividade,
-    ) || null;
+    activityTemplates.find((template) => template.tipo_atividade === selectedTipoAtividade) || null;
   const selectedActivityTypeLabel =
     selectedActivityTemplateSummary?.label ||
     (hasText(selectedTipoAtividade)
@@ -796,8 +742,7 @@ export function AprForm({ id }: AprFormProps) {
         hasText(item.etapa) ||
         hasText(item.condicao_perigosa) ||
         hasText(item.agente_ambiental);
-      const hasEvaluation =
-        hasText(item.probabilidade) && hasText(item.severidade);
+      const hasEvaluation = hasText(item.probabilidade) && hasText(item.severidade);
       const hasControl =
         hasText(item.medidas_prevencao) ||
         hasText(item.epc) ||
@@ -849,10 +794,7 @@ export function AprForm({ id }: AprFormProps) {
         }
       })
       .catch((error) => {
-        logger.error(
-          "Erro ao carregar detalhes do template de atividade da APR:",
-          error,
-        );
+        logger.error("Erro ao carregar detalhes do template de atividade da APR:", error);
         if (active) {
           setSelectedActivityTemplate(null);
         }
@@ -886,13 +828,9 @@ export function AprForm({ id }: AprFormProps) {
       params.set("templateId", suggestion.id);
       if (selectedCompanyId) params.set("company_id", selectedCompanyId);
       if (selectedSiteId) params.set("site_id", selectedSiteId);
-      if (tituloApr) params.set("title", `${tituloApr} • ${suggestion.label}`);
-      if (watch("descricao")) {
-        params.set("description", String(watch("descricao")));
-      }
       return `/dashboard/checklists/new?${params.toString()}`;
     },
-    [selectedCompanyId, selectedSiteId, tituloApr, watch],
+    [selectedCompanyId, selectedSiteId],
   );
 
   const {
@@ -910,10 +848,7 @@ export function AprForm({ id }: AprFormProps) {
     name: "itens_risco",
   }) as AprFormData["itens_risco"];
   const materiallyCompleteRiskCount = useMemo(
-    () =>
-      (watchedRiskRows || []).filter((item) =>
-        isRiskRowMateriallyComplete(item),
-      ).length,
+    () => (watchedRiskRows || []).filter((item) => isRiskRowMateriallyComplete(item)).length,
     [isRiskRowMateriallyComplete, watchedRiskRows],
   );
   const totalRiskLines = riskFields.length;
@@ -921,9 +856,9 @@ export function AprForm({ id }: AprFormProps) {
   const [compactMode, setCompactMode] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const riskFieldsRef = useRef(riskFields);
-  const pendingRiskRemovalTimeoutsRef = useRef<
-    Map<string, ReturnType<typeof setTimeout>>
-  >(new Map());
+  const pendingRiskRemovalTimeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
   const registerOfflineBlocked = useCallback(
     (reason: string) => {
       trackAprOfflineTelemetry("offline_blocked", {
@@ -958,9 +893,7 @@ export function AprForm({ id }: AprFormProps) {
     const catalogLabels = selectedEpiCatalog.map((epi) =>
       epi.ca ? `${epi.nome} CA ${epi.ca}` : epi.nome,
     );
-    const rowLabels = (watchedRiskRows || []).flatMap((item) =>
-      splitDocumentTokens(item?.epi),
-    );
+    const rowLabels = (watchedRiskRows || []).flatMap((item) => splitDocumentTokens(item?.epi));
 
     return uniqueDocumentTokens([...catalogLabels, ...rowLabels]).slice(0, 7);
   }, [selectedEpiCatalog, watchedRiskRows]);
@@ -976,18 +909,15 @@ export function AprForm({ id }: AprFormProps) {
       (acc, level) => ({ ...acc, [level.key]: 0 }),
       {} as Record<AprDocumentRiskLevel, number>,
     );
-    const startedRows = (watchedRiskRows || []).filter((item) =>
-      isRiskRowStarted(item),
-    );
+    const startedRows = (watchedRiskRows || []).filter((item) => isRiskRowStarted(item));
 
     startedRows.forEach((item) => {
       counts[inferAprDocumentRiskLevel(item)] += 1;
     });
 
     const highestLevel =
-      [...APR_DOCUMENT_RISK_LEVELS]
-        .reverse()
-        .find((level) => counts[level.key] > 0)?.label || "Sem risco mapeado";
+      [...APR_DOCUMENT_RISK_LEVELS].reverse().find((level) => counts[level.key] > 0)?.label ||
+      "Sem risco mapeado";
 
     return {
       counts,
@@ -996,10 +926,8 @@ export function AprForm({ id }: AprFormProps) {
       criticalCount: counts.alto + counts.critico,
     };
   }, [isRiskRowStarted, watchedRiskRows]);
-  const aprDocumentNumber =
-    watch("numero") || currentApr?.numero || (id ? "APR" : "Nova APR");
-  const aprDocumentTitle =
-    tituloApr || currentApr?.titulo || "Atividade ainda não definida";
+  const aprDocumentNumber = watch("numero") || currentApr?.numero || (id ? "APR" : "Nova APR");
+  const aprDocumentTitle = tituloApr || currentApr?.titulo || "Atividade ainda não definida";
   const aprDocumentDescription =
     descricaoApr ||
     currentApr?.descricao ||
@@ -1058,9 +986,7 @@ export function AprForm({ id }: AprFormProps) {
 
       const finalizeRemoval = () => {
         pendingRiskRemovalTimeoutsRef.current.delete(pendingKey);
-        const currentIndex = riskFieldsRef.current.findIndex(
-          (field) => field.id === fieldId,
-        );
+        const currentIndex = riskFieldsRef.current.findIndex((field) => field.id === fieldId);
         if (currentIndex < 0) return;
 
         removeRisk(currentIndex);
@@ -1081,13 +1007,11 @@ export function AprForm({ id }: AprFormProps) {
       toast.warning("Linha de risco marcada para remoção.", {
         id: pendingKey,
         duration: 5000,
-        description:
-          "Você pode desfazer esta ação antes da remoção definitiva.",
+        description: "Você pode desfazer esta ação antes da remoção definitiva.",
         action: {
           label: "Desfazer",
           onClick: () => {
-            const pendingTimeout =
-              pendingRiskRemovalTimeoutsRef.current.get(pendingKey);
+            const pendingTimeout = pendingRiskRemovalTimeoutsRef.current.get(pendingKey);
             if (pendingTimeout) {
               clearTimeout(pendingTimeout);
               pendingRiskRemovalTimeoutsRef.current.delete(pendingKey);
@@ -1222,20 +1146,9 @@ export function AprForm({ id }: AprFormProps) {
         );
       }
 
-      toast.success(
-        `${preview.importedRows} linha(s) da planilha aplicadas ao formulário.`,
-      );
+      toast.success(`${preview.importedRows} linha(s) da planilha aplicadas ao formulário.`);
     },
-    [
-      companies,
-      isReadOnly,
-      notifyReadOnly,
-      replaceRisk,
-      selectedCompanyId,
-      setValue,
-      sites,
-      users,
-    ],
+    [companies, isReadOnly, notifyReadOnly, replaceRisk, selectedCompanyId, setValue, sites, users],
   );
 
   const handleExcelFileSelection = useCallback(
@@ -1258,10 +1171,7 @@ export function AprForm({ id }: AprFormProps) {
         setExcelPreview(preview);
 
         if (preview.errors.length > 0) {
-          toast.error(
-            preview.errors[0] ||
-              "A planilha possui inconsistências de importação.",
-          );
+          toast.error(preview.errors[0] || "A planilha possui inconsistências de importação.");
           return;
         }
 
@@ -1274,10 +1184,9 @@ export function AprForm({ id }: AprFormProps) {
           typeof error === "object" &&
           error !== null &&
           "response" in error &&
-          typeof (error as { response?: { data?: { message?: string } } })
-            .response?.data?.message === "string"
-            ? (error as { response?: { data?: { message?: string } } })
-                .response!.data!.message
+          typeof (error as { response?: { data?: { message?: string } } }).response?.data
+            ?.message === "string"
+            ? (error as { response?: { data?: { message?: string } } }).response!.data!.message
             : "Não foi possível interpretar a planilha APR.";
         toast.error(message);
       } finally {
@@ -1304,9 +1213,7 @@ export function AprForm({ id }: AprFormProps) {
   const applySuggestedAprRisk = useCallback(
     (suggestion: SophieDraftRiskSuggestion) => {
       if (isReadOnly) {
-        notifyReadOnly(
-          "Não é possível aplicar sugestões em uma APR bloqueada.",
-        );
+        notifyReadOnly("Não é possível aplicar sugestões em uma APR bloqueada.");
         return;
       }
       let appliedSelection = false;
@@ -1354,8 +1261,7 @@ export function AprForm({ id }: AprFormProps) {
     let appliedCount = 0;
     const nextSelectedRiskIds = [...selectedRiskIds];
     sophieSuggestedRisks.forEach((suggestion) => {
-      const shouldSelect =
-        suggestion.id && !nextSelectedRiskIds.includes(suggestion.id);
+      const shouldSelect = suggestion.id && !nextSelectedRiskIds.includes(suggestion.id);
       const shouldAppend = !hasSuggestedRiskInMatrix(suggestion);
 
       if (shouldSelect || shouldAppend) {
@@ -1383,9 +1289,7 @@ export function AprForm({ id }: AprFormProps) {
     }
 
     if (appliedCount > 0) {
-      toast.success(
-        `${appliedCount} sugestão(ões) da SOPHIE aplicadas na APR.`,
-      );
+      toast.success(`${appliedCount} sugestão(ões) da SOPHIE aplicadas na APR.`);
     } else {
       toast.info("As sugestões da SOPHIE já foram refletidas na APR.");
     }
@@ -1402,9 +1306,7 @@ export function AprForm({ id }: AprFormProps) {
 
   const applySelectedActivityTemplate = useCallback(() => {
     if (isReadOnly) {
-      notifyReadOnly(
-        "Não é possível aplicar template de atividade em uma APR bloqueada.",
-      );
+      notifyReadOnly("Não é possível aplicar template de atividade em uma APR bloqueada.");
       return;
     }
     if (!selectedActivityTemplate) {
@@ -1414,26 +1316,21 @@ export function AprForm({ id }: AprFormProps) {
 
     const templateRows = selectedActivityTemplate.risk_items.map((item) =>
       normalizeRiskRow({
-        atividade_processo:
-          item.atividade || selectedActivityTemplate.label || tituloApr || "",
+        atividade_processo: item.atividade || selectedActivityTemplate.label || tituloApr || "",
         etapa: item.etapa || "",
         agente_ambiental: item.agente_ambiental || "",
         condicao_perigosa: item.condicao_perigosa || "",
         fontes_circunstancias: item.fonte_circunstancia || "",
         possiveis_lesoes: item.lesao || "",
-        probabilidade:
-          item.probabilidade !== undefined ? String(item.probabilidade) : "",
-        severidade:
-          item.severidade !== undefined ? String(item.severidade) : "",
+        probabilidade: item.probabilidade !== undefined ? String(item.probabilidade) : "",
+        severidade: item.severidade !== undefined ? String(item.severidade) : "",
         medidas_prevencao: item.medidas_prevencao || "",
         responsavel: item.responsavel || "",
         status_acao: item.status_acao || "Pendente",
       }),
     );
 
-    const currentRows = (getValues("itens_risco") || []).map((item) =>
-      normalizeRiskRow(item),
-    );
+    const currentRows = (getValues("itens_risco") || []).map((item) => normalizeRiskRow(item));
     const existingKeys = new Set(
       currentRows.filter((item) => isRiskRowStarted(item)).map(buildRiskRowKey),
     );
@@ -1442,9 +1339,7 @@ export function AprForm({ id }: AprFormProps) {
     );
 
     if (uniqueTemplateRows.length === 0) {
-      toast.info(
-        "Os riscos principais deste template já estão refletidos na grade da APR.",
-      );
+      toast.info("Os riscos principais deste template já estão refletidos na grade da APR.");
       return;
     }
 
@@ -1544,9 +1439,7 @@ export function AprForm({ id }: AprFormProps) {
       let offlineQueueItemId: string | undefined;
       let offlineQueueDeduplicated = false;
       const basePayload = Object.fromEntries(
-        Object.entries(data).filter(
-          ([key]) => key !== "pdf_signed" && key !== "itens_risco",
-        ),
+        Object.entries(data).filter(([key]) => key !== "pdf_signed" && key !== "itens_risco"),
       ) as AprMutationPayload;
       const normalizeOptionalString = (value: unknown): string | undefined => {
         if (typeof value !== "string") {
@@ -1555,20 +1448,14 @@ export function AprForm({ id }: AprFormProps) {
         const trimmed = value.trim();
         return trimmed ? trimmed : undefined;
       };
-      const normalizedRiskItems: AprRiskItemInput[] = (
-        data.itens_risco || []
-      ).map((item) => ({
+      const normalizedRiskItems: AprRiskItemInput[] = (data.itens_risco || []).map((item) => ({
         atividade_processo: normalizeOptionalString(item.atividade_processo),
         etapa: normalizeOptionalString(item.etapa),
         agente_ambiental: normalizeOptionalString(item.agente_ambiental),
         condicao_perigosa: normalizeOptionalString(item.condicao_perigosa),
-        fonte_circunstancia: normalizeOptionalString(
-          item.fontes_circunstancias,
-        ),
+        fonte_circunstancia: normalizeOptionalString(item.fontes_circunstancias),
         possiveis_lesoes: normalizeOptionalString(item.possiveis_lesoes),
-        probabilidade: item.probabilidade
-          ? Number(item.probabilidade)
-          : undefined,
+        probabilidade: item.probabilidade ? Number(item.probabilidade) : undefined,
         severidade: item.severidade ? Number(item.severidade) : undefined,
         categoria_risco: normalizeOptionalString(item.categoria_risco),
         medidas_prevencao: normalizeOptionalString(item.medidas_prevencao),
@@ -1576,9 +1463,8 @@ export function AprForm({ id }: AprFormProps) {
         epi: normalizeOptionalString(item.epi),
         permissao_trabalho: normalizeOptionalString(item.permissao_trabalho),
         normas_relacionadas: normalizeOptionalString(item.normas_relacionadas),
-        hierarquia_controle: normalizeOptionalString(
-          item.hierarquia_controle,
-        ) as AprRiskItemInput["hierarquia_controle"] | undefined,
+        hierarquia_controle: normalizeOptionalString(item.hierarquia_controle) as
+          AprRiskItemInput["hierarquia_controle"] | undefined,
         responsavel: normalizeOptionalString(item.responsavel),
         prazo: normalizeOptionalString(item.prazo),
         status_acao: normalizeOptionalString(item.status_acao),
@@ -1678,23 +1564,17 @@ export function AprForm({ id }: AprFormProps) {
 
       if (aprId && !offlineQueued) {
         if (signatureChanges.hasPendingChanges && !canManageSignatures) {
-          throw new Error(
-            "Seu perfil não permite gerenciar assinaturas da APR.",
-          );
+          throw new Error("Seu perfil não permite gerenciar assinaturas da APR.");
         }
 
         if (canManageSignatures) {
           const signatureIdsToDelete = signatureChanges.signaturesToDelete
             .map(([, persisted]) => persisted.id)
-            .filter((signatureId): signatureId is string =>
-              Boolean(signatureId),
-            );
+            .filter((signatureId): signatureId is string => Boolean(signatureId));
 
           if (signatureIdsToDelete.length > 0) {
             await Promise.all(
-              signatureIdsToDelete.map((signatureId) =>
-                signaturesService.deleteById(signatureId),
-              ),
+              signatureIdsToDelete.map((signatureId) => signaturesService.deleteById(signatureId)),
             );
           }
 
@@ -1734,17 +1614,12 @@ export function AprForm({ id }: AprFormProps) {
         if (submitResult.offlineQueued) {
           return "APR base enfileirada para sincronização. Assinaturas e emissão final continuam bloqueadas até o retorno da conexão.";
         }
-        return id
-          ? "APR atualizada com sucesso!"
-          : "APR cadastrada com sucesso!";
+        return id ? "APR atualizada com sucesso!" : "APR cadastrada com sucesso!";
       },
       redirectTo: "/dashboard/aprs",
       skipRedirect: (result) => {
         const submitResult = (result as AprSubmitResult | undefined) || {};
-        return (
-          submitIntentRef.current === "save_and_print" ||
-          Boolean(submitResult.offlineQueued)
-        );
+        return submitIntentRef.current === "save_and_print" || Boolean(submitResult.offlineQueued);
       },
       context: "APR",
       onSuccess: (result) => {
@@ -1767,9 +1642,7 @@ export function AprForm({ id }: AprFormProps) {
           };
           persistPendingOfflineSync(pendingSync);
           trackAprOfflineTelemetry(
-            submitResult.offlineQueueDeduplicated
-              ? "offline_deduplicated"
-              : "offline_enqueued",
+            submitResult.offlineQueueDeduplicated ? "offline_deduplicated" : "offline_enqueued",
             {
               draftId: pendingSync.draftId,
               queueItemId: pendingSync.queueItemId,
@@ -1811,19 +1684,12 @@ export function AprForm({ id }: AprFormProps) {
           let didNavigateToPdf = false;
           let usedPopup = false;
           try {
-            const result = await handlePrintAfterSave(
-              submitResult.aprId as string,
-            );
+            const result = await handlePrintAfterSave(submitResult.aprId as string);
             didNavigateToPdf = result.didNavigateToPdf;
             usedPopup = result.usedPopup;
           } catch (printError) {
-            logger.error(
-              "Erro ao preparar impressão automática da APR:",
-              printError,
-            );
-            toast.warning(
-              "APR salva, mas não foi possível abrir a impressão automática.",
-            );
+            logger.error("Erro ao preparar impressão automática da APR:", printError);
+            toast.warning("APR salva, mas não foi possível abrir a impressão automática.");
           } finally {
             // Se o pop-up foi bloqueado, caímos para abrir o PDF na mesma aba
             // (window.location.assign). Nesse cenário, redirecionar aqui pode
@@ -1845,9 +1711,7 @@ export function AprForm({ id }: AprFormProps) {
 
   const handleAiAnalysis = async () => {
     if (isReadOnly) {
-      notifyReadOnly(
-        "Ações de sugestão/análise não estão disponíveis em modo somente leitura.",
-      );
+      notifyReadOnly("Ações de sugestão/análise não estão disponíveis em modo somente leitura.");
       return;
     }
     if (!isAiEnabled()) {
@@ -1864,9 +1728,7 @@ export function AprForm({ id }: AprFormProps) {
 
     try {
       setAnalyzing(true);
-      const result = await aiService.analyzeApr(
-        titulo + " " + (descricao || ""),
-      );
+      const result = await aiService.analyzeApr(titulo + " " + (descricao || ""));
 
       if (result.risks.length > 0) {
         setValue("risks", [...new Set([...selectedRiskIds, ...result.risks])]);
@@ -2017,10 +1879,7 @@ export function AprForm({ id }: AprFormProps) {
       if (queuedItem) {
         const nextStatus: AprOfflineSyncStatus =
           queuedItem.state === "retry_waiting" ? "failed" : "queued";
-        const nextError =
-          queuedItem.state === "retry_waiting"
-            ? queuedItem.lastError
-            : undefined;
+        const nextError = queuedItem.state === "retry_waiting" ? queuedItem.lastError : undefined;
 
         if (
           draftPendingOfflineSync.queueItemId !== queuedItem.id ||
@@ -2089,8 +1948,7 @@ export function AprForm({ id }: AprFormProps) {
       const dedupeKey = detail?.item?.dedupeKey;
       const matchesCurrentDraft =
         itemId === draftPendingOfflineSync.queueItemId ||
-        (draftPendingOfflineSync.dedupeKey &&
-          dedupeKey === draftPendingOfflineSync.dedupeKey);
+        (draftPendingOfflineSync.dedupeKey && dedupeKey === draftPendingOfflineSync.dedupeKey);
 
       if (!matchesCurrentDraft) {
         return;
@@ -2187,10 +2045,7 @@ export function AprForm({ id }: AprFormProps) {
         return;
       }
 
-      if (
-        detail.status === "removed" &&
-        draftPendingOfflineSync.status !== "synced_base"
-      ) {
+      if (detail.status === "removed" && draftPendingOfflineSync.status !== "synced_base") {
         persistPendingOfflineSync({
           ...draftPendingOfflineSync,
           status: "orphaned",
@@ -2207,16 +2062,10 @@ export function AprForm({ id }: AprFormProps) {
       }
     };
 
-    window.addEventListener(
-      "app:offline-sync-item",
-      handleOfflineSyncItem as EventListener,
-    );
+    window.addEventListener("app:offline-sync-item", handleOfflineSyncItem as EventListener);
 
     return () => {
-      window.removeEventListener(
-        "app:offline-sync-item",
-        handleOfflineSyncItem as EventListener,
-      );
+      window.removeEventListener("app:offline-sync-item", handleOfflineSyncItem as EventListener);
     };
   }, [draftPendingOfflineSync, persistPendingOfflineSync]);
 
@@ -2259,15 +2108,7 @@ export function AprForm({ id }: AprFormProps) {
     }
 
     scheduleDraftPersist();
-  }, [
-    currentStep,
-    draftMetadata,
-    draftStorageKey,
-    fetching,
-    id,
-    isReadOnly,
-    scheduleDraftPersist,
-  ]);
+  }, [currentStep, draftMetadata, draftStorageKey, fetching, id, isReadOnly, scheduleDraftPersist]);
 
   // M01 — Auto-seleciona empresa/site quando há apenas uma opção (nova APR)
   useEffect(() => {
@@ -2308,19 +2149,11 @@ export function AprForm({ id }: AprFormProps) {
 
   const toggleSelection = useCallback(
     (
-      field:
-        | "activities"
-        | "risks"
-        | "epis"
-        | "tools"
-        | "machines"
-        | "participants",
+      field: "activities" | "risks" | "epis" | "tools" | "machines" | "participants",
       value: string,
     ) => {
       if (isReadOnly) {
-        notifyReadOnly(
-          "Não é possível alterar seleções/assinaturas em uma APR bloqueada.",
-        );
+        notifyReadOnly("Não é possível alterar seleções/assinaturas em uma APR bloqueada.");
         return;
       }
       const current = watch(field) || [];
@@ -2388,9 +2221,7 @@ export function AprForm({ id }: AprFormProps) {
   const handleSaveSignature = useCallback(
     (signatureData: string, type: string) => {
       if (isReadOnly) {
-        notifyReadOnly(
-          "Não é possível salvar assinaturas em uma APR bloqueada.",
-        );
+        notifyReadOnly("Não é possível salvar assinaturas em uma APR bloqueada.");
         return;
       }
       if (!canManageSignatures) {
@@ -2404,21 +2235,12 @@ export function AprForm({ id }: AprFormProps) {
         }));
 
         const current = watch("participants") || [];
-        const updated = Array.from(
-          new Set([...current, currentSigningUser.id]),
-        );
+        const updated = Array.from(new Set([...current, currentSigningUser.id]));
         setValue("participants", updated, { shouldValidate: true });
         toast.success(`Assinatura de ${currentSigningUser.nome} capturada!`);
       }
     },
-    [
-      canManageSignatures,
-      currentSigningUser,
-      isReadOnly,
-      notifyReadOnly,
-      setValue,
-      watch,
-    ],
+    [canManageSignatures, currentSigningUser, isReadOnly, notifyReadOnly, setValue, watch],
   );
   const handleReleasePendingOfflineState = useCallback(() => {
     if (!draftPendingOfflineSync) {
@@ -2489,9 +2311,7 @@ export function AprForm({ id }: AprFormProps) {
       return;
     }
 
-    const result = await retryOfflineQueueItem(
-      draftPendingOfflineSync.queueItemId,
-    );
+    const result = await retryOfflineQueueItem(draftPendingOfflineSync.queueItemId);
     if (result.status === "sent") {
       toast.success(
         "A APR base foi sincronizada. Conclua as assinaturas e a emissão final online.",
@@ -2514,8 +2334,7 @@ export function AprForm({ id }: AprFormProps) {
     draftPendingOfflineSync?.status === "synced_base" ||
     draftPendingOfflineSync?.status === "orphaned";
   const canRetryPendingOfflineState =
-    draftPendingOfflineSync?.status === "failed" &&
-    Boolean(draftPendingOfflineSync.queueItemId);
+    draftPendingOfflineSync?.status === "failed" && Boolean(draftPendingOfflineSync.queueItemId);
   const isDraftSyncInFlight = draftPendingOfflineSync?.status === "syncing";
   const saveAndPrintBlockReason = isOffline
     ? "Salvar e imprimir exige conexão ativa."
@@ -2567,11 +2386,9 @@ export function AprForm({ id }: AprFormProps) {
         tipo_atividade: "Selecione o tipo de atividade da APR.",
         frente_trabalho: "Informe a frente de trabalho.",
         turno: "Informe o turno previsto.",
-        local_execucao_detalhado:
-          "Informe o local detalhado de execução da APR.",
+        local_execucao_detalhado: "Informe o local detalhado de execução da APR.",
         responsavel_tecnico_nome: "Informe o responsável técnico pela APR.",
-        responsavel_tecnico_registro:
-          "Informe o registro profissional do responsável técnico.",
+        responsavel_tecnico_registro: "Informe o registro profissional do responsável técnico.",
       };
 
       requiredStepOneFields.forEach((field) => {
@@ -2677,9 +2494,7 @@ export function AprForm({ id }: AprFormProps) {
     >
       {fetching ? (
         <div className="rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)] print:hidden">
-          <InlineLoadingState
-            label={id ? "Carregando APR..." : "Preparando APR..."}
-          />
+          <InlineLoadingState label={id ? "Carregando APR..." : "Preparando APR..."} />
         </div>
       ) : null}
 
@@ -2734,16 +2549,29 @@ export function AprForm({ id }: AprFormProps) {
               disabled={loading || isReadOnly}
               className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--component-button-primary-bg)] px-4 py-2.5 text-sm font-bold text-[var(--color-text-inverse)] shadow-[var(--ds-shadow-sm)] transition-none hover:translate-y-0 hover:shadow-[var(--ds-shadow-sm)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? (
-                <Loader2 className="h-4 w-4" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
+              {loading ? <Loader2 className="h-4 w-4" /> : <Save className="h-4 w-4" />}
               Salvar APR
             </button>
           </div>
         </div>
       </div>
+
+      <AprDocumentHero
+        number={aprDocumentNumber}
+        title={aprDocumentTitle}
+        status={(watch("status") || currentApr?.status || "Pendente") as Apr["status"]}
+        version={currentApr?.versao || 1}
+        company={selectedCompany?.razao_social || currentApr?.company?.razao_social || "Não definida"}
+        site={selectedSite?.nome || currentApr?.site?.nome || "Não definida"}
+        responsible={
+          selectedElaborador?.nome ||
+          currentApr?.elaborador?.nome ||
+          "Não definido"
+        }
+        updatedAt={currentApr?.updated_at}
+        hasPdfHash={Boolean(currentApr?.final_pdf_hash_sha256)}
+        readOnly={isReadOnly}
+      />
 
       {isFieldMode ? (
         <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-success-border)] bg-[var(--ds-color-success-subtle)] p-5">
@@ -2753,8 +2581,8 @@ export function AprForm({ id }: AprFormProps) {
                 APR em campo
               </p>
               <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                Registre atividade, riscos e controles no local da operação. O
-                rascunho continua salvo enquanto você avança no wizard.
+                Registre atividade, riscos e controles no local da operação. O rascunho continua
+                salvo enquanto você avança no wizard.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-center md:w-[260px]">
@@ -2851,10 +2679,7 @@ export function AprForm({ id }: AprFormProps) {
       )}
 
       {id && approvalProgressStarted && (
-        <AprApprovalPanel
-          aprId={id}
-          onStatusChange={() => reloadAprWorkflowContext(id)}
-        />
+        <AprApprovalPanel aprId={id} onStatusChange={() => reloadAprWorkflowContext(id)} />
       )}
 
       {id && !isReadOnly && (
@@ -2901,22 +2726,10 @@ export function AprForm({ id }: AprFormProps) {
           {compareResult && (
             <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-5">
               <MiniStat label="Base" value={compareResult.summary.totalBase} />
-              <MiniStat
-                label="Alvo"
-                value={compareResult.summary.totalTarget}
-              />
-              <MiniStat
-                label="Adicionados"
-                value={compareResult.summary.added}
-              />
-              <MiniStat
-                label="Removidos"
-                value={compareResult.summary.removed}
-              />
-              <MiniStat
-                label="Alterados"
-                value={compareResult.summary.changed}
-              />
+              <MiniStat label="Alvo" value={compareResult.summary.totalTarget} />
+              <MiniStat label="Adicionados" value={compareResult.summary.added} />
+              <MiniStat label="Removidos" value={compareResult.summary.removed} />
+              <MiniStat label="Alterados" value={compareResult.summary.changed} />
             </div>
           )}
         </div>
@@ -2924,9 +2737,7 @@ export function AprForm({ id }: AprFormProps) {
 
       {id && currentApr?.risk_items && currentApr.risk_items.length > 0 && (
         <div className="sst-card p-4">
-          <h2 className={aprSectionTitleClass}>
-            Evidência fotográfica da equipe
-          </h2>
+          <h2 className={aprSectionTitleClass}>Evidência fotográfica da equipe</h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
               <label className={aprLabelCompactClass}>Item de risco</label>
@@ -2942,8 +2753,7 @@ export function AprForm({ id }: AprFormProps) {
                   .sort((a, b) => a.ordem - b.ordem)
                   .map((item) => (
                     <option key={item.id} value={item.id}>
-                      #{item.ordem + 1}{" "}
-                      {item.atividade || item.condicao_perigosa || "Risco"}
+                      #{item.ordem + 1} {item.atividade || item.condicao_perigosa || "Risco"}
                     </option>
                   ))}
               </select>
@@ -3027,10 +2837,7 @@ export function AprForm({ id }: AprFormProps) {
               type="button"
               onClick={handleUploadEvidence}
               disabled={
-                isReadOnly ||
-                uploadingEvidence ||
-                !selectedRiskItemEvidence ||
-                !evidenceFile
+                isReadOnly || uploadingEvidence || !selectedRiskItemEvidence || !evidenceFile
               }
               className={aprSuccessButtonClass}
             >
@@ -3077,9 +2884,7 @@ export function AprForm({ id }: AprFormProps) {
                       </a>
                       {safeExternalArtifactUrl(item.watermarked_url) && (
                         <a
-                          href={
-                            safeExternalArtifactUrl(item.watermarked_url) as string
-                          }
+                          href={safeExternalArtifactUrl(item.watermarked_url) as string}
                           target="_blank"
                           rel="noreferrer"
                           className="font-semibold text-[var(--color-success)] hover:underline"
@@ -3092,7 +2897,6 @@ export function AprForm({ id }: AprFormProps) {
                 </div>
               ))}
           </div>
-
         </div>
       )}
 
@@ -3106,9 +2910,7 @@ export function AprForm({ id }: AprFormProps) {
               <p className="text-sm font-bold text-[var(--ds-color-text-primary)]">
                 APR bloqueada para edição
               </p>
-              <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-                {readOnlyReason}
-              </p>
+              <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">{readOnlyReason}</p>
             </div>
           </div>
         </div>
@@ -3130,19 +2932,11 @@ export function AprForm({ id }: AprFormProps) {
                     <h1 className="text-2xl font-black tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
                       {aprDocumentNumber}
                     </h1>
-                    <StatusPill tone={aprDocumentStatusTone}>
-                      {aprDocumentStatus}
-                    </StatusPill>
-                    {isFieldMode ? (
-                      <StatusPill tone="success">Modo campo</StatusPill>
-                    ) : null}
-                    {draftRestored ? (
-                      <StatusPill tone="warning">Rascunho ativo</StatusPill>
-                    ) : null}
+                    <StatusPill tone={aprDocumentStatusTone}>{aprDocumentStatus}</StatusPill>
+                    {isFieldMode ? <StatusPill tone="success">Modo campo</StatusPill> : null}
+                    {draftRestored ? <StatusPill tone="warning">Rascunho ativo</StatusPill> : null}
                     {id && currentApr?.versao ? (
-                      <StatusPill tone="primary">
-                        Versão {currentApr.versao}
-                      </StatusPill>
+                      <StatusPill tone="primary">Versão {currentApr.versao}</StatusPill>
                     ) : null}
                   </div>
                   <p className="mt-2 max-w-4xl text-base font-semibold text-[var(--ds-color-text-primary)]">
@@ -3177,11 +2971,7 @@ export function AprForm({ id }: AprFormProps) {
                   <DocumentInfoCell
                     icon={UserRound}
                     label="Responsável técnico"
-                    value={
-                      responsavelTecnicoApr ||
-                      selectedElaborador?.nome ||
-                      "Não definido"
-                    }
+                    value={responsavelTecnicoApr || selectedElaborador?.nome || "Não definido"}
                   />
                   <DocumentInfoCell
                     icon={Building2}
@@ -3193,10 +2983,7 @@ export function AprForm({ id }: AprFormProps) {
                     icon={MapPin}
                     label="Local de trabalho"
                     value={
-                      localExecucaoApr ||
-                      frenteTrabalhoApr ||
-                      selectedSite?.nome ||
-                      "Não definido"
+                      localExecucaoApr || frenteTrabalhoApr || selectedSite?.nome || "Não definido"
                     }
                     helper={areaRiscoApr || undefined}
                   />
@@ -3251,9 +3038,7 @@ export function AprForm({ id }: AprFormProps) {
                     title="Elaborador"
                     name={selectedElaborador?.nome || "Não definido"}
                     detail={
-                      completedSignatures > 0
-                        ? "Assinatura capturada"
-                        : "Aguardando assinatura"
+                      completedSignatures > 0 ? "Assinatura capturada" : "Aguardando assinatura"
                     }
                     state={completedSignatures > 0 ? "done" : "pending"}
                   />
@@ -3287,10 +3072,7 @@ export function AprForm({ id }: AprFormProps) {
                 </div>
               </div>
 
-              <nav
-                aria-label="Etapas da APR"
-                className="mt-6 grid gap-2 lg:grid-cols-3"
-              >
+              <nav aria-label="Etapas da APR" className="mt-6 grid gap-2 lg:grid-cols-3">
                 {APR_STEPS.map((step) => {
                   const Icon = step.icon;
                   const isActive = currentStep === step.id;
@@ -3396,8 +3178,7 @@ export function AprForm({ id }: AprFormProps) {
                   </ul>
                 ) : (
                   <p className="mt-3 text-sm leading-6 text-[var(--ds-color-text-secondary)]">
-                    Selecione EPIs ou preencha a coluna EPI na matriz para
-                    alimentar este resumo.
+                    Selecione EPIs ou preencha a coluna EPI na matriz para alimentar este resumo.
                   </p>
                 )}
               </div>
@@ -3408,25 +3189,19 @@ export function AprForm({ id }: AprFormProps) {
                 </p>
                 <dl className="mt-3 space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-[var(--ds-color-text-secondary)]">
-                      Versão
-                    </dt>
+                    <dt className="text-[var(--ds-color-text-secondary)]">Versão</dt>
                     <dd className="font-semibold text-[var(--ds-color-text-primary)]">
                       v{currentApr?.versao || 1}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-[var(--ds-color-text-secondary)]">
-                      Validade
-                    </dt>
+                    <dt className="text-[var(--ds-color-text-secondary)]">Validade</dt>
                     <dd className="text-right font-semibold text-[var(--ds-color-text-primary)]">
                       {aprDocumentValidity}
                     </dd>
                   </div>
                   <div className="flex items-start justify-between gap-3">
-                    <dt className="text-[var(--ds-color-text-secondary)]">
-                      Normas
-                    </dt>
+                    <dt className="text-[var(--ds-color-text-secondary)]">Normas</dt>
                     <dd className="text-right font-semibold text-[var(--ds-color-text-primary)]">
                       {relatedNormLabels.length > 0
                         ? relatedNormLabels.join(" · ")
@@ -3441,11 +3216,7 @@ export function AprForm({ id }: AprFormProps) {
                   disabled={!aiEnabled || analyzing || isReadOnly}
                   className="mt-5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-primary-subtle)] px-4 py-2 text-sm font-bold text-[var(--color-primary)] transition-none hover:bg-[color:var(--ds-color-primary-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {analyzing ? (
-                    <Loader2 className="h-4 w-4" />
-                  ) : (
-                    <Sparkles className="h-4 w-4" />
-                  )}
+                  {analyzing ? <Loader2 className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
                   Consultar Sophie IA
                   <ArrowRight className="h-4 w-4" />
                 </button>
@@ -3465,9 +3236,7 @@ export function AprForm({ id }: AprFormProps) {
                   {pendingOfflineSyncUi.badge}
                 </span>
                 <p className="font-semibold">{pendingOfflineSyncUi.summary}</p>
-                <p className="text-[var(--color-warning)]/90">
-                  {pendingOfflineSyncUi.nextStep}
-                </p>
+                <p className="text-[var(--color-warning)]/90">{pendingOfflineSyncUi.nextStep}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {canRetryPendingOfflineState ? (
@@ -3509,8 +3278,7 @@ export function AprForm({ id }: AprFormProps) {
               Assinaturas capturadas ficam somente na memória desta sessão.
             </p>
             <p className="mt-1 text-[var(--color-danger)]/90">
-              Reconecte-se para concluir o envio das assinaturas antes de sair
-              da tela.
+              Reconecte-se para concluir o envio das assinaturas antes de sair da tela.
             </p>
           </div>
         ) : null}
@@ -3522,8 +3290,8 @@ export function AprForm({ id }: AprFormProps) {
               <div>
                 <p className="font-semibold">Revisão final obrigatória</p>
                 <p className="mt-1 text-[var(--color-danger)]/90">
-                  Não finalize a APR sem revisar a matriz de risco, controles
-                  sugeridos e evidências associadas ao trabalho.
+                  Não finalize a APR sem revisar a matriz de risco, controles sugeridos e evidências
+                  associadas ao trabalho.
                 </p>
               </div>
             </div>
@@ -3550,10 +3318,7 @@ export function AprForm({ id }: AprFormProps) {
                 </div>
               </div>
               <nav aria-label="Etapas da APR">
-                <div
-                  className="grid gap-3 px-5 py-4 lg:grid-cols-3"
-                  role="list"
-                >
+                <div className="grid gap-3 px-5 py-4 lg:grid-cols-3" role="list">
                   {APR_STEPS.map((step) => {
                     const Icon = step.icon;
                     const isActive = currentStep === step.id;
@@ -3653,34 +3418,18 @@ export function AprForm({ id }: AprFormProps) {
                     label="Empresa"
                     value={selectedCompany?.razao_social || "Não definida"}
                   />
-                  <SummaryMetaCard
-                    label="Obra"
-                    value={selectedSite?.nome || "Não definida"}
-                  />
+                  <SummaryMetaCard label="Obra" value={selectedSite?.nome || "Não definida"} />
                   <SummaryMetaCard
                     label="Elaborador"
                     value={selectedElaborador?.nome || "Não definido"}
                   />
-                  <SummaryMetaCard
-                    label="Tipo de atividade"
-                    value={selectedActivityTypeLabel}
-                  />
-                  <SummaryMetaCard
-                    label="Turno"
-                    value={watch("turno") || "Não definido"}
-                  />
-                  <SummaryMetaCard
-                    label="Status"
-                    value={watch("status") || "Pendente"}
-                  />
+                  <SummaryMetaCard label="Tipo de atividade" value={selectedActivityTypeLabel} />
+                  <SummaryMetaCard label="Turno" value={watch("turno") || "Não definido"} />
+                  <SummaryMetaCard label="Status" value={watch("status") || "Pendente"} />
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
-                  <WizardMetric
-                    label="Linhas"
-                    value={String(totalRiskLines)}
-                    tone="default"
-                  />
+                  <WizardMetric label="Linhas" value={String(totalRiskLines)} tone="default" />
                   <WizardMetric
                     label="Participantes"
                     value={String(selectedParticipantIds.length)}
@@ -3711,40 +3460,33 @@ export function AprForm({ id }: AprFormProps) {
                       </span>
                     </div>
                     <div className="mt-2 space-y-1.5">
-                      {selectedParticipantIds
-                        .slice(0, 4)
-                        .map((participantId) => {
-                          const hasSignature = Boolean(
-                            signatures[participantId],
-                          );
-                          const participant = filteredUsers.find(
-                            (item) => item.id === participantId,
-                          );
-                          return (
-                            <div
-                              key={participantId}
-                              className="flex items-center justify-between gap-3 text-xs"
+                      {selectedParticipantIds.slice(0, 4).map((participantId) => {
+                        const hasSignature = Boolean(signatures[participantId]);
+                        const participant = filteredUsers.find((item) => item.id === participantId);
+                        return (
+                          <div
+                            key={participantId}
+                            className="flex items-center justify-between gap-3 text-xs"
+                          >
+                            <span className="truncate font-medium text-[var(--ds-color-text-primary)]">
+                              {participant?.nome || "Participante"}
+                            </span>
+                            <span
+                              className={cn(
+                                "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
+                                hasSignature
+                                  ? "border border-[var(--ds-color-success-border)] bg-[color:var(--ds-color-success-subtle)] text-[var(--color-success)]"
+                                  : "border border-[var(--ds-color-info-border)] bg-[color:var(--ds-color-info-subtle)] text-[var(--color-info)]",
+                              )}
                             >
-                              <span className="truncate font-medium text-[var(--ds-color-text-primary)]">
-                                {participant?.nome || "Participante"}
-                              </span>
-                              <span
-                                className={cn(
-                                  "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
-                                  hasSignature
-                                    ? "border border-[var(--ds-color-success-border)] bg-[color:var(--ds-color-success-subtle)] text-[var(--color-success)]"
-                                    : "border border-[var(--ds-color-info-border)] bg-[color:var(--ds-color-info-subtle)] text-[var(--color-info)]",
-                                )}
-                              >
-                                {hasSignature ? "Assinado" : "Pendente"}
-                              </span>
-                            </div>
-                          );
-                        })}
+                              {hasSignature ? "Assinado" : "Pendente"}
+                            </span>
+                          </div>
+                        );
+                      })}
                       {selectedParticipantIds.length > 4 ? (
                         <p className="pt-1 text-[11px] font-medium text-[var(--ds-color-text-secondary)]">
-                          +{selectedParticipantIds.length - 4} participante(s)
-                          no fluxo.
+                          +{selectedParticipantIds.length - 4} participante(s) no fluxo.
                         </p>
                       ) : null}
                     </div>
@@ -3754,12 +3496,9 @@ export function AprForm({ id }: AprFormProps) {
                     <div className="flex items-start gap-2">
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                       <div>
-                        <p className="font-semibold">
-                          Fluxo de assinatura ainda incompleto.
-                        </p>
+                        <p className="font-semibold">Fluxo de assinatura ainda incompleto.</p>
                         <p className="mt-1 text-[11px] leading-5 text-[var(--color-warning)]/90">
-                          Defina participantes e assinaturas antes de concluir a
-                          APR.
+                          Defina participantes e assinaturas antes de concluir a APR.
                         </p>
                       </div>
                     </div>
@@ -3783,9 +3522,7 @@ export function AprForm({ id }: AprFormProps) {
                             Draft {draftPendingOfflineSync.draftId.slice(0, 8)}
                           </span>
                         </div>
-                        <p className="font-semibold">
-                          {pendingOfflineSyncUi.summary}
-                        </p>
+                        <p className="font-semibold">{pendingOfflineSyncUi.summary}</p>
                         <p className="text-[var(--color-warning)]/90">
                           {pendingOfflineSyncUi.nextStep}
                         </p>
@@ -3799,9 +3536,7 @@ export function AprForm({ id }: AprFormProps) {
                           ? "sincronizada no servidor"
                           : "salva localmente neste navegador"}
                       </p>
-                      <p>
-                        Assinaturas finais: pendentes e obrigatoriamente online
-                      </p>
+                      <p>Assinaturas finais: pendentes e obrigatoriamente online</p>
                       <p>PDF final: bloqueado até a conclusão online</p>
                       <p>Emissão governada: bloqueada até a conclusão online</p>
                     </div>
@@ -3849,13 +3584,11 @@ export function AprForm({ id }: AprFormProps) {
                   className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-danger-border)] bg-[color:var(--ds-color-danger-subtle)] px-4 py-3 text-sm text-[var(--color-danger)]"
                 >
                   <p className="font-semibold">
-                    Assinaturas capturadas ficam somente na memória desta
-                    sessão.
+                    Assinaturas capturadas ficam somente na memória desta sessão.
                   </p>
                   <p className="mt-1 text-[var(--color-danger)]/90">
-                    Elas não são gravadas localmente nem entram na fila offline.
-                    Reconecte-se para concluir o envio das assinaturas antes de
-                    sair da tela.
+                    Elas não são gravadas localmente nem entram na fila offline. Reconecte-se para
+                    concluir o envio das assinaturas antes de sair da tela.
                   </p>
                 </div>
               ) : null}
@@ -3867,8 +3600,8 @@ export function AprForm({ id }: AprFormProps) {
                     <div>
                       <p className="font-semibold">Revisão final obrigatória</p>
                       <p className="mt-1 text-[var(--color-danger)]/90">
-                        Não finalize a APR sem revisar a matriz de risco,
-                        controles sugeridos e evidências associadas ao trabalho.
+                        Não finalize a APR sem revisar a matriz de risco, controles sugeridos e
+                        evidências associadas ao trabalho.
                       </p>
                     </div>
                   </div>
@@ -3887,18 +3620,14 @@ export function AprForm({ id }: AprFormProps) {
                     Ações seguras em somente leitura
                   </p>
                   <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-                    Exportação e navegação visual continuam disponíveis sem
-                    reabrir edição da APR.
+                    Exportação e navegação visual continuam disponíveis sem reabrir edição da APR.
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() =>
-                      downloadExcel(
-                        "/aprs/export/excel/template",
-                        "apr-template-importacao.xlsx",
-                      )
+                      downloadExcel("/aprs/export/excel/template", "apr-template-importacao.xlsx")
                     }
                     className="inline-flex items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm font-semibold text-[var(--ds-color-text-secondary)] transition-none hover:bg-[var(--ds-color-surface-base)]"
                   >
@@ -3908,12 +3637,7 @@ export function AprForm({ id }: AprFormProps) {
                   {id ? (
                     <button
                       type="button"
-                      onClick={() =>
-                        downloadExcel(
-                          `/aprs/${id}/export/excel`,
-                          `apr-${id}.xlsx`,
-                        )
-                      }
+                      onClick={() => downloadExcel(`/aprs/${id}/export/excel`, `apr-${id}.xlsx`)}
                       className="inline-flex items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm font-semibold text-[var(--ds-color-text-secondary)] transition-none hover:bg-[var(--ds-color-surface-base)]"
                     >
                       <Download className="h-4 w-4" />
@@ -3940,10 +3664,7 @@ export function AprForm({ id }: AprFormProps) {
             </div>
           )}
 
-          <fieldset
-            disabled={isReadOnly}
-            className="border-none p-0 m-0 min-w-0"
-          >
+          <fieldset disabled={isReadOnly} className="border-none p-0 m-0 min-w-0">
             {currentStep === 1 && (
               <div className={aprInteractivePanelClass}>
                 <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -3968,50 +3689,38 @@ export function AprForm({ id }: AprFormProps) {
                   )}
                 </div>
                 <p className="text-xs text-[var(--ds-color-text-secondary)]">
-                  Campos marcados com{" "}
-                  <span className="text-[var(--color-danger)]">*</span> são obrigatórios
+                  Campos marcados com <span className="text-[var(--color-danger)]">*</span> são
+                  obrigatórios
                 </p>
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
                     <label htmlFor="apr-numero" className={aprLabelClass}>
-                      Número da APR<AprRequiredMark />
+                      Número da APR
+                      <AprRequiredMark />
                     </label>
                     <input
                       id="apr-numero"
                       type="text"
                       {...register("numero")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.numero && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.numero && aprFieldErrorClass)}
                       placeholder="Ex: 2024/001"
                     />
-                    {errors.numero && (
-                      <p className={aprErrorTextClass}>
-                        {errors.numero.message}
-                      </p>
-                    )}
+                    {errors.numero && <p className={aprErrorTextClass}>{errors.numero.message}</p>}
                   </div>
 
                   <div>
                     <label htmlFor="apr-titulo" className={aprLabelClass}>
-                      Título da APR<AprRequiredMark />
+                      Título da APR
+                      <AprRequiredMark />
                     </label>
                     <input
                       id="apr-titulo"
                       type="text"
                       {...register("titulo")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.titulo && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.titulo && aprFieldErrorClass)}
                       placeholder="Ex: Instalação de Painéis Solares"
                     />
-                    {errors.titulo && (
-                      <p className={aprErrorTextClass}>
-                        {errors.titulo.message}
-                      </p>
-                    )}
+                    {errors.titulo && <p className={aprErrorTextClass}>{errors.titulo.message}</p>}
                   </div>
 
                   <div className="md:col-span-2">
@@ -4029,48 +3738,36 @@ export function AprForm({ id }: AprFormProps) {
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="apr-tipo-atividade"
-                      className={aprLabelClass}
-                    >
-                      Tipo de atividade<AprRequiredMark />
+                    <label htmlFor="apr-tipo-atividade" className={aprLabelClass}>
+                      Tipo de atividade
+                      <AprRequiredMark />
                     </label>
                     <select
                       id="apr-tipo-atividade"
                       {...register("tipo_atividade")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.tipo_atividade && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.tipo_atividade && aprFieldErrorClass)}
                     >
                       <option value="">Selecione um tipo de atividade</option>
                       {activityTemplates.map((template) => (
-                        <option
-                          key={template.tipo_atividade}
-                          value={template.tipo_atividade}
-                        >
+                        <option key={template.tipo_atividade} value={template.tipo_atividade}>
                           {template.label}
                         </option>
                       ))}
                     </select>
                     {errors.tipo_atividade && (
-                      <p className={aprErrorTextClass}>
-                        {errors.tipo_atividade.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.tipo_atividade.message}</p>
                     )}
                   </div>
 
                   <div>
                     <label htmlFor="apr-turno" className={aprLabelClass}>
-                      Turno<AprRequiredMark />
+                      Turno
+                      <AprRequiredMark />
                     </label>
                     <select
                       id="apr-turno"
                       {...register("turno")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.turno && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.turno && aprFieldErrorClass)}
                     >
                       <option value="">Selecione o turno</option>
                       <option value="Diurno">Diurno</option>
@@ -4078,33 +3775,21 @@ export function AprForm({ id }: AprFormProps) {
                       <option value="Integral">Integral</option>
                       <option value="Revezamento">Revezamento</option>
                     </select>
-                    {errors.turno && (
-                      <p className={aprErrorTextClass}>
-                        {errors.turno.message}
-                      </p>
-                    )}
+                    {errors.turno && <p className={aprErrorTextClass}>{errors.turno.message}</p>}
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="apr-frente-trabalho"
-                      className={aprLabelClass}
-                    >
+                    <label htmlFor="apr-frente-trabalho" className={aprLabelClass}>
                       Frente de trabalho
                     </label>
                     <input
                       id="apr-frente-trabalho"
                       {...register("frente_trabalho")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.frente_trabalho && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.frente_trabalho && aprFieldErrorClass)}
                       placeholder="Ex: Linha 02, setor de manutenção, área quente"
                     />
                     {errors.frente_trabalho && (
-                      <p className={aprErrorTextClass}>
-                        {errors.frente_trabalho.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.frente_trabalho.message}</p>
                     )}
                   </div>
 
@@ -4142,25 +3827,19 @@ export function AprForm({ id }: AprFormProps) {
                         <button
                           type="button"
                           onClick={() => setConfirmTemplateOpen(true)}
-                          disabled={
-                            loadingActivityTemplate || !selectedActivityTemplate
-                          }
+                          disabled={loadingActivityTemplate || !selectedActivityTemplate}
                           className={aprSoftPrimaryButtonClass}
                         >
-                          {loadingActivityTemplate
-                            ? "Carregando..."
-                            : "Aplicar template à grade"}
+                          {loadingActivityTemplate ? "Carregando..." : "Aplicar template à grade"}
                         </button>
                       </div>
                     </div>
                   </div>
 
                   <div className="md:col-span-2">
-                    <label
-                      htmlFor="apr-local-detalhado"
-                      className={aprLabelClass}
-                    >
-                      Local detalhado de execução<AprRequiredMark />
+                    <label htmlFor="apr-local-detalhado" className={aprLabelClass}>
+                      Local detalhado de execução
+                      <AprRequiredMark />
                     </label>
                     <textarea
                       id="apr-local-detalhado"
@@ -4173,18 +3852,14 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Ex: Cobertura do bloco administrativo, face leste, acesso por plataforma elevatória"
                     />
                     {errors.local_execucao_detalhado && (
-                      <p className={aprErrorTextClass}>
-                        {errors.local_execucao_detalhado.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.local_execucao_detalhado.message}</p>
                     )}
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="apr-responsavel-tecnico"
-                      className={aprLabelClass}
-                    >
-                      Responsável técnico<AprRequiredMark />
+                    <label htmlFor="apr-responsavel-tecnico" className={aprLabelClass}>
+                      Responsável técnico
+                      <AprRequiredMark />
                     </label>
                     <input
                       id="apr-responsavel-tecnico"
@@ -4196,17 +3871,12 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Nome do responsável técnico"
                     />
                     {errors.responsavel_tecnico_nome && (
-                      <p className={aprErrorTextClass}>
-                        {errors.responsavel_tecnico_nome.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.responsavel_tecnico_nome.message}</p>
                     )}
                   </div>
 
                   <div>
-                    <label
-                      htmlFor="apr-responsavel-registro"
-                      className={aprLabelClass}
-                    >
+                    <label htmlFor="apr-responsavel-registro" className={aprLabelClass}>
                       Registro profissional
                     </label>
                     <input
@@ -4214,8 +3884,7 @@ export function AprForm({ id }: AprFormProps) {
                       {...register("responsavel_tecnico_registro")}
                       className={cn(
                         aprFieldClass,
-                        errors.responsavel_tecnico_registro &&
-                          aprFieldErrorClass,
+                        errors.responsavel_tecnico_registro && aprFieldErrorClass,
                       )}
                       placeholder="Ex: CREA 000000 / TST 00000"
                     />
@@ -4232,20 +3901,18 @@ export function AprForm({ id }: AprFormProps) {
                         Governança documental
                       </p>
                       <p className="mt-2 text-sm text-[var(--ds-color-text-secondary)]">
-                        O PDF final não faz parte do preenchimento básico desta
-                        etapa. Depois da aprovação, use o fluxo oficial da APR
-                        para emitir, abrir ou compartilhar o documento
-                        governado.
+                        O PDF final não faz parte do preenchimento básico desta etapa. Depois da
+                        aprovação, use o fluxo oficial da APR para emitir, abrir ou compartilhar o
+                        documento governado.
                       </p>
                       {hasFinalPdf ? (
                         <p className="mt-2 text-sm font-semibold text-[var(--color-success)]">
-                          Esta APR já possui PDF final emitido e está bloqueada
-                          para edição.
+                          Esta APR já possui PDF final emitido e está bloqueada para edição.
                         </p>
                       ) : isApproved ? (
                         <p className="mt-2 text-sm font-semibold text-[var(--color-warning)]">
-                          APR aprovada. O próximo passo é emitir o PDF final
-                          governado antes do encerramento.
+                          APR aprovada. O próximo passo é emitir o PDF final governado antes do
+                          encerramento.
                         </p>
                       ) : null}
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -4256,9 +3923,7 @@ export function AprForm({ id }: AprFormProps) {
                             disabled={emittingGovernedPdf || isOffline}
                             className={aprPrimaryCompactButtonClass}
                           >
-                            {emittingGovernedPdf
-                              ? "Emitindo PDF..."
-                              : "Emitir PDF final"}
+                            {emittingGovernedPdf ? "Emitindo PDF..." : "Emitir PDF final"}
                           </button>
                         ) : null}
                         {hasFinalPdf ? (
@@ -4277,20 +3942,17 @@ export function AprForm({ id }: AprFormProps) {
 
                   <div>
                     <label htmlFor="apr-company" className={aprLabelClass}>
-                      Empresa<AprRequiredMark />
+                      Empresa
+                      <AprRequiredMark />
                     </label>
                     <select
                       id="apr-company"
                       {...register("company_id")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.company_id && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.company_id && aprFieldErrorClass)}
                       onChange={(e) => {
                         const companyId = e.target.value;
                         const hasFilledData =
-                          riskFields.length > 0 ||
-                          selectedParticipantIds.length > 0;
+                          riskFields.length > 0 || selectedParticipantIds.length > 0;
                         if (hasFilledData) {
                           setPendingCompanyId(companyId);
                           setConfirmCompanyChangeOpen(true);
@@ -4315,15 +3977,14 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.company_id && (
-                      <p className={aprErrorTextClass}>
-                        {errors.company_id.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.company_id.message}</p>
                     )}
                   </div>
 
                   <div>
                     <label htmlFor="apr-site" className={aprLabelClass}>
-                      Site/Obra<AprRequiredMark />
+                      Site/Obra
+                      <AprRequiredMark />
                     </label>
                     <select
                       id="apr-site"
@@ -4336,9 +3997,7 @@ export function AprForm({ id }: AprFormProps) {
                       )}
                     >
                       <option value="">
-                        {selectedCompanyId
-                          ? "Selecione um site"
-                          : "Selecione uma empresa primeiro"}
+                        {selectedCompanyId ? "Selecione um site" : "Selecione uma empresa primeiro"}
                       </option>
                       {filteredSites.map((site) => (
                         <option key={site.id} value={site.id}>
@@ -4347,15 +4006,14 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.site_id && (
-                      <p className={aprErrorTextClass}>
-                        {errors.site_id.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.site_id.message}</p>
                     )}
                   </div>
 
                   <div>
                     <label htmlFor="apr-elaborador" className={aprLabelClass}>
-                      Elaborador<AprRequiredMark />
+                      Elaborador
+                      <AprRequiredMark />
                     </label>
                     <select
                       id="apr-elaborador"
@@ -4379,9 +4037,7 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.elaborador_id && (
-                      <p className={aprErrorTextClass}>
-                        {errors.elaborador_id.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.elaborador_id.message}</p>
                     )}
                   </div>
 
@@ -4412,42 +4068,34 @@ export function AprForm({ id }: AprFormProps) {
 
                   <div>
                     <label htmlFor="apr-data-inicio" className={aprLabelClass}>
-                      Data Início<AprRequiredMark />
+                      Data Início
+                      <AprRequiredMark />
                     </label>
                     <input
                       id="apr-data-inicio"
                       type="date"
                       {...register("data_inicio")}
-                      className={cn(
-                        aprFieldClass,
-                        errors.data_inicio && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.data_inicio && aprFieldErrorClass)}
                     />
                     {errors.data_inicio && (
-                      <p className={aprErrorTextClass}>
-                        {errors.data_inicio.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.data_inicio.message}</p>
                     )}
                   </div>
 
                   <div>
                     <label htmlFor="apr-data-fim" className={aprLabelClass}>
-                      Data Fim<AprRequiredMark />
+                      Data Fim
+                      <AprRequiredMark />
                     </label>
                     <input
                       id="apr-data-fim"
                       type="date"
                       {...register("data_fim")}
                       min={dataInicioApr || undefined}
-                      className={cn(
-                        aprFieldClass,
-                        errors.data_fim && aprFieldErrorClass,
-                      )}
+                      className={cn(aprFieldClass, errors.data_fim && aprFieldErrorClass)}
                     />
                     {errors.data_fim && (
-                      <p className={aprErrorTextClass}>
-                        {errors.data_fim.message}
-                      </p>
+                      <p className={aprErrorTextClass}>{errors.data_fim.message}</p>
                     )}
                   </div>
 
@@ -4491,8 +4139,7 @@ export function AprForm({ id }: AprFormProps) {
             {currentStep === 2 && (
               <>
                 <div className="space-y-6">
-                  {(sophieSuggestedRisks.length > 0 ||
-                    sophieMandatoryChecklists.length > 0) && (
+                  {(sophieSuggestedRisks.length > 0 || sophieMandatoryChecklists.length > 0) && (
                     <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-primary-subtle)]/45 p-5">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
@@ -4503,9 +4150,8 @@ export function AprForm({ id }: AprFormProps) {
                             Aplicações rápidas para esta APR
                           </h3>
                           <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-                            Use um clique para refletir os riscos sugeridos na
-                            seleção e na planilha, ou abrir os checklists
-                            operacionais recomendados.
+                            Use um clique para refletir os riscos sugeridos na seleção e na
+                            planilha, ou abrir os checklists operacionais recomendados.
                           </p>
                         </div>
                         {sophieSuggestedRisks.length > 0 ? (
@@ -4527,16 +4173,13 @@ export function AprForm({ id }: AprFormProps) {
                           <div className="mt-3 flex flex-wrap gap-2">
                             {sophieSuggestedRisks.map((suggestion, index) => {
                               const alreadySelected =
-                                (suggestion.id &&
-                                  selectedRiskIds.includes(suggestion.id)) ||
+                                (suggestion.id && selectedRiskIds.includes(suggestion.id)) ||
                                 hasSuggestedRiskInMatrix(suggestion);
                               return (
                                 <button
                                   key={`${suggestion.label}-${index}`}
                                   type="button"
-                                  onClick={() =>
-                                    applySuggestedAprRisk(suggestion)
-                                  }
+                                  onClick={() => applySuggestedAprRisk(suggestion)}
                                   className={cn(
                                     "rounded-full border px-3 py-1.5 text-xs font-semibold motion-safe:transition-colors",
                                     alreadySelected
@@ -4545,12 +4188,8 @@ export function AprForm({ id }: AprFormProps) {
                                   )}
                                 >
                                   {suggestion.label}
-                                  {suggestion.category
-                                    ? ` • ${suggestion.category}`
-                                    : ""}
-                                  {alreadySelected
-                                    ? " • Aplicado"
-                                    : " • Aplicar"}
+                                  {suggestion.category ? ` • ${suggestion.category}` : ""}
+                                  {alreadySelected ? " • Aplicado" : " • Aplicar"}
                                 </button>
                               );
                             })}
@@ -4576,9 +4215,7 @@ export function AprForm({ id }: AprFormProps) {
                                   {suggestion.reason}
                                 </p>
                                 <Link
-                                  href={buildChecklistSuggestionHref(
-                                    suggestion,
-                                  )}
+                                  href={buildChecklistSuggestionHref(suggestion)}
                                   className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[var(--color-primary)] hover:underline"
                                 >
                                   Abrir checklist recomendado
@@ -4596,9 +4233,8 @@ export function AprForm({ id }: AprFormProps) {
                       role="alert"
                       className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-warning-border)] bg-[color:var(--ds-color-warning-subtle)] px-4 py-3 text-sm text-[var(--color-warning)]"
                     >
-                      As assinaturas da APR ficam bloqueadas offline. Continue a
-                      APR base e volte online para capturar ou reenviar as
-                      assinaturas.
+                      As assinaturas da APR ficam bloqueadas offline. Continue a APR base e volte
+                      online para capturar ou reenviar as assinaturas.
                     </div>
                   ) : null}
                   <SectionGrid
@@ -4610,9 +4246,7 @@ export function AprForm({ id }: AprFormProps) {
                     helperText="Selecione os participantes da APR e acompanhe quem ainda precisa concluir a assinatura obrigatória."
                   />
                   {errors.participants && (
-                    <div className={aprDangerInlineClass}>
-                      {errors.participants.message}
-                    </div>
+                    <div className={aprDangerInlineClass}>{errors.participants.message}</div>
                   )}
                 </div>
 
@@ -4635,8 +4269,8 @@ export function AprForm({ id }: AprFormProps) {
                             Matriz operacional de riscos e governança
                           </h2>
                           <p className="mt-1 text-xs leading-5 text-[var(--ds-color-text-secondary)]">
-                            Lance riscos, revise pendências e mantenha a
-                            rastreabilidade sem sair da grade principal.
+                            Lance riscos, revise pendências e mantenha a rastreabilidade sem sair da
+                            grade principal.
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
@@ -4670,10 +4304,7 @@ export function AprForm({ id }: AprFormProps) {
                             <button
                               type="button"
                               onClick={() =>
-                                downloadExcel(
-                                  `/aprs/${id}/export/excel`,
-                                  `apr-${id}.xlsx`,
-                                )
+                                downloadExcel(`/aprs/${id}/export/excel`, `apr-${id}.xlsx`)
                               }
                               className="inline-flex items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs font-semibold text-[var(--ds-color-text-secondary)] transition-none hover:bg-[var(--ds-color-surface-base)]"
                             >
@@ -4688,11 +4319,7 @@ export function AprForm({ id }: AprFormProps) {
                               setExpandedRows(new Set());
                             }}
                             className="inline-flex items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs font-semibold text-[var(--ds-color-text-secondary)] transition-none hover:bg-[var(--ds-color-surface-base)]"
-                            title={
-                              compactMode
-                                ? "Expandir todas as linhas"
-                                : "Modo compacto"
-                            }
+                            title={compactMode ? "Expandir todas as linhas" : "Modo compacto"}
                           >
                             {compactMode ? (
                               <Maximize2 className="h-4 w-4" />
@@ -4746,9 +4373,7 @@ export function AprForm({ id }: AprFormProps) {
                           {excelPreview.errors.length === 0 && !isReadOnly ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                applyExcelPreviewToForm(excelPreview)
-                              }
+                              onClick={() => applyExcelPreviewToForm(excelPreview)}
                               className="inline-flex items-center gap-2 rounded-[var(--ds-radius-md)] bg-[var(--component-button-primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--color-text-inverse)] shadow-[var(--ds-shadow-sm)] transition-none hover:translate-y-0 hover:shadow-[var(--ds-shadow-sm)]"
                             >
                               <CheckCircle2 className="h-4 w-4" />
@@ -4796,22 +4421,13 @@ export function AprForm({ id }: AprFormProps) {
                       </div>
 
                       <div className="grid gap-2 px-4 py-2.5 md:grid-cols-2 xl:grid-cols-6">
-                        <SummaryMetaCard
-                          label="Descrição"
-                          value={tituloApr || "-"}
-                        />
+                        <SummaryMetaCard label="Descrição" value={tituloApr || "-"} />
                         <SummaryMetaCard
                           label="Empresa"
                           value={selectedCompany?.razao_social || "-"}
                         />
-                        <SummaryMetaCard
-                          label="Site / obra"
-                          value={selectedSite?.nome || "-"}
-                        />
-                        <SummaryMetaCard
-                          label="Data"
-                          value={dataInicioApr || "-"}
-                        />
+                        <SummaryMetaCard label="Site / obra" value={selectedSite?.nome || "-"} />
+                        <SummaryMetaCard label="Data" value={dataInicioApr || "-"} />
                         <SummaryMetaCard
                           label="Revisão / versão"
                           value={`${new Date().toLocaleDateString("pt-BR")} / v${currentApr?.versao || 1}`}
@@ -4851,16 +4467,14 @@ export function AprForm({ id }: AprFormProps) {
                               Nenhuma linha adicionada ainda.
                             </p>
                             <p className="mt-2 text-sm text-[var(--ds-color-text-secondary)]">
-                              Comece pela primeira atividade crítica ou traga
-                              uma planilha existente para acelerar a matriz.
+                              Comece pela primeira atividade crítica ou traga uma planilha existente
+                              para acelerar a matriz.
                             </p>
                             <div className="mt-4 flex flex-col items-center justify-center gap-2 sm:flex-row">
                               {!isReadOnly ? (
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    appendRisk(createEmptyRiskRow())
-                                  }
+                                  onClick={() => appendRisk(createEmptyRiskRow())}
                                   className="inline-flex items-center gap-2 rounded-[var(--ds-radius-md)] bg-[var(--component-button-primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--color-text-inverse)] shadow-[var(--ds-shadow-sm)] transition-none hover:translate-y-0 hover:shadow-[var(--ds-shadow-sm)]"
                                 >
                                   <Plus className="h-4 w-4" />
@@ -4884,18 +4498,15 @@ export function AprForm({ id }: AprFormProps) {
                             <div className="mt-4 inline-flex max-w-2xl items-start gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-info-border)] bg-[color:var(--ds-color-info-subtle)] px-3 py-2 text-left text-xs text-[var(--color-info)]">
                               <ClipboardList className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                               <span>
-                                Use importação quando a APR já existir em
-                                planilha. Use adição manual quando a análise
-                                estiver sendo construída direto no sistema.
+                                Use importação quando a APR já existir em planilha. Use adição
+                                manual quando a análise estiver sendo construída direto no sistema.
                               </span>
                             </div>
                           </div>
                         ) : (
                           <div className="overflow-x-auto">
                             <AprRiskGridHeader
-                              hiddenCompactDetailsCount={
-                                hiddenCompactDetailsCount
-                              }
+                              hiddenCompactDetailsCount={hiddenCompactDetailsCount}
                             />
                             <div className="space-y-3 p-3">
                               {riskFields.map((field, index) => {
@@ -4927,9 +4538,7 @@ export function AprForm({ id }: AprFormProps) {
                   </div>
 
                   <div className="grid gap-3 xl:grid-cols-[minmax(0,1.16fr)_minmax(320px,0.84fr)]">
-                    <AprRiskReferencePanel
-                      getActionCriteriaText={getActionCriteriaText}
-                    />
+                    <AprRiskReferencePanel getActionCriteriaText={getActionCriteriaText} />
                     <div className="rounded-[calc(var(--ds-radius-xl)+2px)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-[var(--ds-shadow-xs)]">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
                         Feedback visual
@@ -4976,8 +4585,14 @@ export function AprForm({ id }: AprFormProps) {
                     { label: "Número da APR preenchido", ok: Boolean(watchedNumero) },
                     { label: "Título da APR preenchido", ok: Boolean(watchedTitulo) },
                     { label: "Data de início definida", ok: Boolean(watchedDataInicio) },
-                    { label: "Ao menos 1 linha de risco completa", ok: materiallyCompleteRiskCount > 0 },
-                    { label: "Ao menos 1 participante selecionado", ok: selectedParticipantIds.length > 0 },
+                    {
+                      label: "Ao menos 1 linha de risco completa",
+                      ok: materiallyCompleteRiskCount > 0,
+                    },
+                    {
+                      label: "Ao menos 1 participante selecionado",
+                      ok: selectedParticipantIds.length > 0,
+                    },
                   ];
                   const allOk = items.every((i) => i.ok);
                   return (
@@ -4993,7 +4608,13 @@ export function AprForm({ id }: AprFormProps) {
                             ) : (
                               <AlertTriangle className="h-4 w-4 shrink-0 text-[var(--color-warning)]" />
                             )}
-                            <span className={item.ok ? "text-[var(--ds-color-text-primary)]" : "text-[var(--ds-color-text-secondary)]"}>
+                            <span
+                              className={
+                                item.ok
+                                  ? "text-[var(--ds-color-text-primary)]"
+                                  : "text-[var(--ds-color-text-secondary)]"
+                              }
+                            >
                               {item.label}
                             </span>
                           </li>
@@ -5016,8 +4637,8 @@ export function AprForm({ id }: AprFormProps) {
                     Validação final da APR
                   </h3>
                   <p className="mt-2 text-sm text-[var(--ds-color-text-secondary)]">
-                    Revise a coerência da matriz de risco, os participantes
-                    assinantes e os anexos antes de persistir a análise.
+                    Revise a coerência da matriz de risco, os participantes assinantes e os anexos
+                    antes de persistir a análise.
                   </p>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-4 py-3">
@@ -5035,8 +4656,8 @@ export function AprForm({ id }: AprFormProps) {
                         Participantes
                       </p>
                       <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                        {selectedParticipantIds.length} selecionado(s) ·{" "}
-                        {completedSignatures} assinatura(s)
+                        {selectedParticipantIds.length} selecionado(s) · {completedSignatures}{" "}
+                        assinatura(s)
                       </p>
                       {selectedParticipantIds.length > 0 && (
                         <button
@@ -5148,8 +4769,7 @@ export function AprForm({ id }: AprFormProps) {
                           ))
                         ) : (
                           <p className="text-sm text-[var(--ds-color-text-secondary)]">
-                            O fluxo de aprovação será exibido após o primeiro
-                            carregamento da APR.
+                            O fluxo de aprovação será exibido após o primeiro carregamento da APR.
                           </p>
                         )}
                       </div>
@@ -5164,15 +4784,13 @@ export function AprForm({ id }: AprFormProps) {
                           <span className="font-semibold text-[var(--ds-color-text-primary)]">
                             Código:
                           </span>{" "}
-                          {currentApr?.verification_code ||
-                            "Gerado na emissão final"}
+                          {currentApr?.verification_code || "Gerado na emissão final"}
                         </p>
                         <p>
                           <span className="font-semibold text-[var(--ds-color-text-primary)]">
                             Hash:
                           </span>{" "}
-                          {currentApr?.final_pdf_hash_sha256 ||
-                            "Gerado na emissão final"}
+                          {currentApr?.final_pdf_hash_sha256 || "Gerado na emissão final"}
                         </p>
                         <p>
                           <span className="font-semibold text-[var(--ds-color-text-primary)]">
@@ -5200,14 +4818,11 @@ export function AprForm({ id }: AprFormProps) {
                       Auditoria avançada (opcional)
                     </summary>
                     <p className="mt-2 text-sm text-[var(--ds-color-text-secondary)]">
-                      Utilize este bloco apenas quando o processo exigir registro
-                      formal de auditoria interna.
+                      Utilize este bloco apenas quando o processo exigir registro formal de
+                      auditoria interna.
                     </p>
                     <div className="mt-4">
-                      <AuditSection
-                        register={register}
-                        auditors={filteredUsers}
-                      />
+                      <AuditSection register={register} auditors={filteredUsers} />
                     </div>
                   </details>
                 )}
@@ -5215,10 +4830,7 @@ export function AprForm({ id }: AprFormProps) {
             )}
           </fieldset>
 
-          <MobileActionBar
-            aria-label="Ações da APR"
-            className="flex flex-col gap-4"
-          >
+          <MobileActionBar aria-label="Ações da APR" className="flex flex-col gap-4">
             {!id && draftStorageKey && !isReadOnly ? (
               <div
                 role="status"
@@ -5254,237 +4866,199 @@ export function AprForm({ id }: AprFormProps) {
 
             <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 flex-wrap items-center gap-2">
-              {currentStep > 1 ? (
-                <button
-                  type="button"
-                  onClick={prevStep}
-                  className={aprGhostActionClass}
-                >
-                  Voltar
-                </button>
-              ) : (
-                <Link href="/dashboard/aprs" className={aprGhostActionClass}>
-                  Cancelar
-                </Link>
-              )}
-              {(isApproved || hasFinalPdf) && (
-                <span className="hidden rounded-full border border-[var(--ds-color-border-subtle)] bg-[color:var(--color-card-muted)]/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)] sm:inline-flex sm:items-center sm:gap-1">
-                  <Lock className="h-3 w-3" />
-                  {hasFinalPdf ? "PDF emitido" : "Aprovada"}
-                </span>
-              )}
-            </div>
+                {currentStep > 1 ? (
+                  <button type="button" onClick={prevStep} className={aprGhostActionClass}>
+                    Voltar
+                  </button>
+                ) : (
+                  <Link href="/dashboard/aprs" className={aprGhostActionClass}>
+                    Cancelar
+                  </Link>
+                )}
+                {(isApproved || hasFinalPdf) && (
+                  <span className="hidden rounded-full border border-[var(--ds-color-border-subtle)] bg-[color:var(--color-card-muted)]/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)] sm:inline-flex sm:items-center sm:gap-1">
+                    <Lock className="h-3 w-3" />
+                    {hasFinalPdf ? "PDF emitido" : "Aprovada"}
+                  </span>
+                )}
+              </div>
 
               <div
                 className={cn(
                   "flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-0 sm:space-x-4",
-                  isFieldMode &&
-                    "grid grid-cols-2 gap-3 sm:flex-none sm:space-x-0",
+                  isFieldMode && "grid grid-cols-2 gap-3 sm:flex-none sm:space-x-0",
                 )}
               >
-              {currentStep >= 3 ? (
-                hasFinalPdf ? (
-                  <div
-                    className={cn(
-                      "flex flex-col gap-3 sm:flex-row sm:items-center",
-                      isFieldMode && "col-span-2",
-                    )}
-                  >
-                    {isApproved ? (
+                {currentStep >= 3 ? (
+                  hasFinalPdf ? (
+                    <div
+                      className={cn(
+                        "flex flex-col gap-3 sm:flex-row sm:items-center",
+                        isFieldMode && "col-span-2",
+                      )}
+                    >
+                      {isApproved ? (
+                        <button
+                          type="button"
+                          onClick={handleCloseApr}
+                          disabled={closingApr}
+                          className={cn(aprPrimarySubmitActionClass, isFieldMode && "min-h-12")}
+                        >
+                          {closingApr ? (
+                            <Loader2 className="h-4 w-4 " />
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4" />
+                          )}
+                          <span>{closingApr ? "Encerrando APR..." : "Encerrar APR"}</span>
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        onClick={handleCloseApr}
-                        disabled={closingApr}
+                        onClick={handleOpenGovernedPdf}
+                        disabled={isOffline}
                         className={cn(
-                          aprPrimarySubmitActionClass,
+                          aprGhostActionClass,
+                          "inline-flex items-center justify-center gap-2",
+                          isOffline && "cursor-not-allowed opacity-60",
                           isFieldMode && "min-h-12",
                         )}
                       >
-                        {closingApr ? (
-                          <Loader2 className="h-4 w-4 " />
-                        ) : (
-                          <CheckCircle2 className="h-4 w-4" />
-                        )}
-                        <span>
-                          {closingApr ? "Encerrando APR..." : "Encerrar APR"}
-                        </span>
+                        <FileText className="h-4 w-4" />
+                        <span>Abrir PDF final</span>
                       </button>
-                    ) : null}
+                    </div>
+                  ) : isApproved ? (
                     <button
                       type="button"
-                      onClick={handleOpenGovernedPdf}
-                      disabled={isOffline}
+                      onClick={handleEmitGovernedPdf}
+                      disabled={!canGenerateAprPdf || emittingGovernedPdf || isOffline}
                       className={cn(
-                        aprGhostActionClass,
-                        "inline-flex items-center justify-center gap-2",
+                        aprPrimarySubmitActionClass,
                         isOffline && "cursor-not-allowed opacity-60",
                         isFieldMode && "min-h-12",
                       )}
                     >
-                      <FileText className="h-4 w-4" />
-                      <span>Abrir PDF final</span>
+                      {emittingGovernedPdf ? (
+                        <Loader2 className="h-4 w-4 " />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                      <span>Emitir PDF final governado</span>
                     </button>
-                  </div>
-                ) : isApproved ? (
-                  <button
-                    type="button"
-                    onClick={handleEmitGovernedPdf}
-                    disabled={
-                      !canGenerateAprPdf || emittingGovernedPdf || isOffline
-                    }
-                    className={cn(
-                      aprPrimarySubmitActionClass,
-                      isOffline && "cursor-not-allowed opacity-60",
-                      isFieldMode && "min-h-12",
-                    )}
-                  >
-                    {emittingGovernedPdf ? (
-                      <Loader2 className="h-4 w-4 " />
-                    ) : (
-                      <FileText className="h-4 w-4" />
-                    )}
-                    <span>Emitir PDF final governado</span>
-                  </button>
-                ) : isReadOnly ? (
-                  <div
-                    className={cn(
-                      "flex flex-col gap-2 sm:items-end",
-                      isFieldMode && "col-span-2",
-                    )}
-                  >
-                    {canApprove && canApproveCurrentApr ? (
+                  ) : isReadOnly ? (
+                    <div
+                      className={cn(
+                        "flex flex-col gap-2 sm:items-end",
+                        isFieldMode && "col-span-2",
+                      )}
+                    >
+                      {canApprove && canApproveCurrentApr ? (
+                        <button
+                          type="button"
+                          onClick={handleApproveApr}
+                          disabled={finalizing}
+                          className={cn(aprPrimarySubmitActionClass, isFieldMode && "min-h-12")}
+                        >
+                          {finalizing ? (
+                            <Loader2 className="h-4 w-4 " />
+                          ) : (
+                            <ShieldCheck className="h-4 w-4" />
+                          )}
+                          <span>
+                            {pendingApprovalStep
+                              ? `Aprovar etapa: ${pendingApprovalStep.title}`
+                              : "Aprovar APR"}
+                          </span>
+                        </button>
+                      ) : null}
+                      {readOnlyReason ? (
+                        <p className="text-sm text-[var(--ds-color-text-secondary)] sm:max-w-md sm:text-right">
+                          {readOnlyReason}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <>
                       <button
                         type="button"
-                        onClick={handleApproveApr}
-                        disabled={finalizing}
+                        onClick={() => {
+                          submitIntentRef.current = "save_and_print";
+                          void handleSubmit(onSubmit)();
+                        }}
+                        disabled={!canWriteApr || loading || isOffline || isDraftSyncInFlight}
+                        title={saveAndPrintBlockReason || undefined}
                         className={cn(
-                          aprPrimarySubmitActionClass,
+                          aprGhostActionClass,
+                          "inline-flex items-center justify-center gap-2",
+                          (isOffline || isDraftSyncInFlight) && "cursor-not-allowed opacity-60",
                           isFieldMode && "min-h-12",
                         )}
                       >
-                        {finalizing ? (
+                        {loading ? (
                           <Loader2 className="h-4 w-4 " />
                         ) : (
-                          <ShieldCheck className="h-4 w-4" />
+                          <Printer className="h-4 w-4" />
                         )}
-                        <span>
-                          {pendingApprovalStep
-                            ? `Aprovar etapa: ${pendingApprovalStep.title}`
-                            : "Aprovar APR"}
-                        </span>
+                        <span>Salvar e imprimir</span>
                       </button>
-                    ) : null}
-                    {readOnlyReason ? (
-                      <p className="text-sm text-[var(--ds-color-text-secondary)] sm:max-w-md sm:text-right">
-                        {readOnlyReason}
-                      </p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        submitIntentRef.current = "save_and_print";
-                        void handleSubmit(onSubmit)();
-                      }}
-                      disabled={
-                        !canWriteApr ||
-                        loading ||
-                        isOffline ||
-                        isDraftSyncInFlight
-                      }
-                      title={saveAndPrintBlockReason || undefined}
-                      className={cn(
-                        aprGhostActionClass,
-                        "inline-flex items-center justify-center gap-2",
-                        (isOffline || isDraftSyncInFlight) &&
-                          "cursor-not-allowed opacity-60",
-                        isFieldMode && "min-h-12",
-                      )}
-                    >
-                      {loading ? (
-                        <Loader2 className="h-4 w-4 " />
-                      ) : (
-                        <Printer className="h-4 w-4" />
-                      )}
-                      <span>Salvar e imprimir</span>
-                    </button>
-                    {saveAndPrintBlockReason ? (
-                      <p className="text-sm text-[var(--ds-color-text-secondary)] sm:ml-2">
-                        {saveAndPrintBlockReason}
-                      </p>
-                    ) : null}
-                    <button
-                      type="submit"
-                      onClick={() => {
-                        submitIntentRef.current = "save";
-                        if (
-                          complianceResult &&
-                          complianceResult.blockers.length > 0
-                        ) {
-                          compliancePanelRef.current?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          });
+                      {saveAndPrintBlockReason ? (
+                        <p className="text-sm text-[var(--ds-color-text-secondary)] sm:ml-2">
+                          {saveAndPrintBlockReason}
+                        </p>
+                      ) : null}
+                      <button
+                        type="submit"
+                        onClick={() => {
+                          submitIntentRef.current = "save";
+                          if (complianceResult && complianceResult.blockers.length > 0) {
+                            compliancePanelRef.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "start",
+                            });
+                          }
+                        }}
+                        disabled={
+                          !canWriteApr ||
+                          loading ||
+                          isDraftSyncInFlight ||
+                          Boolean(id && complianceResult && complianceResult.blockers.length > 0)
                         }
-                      }}
-                      disabled={
-                        !canWriteApr ||
-                        loading ||
-                        isDraftSyncInFlight ||
-                        Boolean(
-                          id &&
-                          complianceResult &&
-                          complianceResult.blockers.length > 0,
-                        )
-                      }
-                      title={
-                        id &&
-                        complianceResult &&
-                        complianceResult.blockers.length > 0
-                          ? "APR possui pendências críticas. Corrija antes de salvar."
-                          : saveBlockReason || undefined
-                      }
-                      className={cn(
-                        aprPrimarySubmitActionClass,
-                        isDraftSyncInFlight && "cursor-not-allowed opacity-60",
-                        isFieldMode && "min-h-12",
-                      )}
-                    >
-                      {loading ? (
-                        <Loader2 className="h-4 w-4 " />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-                      <span>{id ? "Atualizar APR" : "Salvar APR"}</span>
-                    </button>
-                    {saveBlockReason ? (
-                      <p className="text-sm text-[var(--ds-color-text-secondary)] sm:ml-2">
-                        {saveBlockReason}
-                      </p>
-                    ) : null}
-                  </>
-                )
-              ) : (
-                <button
-                  type="button"
-                  onClick={nextStep}
-                  className={cn(
-                    aprPrimaryActionClass,
-                    isFieldMode && "min-h-12",
-                  )}
-                >
-                  <span>Próximo</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              )}
+                        title={
+                          id && complianceResult && complianceResult.blockers.length > 0
+                            ? "APR possui pendências críticas. Corrija antes de salvar."
+                            : saveBlockReason || undefined
+                        }
+                        className={cn(
+                          aprPrimarySubmitActionClass,
+                          isDraftSyncInFlight && "cursor-not-allowed opacity-60",
+                          isFieldMode && "min-h-12",
+                        )}
+                      >
+                        {loading ? <Loader2 className="h-4 w-4 " /> : <Save className="h-4 w-4" />}
+                        <span>{id ? "Atualizar APR" : "Salvar APR"}</span>
+                      </button>
+                      {saveBlockReason ? (
+                        <p className="text-sm text-[var(--ds-color-text-secondary)] sm:ml-2">
+                          {saveBlockReason}
+                        </p>
+                      ) : null}
+                    </>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    onClick={nextStep}
+                    className={cn(aprPrimaryActionClass, isFieldMode && "min-h-12")}
+                  >
+                    <span>Próximo</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           </MobileActionBar>
         </div>
       </form>
-
 
       {formActionModal ? (
         <AprActionModal

@@ -1,0 +1,68 @@
+{
+  auto_https disable_redirects
+  servers :443 {
+    protocols h1 h2
+  }
+  log {
+    output stdout
+    format json
+  }
+}
+
+http://api-loadtest.sgsseguranca.com.br {
+  redir https://api-loadtest.sgsseguranca.com.br{uri} permanent
+}
+
+http://:80 {
+  respond "Not Found" 404
+}
+
+https://api-loadtest.sgsseguranca.com.br {
+  tls {
+    protocols tls1.2 tls1.3
+  }
+
+  header {
+    Cache-Control "no-store, no-cache, must-revalidate"
+    Pragma "no-cache"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+  }
+
+  request_body {
+    max_size 20MB
+  }
+
+  @public_health path /health/public
+  handle @public_health {
+    reverse_proxy proxy-loadtest:80 {
+      transport http {
+        dial_timeout 5s
+        response_header_timeout 30s
+        read_timeout 60s
+        write_timeout 30s
+      }
+    }
+  }
+
+  @with_key header X-Loadtest-Key {$LOADTEST_PROXY_KEY}
+  handle @with_key {
+    reverse_proxy proxy-loadtest:80 {
+      transport http {
+        dial_timeout 5s
+        response_header_timeout 30s
+        read_timeout 60s
+        write_timeout 30s
+      }
+    }
+  }
+
+  handle {
+    respond "Unauthorized" 401
+  }
+}
+
+https://:443 {
+  tls internal
+  respond "Not Found" 404
+}

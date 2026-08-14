@@ -6,6 +6,7 @@ import Script from 'next/script';
 import Image from 'next/image';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import api from '@/lib/api';
+import { formatCpfInput } from '@/lib/format/cpf';
 import axios from 'axios';
 import styles from '../auth.module.css';
 
@@ -20,14 +21,6 @@ declare global {
       remove: (widgetId?: string) => void;
     };
   }
-}
-
-function formatCpf(value: string): string {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
-  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
-  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 }
 
 function getBodyNonce(): string | undefined {
@@ -89,7 +82,7 @@ export default function ForgotPasswordPage() {
 
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (error) setError('');
-    setCpf(formatCpf(e.target.value));
+    setCpf(formatCpfInput(e.target.value));
   };
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

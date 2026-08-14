@@ -1,16 +1,25 @@
 import {
   BadRequestException,
-  Inject,
   Injectable,
   Logger,
   NotFoundException,
-  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { InjectQueue } from '@nestjs/bullmq';
-import type { Queue } from 'bullmq';
 import { Repository, IsNull } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { createHash } from 'node:crypto';
+import QRCode from 'qrcode';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
+import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
+import { SignaturesService } from '../signatures/signatures.service';
+import type { Signature } from '../signatures/entities/signature.entity';
+import {
+  buildIntegrityFlags,
+  hashDeviceId,
+  maskIpAddress,
+  parseOptionalDate,
+  roundCoordinate,
+} from '../../shared/security/evidence-integrity.util';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
 import { PdfService } from '../../shared/services/pdf.service';
@@ -44,8 +53,16 @@ import { UpdatePhotographicReportImageDto } from './dto/update-photographic-repo
 import { ReorderPhotographicReportImagesDto } from './dto/reorder-photographic-report-images.dto';
 import { UploadPhotographicReportImagesDto } from './dto/upload-photographic-report-images.dto';
 import {
+  APPLICABLE_NR_OPTIONS,
+  MAX_APPLICABLE_NRS,
+  MAX_PHOTO_CONDITIONS,
+  isApplicableNr,
+} from './photographic-reports.constants';
+import { buildPhotographicReportCode } from './photographic-reports.document-code';
+import {
   buildPhotographicReportHtml,
   type PhotographicReportRenderableImage,
+  type RenderableSignature,
 } from './photographic-reports.renderer';
 import { buildPhotographicReportWordBuffer } from './photographic-reports.word';
 import {
@@ -63,9 +80,6 @@ import {
 } from './entities/photographic-report.entity';
 import { Company } from '../companies/entities/company.entity';
 import { escapeLikePattern } from '../../shared/utils/sql.util';
-import { MailService } from '../../infra/mail/mail.service';
-import { DocumentMailDispatchResponseDto } from '../../infra/mail/dto/document-mail-dispatch-response.dto';
-import { defaultJobOptions } from '../../infra/queue/default-job-options';
 
 type PhotographicReportWithCounts = PhotographicReport & {
   dayCount?: number;
@@ -77,6 +91,13 @@ type PhotographicReportAnalysisResult = Awaited<
 >;
 
 const DEFAULT_IMAGE_MAX_FILE_SIZE = 15 * 1024 * 1024;
+
+/**
+ * Validade do token do QR: 30 dias, mesmo valor usado pelo módulo de Não
+ * Conformidades. O documento em si não expira — apenas o link com token
+ * embutido; quem tiver o código pode revalidar pelo portal.
+ */
+const PUBLIC_VALIDATION_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PDF_MIME_TYPE = 'application/pdf';
 const WORD_MIME_TYPE =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -103,10 +124,8 @@ export class PhotographicReportsService {
     private readonly fileInspectionService: FileInspectionService,
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
-    @Inject(forwardRef(() => MailService))
-    private readonly mailService: MailService,
-    @InjectQueue('mail')
-    private readonly mailQueue: Queue,
+    private readonly publicValidationGrantService: PublicValidationGrantService,
+    private readonly signaturesService: SignaturesService,
   ) {}
 
   createUploadOptions(maxFileSize = DEFAULT_IMAGE_MAX_FILE_SIZE) {
@@ -166,6 +185,43 @@ export class PhotographicReportsService {
     return normalized.length > 0 ? normalized : null;
   }
 
+  /**
+   * Filtra as NRs contra o catálogo conhecido.
+   *
+   * A pertinência é conferida aqui e não no DTO de propósito: uma norma
+   * desconhecida (catálogo do frontend defasado, colagem manual) é descartada
+   * em silêncio em vez de derrubar com 400 um relatório que no mais está
+   * válido. Perder uma NR do documento é recuperável; perder o salvamento
+   * inteiro no meio de uma inspeção, não.
+   */
+  private normalizeApplicableNrs(
+    values?: Array<string | null | undefined> | null,
+  ): string[] | null {
+    const normalized = (values || [])
+      .map((value) => this.normalizeText(value)?.toUpperCase())
+      .filter((value): value is string => Boolean(value))
+      .filter((value) => isApplicableNr(value));
+
+    // Duplicatas viriam de seleção repetida no cliente e poluiriam o PDF.
+    const unique = [...new Set(normalized)].slice(0, MAX_APPLICABLE_NRS);
+    if (unique.length !== normalized.length) {
+      this.logger.debug(
+        `NRs descartadas por serem desconhecidas ou duplicadas (recebidas ${
+          (values || []).length
+        }, aceitas ${unique.length}). Catálogo: ${APPLICABLE_NR_OPTIONS.length} normas.`,
+      );
+    }
+
+    return unique.length > 0 ? unique : null;
+  }
+
+  /** UF do registro profissional: duas letras maiúsculas, ou nulo. */
+  private normalizeRegistrationState(value?: string | null): string | null {
+    const normalized = this.normalizeText(value)?.toUpperCase();
+    if (!normalized) return null;
+    return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
+  }
+
   private normalizeDate(value?: string | null): string | null {
     const normalized = this.normalizeText(value);
     if (!normalized) return null;
@@ -182,15 +238,6 @@ export class PhotographicReportsService {
       throw new BadRequestException(`Horário inválido em ${fieldLabel}.`);
     }
     return normalized.slice(0, 5);
-  }
-
-  private buildReportCode(
-    report: Pick<PhotographicReport, 'id' | 'start_date'>,
-  ): string {
-    const year =
-      this.normalizeDate(report.start_date)?.slice(0, 4) ||
-      new Date().getFullYear().toString();
-    return `RFP-${year}-${report.id.slice(0, 8).toUpperCase()}`;
   }
 
   private buildFileSlug(
@@ -387,6 +434,28 @@ export class PhotographicReportsService {
       ai_technical_assessment: image.ai_technical_assessment,
       ai_condition_classification: image.ai_condition_classification,
       ai_recommendations: image.ai_recommendations,
+      photo_conditions: image.photo_conditions,
+
+      is_nonconformity: image.is_nonconformity ?? false,
+      recommended_action: image.recommended_action ?? null,
+      action_deadline: image.action_deadline ?? null,
+      action_responsible: image.action_responsible ?? null,
+
+      // `device_id` e `ip_address` NÃO são expostos — ver comentário em
+      // PhotographicReportImageResponse. Só o manifesto do PDF os consome.
+      original_name: image.original_name ?? null,
+      mime_type: image.mime_type ?? null,
+      file_size_bytes: image.file_size_bytes ?? null,
+      hash_sha256: image.hash_sha256 ?? null,
+      captured_at: image.captured_at ? image.captured_at.toISOString() : null,
+      latitude: image.latitude ?? null,
+      longitude: image.longitude ?? null,
+      accuracy_m: image.accuracy_m ?? null,
+      exif_datetime: image.exif_datetime
+        ? image.exif_datetime.toISOString()
+        : null,
+      integrity_flags: image.integrity_flags ?? null,
+
       created_at: image.created_at.toISOString(),
       updated_at: image.updated_at.toISOString(),
       day: image.report_day_id ? dayMap.get(image.report_day_id) || null : null,
@@ -458,6 +527,7 @@ export class PhotographicReportsService {
       end_time: report.end_time,
       responsible_name: report.responsible_name,
       contractor_company: report.contractor_company,
+      ...this.mapReportSstAndGovernanceFields(report),
       general_observations: report.general_observations,
       ai_summary: report.ai_summary,
       final_conclusion: report.final_conclusion,
@@ -475,6 +545,47 @@ export class PhotographicReportsService {
       days: mappedDays,
       images: mappedImages,
       exports: mappedExports,
+    };
+  }
+
+  /**
+   * Campos de SST e governança comuns à resposta de lista e à detalhada.
+   *
+   * Extraído porque os dois mapeadores enumeram o mesmo conjunto: manter duas
+   * listas manuais foi o que fez `photo_conditions` e o INSERT de imagens
+   * divergirem em silêncio.
+   */
+  private mapReportSstAndGovernanceFields(
+    report: PhotographicReport,
+  ): Pick<
+    PhotographicReportListItemResponse,
+    | 'responsible_registration_type'
+    | 'responsible_registration_number'
+    | 'responsible_registration_state'
+    | 'art_number'
+    | 'applicable_nrs'
+    | 'inspection_methodology'
+    | 'scope_and_limitations'
+    | 'verification_code'
+    | 'final_pdf_hash_sha256'
+    | 'pdf_generated_at'
+  > {
+    return {
+      responsible_registration_type:
+        report.responsible_registration_type ?? null,
+      responsible_registration_number:
+        report.responsible_registration_number ?? null,
+      responsible_registration_state:
+        report.responsible_registration_state ?? null,
+      art_number: report.art_number ?? null,
+      applicable_nrs: report.applicable_nrs ?? null,
+      inspection_methodology: report.inspection_methodology ?? null,
+      scope_and_limitations: report.scope_and_limitations ?? null,
+      verification_code: report.verification_code ?? null,
+      final_pdf_hash_sha256: report.final_pdf_hash_sha256 ?? null,
+      pdf_generated_at: report.pdf_generated_at
+        ? report.pdf_generated_at.toISOString()
+        : null,
     };
   }
 
@@ -507,6 +618,7 @@ export class PhotographicReportsService {
       end_time: report.end_time,
       responsible_name: report.responsible_name,
       contractor_company: report.contractor_company,
+      ...this.mapReportSstAndGovernanceFields(report),
       general_observations: report.general_observations,
       ai_summary: report.ai_summary,
       final_conclusion: report.final_conclusion,
@@ -694,10 +806,21 @@ export class PhotographicReportsService {
         dto.responsible_name,
         'Responsável pelo relatório',
       ),
+      responsible_registration_type: dto.responsible_registration_type ?? null,
+      responsible_registration_number: this.normalizeText(
+        dto.responsible_registration_number,
+      ),
+      responsible_registration_state: this.normalizeRegistrationState(
+        dto.responsible_registration_state,
+      ),
+      art_number: this.normalizeText(dto.art_number),
       contractor_company: this.normalizeRequiredText(
         dto.contractor_company,
         'Empresa executora',
       ),
+      applicable_nrs: this.normalizeApplicableNrs(dto.applicable_nrs),
+      inspection_methodology: this.normalizeText(dto.inspection_methodology),
+      scope_and_limitations: this.normalizeText(dto.scope_and_limitations),
       general_observations: this.normalizeText(dto.general_observations),
       ai_summary: null,
       final_conclusion: null,
@@ -804,10 +927,47 @@ export class PhotographicReportsService {
       );
       hasMutations = true;
     }
+    if (dto.responsible_registration_type !== undefined) {
+      report.responsible_registration_type =
+        dto.responsible_registration_type ?? null;
+      hasMutations = true;
+    }
+    if (dto.responsible_registration_number !== undefined) {
+      report.responsible_registration_number = this.normalizeText(
+        dto.responsible_registration_number,
+      );
+      hasMutations = true;
+    }
+    if (dto.responsible_registration_state !== undefined) {
+      report.responsible_registration_state = this.normalizeRegistrationState(
+        dto.responsible_registration_state,
+      );
+      hasMutations = true;
+    }
+    if (dto.art_number !== undefined) {
+      report.art_number = this.normalizeText(dto.art_number);
+      hasMutations = true;
+    }
     if (dto.contractor_company !== undefined) {
       report.contractor_company = this.normalizeRequiredText(
         dto.contractor_company,
         'Empresa executora',
+      );
+      hasMutations = true;
+    }
+    if (dto.applicable_nrs !== undefined) {
+      report.applicable_nrs = this.normalizeApplicableNrs(dto.applicable_nrs);
+      hasMutations = true;
+    }
+    if (dto.inspection_methodology !== undefined) {
+      report.inspection_methodology = this.normalizeText(
+        dto.inspection_methodology,
+      );
+      hasMutations = true;
+    }
+    if (dto.scope_and_limitations !== undefined) {
+      report.scope_and_limitations = this.normalizeText(
+        dto.scope_and_limitations,
       );
       hasMutations = true;
     }
@@ -903,6 +1063,22 @@ export class PhotographicReportsService {
               'Responsável pelo relatório',
             )
           : report.responsible_name,
+      responsible_registration_type:
+        dto.responsible_registration_type !== undefined
+          ? (dto.responsible_registration_type ?? null)
+          : report.responsible_registration_type,
+      responsible_registration_number:
+        dto.responsible_registration_number !== undefined
+          ? this.normalizeText(dto.responsible_registration_number)
+          : report.responsible_registration_number,
+      responsible_registration_state:
+        dto.responsible_registration_state !== undefined
+          ? this.normalizeRegistrationState(dto.responsible_registration_state)
+          : report.responsible_registration_state,
+      art_number:
+        dto.art_number !== undefined
+          ? this.normalizeText(dto.art_number)
+          : report.art_number,
       contractor_company:
         dto.contractor_company !== undefined
           ? this.normalizeRequiredText(
@@ -910,6 +1086,18 @@ export class PhotographicReportsService {
               'Empresa executora',
             )
           : report.contractor_company,
+      applicable_nrs:
+        dto.applicable_nrs !== undefined
+          ? this.normalizeApplicableNrs(dto.applicable_nrs)
+          : report.applicable_nrs,
+      inspection_methodology:
+        dto.inspection_methodology !== undefined
+          ? this.normalizeText(dto.inspection_methodology)
+          : report.inspection_methodology,
+      scope_and_limitations:
+        dto.scope_and_limitations !== undefined
+          ? this.normalizeText(dto.scope_and_limitations)
+          : report.scope_and_limitations,
       general_observations:
         dto.general_observations !== undefined
           ? this.normalizeText(dto.general_observations)
@@ -1080,6 +1268,11 @@ export class PhotographicReportsService {
     reportId: string,
     files: Express.Multer.File[],
     dto: UploadPhotographicReportImagesDto,
+    /**
+     * IP de origem do upload, mascarado antes de persistir (IPv4 /24, IPv6
+     * /48). Opcional para não quebrar chamadas internas que não têm request.
+     */
+    ipAddress?: string | null,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
@@ -1114,7 +1307,11 @@ export class PhotographicReportsService {
     const startingOrder =
       Math.max(...(report.images || []).map((image) => image.image_order), 0) ||
       0;
-    const createdImages: PhotographicReportImage[] = [];
+    // Uma ÚNICA lista de payloads planos, usada tanto pelo insert quanto pelo
+    // rollback de storage. Antes existiam duas listas — entidades via create()
+    // e um literal de 11 colunas escrito à mão no insert() — e só a segunda
+    // chegava ao banco.
+    const createdImages: QueryDeepPartialEntity<PhotographicReportImage>[] = [];
 
     try {
       for (let index = 0; index < files.length; index += 1) {
@@ -1157,35 +1354,76 @@ export class PhotographicReportsService {
           buffer,
           file.mimetype,
         );
-        createdImages.push(
-          this.imageRepository.create({
-            company_id: companyId,
-            report_id: report.id,
-            report_day_id: targetDay?.id || null,
-            image_url: storageKey,
-            image_order: startingOrder + index + 1,
-            manual_caption: this.normalizeText(dto.manual_caption) || null,
-            ai_title: null,
-            ai_description: null,
-            ai_positive_points: null,
-            ai_technical_assessment: null,
-            ai_condition_classification: null,
-            ai_recommendations: null,
+
+        // Integridade da evidência. O hash é dos bytes RECEBIDOS: o cliente
+        // re-encoda a imagem antes de enviar, então isto comprova que o
+        // arquivo não mudou desde o recebimento — não a autoria da captura.
+        // `integrity_flags.client_reencoded` carrega essa ressalva até o PDF.
+        const hashSha256 = createHash('sha256').update(buffer).digest('hex');
+
+        createdImages.push({
+          company_id: companyId,
+          report_id: report.id,
+          report_day_id: targetDay?.id || null,
+          image_url: storageKey,
+          image_order: startingOrder + index + 1,
+          manual_caption: this.normalizeText(dto.manual_caption) || null,
+          ai_title: null,
+          ai_description: null,
+          ai_positive_points: null,
+          ai_technical_assessment: null,
+          ai_condition_classification: null,
+          ai_recommendations: null,
+
+          original_name: this.normalizeText(file.originalname) || null,
+          mime_type: file.mimetype || null,
+          file_size_bytes: file.size || buffer.length,
+          hash_sha256: hashSha256,
+          // Listas posicionais: o índice N descreve o arquivo N.
+          captured_at: parseOptionalDate(dto.captured_at_list?.[index]),
+          exif_datetime: parseOptionalDate(dto.exif_datetime_list?.[index]),
+          latitude: roundCoordinate(dto.latitude),
+          longitude: roundCoordinate(dto.longitude),
+          accuracy_m:
+            typeof dto.accuracy_m === 'number' ? dto.accuracy_m : null,
+          device_id: hashDeviceId(dto.device_id),
+          ip_address: maskIpAddress(ipAddress),
+          integrity_flags: buildIntegrityFlags({
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            accuracy_m: dto.accuracy_m,
+            device_id: dto.device_id,
+            ipAddress,
+            exif_datetime: dto.exif_datetime_list?.[index],
+            clientReencoded: dto.client_reencoded,
           }),
-        );
+        });
       }
 
-      await this.imageRepository.save(createdImages);
-      this.markEditingIfNeeded(
-        report,
-        PhotographicReportStatus.AGUARDANDO_ANALISE,
+      // Uma única escrita a partir das entidades já construídas. Antes havia
+      // um segundo literal de 11 colunas escrito à mão aqui, de modo que toda
+      // coluna nova adicionada ao create() era descartada em silêncio no
+      // insert() — foi assim que os metadados de integridade quase nasceram
+      // mortos.
+      await this.imageRepository.insert(createdImages);
+
+      const nextStatus =
+        report.status === PhotographicReportStatus.FINALIZADO ||
+        report.status === PhotographicReportStatus.EXPORTADO
+          ? PhotographicReportStatus.EM_EDICAO
+          : PhotographicReportStatus.AGUARDANDO_ANALISE;
+      await this.reportRepository.update(
+        { id: report.id },
+        { status: nextStatus },
       );
-      await this.reportRepository.save(report);
-      return this.findOne(report.id);
+
+      return await this.findOne(report.id);
     } catch (error) {
       for (const image of createdImages) {
+        const storageKey = image.image_url;
+        if (typeof storageKey !== 'string') continue;
         try {
-          await this.documentStorageService.deleteFile(image.image_url);
+          await this.documentStorageService.deleteFile(storageKey);
         } catch {
           /* best effort cleanup */
         }
@@ -1245,6 +1483,35 @@ export class PhotographicReportsService {
         dto.ai_recommendations,
         5,
       );
+    }
+
+    // BUG CORRIGIDO: `photo_conditions` era declarado no DTO, devolvido por
+    // mapImageEntity e enviado pelo PhotoCard, mas NÃO tinha branch de escrita
+    // aqui — todo checkbox marcado pelo usuário era descartado em silêncio
+    // desde que a feature foi entregue.
+    if (dto.photo_conditions !== undefined) {
+      image.photo_conditions = this.normalizeStringArray(
+        dto.photo_conditions,
+        MAX_PHOTO_CONDITIONS,
+      );
+    }
+
+    // Não conformidade. Os campos são independentes de propósito: desmarcar a
+    // NC não deve exigir reenviar a ação, e limpar a ação não deve exigir
+    // desmarcar a NC.
+    if (dto.is_nonconformity !== undefined) {
+      image.is_nonconformity = Boolean(dto.is_nonconformity);
+    }
+    if (dto.recommended_action !== undefined) {
+      image.recommended_action = this.normalizeText(dto.recommended_action);
+    }
+    if (dto.action_deadline !== undefined) {
+      image.action_deadline = dto.action_deadline
+        ? this.normalizeDate(dto.action_deadline)
+        : null;
+    }
+    if (dto.action_responsible !== undefined) {
+      image.action_responsible = this.normalizeText(dto.action_responsible);
     }
 
     this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
@@ -1498,27 +1765,244 @@ export class PhotographicReportsService {
     return this.findOne(persisted.id);
   }
 
-  private async resolveCompanyLogoDataUrl(
-    companyId: string,
-  ): Promise<string | null> {
+  /**
+   * Identidade visual e jurídica da empresa emitente.
+   *
+   * Substitui o antigo `resolveCompanyLogoDataUrl`, que só trazia o logo. O PDF
+   * e o Word vinham identificando a empresa emitente com `report.client_name`
+   * — ou seja, com o nome do CLIENTE. Num documento que carrega o registro
+   * profissional do responsável e o número da ART, atribuir a emissão a outra
+   * pessoa jurídica é a diferença entre um relatório técnico válido e um
+   * inválido.
+   *
+   * A relação `company` NÃO é adicionada ao `findReportEntity`: isso carregaria
+   * a linha inteira (incluindo colunas cifradas e de ciclo de vida) em todo
+   * `findOne`, para benefício de dois caminhos de exportação.
+   *
+   * Degrada sem lançar: logo ou dados ausentes nunca podem derrubar a emissão.
+   */
+  private async resolveCompanyBranding(companyId: string): Promise<{
+    razaoSocial: string | null;
+    cnpj: string | null;
+    logoDataUrl: string | null;
+  }> {
+    const fallback = { razaoSocial: null, cnpj: null, logoDataUrl: null };
+
+    let company: Company | null;
     try {
-      const company = await this.companyRepository.findOne({
+      company = await this.companyRepository.findOne({
         where: { id: companyId },
-        select: ['id', 'logo_storage_key', 'logo_content_type'],
+        select: [
+          'id',
+          'razao_social',
+          'cnpj',
+          'logo_storage_key',
+          'logo_content_type',
+        ],
       });
-      if (!company?.logo_storage_key) return null;
+    } catch (error) {
+      this.logger.warn(
+        `Dados da empresa ${companyId} indisponíveis durante geração de documento: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return fallback;
+    }
+
+    if (!company) return fallback;
+
+    const identity = {
+      razaoSocial: company.razao_social ?? null,
+      cnpj: company.cnpj ?? null,
+    };
+
+    if (!company.logo_storage_key) {
+      return { ...identity, logoDataUrl: null };
+    }
+
+    // O logo é baixado do storage e falha com mais frequência que a consulta.
+    // Perdê-lo não pode custar a identidade da empresa no documento.
+    try {
       const buf = await this.documentStorageService.downloadFileBuffer(
         company.logo_storage_key,
       );
       const mime = company.logo_content_type ?? 'image/png';
-      return `data:${mime};base64,${buf.toString('base64')}`;
+      return {
+        ...identity,
+        logoDataUrl: `data:${mime};base64,${buf.toString('base64')}`,
+      };
     } catch (error) {
       this.logger.warn(
         `Logo da empresa ${companyId} indisponível durante geração de PDF: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
+      return { ...identity, logoDataUrl: null };
+    }
+  }
+
+  /**
+   * QR e URL de validação pública do documento.
+   *
+   * Copiado quase literalmente de `nonconformities-pdf.service.ts` para que os
+   * dois módulos produzam QRs visualmente idênticos e resolvam pelo mesmo
+   * endpoint. Três propriedades importantes:
+   *
+   * - O `documentCode` é determinístico a partir do relatório, então pode ser
+   *   embutido no QR ANTES do render e persistido depois. O hash do PDF não
+   *   entra no QR — não teria como, é o hash do documento que o contém.
+   * - O QR vai como data URI. O Chromium do renderer não pode fazer requisição
+   *   de rede durante a geração; buscar a imagem quebraria essa invariante.
+   * - Toda falha degrada para `{ url: null, qrDataUri: null }`. Portal não
+   *   configurado em staging não pode impedir a emissão do documento.
+   */
+  private async buildPublicValidationPresentation(
+    report: Pick<PhotographicReport, 'id' | 'company_id'>,
+    documentCode: string,
+  ): Promise<{ url: string | null; qrDataUri: string | null }> {
+    const portalOrigin = this.resolvePublicValidationPortalOrigin();
+    if (!portalOrigin) {
+      this.logger.warn({
+        event: 'photographic_report_public_validation_unavailable',
+        reportId: report.id,
+        reason: 'public_portal_origin_not_configured',
+      });
+      return { url: null, qrDataUri: null };
+    }
+
+    try {
+      const token = await this.publicValidationGrantService.issueToken({
+        code: documentCode,
+        companyId: report.company_id,
+        documentId: report.id,
+        portal: 'photographic_report_public_validation',
+        expiresInSeconds: PUBLIC_VALIDATION_TOKEN_TTL_SECONDS,
+      });
+      const validationUrl = new URL(
+        `/validar/${encodeURIComponent(documentCode)}`,
+        portalOrigin,
+      );
+      validationUrl.searchParams.set('token', token);
+      const url = validationUrl.toString();
+      const qrDataUri = await QRCode.toDataURL(url, {
+        errorCorrectionLevel: 'M',
+        margin: 1,
+        width: 256,
+        color: {
+          dark: '#0F2036',
+          light: '#FFFFFF',
+        },
+      });
+
+      return { url, qrDataUri };
+    } catch (error) {
+      this.logger.warn({
+        event: 'photographic_report_public_validation_unavailable',
+        reportId: report.id,
+        companyId: report.company_id,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return { url: null, qrDataUri: null };
+    }
+  }
+
+  private resolvePublicValidationPortalOrigin(): string | null {
+    const configuredOrigins = [
+      process.env.FRONTEND_URL,
+      process.env.NEXT_PUBLIC_APP_URL,
+      process.env.APP_URL,
+    ];
+
+    for (const candidate of configuredOrigins) {
+      const value = String(candidate || '').trim();
+      if (!value) {
+        continue;
+      }
+
+      try {
+        const parsed = new URL(value);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+          return parsed.origin;
+        }
+      } catch {
+        // Tenta a próxima variável; nenhum valor é interpolado no HTML.
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Assinaturas do relatório, para o bloco de assinaturas do documento.
+   *
+   * O `.catch` NÃO é decorativo: `findByDocument` chama
+   * `assertDocumentSiteVisibleForCurrentScope` antes de qualquer coisa e lança
+   * `NotFoundException` para módulo fora do mapa de escopo. Sem esta rede, um
+   * erro na resolução de escopo derrubaria TODA emissão de PDF — o documento
+   * deixaria de sair por causa de um painel acessório.
+   *
+   * O resolver dedicado (`resolvePhotographicReportSignatureDocumentScope`) é
+   * a correção; isto aqui é o cinto de segurança.
+   */
+  /**
+   * Imagem da assinatura pronta para o HTML.
+   *
+   * Assinaturas acima de 4 KB (`SIGNATURE_DATA_S3_THRESHOLD_BYTES`) — ou seja,
+   * praticamente toda assinatura DESENHADA — têm `signature_data` nulo e o
+   * payload no storage. Buscar aqui, no serviço, mantém a invariante de que o
+   * Chromium não faz requisição de rede durante o render: quando o HTML é
+   * montado, a imagem já é um data URI.
+   *
+   * Assinaturas do tipo HMAC não têm imagem — a prova é o hash, e o documento
+   * mostra a linha para rubrica manuscrita.
+   */
+  private async resolveSignatureImage(
+    signature: Signature,
+  ): Promise<string | null> {
+    try {
+      const data = await this.signaturesService.resolveSignatureData(signature);
+      if (!data || !data.startsWith('data:image/')) {
+        return null;
+      }
+      return data;
+    } catch (error) {
+      this.logger.warn(
+        `Imagem da assinatura ${signature.id} indisponível na emissão: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       return null;
+    }
+  }
+
+  private async loadReportSignatures(
+    reportId: string,
+  ): Promise<RenderableSignature[]> {
+    try {
+      const signatures = await this.signaturesService.findByDocument(
+        reportId,
+        'PHOTOGRAPHIC_REPORT',
+      );
+
+      return await Promise.all(
+        signatures.map(async (signature) => ({
+          signerName: signature.user?.nome ?? null,
+          signerRole: signature.user?.funcao ?? null,
+          type: signature.type ?? null,
+          signedAt: signature.signed_at
+            ? signature.signed_at.toISOString()
+            : null,
+          signatureHash: signature.signature_hash ?? null,
+          signatureImage: await this.resolveSignatureImage(signature),
+        })),
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Assinaturas indisponíveis para o relatório ${reportId} durante a emissão: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return [];
     }
   }
 
@@ -1531,18 +2015,36 @@ export class PhotographicReportsService {
         ...image,
         data_url: await this.fileBufferToDataUrl(
           image.image_url,
-          this.guessImageMimeType(image.image_url),
+          // `mime_type` real, gravado no upload desde a migration 370.
+          // `guessImageMimeType` fica como fallback para linhas anteriores.
+          image.mime_type ?? this.guessImageMimeType(image.image_url),
         ),
         activity_date_label: image.day?.activity_date || report.start_date,
       });
     }
 
-    const logoDataUrl = await this.resolveCompanyLogoDataUrl(report.company_id);
+    const documentCode = buildPhotographicReportCode(report);
+
+    // Os três são independentes e cada um já degrada sozinho — buscar em
+    // paralelo evita somar três idas de rede ao tempo de emissão.
+    const [branding, validation, signatures] = await Promise.all([
+      this.resolveCompanyBranding(report.company_id),
+      this.buildPublicValidationPresentation(report, documentCode),
+      this.loadReportSignatures(report.id),
+    ]);
+
     const html = buildPhotographicReportHtml(report, {
-      companyName: report.client_name,
+      companyIdentity: {
+        razaoSocial: branding.razaoSocial,
+        cnpj: branding.cnpj,
+      },
+      clientName: report.client_name,
+      documentCode,
       generatedAt: new Date().toISOString(),
       renderableImages,
-      logoDataUrl,
+      logoDataUrl: branding.logoDataUrl,
+      validation,
+      signatures,
     });
 
     return this.pdfService.generateFromHtml(html, {
@@ -1580,8 +2082,14 @@ export class PhotographicReportsService {
       });
     }
 
+    const branding = await this.resolveCompanyBranding(report.company_id);
     return buildPhotographicReportWordBuffer(report, {
-      companyName: report.client_name,
+      companyIdentity: {
+        razaoSocial: branding.razaoSocial,
+        cnpj: branding.cnpj,
+      },
+      clientName: report.client_name,
+      documentCode: buildPhotographicReportCode(report),
       generatedAt: new Date().toISOString(),
       renderableImages,
     });
@@ -1598,6 +2106,9 @@ export class PhotographicReportsService {
     const generatedBy = RequestContext.getUserId() || null;
 
     if (params.exportType === PhotographicReportExportType.PDF) {
+      const documentCode = buildPhotographicReportCode(params.report);
+      const folderPath = params.fileKey.split('/').slice(0, -1).join('/');
+
       await this.documentGovernanceService.registerFinalDocument({
         companyId: params.report.company_id,
         module: 'photographic_report',
@@ -1605,13 +2116,35 @@ export class PhotographicReportsService {
         title: `Relatório Fotográfico - ${params.report.client_name} / ${params.report.project_name}`,
         documentDate: params.report.end_date || params.report.start_date,
         fileKey: params.fileKey,
-        folderPath: params.fileKey.split('/').slice(0, -1).join('/'),
+        folderPath,
         originalName: params.originalName,
         mimeType: params.mimeType,
         fileBuffer: params.fileBuffer,
         createdBy: generatedBy,
-        documentCode: this.buildReportCode(params.report),
+        documentCode,
         documentType: 'pdf',
+
+        // Sem este callback o hash e o código eram calculados, registrados no
+        // Document Registry e depois esquecidos — a entidade nunca sabia que
+        // tinha sido emitida, e a validação pública não tinha o que conferir.
+        // Roda DENTRO da transação de registerFinalDocument, então metadados,
+        // integridade e registry commitam juntos ou não commitam.
+        persistEntityMetadata: async (manager, hash) => {
+          await manager.getRepository(PhotographicReport).update(
+            {
+              id: params.report.id,
+              company_id: params.report.company_id,
+            },
+            {
+              final_pdf_hash_sha256: hash,
+              verification_code: documentCode,
+              pdf_file_key: params.fileKey,
+              pdf_folder_path: folderPath,
+              pdf_original_name: params.originalName,
+              pdf_generated_at: new Date(),
+            },
+          );
+        },
       });
     }
 
@@ -1781,95 +2314,6 @@ export class PhotographicReportsService {
         registryEntry.file_key.split('/').pop() ||
         null,
       url,
-    };
-  }
-
-  async sendEmail(
-    id: string,
-    to: string[],
-  ): Promise<DocumentMailDispatchResponseDto & { recipients: number }> {
-    const report = await this.findOne(id);
-    if (!to.length) {
-      return {
-        success: true,
-        message: 'Nenhum destinatário informado para envio do relatório.',
-        deliveryMode: 'sent',
-        artifactType: 'governed_final_pdf',
-        isOfficial: false,
-        fallbackUsed: false,
-        documentId: report.id,
-        documentType: 'PHOTOGRAPHIC_REPORT',
-        recipients: 0,
-      };
-    }
-
-    const pdfExports = (report.exports ?? []).filter(
-      (e) => e.export_type === PhotographicReportExportType.PDF,
-    );
-    if (!pdfExports.length) {
-      throw new BadRequestException(
-        'Exporte o relatório em PDF antes de enviar por e-mail.',
-      );
-    }
-
-    const context = this.tenantService.getContext();
-    const companyId = context?.companyId ?? report.company_id;
-    const workerTenantContext = {
-      companyId,
-      isSuperAdmin: context?.isSuperAdmin ?? false,
-      siteScope: context?.siteScope,
-      ...(context?.siteScope === 'single' ? { siteIds: context.siteIds } : {}),
-    };
-
-    let queuedCount = 0;
-    let syncFallbackUsed = false;
-
-    for (const email of to) {
-      try {
-        await this.mailQueue.add(
-          'send-document',
-          {
-            documentId: report.id,
-            documentType: 'PHOTOGRAPHIC_REPORT',
-            email,
-            companyId,
-            tenantContext: workerTenantContext,
-          },
-          defaultJobOptions,
-        );
-        queuedCount++;
-      } catch (error) {
-        this.logger.warn(
-          `Fila de e-mail indisponível para relatório fotográfico ${report.id}, aplicando fallback síncrono: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        await this.mailService.sendStoredDocument(
-          report.id,
-          'PHOTOGRAPHIC_REPORT',
-          email,
-          companyId,
-        );
-        syncFallbackUsed = true;
-      }
-    }
-
-    const deliveryMode: 'queued' | 'sent' =
-      queuedCount === to.length ? 'queued' : 'sent';
-
-    return {
-      success: true,
-      message:
-        deliveryMode === 'queued'
-          ? `Relatório fotográfico enfileirado para envio a ${to.length} destinatário(s).`
-          : `Relatório fotográfico enviado a ${to.length} destinatário(s) via fallback síncrono.`,
-      deliveryMode,
-      artifactType: 'governed_final_pdf',
-      isOfficial: false,
-      fallbackUsed: syncFallbackUsed,
-      documentId: report.id,
-      documentType: 'PHOTOGRAPHIC_REPORT',
-      recipients: to.length,
     };
   }
 }

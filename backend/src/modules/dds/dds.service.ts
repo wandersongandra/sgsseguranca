@@ -30,6 +30,7 @@ import { UpdateDdsDto } from './dto/update-dds.dto';
 import { UpdateDdsAuditDto } from './dto/update-dds-audit.dto';
 import { ReplaceDdsSignaturesDto } from './dto/replace-dds-signatures.dto';
 import { User } from '../users/entities/user.entity';
+import { UserSite } from '../users/entities/user-site.entity';
 import { Site } from '../sites/entities/site.entity';
 import {
   DocumentBundleService,
@@ -1532,6 +1533,17 @@ export class DdsService {
 
   async remove(id: string): Promise<void> {
     const dds = await this.findOne(id);
+
+    // Mesma trava que PtsService.remove() e NonConformitiesService.remove()
+    // aplicam. Sem ela, um DDS já emitido tinha o PDF final apagado do storage
+    // e a entrada removida do document_registry — quebrando permanentemente
+    // qualquer QR/código de validação pública já distribuído do documento.
+    if (dds.pdf_file_key) {
+      throw new BadRequestException(
+        'Somente DDS sem PDF final podem ser removidos. Use os fluxos formais de arquivamento para registros já emitidos.',
+      );
+    }
+
     await this.documentGovernanceService.removeFinalDocumentReference({
       companyId: dds.company_id,
       module: 'dds',
@@ -1906,7 +1918,20 @@ export class DdsService {
       ],
       select: ['id'],
     });
+
+    const siteLinks = await this.ddsRepository.manager
+      .getRepository(UserSite)
+      .find({
+        where: {
+          user_id: In(uniqueUserIds),
+          company_id: companyId,
+          site_id: siteId,
+        },
+        select: ['user_id'],
+      });
+
     const foundIds = new Set(users.map((user) => user.id));
+    siteLinks.forEach((link) => foundIds.add(link.user_id));
     const missingIds = uniqueUserIds.filter((userId) => !foundIds.has(userId));
     if (missingIds.length > 0) {
       throw new BadRequestException(

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { handleApiError } from "@/lib/error-handler";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { X } from "lucide-react";
 
 interface AprReopenModalProps {
@@ -14,6 +15,9 @@ interface AprReopenModalProps {
 export function AprReopenModal({ open, onClose, onConfirm }: AprReopenModalProps) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(dialogRef, open, onClose);
 
   const handleConfirm = async () => {
     const trimmed = reason.trim();
@@ -38,6 +42,7 @@ export function AprReopenModal({ open, onClose, onConfirm }: AprReopenModalProps
 
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--component-overlay)] px-4"
       role="dialog"
       aria-modal="true"

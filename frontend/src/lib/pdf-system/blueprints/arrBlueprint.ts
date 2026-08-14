@@ -22,7 +22,7 @@ const ARR_STATUS_LABEL: Record<string, string> = {
 const ARR_RISCO_LABEL: Record<string, string> = {
   critico: "Crítico",
   alto: "Alto",
-  medio: "Médio",
+  medio: "Moderado",
   baixo: "Baixo",
 };
 
@@ -38,7 +38,6 @@ const ARR_SEVERITY_LABEL: Record<string, string> = {
   grave: "Grave",
   critica: "Crítica",
 };
-
 function buildStatusTone(status: string) {
   if (status === "tratada") return "success" as const;
   if (status === "analisada") return "info" as const;

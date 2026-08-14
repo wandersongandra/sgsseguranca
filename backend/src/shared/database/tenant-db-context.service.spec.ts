@@ -141,6 +141,45 @@ describe('TenantDbContextService', () => {
     );
   });
 
+  it('injeta todos os sites autorizados no contexto RLS sem perder o site ativo', async () => {
+    const client = createClient();
+    const pool = createPool(client);
+    const service = buildService(
+      { master: pool },
+      {
+        companyId: '11111111-1111-4111-8111-111111111111',
+        isSuperAdmin: false,
+        userId: '22222222-2222-4222-8222-222222222222',
+        siteId: '33333333-3333-4333-8333-333333333333',
+        siteIds: [
+          '33333333-3333-4333-8333-333333333333',
+          '44444444-4444-4444-8444-444444444444',
+        ],
+        siteScope: 'single',
+      },
+    );
+
+    service.onApplicationBootstrap();
+
+    await new Promise<void>((resolve, reject) => {
+      pool.connect((err, pgClient, release) => {
+        if (err || !pgClient || !release) {
+          reject(err ?? new Error('client ausente'));
+          return;
+        }
+        release();
+        resolve();
+      });
+    });
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("set_config('app.current_site_ids'"),
+      expect.arrayContaining([
+        '33333333-3333-4333-8333-333333333333,44444444-4444-4444-8444-444444444444',
+      ]),
+    );
+  });
+
   it('mantem bypass RLS apenas para ADMIN_GERAL sem tenant efetivo', async () => {
     const client = createClient();
     const pool = createPool(client);

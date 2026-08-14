@@ -70,7 +70,7 @@ function setSessionToken(token: string) {
   try {
     sessionStorage.setItem(SESSION_KEY, token);
   } catch {
-    // sessionStorage indisponível (ex:私 mode) — falha silenciosa
+    // sessionStorage indisponível (ex: modo privado) — falha silenciosa
   }
 }
 

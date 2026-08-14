@@ -152,6 +152,9 @@ describe('DidsService', () => {
         .mockResolvedValueOnce([{ id: 'responsavel-1' }])
         .mockResolvedValueOnce([]),
     };
+    const userSiteRepository = {
+      find: jest.fn(() => Promise.resolve([])),
+    };
     (
       didRepository as unknown as {
         manager: { getRepository: jest.Mock };
@@ -161,7 +164,9 @@ describe('DidsService', () => {
         .fn()
         .mockReturnValueOnce(siteRepository)
         .mockReturnValueOnce(userRepository)
-        .mockReturnValueOnce(userRepository),
+        .mockReturnValueOnce(userSiteRepository)
+        .mockReturnValueOnce(userRepository)
+        .mockReturnValueOnce(userSiteRepository),
     };
 
     await expect(
@@ -195,6 +200,9 @@ describe('DidsService', () => {
         .mockResolvedValueOnce([{ id: 'responsavel-1' }])
         .mockResolvedValueOnce([{ id: 'participante-company-scoped' }]),
     };
+    const userSiteRepository = {
+      find: jest.fn(() => Promise.resolve([])),
+    };
     (
       didRepository as unknown as {
         manager: { getRepository: jest.Mock };
@@ -204,7 +212,9 @@ describe('DidsService', () => {
         .fn()
         .mockReturnValueOnce(siteRepository)
         .mockReturnValueOnce(userRepository)
-        .mockReturnValueOnce(userRepository),
+        .mockReturnValueOnce(userSiteRepository)
+        .mockReturnValueOnce(userRepository)
+        .mockReturnValueOnce(userSiteRepository),
     };
 
     await expect(
@@ -220,6 +230,55 @@ describe('DidsService', () => {
         site_id: 'site-1',
         responsavel_id: 'responsavel-1',
         participants: ['participante-company-scoped'],
+      }),
+    ).resolves.toBeTruthy();
+
+    expect(didRepository.save).toHaveBeenCalled();
+  });
+
+  it('permite participante vinculado à obra via user_sites ao criar DID', async () => {
+    const siteRepository = {
+      findOne: jest.fn(() => Promise.resolve({ id: 'site-1' })),
+    };
+    const userRepository = {
+      find: jest
+        .fn()
+        .mockResolvedValueOnce([{ id: 'responsavel-1' }])
+        .mockResolvedValueOnce([]),
+    };
+    const userSiteRepository = {
+      find: jest
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([{ user_id: 'participante-vinculado' }]),
+    };
+    (
+      didRepository as unknown as {
+        manager: { getRepository: jest.Mock };
+      }
+    ).manager = {
+      getRepository: jest
+        .fn()
+        .mockReturnValueOnce(siteRepository)
+        .mockReturnValueOnce(userRepository)
+        .mockReturnValueOnce(userSiteRepository)
+        .mockReturnValueOnce(userRepository)
+        .mockReturnValueOnce(userSiteRepository),
+    };
+
+    await expect(
+      service.create({
+        titulo: 'DID operação de içamento',
+        data: '2026-04-15',
+        atividade_principal: 'Içamento de componentes',
+        atividades_planejadas:
+          'Movimentação controlada com sinalização e spotter.',
+        riscos_operacionais: 'Esmagamento, colisão e queda de carga suspensa.',
+        controles_planejados:
+          'Isolamento da área, sinaleiro e checklist pré-uso.',
+        site_id: 'site-1',
+        responsavel_id: 'responsavel-1',
+        participants: ['participante-vinculado'],
       }),
     ).resolves.toBeTruthy();
 

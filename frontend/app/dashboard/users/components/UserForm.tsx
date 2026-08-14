@@ -238,7 +238,7 @@ export function UserForm({ id }: UserFormProps) {
           reset({
             nome: userData.nome,
             email: userData.email,
-            cpf: userData.cpf,
+            cpf: userData.cpf || '',
             funcao: userData.funcao || '',
             role: userData.role,
             company_id: userData.company_id,

@@ -16,8 +16,6 @@ export const metadata: Metadata = {
     'Política de cookies e tecnologias semelhantes da plataforma SGS.',
 };
 
-export const dynamic = 'force-dynamic';
-
 type CookieCategory = 'Estritamente necessário' | 'Funcional';
 
 interface CookieRow {

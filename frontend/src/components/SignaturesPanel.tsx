@@ -105,6 +105,7 @@ export function SignaturesPanel({ isOpen, onClose, documentId, documentType }: S
                         src={sig.signature_data}
                         alt="Assinatura"
                         fill
+                        sizes="96px"
                         className="object-contain p-1"
                       />
                     </div>

@@ -1,6 +1,9 @@
 import api from "@/lib/api";
 import { sanitizeSensitiveDraftValue } from "@/lib/sensitive-draft-sanitizer";
 import { secureOfflineDB } from "./offline-db-secure";
+import { selectedTenantStore } from "./selectedTenantStore";
+import { siteStore } from "./siteStore";
+import { sessionStore } from "./sessionStore";
 
 export type OfflineQueueState = "queued" | "retry_waiting";
 
@@ -9,6 +12,13 @@ export type OfflineQueueMetadata = {
   entityType?: string;
   draftId?: string;
   source?: string;
+};
+
+export type OfflineQueueBinding = {
+  actorId: string;
+  companyId: string;
+  siteId: string | null;
+  sessionGeneration: string;
 };
 
 export type OfflineQueueItem = {
@@ -28,6 +38,7 @@ export type OfflineQueueItem = {
   lastAttemptAt?: string;
   lastError?: string;
   nextRetryAt?: string;
+  binding?: OfflineQueueBinding;
 };
 
 type OfflineQueueSummaryItem = {
@@ -61,6 +72,7 @@ type OfflineQueueInput = Omit<
   correlationId?: string;
   dedupeKey?: string;
   meta?: OfflineQueueMetadata;
+  binding?: OfflineQueueBinding;
 };
 
 type OfflineItemEventStatus =
@@ -149,6 +161,17 @@ function normalizeQueueItem(raw: Partial<OfflineQueueItem>): OfflineQueueItem {
     lastAttemptAt: raw.lastAttemptAt,
     lastError: raw.lastError,
     nextRetryAt: raw.nextRetryAt,
+    binding: raw.binding &&
+      typeof raw.binding.actorId === "string" &&
+      typeof raw.binding.companyId === "string" &&
+      typeof raw.binding.sessionGeneration === "string"
+      ? {
+          actorId: raw.binding.actorId,
+          companyId: raw.binding.companyId,
+          siteId: raw.binding.siteId || null,
+          sessionGeneration: raw.binding.sessionGeneration,
+        }
+      : undefined,
   };
 }
 
@@ -359,12 +382,46 @@ function dispatchItemEvent(
   );
 }
 
+function resolveCurrentBinding(): OfflineQueueBinding | null {
+  const session = sessionStore.get();
+  const tenant = selectedTenantStore.get();
+  const site = siteStore.get();
+  const companyId = tenant?.companyId || session?.companyId || session?.user?.companyId;
+  if (!session?.userId || !companyId) return null;
+  return {
+    actorId: session.userId,
+    companyId,
+    siteId: site?.companyId === companyId ? site.siteId : null,
+    sessionGeneration: session.generation || sessionStore.getGeneration(),
+  };
+}
+
+export function isOfflineBindingCompatible(
+  binding: OfflineQueueBinding | undefined,
+): boolean {
+  const current = resolveCurrentBinding();
+  if (!binding || !current) return false;
+  return (
+    binding.actorId === current.actorId &&
+    binding.companyId === current.companyId &&
+    binding.sessionGeneration === current.sessionGeneration &&
+    (!binding.siteId || binding.siteId === current.siteId)
+  );
+}
+
 async function processQueueItem(
   item: OfflineQueueItem,
   forceRetry = false,
 ): Promise<OfflineQueueItemResult> {
   if (typeof window === "undefined" || !isOnline()) {
     return { status: "offline", itemId: item.id };
+  }
+
+  if (!isOfflineBindingCompatible(item.binding)) {
+    dispatchItemEvent("conflict", item, {
+      error: "Item offline invalidado por troca de sessão, empresa ou obra.",
+    });
+    return { status: "sent", itemId: item.id };
   }
 
   if (
@@ -428,6 +485,10 @@ async function processQueueItem(
 }
 
 export const enqueueOfflineMutation = async (item: OfflineQueueInput) => {
+  const binding = item.binding || resolveCurrentBinding();
+  if (!binding) {
+    throw new Error("Não é possível enfileirar mutação offline sem sessão e tenant ativos.");
+  }
   const queue = await readQueue();
   const now = new Date().toISOString();
 
@@ -448,6 +509,7 @@ export const enqueueOfflineMutation = async (item: OfflineQueueInput) => {
         updatedAt: now,
         lastError: undefined,
         nextRetryAt: undefined,
+        binding,
       });
       queue.splice(existingIndex, 1, updatedItem);
       await writeQueue(queue);
@@ -464,6 +526,7 @@ export const enqueueOfflineMutation = async (item: OfflineQueueInput) => {
     createdAt: now,
     updatedAt: now,
     state: "queued",
+    binding,
   });
   queue.push(queuedItem);
   await writeQueue(queue);
