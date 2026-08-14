@@ -919,7 +919,7 @@ export class NonConformitiesService {
     };
   }
 
-  private applyQuestionnaireUpdateFields(
+  private applyQuestionnaireCauseFields(
     payload: Partial<NonConformity>,
     dto: UpdateNonConformityDto,
   ): void {
@@ -929,11 +929,23 @@ export class NonConformitiesService {
     if (dto.causa_fator_processo !== undefined) payload.causa_fator_processo = dto.causa_fator_processo;
     if (dto.causa_fator_ambiente !== undefined) payload.causa_fator_ambiente = dto.causa_fator_ambiente;
     if (dto.causa_fator_gerencial !== undefined) payload.causa_fator_gerencial = dto.causa_fator_gerencial;
+  }
+
+  private applyQuestionnaireClassificationFields(
+    payload: Partial<NonConformity>,
+    dto: UpdateNonConformityDto,
+  ): void {
     if (dto.tipo_categoria !== undefined) payload.tipo_categoria = this.normalizeOptionalText(dto.tipo_categoria);
     if (dto.tipo_subcategoria !== undefined) payload.tipo_subcategoria = this.normalizeOptionalText(dto.tipo_subcategoria);
     if (dto.requisito_nr_categoria !== undefined) payload.requisito_nr_categoria = this.normalizeOptionalText(dto.requisito_nr_categoria);
     if (dto.risco_categoria !== undefined) payload.risco_categoria = this.normalizeOptionalText(dto.risco_categoria);
     if (dto.risco_fonte !== undefined) payload.risco_fonte = this.normalizeOptionalText(dto.risco_fonte);
+  }
+
+  private applyQuestionnaireEvidenceFields(
+    payload: Partial<NonConformity>,
+    dto: UpdateNonConformityDto,
+  ): void {
     if (dto.evidencia_descricao_foto !== undefined) payload.evidencia_descricao_foto = this.normalizeOptionalText(dto.evidencia_descricao_foto);
     if (dto.evidencia_foto1_key !== undefined) payload.evidencia_foto1_key = this.normalizeOptionalText(dto.evidencia_foto1_key);
     if (dto.evidencia_foto2_key !== undefined) payload.evidencia_foto2_key = this.normalizeOptionalText(dto.evidencia_foto2_key);
@@ -942,6 +954,15 @@ export class NonConformitiesService {
     if (dto.verificacao_foto1_key !== undefined) payload.verificacao_foto1_key = this.normalizeOptionalText(dto.verificacao_foto1_key);
     if (dto.verificacao_foto2_key !== undefined) payload.verificacao_foto2_key = this.normalizeOptionalText(dto.verificacao_foto2_key);
     if (dto.verificacao_foto3_key !== undefined) payload.verificacao_foto3_key = this.normalizeOptionalText(dto.verificacao_foto3_key);
+  }
+
+  private applyQuestionnaireUpdateFields(
+    payload: Partial<NonConformity>,
+    dto: UpdateNonConformityDto,
+  ): void {
+    this.applyQuestionnaireCauseFields(payload, dto);
+    this.applyQuestionnaireClassificationFields(payload, dto);
+    this.applyQuestionnaireEvidenceFields(payload, dto);
   }
 
   private buildUpdatePayload(

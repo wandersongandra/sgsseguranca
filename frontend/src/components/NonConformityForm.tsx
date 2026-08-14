@@ -121,6 +121,17 @@ const nonConformitySchema = z.object({
 
 type NonConformityFormData = z.infer<typeof nonConformitySchema>;
 
+const NC_TYPE_CATEGORIES = ["NC_MAIOR", "NC_MENOR", "OBSERVACAO", "MELHORIA"];
+const NC_TYPE_SUBCATEGORIES = [
+  "Segurança operacional",
+  "Condição insegura",
+  "Ato inseguro",
+  "Procedimento",
+  "Equipamento",
+  "Treinamento",
+  "Outro",
+];
+
 const MAX_CAPTURE_DIMENSION = 1600;
 
 type NonConformityAttachmentFormValue = { url: string };
@@ -254,6 +265,31 @@ function nullsToUndefined<T extends Record<string, unknown>>(obj: T): T {
     }
   }
   return result;
+}
+
+function buildLoadedNonConformityFormValues(
+  nonConformity: NonConformity,
+  currentStatus: NcStatus,
+) {
+  return {
+    ...nullsToUndefined(nonConformity as unknown as Record<string, unknown>),
+    checklist_id: nonConformity.checklist_id ?? undefined,
+    tipo_categoria: nonConformity.tipo_categoria ?? undefined,
+    tipo_subcategoria: nonConformity.tipo_subcategoria ?? undefined,
+    causa_categoria: nonConformity.causa_categoria ?? undefined,
+    requisito_nr_categoria: nonConformity.requisito_nr_categoria ?? undefined,
+    risco_categoria: nonConformity.risco_categoria ?? undefined,
+    risco_fonte: nonConformity.risco_fonte ?? undefined,
+    evidencia_descricao_foto: nonConformity.evidencia_descricao_foto ?? undefined,
+    verificacao_descricao_foto: nonConformity.verificacao_descricao_foto ?? undefined,
+    status: currentStatus,
+    data_identificacao: toInputDateValue(nonConformity.data_identificacao),
+    acao_imediata_data: toInputDateValue(nonConformity.acao_imediata_data) || undefined,
+    acao_definitiva_prazo: toInputDateValue(nonConformity.acao_definitiva_prazo) || undefined,
+    acao_definitiva_data_prevista: toInputDateValue(nonConformity.acao_definitiva_data_prevista) || undefined,
+    verificacao_data: toInputDateValue(nonConformity.verificacao_data) || undefined,
+    anexos: toNcAttachmentFormValues(nonConformity.anexos),
+  };
 }
 
 async function loadNonConformityFormData(companyId: string, id?: string) {
@@ -826,26 +862,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           legacyAttachmentReferencesRef.current = new Set(
             getLegacyAttachmentReferences(nonConformity.anexos),
           );
-          reset({
-            ...nullsToUndefined(nonConformity as unknown as Record<string, unknown>),
-            checklist_id: nonConformity.checklist_id ?? undefined,
-            tipo_categoria: nonConformity.tipo_categoria ?? undefined,
-            tipo_subcategoria: nonConformity.tipo_subcategoria ?? undefined,
-            causa_categoria: nonConformity.causa_categoria ?? undefined,
-            requisito_nr_categoria: nonConformity.requisito_nr_categoria ?? undefined,
-            risco_categoria: nonConformity.risco_categoria ?? undefined,
-            risco_fonte: nonConformity.risco_fonte ?? undefined,
-            evidencia_descricao_foto: nonConformity.evidencia_descricao_foto ?? undefined,
-            verificacao_descricao_foto: nonConformity.verificacao_descricao_foto ?? undefined,
-            status: normalizeNcStatus(nonConformity.status),
-            data_identificacao: toInputDateValue(nonConformity.data_identificacao),
-            acao_imediata_data: toInputDateValue(nonConformity.acao_imediata_data) || undefined,
-            acao_definitiva_prazo: toInputDateValue(nonConformity.acao_definitiva_prazo) || undefined,
-            acao_definitiva_data_prevista:
-              toInputDateValue(nonConformity.acao_definitiva_data_prevista) || undefined,
-            verificacao_data: toInputDateValue(nonConformity.verificacao_data) || undefined,
-            anexos: toNcAttachmentFormValues(nonConformity.anexos),
-          });
+          reset(buildLoadedNonConformityFormValues(nonConformity, currentStatus));
           // react-hook-form com resolver (zod) não computa formState.isValid
           // automaticamente após reset() — só roda validação em resposta a
           // interação do usuário (mode: "onBlur"). Sem isso, o botão Salvar
@@ -1009,16 +1026,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     "Outro",
   ];
 
-  const tiposNcCategorias = ["NC_MAIOR", "NC_MENOR", "OBSERVACAO", "MELHORIA"];
-  const tiposNcSubcategorias = [
-    "Segurança operacional",
-    "Condição insegura",
-    "Ato inseguro",
-    "Procedimento",
-    "Equipamento",
-    "Treinamento",
-    "Outro",
-  ];
   const niveisRisco = ["Baixo", "Médio", "Alto", "Crítico"];
   const statusAcao = ["Implementada", "Em andamento", "Não implementada"];
   const resultadoEficacia = ["Sim", "Parcialmente", "Não"];
@@ -1331,7 +1338,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               hasError={!!errors.tipo}
             >
               <option value="">Selecione o tipo</option>
-              {tiposNcCategorias.map((tipo) => (
+              {NC_TYPE_CATEGORIES.map((tipo) => (
                 <option key={tipo} value={tipo}>
                   {tipo.replaceAll("_", " ")}
                 </option>
@@ -1345,7 +1352,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
                 </label>
                 <Select {...register("tipo_subcategoria")}>
                   <option value="">Selecione</option>
-                  {tiposNcSubcategorias.map((item) => (
+                  {NC_TYPE_SUBCATEGORIES.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -1358,7 +1365,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
                 </label>
                 <Select {...register("tipo_categoria")}>
                   <option value="">Selecione</option>
-                  {tiposNcCategorias.map((item) => (
+                  {NC_TYPE_CATEGORIES.map((item) => (
                     <option key={item} value={item}>
                       {item.replaceAll("_", " ")}
                     </option>
