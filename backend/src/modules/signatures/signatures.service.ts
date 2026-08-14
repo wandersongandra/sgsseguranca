@@ -35,6 +35,14 @@ import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.u
 import { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import { Apr, AprStatus } from '../aprs/entities/apr.entity';
+import { AprRiskEvidence } from '../aprs/entities/apr-risk-evidence.entity';
+import {
+  APR_CONTENT_CANONICALIZATION_VERSION,
+  APR_CONTENT_HASH_ALGORITHM,
+  APR_CONTENT_INTEGRITY_SCHEME,
+  buildAprSignableContentV1,
+  hashAprSignableContentV1,
+} from '../aprs/apr-integrity.util';
 import { Pt } from '../pts/entities/pt.entity';
 import { Dds } from '../dds/entities/dds.entity';
 import { Checklist } from '../checklists/entities/checklist.entity';
@@ -96,6 +104,14 @@ type SignatureVerificationDetails = {
   signatureEvidenceHash: string | null;
   documentBindingHash: string | null;
 };
+
+export type ContentIntegrityStatus =
+  | 'VALID'
+  | 'CONTENT_MISMATCH'
+  | 'LEGACY_SIGNATURE'
+  | 'MISSING_CONTENT'
+  | 'MISSING_SIGNATURE'
+  | 'INVALID_STATE';
 
 type SiteScopedSignatureDocument = {
   id: string;
@@ -179,6 +195,7 @@ export class SignaturesService {
       documentId: createSignatureDto.document_id,
       documentType,
       companyId,
+      signerUserId: authenticatedUserId,
     });
     return this.signaturesRepository.manager.transaction((manager) =>
       this.persistSignature(
@@ -211,6 +228,7 @@ export class SignaturesService {
       documentId: createSignatureDto.document_id,
       documentType,
       companyId,
+      signerUserId,
     });
 
     return this.persistSignature(
@@ -400,6 +418,14 @@ export class SignaturesService {
       companyId: effectiveCompanyId,
       registryContext,
     });
+    const contentBinding =
+      payload.document_type.toLowerCase() === 'apr'
+        ? await this.loadAprContentBinding({
+            manager,
+            documentId: payload.document_id,
+            companyId: effectiveCompanyId,
+          })
+        : null;
     const signatureEvidenceHash = hashSignatureEvidence(payload.signature_data);
     const verificationMode = SIGNATURE_VERIFICATION_MODES.SERVER_VERIFIABLE;
     const proofScope = documentBinding.proofScope;
@@ -424,6 +450,12 @@ export class SignaturesService {
         document_code: documentBinding.documentCode,
         file_hash: documentBinding.fileHash,
         file_key: documentBinding.fileKey,
+        content_hash: contentBinding?.contentHash || null,
+        hash_algorithm: contentBinding ? APR_CONTENT_HASH_ALGORITHM : null,
+        canonicalization_version: contentBinding
+          ? APR_CONTENT_CANONICALIZATION_VERSION
+          : null,
+        integrity_scheme: contentBinding ? APR_CONTENT_INTEGRITY_SCHEME : null,
       },
       signer: {
         user_id: signerUserId,
@@ -469,6 +501,12 @@ export class SignaturesService {
       timestamp_token: generatedStamp.timestamp_token,
       timestamp_authority: generatedStamp.timestamp_authority,
       signed_at: signedAt,
+      content_hash: contentBinding?.contentHash || null,
+      hash_algorithm: contentBinding ? APR_CONTENT_HASH_ALGORITHM : null,
+      canonicalization_version: contentBinding
+        ? APR_CONTENT_CANONICALIZATION_VERSION
+        : null,
+      integrity_scheme: contentBinding ? APR_CONTENT_INTEGRITY_SCHEME : null,
       integrity_payload: {
         schema_version: 2,
         document_id: payload.document_id,
@@ -484,6 +522,15 @@ export class SignaturesService {
         legal_assurance: legalAssurance,
         proof_scope: proofScope,
         canonical_payload_hash: canonicalPayloadHash,
+        content_hash: contentBinding?.contentHash,
+        hash_algorithm: contentBinding ? APR_CONTENT_HASH_ALGORITHM : undefined,
+        canonicalization_version: contentBinding
+          ? APR_CONTENT_CANONICALIZATION_VERSION
+          : undefined,
+        integrity_scheme: contentBinding
+          ? APR_CONTENT_INTEGRITY_SCHEME
+          : undefined,
+        signable_content: contentBinding?.content,
         canonical_payload: canonicalPayload,
         signature_evidence_hash: signatureEvidenceHash,
         signature_evidence_kind: this.resolveEvidenceKind(
@@ -504,6 +551,16 @@ export class SignaturesService {
           updated_at: documentBinding.updatedAt,
           proof_scope: documentBinding.proofScope,
           binding_hash: documentBinding.bindingHash,
+          content_hash: contentBinding?.contentHash,
+          hash_algorithm: contentBinding
+            ? APR_CONTENT_HASH_ALGORITHM
+            : undefined,
+          canonicalization_version: contentBinding
+            ? APR_CONTENT_CANONICALIZATION_VERSION
+            : undefined,
+          integrity_scheme: contentBinding
+            ? APR_CONTENT_INTEGRITY_SCHEME
+            : undefined,
         },
         document_registry: registryContext
           ? {
@@ -544,12 +601,85 @@ export class SignaturesService {
           documentCode: registryContext?.documentCode || null,
           documentFileHash: registryContext?.fileHash || null,
           documentBindingHash: documentBinding.bindingHash,
+          contentHash: contentBinding?.contentHash || null,
+          hashAlgorithm: contentBinding ? APR_CONTENT_HASH_ALGORITHM : null,
+          canonicalizationVersion: contentBinding
+            ? APR_CONTENT_CANONICALIZATION_VERSION
+            : null,
         },
       },
       manager ? { manager } : undefined,
     );
 
     return savedSignature;
+  }
+
+  private async loadAprContentBinding(input: {
+    manager?: EntityManager;
+    documentId: string;
+    companyId: string | null;
+  }): Promise<{ content: Record<string, unknown>; contentHash: string }> {
+    const manager = input.manager;
+    if (!manager) {
+      throw new BadRequestException(
+        'Não foi possível calcular a integridade da APR em uma transação.',
+      );
+    }
+
+    // O lock do pai permanece válido até o INSERT da assinatura. As tabelas
+    // filhas são carregadas dentro do mesmo manager, eliminando TOCTOU entre
+    // validação, hash e persistência.
+    const lockedRows = await manager.query<Array<{ id: string }>>(
+      `SELECT "id" FROM "aprs"
+        WHERE "id" = $1 AND "company_id" = $2 AND "deleted_at" IS NULL
+        FOR UPDATE`,
+      [input.documentId, input.companyId],
+    );
+    if (lockedRows.length === 0) {
+      throw new NotFoundException(
+        'APR não encontrada para cálculo de integridade.',
+      );
+    }
+    const aprRepository = manager.getRepository(Apr);
+    const apr = await aprRepository.findOne({
+      where: input.companyId
+        ? { id: input.documentId, company_id: input.companyId }
+        : { id: input.documentId },
+      relations: [
+        'company',
+        'site',
+        'elaborador',
+        'auditado_por',
+        'activities',
+        'risks',
+        'epis',
+        'tools',
+        'machines',
+        'participants',
+        'risk_items',
+      ],
+    });
+    if (!apr) {
+      throw new NotFoundException(
+        'APR não encontrada para cálculo de integridade.',
+      );
+    }
+
+    const evidences = await manager.getRepository(AprRiskEvidence).find({
+      where: { apr_id: input.documentId },
+      select: [
+        'id',
+        'apr_risk_item_id',
+        'original_name',
+        'hash_sha256',
+        'watermarked_hash_sha256',
+        'captured_at',
+      ],
+      order: { uploaded_at: 'ASC' },
+    });
+    const contentInput = { ...apr, evidences };
+    const content = buildAprSignableContentV1(contentInput);
+    return { content, contentHash: hashAprSignableContentV1(contentInput) };
   }
 
   async findByDocument(
@@ -586,7 +716,7 @@ export class SignaturesService {
     });
     const hydratedSignatures = await this.hydrateSignaturesData(signatures);
     return hydratedSignatures.map((signature) =>
-      this.minimizeSignatureUser(signature),
+      this.minimizeSignaturePayload(this.minimizeSignatureUser(signature)),
     );
   }
 
@@ -765,6 +895,10 @@ export class SignaturesService {
     proof_scope?: SignatureProofScope | null;
     document_binding_hash?: string | null;
     signature_evidence_hash?: string | null;
+    content_integrity?: ContentIntegrityStatus;
+    content_hash?: string | null;
+    hash_algorithm?: string | null;
+    canonicalization_version?: number | null;
   }> {
     const tenantId = this.tenantService.getTenantId();
     const signature = await this.signaturesRepository.findOne({
@@ -792,6 +926,28 @@ export class SignaturesService {
         )
       : false;
     const verificationDetails = this.extractVerificationDetails(signature);
+    let contentIntegrity: ContentIntegrityStatus | undefined;
+    if (signature.document_type.toLowerCase() === 'apr') {
+      if (!signature.content_hash) {
+        contentIntegrity = 'LEGACY_SIGNATURE';
+      } else {
+        try {
+          const binding = await this.dataSource.transaction((manager) =>
+            this.loadAprContentBinding({
+              manager,
+              documentId: signature.document_id,
+              companyId: signature.company_id,
+            }),
+          );
+          contentIntegrity =
+            binding.contentHash === signature.content_hash
+              ? 'VALID'
+              : 'CONTENT_MISMATCH';
+        } catch {
+          contentIntegrity = 'MISSING_CONTENT';
+        }
+      }
+    }
 
     return {
       id: signature.id,
@@ -804,6 +960,10 @@ export class SignaturesService {
       proof_scope: verificationDetails.proofScope,
       document_binding_hash: verificationDetails.documentBindingHash,
       signature_evidence_hash: verificationDetails.signatureEvidenceHash,
+      content_integrity: contentIntegrity,
+      content_hash: signature.content_hash,
+      hash_algorithm: signature.hash_algorithm,
+      canonicalization_version: signature.canonicalization_version,
     };
   }
 
@@ -941,6 +1101,7 @@ export class SignaturesService {
     documentId: string;
     documentType: string;
     companyId: string | null;
+    signerUserId?: string;
   }): Promise<void> {
     const module =
       resolveRegistryModuleForSignatureDocumentType(input.documentType) ||
@@ -960,11 +1121,38 @@ export class SignaturesService {
           where: input.companyId
             ? { id: input.documentId, company_id: input.companyId }
             : { id: input.documentId },
-          select: ['id', 'company_id', 'status', 'pdf_file_key'],
+          select: [
+            'id',
+            'company_id',
+            'status',
+            'pdf_file_key',
+            'elaborador_id',
+          ],
         });
 
         if (!apr) {
           throw new NotFoundException('APR não encontrada para assinatura.');
+        }
+
+        if (input.signerUserId) {
+          const participantRows = await this.dataSource.query<
+            Array<{ allowed: boolean | string }>
+          >(
+            `SELECT EXISTS (
+               SELECT 1 FROM "apr_participants"
+                WHERE "apr_id" = $1 AND "user_id" = $2
+             ) AS allowed`,
+            [apr.id, input.signerUserId],
+          );
+          const isParticipant =
+            participantRows[0]?.allowed === true ||
+            participantRows[0]?.allowed === 't' ||
+            participantRows[0]?.allowed === 'true';
+          if (apr.elaborador_id !== input.signerUserId && !isParticipant) {
+            throw new ForbiddenException(
+              'Somente o elaborador ou um participante da APR pode registrar assinatura.',
+            );
+          }
         }
 
         if (hasGovernedFinalPdf || apr.pdf_file_key) {
@@ -1328,6 +1516,26 @@ export class SignaturesService {
       nome: signature.user.nome,
       funcao: signature.user.funcao,
     } as User;
+    return signature;
+  }
+
+  /**
+   * The canonical APR snapshot is kept server-side for forensic verification,
+   * but must not be returned by the broad signature listing endpoint.
+   */
+  private minimizeSignaturePayload(signature: Signature): Signature {
+    if (!signature.integrity_payload) {
+      return signature;
+    }
+
+    const payload = signature.integrity_payload;
+    if (!Object.prototype.hasOwnProperty.call(payload, 'signable_content')) {
+      return signature;
+    }
+
+    const publicPayload = { ...payload };
+    delete publicPayload.signable_content;
+    signature.integrity_payload = publicPayload;
     return signature;
   }
 

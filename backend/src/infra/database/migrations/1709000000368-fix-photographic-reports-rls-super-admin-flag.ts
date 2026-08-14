@@ -10,9 +10,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * sgs_app, pois o GRANT condicional da migration 204 pode não ter sido
  * executado se sgs_app não existia na época.
  */
-export class FixPhotographicReportsRlsSuperAdminFlag1709000000368
-  implements MigrationInterface
-{
+export class FixPhotographicReportsRlsSuperAdminFlag1709000000368 implements MigrationInterface {
   name = 'FixPhotographicReportsRlsSuperAdminFlag1709000000368';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

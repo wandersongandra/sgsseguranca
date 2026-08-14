@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { APR_FEATURE_FLAG_KEY } from '../decorators/apr-feature-flag.decorator';
@@ -37,9 +38,11 @@ export class AprFeatureFlagGuard implements CanActivate {
       enabled = await this.featureFlagService.isEnabled(key, tenantId);
     } catch (err) {
       this.logger.warn(
-        `Falha ao verificar feature flag "${key}" para tenant "${tenantId}"; permitindo acesso por padrão. Erro: ${err instanceof Error ? err.message : String(err)}`,
+        `Falha ao verificar feature flag "${key}" para tenant "${tenantId}"; acesso bloqueado por fail-closed. Erro: ${err instanceof Error ? err.message : String(err)}`,
       );
-      return true;
+      throw new ServiceUnavailableException(
+        'Não foi possível validar a disponibilidade desta funcionalidade.',
+      );
     }
 
     if (!enabled) {
