@@ -27,6 +27,44 @@ function ncStatusTone(status: string): "danger" | "warning" | "info" | "success"
   return "default";
 }
 
+function buildNcActionRows(nc: NonConformity, statusLabel: string): ActionPlanRow[] {
+  const rows: ActionPlanRow[] = [];
+  if (nc.acao_imediata_descricao) {
+    rows.push({
+      action: `Imediata: ${sanitize(nc.acao_imediata_descricao)}`,
+      owner: sanitize(nc.acao_imediata_responsavel),
+      dueDate: formatDate(nc.acao_imediata_data),
+      status: sanitize(nc.acao_imediata_status || "Pendente"),
+    });
+  }
+  if (nc.acao_definitiva_descricao) {
+    const definitiveLines = [
+      `Definitiva: ${sanitize(nc.acao_definitiva_descricao)}`,
+      nc.acao_definitiva_recursos ? `Recursos: ${sanitize(nc.acao_definitiva_recursos)}` : "",
+      nc.acao_definitiva_prazo && nc.acao_definitiva_data_prevista
+        ? `Previsão: ${formatDate(nc.acao_definitiva_data_prevista)}`
+        : "",
+    ].filter(Boolean);
+    rows.push({
+      action: definitiveLines.join("\n"),
+      owner: sanitize(nc.acao_definitiva_responsavel),
+      dueDate: formatDate(nc.acao_definitiva_prazo || nc.acao_definitiva_data_prevista),
+      status: statusLabel,
+    });
+  }
+  const preventiveLines = [
+    nc.acao_preventiva_medidas ? `Medidas: ${sanitize(nc.acao_preventiva_medidas)}` : "",
+    nc.acao_preventiva_treinamento ? `Treinamento: ${sanitize(nc.acao_preventiva_treinamento)}` : "",
+    nc.acao_preventiva_revisao_procedimento ? `Revisão procedimento: ${sanitize(nc.acao_preventiva_revisao_procedimento)}` : "",
+    nc.acao_preventiva_melhoria_processo ? `Melhoria processo: ${sanitize(nc.acao_preventiva_melhoria_processo)}` : "",
+    nc.acao_preventiva_epc_epi ? `EPC/EPI: ${sanitize(nc.acao_preventiva_epc_epi)}` : "",
+  ].filter(Boolean);
+  if (preventiveLines.length > 0) {
+    rows.push({ action: preventiveLines.join("\n"), owner: "-", dueDate: "-", status: "Preventiva" });
+  }
+  return rows;
+}
+
 export async function drawNcBlueprint(
   ctx: PdfContext,
   autoTable: AutoTableFn,
@@ -96,51 +134,7 @@ export async function drawNcBlueprint(
     });
   }
 
-  const actionRows: ActionPlanRow[] = [];
-  if (nc.acao_imediata_descricao) {
-    actionRows.push({
-      action: `Imediata: ${sanitize(nc.acao_imediata_descricao)}`,
-      owner: sanitize(nc.acao_imediata_responsavel),
-      dueDate: formatDate(nc.acao_imediata_data),
-      status: sanitize(nc.acao_imediata_status || "Pendente"),
-    });
-  }
-  if (nc.acao_definitiva_descricao) {
-    const definitiveLines = [
-      `Definitiva: ${sanitize(nc.acao_definitiva_descricao)}`,
-      nc.acao_definitiva_recursos ? `Recursos: ${sanitize(nc.acao_definitiva_recursos)}` : "",
-      nc.acao_definitiva_prazo && nc.acao_definitiva_data_prevista
-        ? `Previsão: ${formatDate(nc.acao_definitiva_data_prevista)}`
-        : "",
-    ].filter(Boolean);
-    actionRows.push({
-      action: definitiveLines.join("\n"),
-      owner: sanitize(nc.acao_definitiva_responsavel),
-      dueDate: formatDate(nc.acao_definitiva_prazo || nc.acao_definitiva_data_prevista),
-      status: statusLabel,
-    });
-  }
-  if (
-    nc.acao_preventiva_medidas ||
-    nc.acao_preventiva_treinamento ||
-    nc.acao_preventiva_revisao_procedimento ||
-    nc.acao_preventiva_melhoria_processo ||
-    nc.acao_preventiva_epc_epi
-  ) {
-    const preventivaLines = [
-      nc.acao_preventiva_medidas ? `Medidas: ${sanitize(nc.acao_preventiva_medidas)}` : "",
-      nc.acao_preventiva_treinamento ? `Treinamento: ${sanitize(nc.acao_preventiva_treinamento)}` : "",
-      nc.acao_preventiva_revisao_procedimento ? `Revisão procedimento: ${sanitize(nc.acao_preventiva_revisao_procedimento)}` : "",
-      nc.acao_preventiva_melhoria_processo ? `Melhoria processo: ${sanitize(nc.acao_preventiva_melhoria_processo)}` : "",
-      nc.acao_preventiva_epc_epi ? `EPC/EPI: ${sanitize(nc.acao_preventiva_epc_epi)}` : "",
-    ].filter(Boolean);
-    actionRows.push({
-      action: preventivaLines.join("\n"),
-      owner: "-",
-      dueDate: "-",
-      status: "Preventiva",
-    });
-  }
+  const actionRows = buildNcActionRows(nc, statusLabel);
   drawActionPlanTable(ctx, autoTable, actionRows, { semanticRules: { profile: "nc" } });
 
   drawNarrativeSection(ctx, { title: "Verificação e resultado", content: nc.verificacao_resultado });
