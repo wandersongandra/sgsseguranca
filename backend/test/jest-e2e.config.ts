@@ -12,7 +12,13 @@ const config: Config = {
     '<rootDir>/multi-tenancy.e2e-spec.ts',
   ],
   transform: {
-    '^.+\\.(t|j)s$': 'ts-jest',
+    '^.+\\.(t|j)s$': [
+      'ts-jest',
+      {
+        isolatedModules: true,
+        diagnostics: false,
+      },
+    ],
   },
   moduleNameMapper: {
     '^uuid$': '<rootDir>/uuid-cjs.js',
