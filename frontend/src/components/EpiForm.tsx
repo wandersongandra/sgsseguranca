@@ -12,6 +12,7 @@ import Link from 'next/link';
 
 import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 import { toInputDateValue } from '@/lib/date/safeFormat';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout';
@@ -88,7 +89,7 @@ export function EpiForm({ id }: EpiFormProps) {
           });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
       } finally {
         setFetching(false);
@@ -112,7 +113,7 @@ export function EpiForm({ id }: EpiFormProps) {
       router.push('/dashboard/epis');
       router.refresh();
     } catch (error) {
-      console.error('Erro ao salvar EPI:', error);
+      logger.error('Erro ao salvar EPI:', error);
       const errorMessage = getFormErrorMessage(error, {
         badRequest: 'Dados inválidos. Revise os campos obrigatórios.',
         unauthorized: 'Sessão expirada. Faça login novamente.',

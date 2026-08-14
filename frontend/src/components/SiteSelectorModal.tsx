@@ -5,6 +5,7 @@ import { Building, Search, Loader2, HardHat } from 'lucide-react';
 import { toast } from 'sonner';
 import { sitesService, Site } from '@/services/sitesService';
 import { siteStore } from '@/lib/siteStore';
+import { logger } from '@/lib/logger';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { StatusPill } from './ui/status-pill';
@@ -70,7 +71,7 @@ export default function SiteSelectorModal({
         }
       } catch (error) {
         if (!cancelled) {
-          console.error('Falha ao carregar obras:', error);
+          logger.error('Falha ao carregar obras:', error);
           setLoadFailed(true);
           toast.error('Não foi possível carregar a lista de obras.');
         }
@@ -94,7 +95,7 @@ export default function SiteSelectorModal({
     const searchLower = deferredSearch.toLowerCase();
     return sites.filter(
       (site) =>
-        site.nome.toLowerCase().includes(searchLower) ||
+        (site.nome ?? '').toLowerCase().includes(searchLower) ||
         site.cidade?.toLowerCase().includes(searchLower) ||
         site.endereco?.toLowerCase().includes(searchLower)
     );
@@ -128,7 +129,7 @@ export default function SiteSelectorModal({
         <div className="space-y-4">
           {/* Campo de busca */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ds-color-text-muted)]" />
             <Input
               placeholder="Buscar obra por nome, cidade ou endereço..."
               value={search}
@@ -141,11 +142,11 @@ export default function SiteSelectorModal({
           {/* Lista de obras */}
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-muted-foreground">Carregando obras...</span>
+              <Loader2 className="h-6 w-6 animate-spin text-[var(--ds-color-text-muted)]" />
+              <span className="ml-2 text-[var(--ds-color-text-muted)]">Carregando obras...</span>
             </div>
           ) : loadFailed ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-[var(--ds-color-text-muted)]">
               <p>Não foi possível carregar as obras.</p>
               <Button
                 variant="link"
@@ -156,7 +157,7 @@ export default function SiteSelectorModal({
               </Button>
             </div>
           ) : filteredSites.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-8 text-[var(--ds-color-text-muted)]">
               {search ? (
                 <p>Nenhuma obra encontrada para &quot;{search}&quot;</p>
               ) : (
@@ -175,7 +176,7 @@ export default function SiteSelectorModal({
                       ${
                         currentSiteId === site.id
                           ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30'
-                          : 'border-border hover:bg-muted/50'
+                          : 'border-[var(--ds-color-border-subtle)] hover:bg-[var(--ds-color-surface-muted)]/50'
                       }
                     `}
                   >
@@ -187,7 +188,7 @@ export default function SiteSelectorModal({
                             ${
                               currentSiteId === site.id
                                 ? 'bg-amber-100 dark:bg-amber-900'
-                                : 'bg-muted'
+                                : 'bg-[var(--ds-color-surface-muted)]'
                             }
                           `}
                         >
@@ -197,7 +198,7 @@ export default function SiteSelectorModal({
                               ${
                                 currentSiteId === site.id
                                   ? 'text-amber-600'
-                                  : 'text-muted-foreground'
+                                  : 'text-[var(--ds-color-text-muted)]'
                               }
                             `}
                           />
@@ -205,7 +206,7 @@ export default function SiteSelectorModal({
                         <div>
                           <div className="font-medium">{site.nome}</div>
                           {(site.cidade || site.endereco) && (
-                            <div className="text-sm text-muted-foreground">
+                            <div className="text-sm text-[var(--ds-color-text-muted)]">
                               {[site.cidade, site.estado]
                                 .filter(Boolean)
                                 .join(' - ')}
@@ -227,7 +228,7 @@ export default function SiteSelectorModal({
       </ModalBody>
 
       <ModalFooter className="items-center justify-between">
-        <span className="text-xs text-muted-foreground">
+        <span className="text-xs text-[var(--ds-color-text-muted)]">
           {filteredSites.length} obra{filteredSites.length !== 1 ? 's' : ''}{' '}
           disponível{filteredSites.length !== 1 ? 'is' : ''}
         </span>

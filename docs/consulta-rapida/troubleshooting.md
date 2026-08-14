@@ -83,52 +83,57 @@ Verifique nesta ordem:
    - `npm run start:worker`
 3. a fila `mail` esta sendo consumida
 4. o provedor ativo de envio
-5. se a Brevo API esta aceitando o IP de saida atual do provedor de runtime
+5. se `MAIL_FROM_EMAIL`/`MAIL_REPLY_TO_EMAIL` usam um dominio verificado no Resend
 
 Diagnostico atual do projeto:
 
 - o backend apenas enfileira o envio
 - o processamento real acontece no `Worker`
-- o fluxo canonico atual usa `BREVO_API_KEY`, portanto o provedor principal e a Brevo API
+- o fluxo canonico atual usa `RESEND_API_KEY`, portanto o provedor principal e o Resend
 - SMTP so deve ser tratado como contingencia, nao como caminho principal de producao
+- **Brevo foi removido do sistema em 2026-08-02** (credenciais SMTP expiradas causavam
+  falha silenciosa de todo o e-mail) — nao existe mais como opcao de provedor
 
 Como saber qual provedor esta ativo:
 
-- se existir `BREVO_API_KEY`, o `MailService` prioriza Brevo API
-- sem `BREVO_API_KEY` e com `MAIL_HOST`, `MAIL_USER`, `MAIL_PASS`, `MAIL_PORT` e `MAIL_SECURE`, o sistema usa SMTP
+- se existir `RESEND_API_KEY`, o `MailService` prioriza Resend
+- sem `RESEND_API_KEY` e com `MAIL_HOST`, `MAIL_USER`, `MAIL_PASS`, `MAIL_PORT` e `MAIL_SECURE`, o sistema usa SMTP
+- ver log de inicializacao do `MailService`: "MailService configurado com Resend." ou "...com SMTP (...)."
 
-O que checar no provedor de runtime atual (Vultr/Coolify):
+O que checar no provedor de runtime atual (Hostinger/Coolify):
 
 - servico `Backend`
 - servico `Worker`
 - variaveis:
-  - `BREVO_API_KEY`
-  - `MAIL_HOST`
-  - `MAIL_PORT`
-  - `MAIL_USER`
-  - `MAIL_PASS`
-  - `MAIL_SECURE`
-  - `MAIL_FROM_EMAIL`
-  - `MAIL_FROM_NAME`
+  - `RESEND_API_KEY`
+  - `MAIL_HOST` / `MAIL_PORT` / `MAIL_USER` / `MAIL_PASS` / `MAIL_SECURE` (fallback SMTP)
+  - `MAIL_FROM_EMAIL` / `MAIL_FROM_NAME`
+  - `MAIL_REPLY_TO_EMAIL` / `MAIL_REPLY_TO_NAME`
 
-O que checar na Brevo:
+O que checar no Resend:
 
-- `Security > Authorised IPs`
-- se o IP de saida do runtime apareceu como nao autorizado
-- se o IP foi realmente movido para a lista de autorizados
+- `resend.com/domains` — `MAIL_FROM_EMAIL`/`MAIL_REPLY_TO_EMAIL` precisam usar um
+  dominio verificado ali (hoje: `sgsseguranca.com.br`); erro tipico:
+  `Resend Error: The <dominio> domain is not verified.`
+- `resend.com/emails` — status de entrega por `messageId`
 
 Sintomas comuns e causa raiz:
 
 - request `201` no backend, PDF salvo e job criado, mas o e-mail nao chega
   - normalmente indica fila/worker ou falha do provedor, nao problema do PDF
-- log com `Brevo bloqueou o IP de saída do servidor (...)`
-  - causa raiz: IP atual do runtime nao autorizado em `Brevo > Security > Authorised IPs`
-- log com `Circuit breaker integration:brevo_email is OPEN`
-  - a integracao entrou em protecao apos falhas consecutivas; aguarde a janela de reset e confirme os IPs autorizados
+- log/erro `Invalid login: 535 5.7.8 Authentication failed`
+  - credencial SMTP (`MAIL_PASS`) invalida/expirada — se `RESEND_API_KEY` estiver
+    configurada corretamente, o Resend deveria ter prioridade; confirmar que
+    `MAIL_HOST`/`MAIL_USER`/`MAIL_PASS` nao estao sobrepondo por engano
+- log/erro `Resend Error: The <dominio> domain is not verified`
+  - `MAIL_FROM_EMAIL` ou `MAIL_REPLY_TO_EMAIL` aponta para um dominio nao
+    verificado no Resend — corrigir para o dominio verificado
+- log com `Circuit breaker integration:(smtp|resend)_email is OPEN`
+  - a integracao entrou em protecao apos falhas consecutivas; aguarde a janela de reset
 - job `queued` com `attemptsMade = 0`
   - normalmente indica que o `Worker` nao esta consumindo a fila
 - job falhado apos consumir a fila
-  - normalmente indica problema real no provedor (Brevo/IP, timeout ou credencial)
+  - normalmente indica problema real no provedor (dominio/credencial/timeout)
 
 Se houver jobs antigos com falha:
 

@@ -50,7 +50,6 @@ export type AlertPreviewResponse = {
 type MailDispatchErrorPayload = {
   message?: unknown;
   code?: unknown;
-  blockedIp?: unknown;
   retryAfterSeconds?: unknown;
 };
 
@@ -142,22 +141,14 @@ export async function extractMailDispatchErrorMessage(
 
   const data = (error.response?.data ?? null) as MailDispatchErrorPayload | null;
   const code = typeof data?.code === 'string' ? data.code : undefined;
-  const blockedIp =
-    typeof data?.blockedIp === 'string' ? data.blockedIp : undefined;
   const retryAfterSeconds =
     typeof data?.retryAfterSeconds === 'number'
       ? data.retryAfterSeconds
       : undefined;
 
-  if (code === 'BREVO_IP_NOT_AUTHORIZED') {
-    return blockedIp
-      ? `O provedor Brevo bloqueou o IP de saida atual do servidor (${blockedIp}). Autorize esse IP em Brevo > Security > Authorised IPs e tente novamente.`
-      : message;
-  }
-
   if (code === 'MAIL_PROVIDER_CIRCUIT_OPEN') {
     return retryAfterSeconds
-      ? `O envio de e-mail esta temporariamente pausado apos falhas recentes na Brevo. Aguarde cerca de ${retryAfterSeconds}s e tente novamente.`
+      ? `O envio de e-mail esta temporariamente pausado apos falhas recentes no provedor. Aguarde cerca de ${retryAfterSeconds}s e tente novamente.`
       : message;
   }
 

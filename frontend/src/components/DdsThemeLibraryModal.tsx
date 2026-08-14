@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Search, BookOpen, Loader2 } from "lucide-react";
 import { safeToLocaleDateString } from "@/lib/date/safeFormat";
+import { logger } from "@/lib/logger";
 
 interface DdsThemeLibraryModalProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ export function DdsThemeLibraryModal({
         });
         setThemes(response.data);
       } catch (error) {
-        console.error("Erro ao carregar biblioteca de temas:", error);
+        logger.error("Erro ao carregar biblioteca de temas:", error);
       } finally {
         setLoading(false);
       }

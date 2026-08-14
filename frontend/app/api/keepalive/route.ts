@@ -93,7 +93,7 @@ export async function GET(request: Request) {
 
   try {
     const startedAt = Date.now();
-    const health = await fetch(`${target}/health/public?keepalive=1&t=${startedAt}`, {
+    const health = await fetch(`${target}/health/ready?keepalive=1&t=${startedAt}`, {
       method: 'GET',
       cache: 'no-store',
       signal: controller.signal,

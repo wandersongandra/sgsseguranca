@@ -109,6 +109,7 @@ import { ContractsModule } from '../../modules/contracts/contracts.module';
 import { DocumentRegistryModule } from '../../modules/document-registry/document-registry.module';
 import { CorrectiveActionsModule } from '../../modules/corrective-actions/corrective-actions.module';
 import { DossiersModule } from '../../modules/dossiers/dossiers.module';
+import { PhotographicReportsModule } from '../../modules/photographic-reports/photographic-reports.module';
 
 export const COMPLIANCE_MODULES: NestModule[] = [
   AuditsModule,
@@ -119,6 +120,7 @@ export const COMPLIANCE_MODULES: NestModule[] = [
   DocumentRegistryModule,
   CorrectiveActionsModule,
   DossiersModule,
+  PhotographicReportsModule,
 ];
 
 // ─── Privacy (LGPD) ──────────────────────────────────────────────────────────

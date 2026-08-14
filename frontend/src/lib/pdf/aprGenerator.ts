@@ -14,6 +14,7 @@ import {
   formatDateTime,
   sanitize,
 } from "@/lib/pdf-system";
+import { logger } from "@/lib/logger";
 
 type AprPdfEvidence = {
   id: string;
@@ -81,7 +82,7 @@ export async function generateAprPdf(
         try {
           const response = await fetch(source);
           if (!response.ok) {
-            console.warn(
+            logger.warn(
               "[APR PDF] Falha ao carregar evidência (HTTP %s): %s",
               response.status,
               source,
@@ -91,12 +92,12 @@ export async function generateAprPdf(
           const blob = await response.blob();
           return blobToDataUrl(blob);
         } catch (err) {
-          console.warn("[APR PDF] Erro ao buscar evidência: %s", source, err);
+          logger.warn("[APR PDF] Erro ao buscar evidência: %s", source, err);
           continue;
         }
       }
       if (sources.length > 0) {
-        console.warn(
+        logger.warn(
           "[APR PDF] Evidência %s não pôde ser carregada de nenhuma fonte. O PDF será gerado sem essa imagem.",
           item.id ?? "desconhecida",
         );

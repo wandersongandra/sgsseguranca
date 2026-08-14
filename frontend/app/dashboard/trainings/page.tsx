@@ -375,7 +375,7 @@ useEffect(() => {
   const filteredTrainings = trainings.filter((training) => {
     const term = deferredSearchTerm.toLowerCase();
     return (
-      training.nome.toLowerCase().includes(term) ||
+      (training.nome ?? '').toLowerCase().includes(term) ||
       (training.user?.nome?.toLowerCase() || "").includes(term)
     );
   });

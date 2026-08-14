@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import {
   AprDueFilter,
   AprListingDensity,
@@ -91,6 +92,10 @@ export function AprAdvancedFiltersDrawer({
     density,
   });
 
+  const drawerRef = useRef<HTMLElement>(null);
+
+  useFocusTrap(drawerRef, isOpen, onClose);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -141,6 +146,7 @@ export function AprAdvancedFiltersDrawer({
   return (
     <div className="fixed inset-0 z-[120] bg-[color:var(--component-overlay)]/45" onClick={onClose}>
       <aside
+        ref={drawerRef}
         role="dialog"
         aria-modal="true"
         aria-label="Filtros avançados de APR"

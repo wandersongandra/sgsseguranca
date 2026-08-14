@@ -517,7 +517,14 @@ Onde olhar:
 - `.github/workflows/disaster-recovery-backup.yml`
 - `docs/consulta-rapida/disaster-recovery-e-backup.md`
 
-## 12. Envio de e-mail por fila com Worker e Brevo API
+## 12. Envio de e-mail por fila com Worker e Brevo API (HISTÓRICO — Brevo removido em 2026-08-02)
+
+> **Desatualizado.** Este registro descreve a integração com Brevo (era o provedor
+> principal na infra Railway antiga). Brevo foi completamente removido do sistema
+> em 2026-08-02 — credenciais SMTP expiradas causaram falha silenciosa de todo o
+> e-mail transacional, e a decisão foi padronizar em **Resend** (prioridade) com
+> SMTP genérico como fallback. Mantido abaixo apenas como registro histórico do
+> que já foi tentado/depurado.
 
 O que foi feito:
 

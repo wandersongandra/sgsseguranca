@@ -12,6 +12,20 @@ import { drawParticipantTable } from "../tables";
 
 type ArrParticipantLike = { nome?: string; funcao?: string | null };
 
+const ARR_STATUS_LABEL: Record<string, string> = {
+  tratada: "Tratada",
+  analisada: "Analisada",
+  rascunho: "Rascunho",
+  arquivada: "Arquivada",
+};
+
+const ARR_RISCO_LABEL: Record<string, string> = {
+  critico: "Crítico",
+  alto: "Alto",
+  medio: "Moderado",
+  baixo: "Baixo",
+};
+
 function buildStatusTone(status: string) {
   if (status === "tratada") return "success" as const;
   if (status === "analisada") return "info" as const;
@@ -21,10 +35,7 @@ function buildStatusTone(status: string) {
 
 function buildCriticality(arr: Arr) {
   if (arr.status === "arquivada") return "Arquivado";
-  if (arr.nivel_risco === "critico") return "Crítico";
-  if (arr.nivel_risco === "alto") return "Alto";
-  if (arr.nivel_risco === "medio") return "Moderado";
-  return "Baixo";
+  return ARR_RISCO_LABEL[arr.nivel_risco] ?? "Baixo";
 }
 
 export async function drawArrBlueprint(
@@ -60,7 +71,7 @@ export async function drawArrBlueprint(
       },
       {
         label: "Nível de risco",
-        value: sanitize(arr.nivel_risco),
+        value: ARR_RISCO_LABEL[arr.nivel_risco] ?? sanitize(arr.nivel_risco),
         tone:
           arr.nivel_risco === "critico" || arr.nivel_risco === "alto"
             ? "warning"
@@ -78,7 +89,7 @@ export async function drawArrBlueprint(
       },
       {
         label: "Status",
-        value: sanitize(arr.status),
+        value: ARR_STATUS_LABEL[arr.status] ?? sanitize(arr.status),
         tone: buildStatusTone(arr.status),
       },
       {

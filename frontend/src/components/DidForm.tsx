@@ -21,15 +21,15 @@ import { sessionStore } from '@/lib/sessionStore';
 import { usePermissions } from '@/hooks/usePermissions';
 import { Permission } from '@/lib/permissions';
 import { isAdminGeralAccount } from '@/lib/auth-session-state';
-import { getDidReadOnlyReason } from '@/app/dashboard/dids/didMeta';
-import { didSchema, type DidFormData } from '@/app/dashboard/dids/didForm.schema';
-import { useDidCatalogs } from '@/app/dashboard/dids/useDidCatalogs';
+import { getDidReadOnlyReason } from '../../app/dashboard/dids/didMeta';
+import { didSchema, type DidFormData } from '../../app/dashboard/dids/didForm.schema';
+import { useDidCatalogs } from '../../app/dashboard/dids/useDidCatalogs';
 import {
   DidContextSection,
   DidFormPageShell,
   DidOperationalSection,
   DidParticipantsSection,
-} from '@/app/dashboard/dids/components/DidFormSections';
+} from '../../app/dashboard/dids/components/DidFormSections';
 import { openPdfForPrint } from '@/lib/print-utils';
 import { base64ToPdfBlob, base64ToPdfFile } from '@/lib/pdf/pdfFile';
 

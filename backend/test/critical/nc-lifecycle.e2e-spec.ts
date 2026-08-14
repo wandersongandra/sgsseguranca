@@ -29,7 +29,7 @@ function buildNcPayload(input: { siteId: string; suffix: string }) {
     requisito_item: '12.38',
     risco_perigo: 'Contato com parte móvel',
     risco_associado: 'Corte e amputação',
-    risco_nivel: 'ALTO',
+    risco_nivel: 'Alto',
     status: NcStatus.ABERTA,
     site_id: input.siteId,
   };
@@ -201,6 +201,26 @@ describeE2E('E2E Critical - Nonconformity lifecycle', () => {
     expect(
       (attachRes.body as { attachmentCount?: number }).attachmentCount,
     ).toBeGreaterThan(0);
+
+    // Preencher campos exigidos pelo assertReadyForClosure antes de encerrar
+    const fillClosureRes = await testApp
+      .request()
+      .patch(`/nonconformities/${ncId}`)
+      .set(testApp.authHeaders(adminTenantA))
+      .set(csrfHeaders)
+      .send({
+        acao_definitiva_descricao:
+          'Instalação de guarda de proteção na máquina',
+        acao_definitiva_responsavel: 'Técnico de Manutenção',
+        acao_definitiva_prazo: '2026-04-01',
+        verificacao_resultado: 'Sim',
+        verificacao_evidencias: 'Guarda instalada e inspecionada visualmente',
+        verificacao_data: '2026-04-02',
+        verificacao_responsavel: 'Técnico SST',
+        assinatura_responsavel_area: 'Supervisor de turno',
+        assinatura_tecnico_auditor: 'Técnico SST',
+      });
+    expect(fillClosureRes.status).toBe(200);
 
     const closeRes = await transitionStatus({
       testApp,

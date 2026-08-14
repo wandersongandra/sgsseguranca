@@ -143,7 +143,6 @@ export function proxy(request: NextRequest) {
     !request.cookies.has(REFRESH_CSRF_COOKIE)
   ) {
     const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirect", pathname);
     return NextResponse.redirect(loginUrl);
   }
 

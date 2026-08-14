@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import {
   AlertTriangle,
   Download,
@@ -21,6 +21,7 @@ import type { Rdo } from "@/services/rdosService";
 import { maskCpf } from "@/lib/format/cpf";
 import { RDO_STATUS_COLORS, RDO_STATUS_LABEL, CLIMA_LABEL, OCORRENCIA_TIPO_LABEL } from "@/services/rdosService";
 import { safeToLocaleDateString } from "@/lib/date/safeFormat";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { DocumentVideoPanel } from "@/components/document-videos/DocumentVideoPanel";
 import type { GovernedDocumentVideoAccessResponse, GovernedDocumentVideoAttachment } from "@/lib/videos/documentVideos";
 
@@ -135,12 +136,22 @@ export function RdoViewerModal({
     [viewRdo],
   );
 
+  const viewerDialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(viewerDialogRef, open && viewRdo !== null, onClose);
+
   if (!open || !viewRdo) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+    <div
+      ref={viewerDialogRef}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Visualizar RDO ${viewRdo.numero}`}
+    >
       <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
         <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-6 py-4">
           <div className="flex items-center gap-3">

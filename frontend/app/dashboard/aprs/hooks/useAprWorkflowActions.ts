@@ -10,6 +10,7 @@ import {
 } from "@/services/aprsService";
 import { openUrlInNewTab } from "@/lib/print-utils";
 import { extractApiErrorMessage, handleApiError } from "@/lib/error-handler";
+import { logger } from "@/lib/logger";
 
 import type { AprFormData } from "../components/aprForm.schema";
 import type { AprWorkflowEvidenceItem } from "./useAprPdfWorkflow";
@@ -155,7 +156,7 @@ export function useAprWorkflowActions({
 
       toast.success("Sugestões de controles aplicadas nas linhas de risco.");
     } catch (error) {
-      console.error("Erro ao sugerir controles:", error);
+      logger.error("Erro ao sugerir controles:", error);
       toast.error("Não foi possível gerar sugestões de controles.");
     } finally {
       setSuggestingControls(false);
@@ -212,7 +213,7 @@ export function useAprWorkflowActions({
           "O PDF final foi emitido, mas a URL segura ainda não está disponível.",
       );
     } catch (error) {
-      console.error("Erro ao emitir PDF governado da APR:", error);
+      logger.error("Erro ao emitir PDF governado da APR:", error);
       toast.error(
         await extractApiErrorMessage(
           error,
@@ -324,7 +325,7 @@ export function useAprWorkflowActions({
           "O PDF final governado não está disponível para abertura agora.",
       );
     } catch (error) {
-      console.error("Erro ao abrir PDF governado da APR:", error);
+      logger.error("Erro ao abrir PDF governado da APR:", error);
       toast.error("Não foi possível abrir o PDF final governado.");
     }
   }, [
@@ -343,7 +344,7 @@ export function useAprWorkflowActions({
       toast.success(`Nova versão criada: ${newApr.numero}`);
       navigateToApr(newApr.id);
     } catch (error) {
-      console.error("Erro ao criar nova versão:", error);
+      logger.error("Erro ao criar nova versão:", error);
       toast.error("Não foi possível criar nova versão.");
     } finally {
       setCreatingVersion(false);
@@ -358,7 +359,7 @@ export function useAprWorkflowActions({
       setCompareResult({ summary: result.summary });
       toast.success("Comparação de versões concluída.");
     } catch (error) {
-      console.error("Erro ao comparar versões:", error);
+      logger.error("Erro ao comparar versões:", error);
       toast.error("Não foi possível comparar as versões.");
     } finally {
       setComparing(false);
@@ -455,7 +456,7 @@ export function useAprWorkflowActions({
       setEvidenceFile(null);
       toast.success("Evidência enviada com hash de integridade.");
     } catch (error) {
-      console.error("Erro ao enviar evidência:", error);
+      logger.error("Erro ao enviar evidência:", error);
       toast.error("Falha ao enviar evidência.");
     } finally {
       setUploadingEvidence(false);

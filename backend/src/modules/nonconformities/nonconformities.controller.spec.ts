@@ -15,6 +15,7 @@ import { FileInspectionService } from '../../shared/security/file-inspection.ser
 import { TenantInterceptor } from '../../shared/tenant/tenant.interceptor';
 import { NonConformitiesController } from './nonconformities.controller';
 import { NonConformitiesService } from './nonconformities.service';
+import { NonConformitiesPdfService } from './services/nonconformities-pdf.service';
 import { NonConformityResponseDto } from './dto/nonconformity-response.dto';
 
 describe('NonConformitiesController (http)', () => {
@@ -24,12 +25,19 @@ describe('NonConformitiesController (http)', () => {
     findPaginated: jest.fn(),
     listStoredFiles: jest.fn(),
     getWeeklyBundle: jest.fn(),
+    removeAttachment: jest.fn(),
+  };
+
+  const nonConformitiesPdfService = {
+    generateFinalPdf: jest.fn(),
   };
 
   beforeEach(() => {
     nonConformitiesService.findPaginated.mockReset();
     nonConformitiesService.listStoredFiles.mockReset();
     nonConformitiesService.getWeeklyBundle.mockReset();
+    nonConformitiesService.removeAttachment.mockReset();
+    nonConformitiesPdfService.generateFinalPdf.mockReset();
   });
 
   beforeAll(async () => {
@@ -39,6 +47,10 @@ describe('NonConformitiesController (http)', () => {
         {
           provide: NonConformitiesService,
           useValue: nonConformitiesService,
+        },
+        {
+          provide: NonConformitiesPdfService,
+          useValue: nonConformitiesPdfService,
         },
         {
           provide: FileInspectionService,
@@ -146,6 +158,37 @@ describe('NonConformitiesController (http)', () => {
       .expect(400);
 
     expect(nonConformitiesService.listStoredFiles).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia upload manual de PDF final para preservar a emissão oficial', async () => {
+    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(httpServer)
+      .post('/nonconformities/11111111-1111-4111-8111-111111111111/file')
+      .expect(410);
+  });
+
+  it('encaminha a remoção imediata de anexo governado pelo endpoint dedicado', async () => {
+    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
+    nonConformitiesService.removeAttachment.mockResolvedValue({
+      entityId: '11111111-1111-4111-8111-111111111111',
+      attachments: [],
+      attachmentCount: 0,
+      removedAttachmentReference: 'gst:nc-attachment:ref',
+      storageCleanup: 'removed',
+      message: 'Anexo removido da não conformidade e do storage oficial.',
+    });
+
+    await request(httpServer)
+      .delete(
+        '/nonconformities/11111111-1111-4111-8111-111111111111/attachments/0',
+      )
+      .expect(200);
+
+    expect(nonConformitiesService.removeAttachment).toHaveBeenCalledWith(
+      '11111111-1111-4111-8111-111111111111',
+      0,
+    );
   });
 
   it('ignora company_id do client no bundle semanal de NC', async () => {

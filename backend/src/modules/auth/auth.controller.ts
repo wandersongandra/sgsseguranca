@@ -211,7 +211,11 @@ export class AuthController {
         this.bruteForceService.registerFailure(tracker),
         this.bruteForceService.registerCpfFailure(body.cpf),
       ]);
-      this.logger.warn({ event: 'login_failed', cpf: CpfUtil.mask(body.cpf) });
+      this.logger.warn({
+        event: 'login_failed',
+        cpf: CpfUtil.mask(body.cpf),
+        ip: tracker ?? 'unknown',
+      });
       this.securityAudit.loginFailed(
         body.cpf,
         tracker ?? undefined,

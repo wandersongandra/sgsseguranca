@@ -4,6 +4,7 @@ import { CommonModule } from '../../shared/common.module';
 import { DocumentRegistryModule } from '../document-registry/document-registry.module';
 import { AiModule } from '../ai/ai.module';
 import { ConsentsModule } from '../consents/consents.module';
+import { SignaturesModule } from '../signatures/signatures.module';
 import { FeatureAiGuard } from '../../shared/guards/feature-ai.guard';
 import { AiConsentGuard } from '../../shared/guards/ai-consent.guard';
 import { PhotographicReportsController } from './photographic-reports.controller';
@@ -19,6 +20,10 @@ import { PhotographicReportExport } from './entities/photographic-report-export.
     DocumentRegistryModule,
     AiModule,
     ConsentsModule,
+    // Sem ciclo: SignaturesModule importa CommonModule, DocumentRegistryModule,
+    // forwardRef(UsersModule) e ForensicTrailModule — nenhum deles alcança
+    // photographic-reports.
+    SignaturesModule,
     TypeOrmModule.forFeature([
       PhotographicReport,
       PhotographicReportDay,

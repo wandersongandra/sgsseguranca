@@ -20,7 +20,11 @@ const DOCUMENT_REGISTRY_VALIDATION_PORTALS = [
   'nonconformity_public_validation',
   'audit_public_validation',
   'training_public_validation',
+  // `report_public_validation` pertence ao módulo `report` (relatórios
+  // gerenciais). O Relatório Fotográfico é outro módulo e precisa do seu
+  // próprio portal — reusar aquele faria o token de um valer no outro.
   'report_public_validation',
+  'photographic_report_public_validation',
 ];
 
 @Controller('public/documents')

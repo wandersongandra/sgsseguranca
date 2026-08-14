@@ -46,15 +46,28 @@ describe('Sidebar', () => {
 
     render(<Sidebar />);
 
-    expect(screen.getByText('Estrutura')).toBeInTheDocument();
+    expect(screen.getByText('Início')).toBeInTheDocument();
     expect(screen.getByText('Campo e Operação')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Funcionários/i })).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: /Usuários e acesso/i }),
-    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /DDS/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /PTs/i })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /^Empresas$/i })).not.toBeInTheDocument();
+
+    // Seção 'Empresa' (ex-Estrutura) inicia recolhida por padrão (#252):
+    // os itens só aparecem ao expandir.
+    expect(
+      screen.queryByRole('link', { name: /Funcionários/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: /Usuários e acesso/i }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Empresa$/i }));
+    expect(
+      screen.getByRole('link', { name: /Funcionários/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: /Usuários e acesso/i }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Calendário/i })).toBeInTheDocument();
   });
 
@@ -73,24 +86,31 @@ describe('Sidebar', () => {
 
     render(<Sidebar />);
 
-    const estruturaSection = screen.getByText('Estrutura').closest('section');
-    expect(estruturaSection).toBeTruthy();
+    expect(screen.getByText('Início')).toBeInTheDocument();
+
+    // Rota ativa (/dashboard/companies) expande automaticamente a seção 'Empresa'.
+    const empresaSection = screen.getByText('Empresa').closest('section');
+    expect(empresaSection).toBeTruthy();
     expect(
-      within(estruturaSection as HTMLElement).getByRole('link', {
+      within(empresaSection as HTMLElement).getByRole('link', {
         name: /^Empresas$/i,
       }),
     ).toBeInTheDocument();
     expect(
-      within(estruturaSection as HTMLElement).getByRole('link', {
+      within(empresaSection as HTMLElement).getByRole('link', {
         name: /Usuários e acesso/i,
       }),
     ).toBeInTheDocument();
-    const leituraEGestaoToggle = screen.getByRole('button', {
-      name: /Leitura e Gestão/i,
+
+    // 'Conformidade' (ex-Leitura e Gestão) inicia recolhida; expande e valida item.
+    const conformidadeToggle = screen.getByRole('button', {
+      name: /^Conformidade$/i,
     });
-    expect(leituraEGestaoToggle).toBeInTheDocument();
-    fireEvent.click(leituraEGestaoToggle);
-    expect(screen.getByRole('link', { name: /Indicadores/i })).toBeInTheDocument();
+    expect(conformidadeToggle).toBeInTheDocument();
+    fireEvent.click(conformidadeToggle);
+    expect(
+      screen.getByRole('link', { name: /Mapa de risco/i }),
+    ).toBeInTheDocument();
   });
 
   it('fecha com Escape, prende o foco e o restaura no gatilho', async () => {

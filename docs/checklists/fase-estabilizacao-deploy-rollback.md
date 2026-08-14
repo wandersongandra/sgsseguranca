@@ -2,7 +2,7 @@
 
 ## Pré-deploy
 - [ ] Confirmar branch `main` atualizado e sem conflitos.
-- [ ] Garantir variáveis obrigatórias em produção (DB, Redis, storage, SMTP/Brevo, OpenAI, Sentry).
+- [ ] Garantir variáveis obrigatórias em produção (DB, Redis, storage, Resend/SMTP, OpenAI, Sentry).
 - [ ] Executar no backend:
   - `npm run lint`
   - `npm run build`
@@ -29,7 +29,7 @@
 - [ ] Login + refresh token + logout.
 - [ ] Fluxo APR completo (criar, editar, finalizar, PDF).
 - [ ] Central de pendências e ações operacionais.
-- [ ] Envio de e-mail real (SMTP/Brevo).
+- [ ] Envio de e-mail real (Resend/SMTP).
 - [ ] Fluxo de assinatura verificável e validação pública.
 - [ ] DR administrativo:
   - backup manual de tenant

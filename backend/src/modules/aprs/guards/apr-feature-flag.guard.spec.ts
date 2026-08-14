@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Repository } from 'typeorm';
 import { AprFeatureFlag } from '../entities/apr-feature-flag.entity';
@@ -99,6 +103,17 @@ describe('AprFeatureFlagGuard', () => {
     await expect(
       guard.canActivate(makeContext('apr_rules_engine')),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('bloqueia por fail-closed quando a consulta da flag falha', async () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue('apr_workflow_configuravel');
+    repo.findOne.mockRejectedValue(new Error('database unavailable'));
+
+    await expect(
+      guard.canActivate(makeContext('apr_workflow_configuravel')),
+    ).rejects.toThrow(ServiceUnavailableException);
   });
 });
 

@@ -197,6 +197,9 @@ const validationSchema = Joi.object({
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().optional().allow(''),
   REDIS_TLS: Joi.boolean().default(false),
+  // Dispensa a exigência de TLS quando o Redis está na mesma rede interna do
+  // host (ver assertSecureRedisConnection). Só deve ser ligado nesse cenário.
+  REDIS_ALLOW_INSECURE_INTERNAL: Joi.boolean().default(false),
   ALERTS_DLQ_COOLDOWN_MS: Joi.number().integer().min(60_000).default(900_000),
   AI_RECOVERY_MAX_AGE_MS: Joi.number()
     .integer()

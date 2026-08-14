@@ -92,6 +92,13 @@ function buildSiteLine(rdo: Rdo) {
   return site || location;
 }
 
+const RDO_STATUS_LABEL: Record<string, string> = {
+  rascunho: "Rascunho",
+  enviado: "Enviado",
+  aprovado: "Aprovado",
+  cancelado: "Cancelado",
+};
+
 function buildStatusTone(status?: string) {
   const normalized = String(status || "").toLowerCase();
   if (normalized.includes("aprov")) return "success" as const;
@@ -174,7 +181,7 @@ export async function drawRdoBlueprint(
     summary:
       "Painel sintético para acompanhamento rápido da obra, com status, liderança responsável e volume operacional registrado no período.",
     metrics: [
-      { label: "Status", value: sanitize(rdo.status), tone: statusTone },
+      { label: "Status", value: RDO_STATUS_LABEL[rdo.status] ?? sanitize(rdo.status), tone: statusTone },
       {
         label: "Responsável",
         value: sanitize(rdo.responsavel?.nome),
@@ -206,7 +213,7 @@ export async function drawRdoBlueprint(
       { label: "Cidade / UF", value: buildLocationLabel(rdo) },
       { label: "Empresa", value: rdo.company?.razao_social || rdo.company_id },
       { label: "Responsável", value: rdo.responsavel?.nome || rdo.responsavel_id },
-      { label: "Status operacional", value: rdo.status },
+      { label: "Status operacional", value: RDO_STATUS_LABEL[rdo.status] ?? sanitize(rdo.status) },
       { label: "Condição do terreno", value: rdo.condicao_terreno || "-" },
     ],
   });

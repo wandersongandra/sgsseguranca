@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 import { PageHeader } from '@/components/layout';
 import { InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
@@ -90,7 +91,7 @@ export function ActivityForm({ id }: ActivityFormProps) {
           });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados do formulário.');
         if (id) router.push('/dashboard/activities');
       } finally {
@@ -115,7 +116,7 @@ export function ActivityForm({ id }: ActivityFormProps) {
       router.push('/dashboard/activities');
       router.refresh();
     } catch (error) {
-      console.error('Erro ao salvar atividade:', error);
+      logger.error('Erro ao salvar atividade:', error);
       const errorMessage = getFormErrorMessage(error, {
         badRequest: 'Dados inválidos. Revise os campos obrigatórios.',
         unauthorized: 'Sessão expirada. Faça login novamente.',

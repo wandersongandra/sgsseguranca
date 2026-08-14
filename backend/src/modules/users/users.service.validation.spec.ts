@@ -18,6 +18,7 @@ import type { PwnedPasswordService } from '../auth/services/pwned-password.servi
 import type { AuditService } from '../audit-trail/audit.service';
 import type { RbacService } from '../rbac/rbac.service';
 import type { AuthRedisService } from '../../shared/redis/redis.service';
+import type { AuthPrincipalService } from '../auth/auth-principal.service';
 import type { ConfigService } from '@nestjs/config';
 import { UserIdentityType } from './constants/user-identity.constant';
 
@@ -95,6 +96,9 @@ function buildService(opts: {
     getUserAccess: jest.fn().mockResolvedValue({ roles: [] }),
   };
   const redisService = { getClient: jest.fn() } as unknown as AuthRedisService;
+  const authPrincipalService = {
+    invalidateBridgeCache: jest.fn(),
+  } as unknown as AuthPrincipalService;
 
   const service = new UsersService(
     userRepo,
@@ -107,6 +111,7 @@ function buildService(opts: {
     rbacService as RbacService,
     redisService,
     { get: jest.fn() } as unknown as ConfigService,
+    authPrincipalService,
   );
 
   return { service, userRepo, profilesRepo };

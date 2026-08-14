@@ -4,7 +4,7 @@
 
 SGS é um SaaS multi-tenant de SST (Saúde e Segurança do Trabalho) para empresas brasileiras. Gerencia APRs, Permissões de Trabalho (PTs), DDS, EPIs, treinamentos, exames ocupacionais, não conformidades, auditorias, assinaturas digitais, assistente IA Sophie, e conformidade LGPD.
 
-**Stack:** NestJS 11 + TypeORM + PostgreSQL + Redis/BullMQ (backend) | Next.js 16 App Router + React 19 + Tailwind CSS (frontend) | Puppeteer (PDFs) | Neon (DB) | Backblaze B2 (storage) | Vercel (frontend) | Vultr/Coolify (backend/worker)
+**Stack:** NestJS 11 + TypeORM + PostgreSQL + Redis/BullMQ (backend) | Next.js 16 App Router + React 19 + Tailwind CSS (frontend) | Puppeteer (PDFs) | Neon (DB) | Backblaze B2 (storage) | Vercel (frontend) | Hostinger VPS/Coolify (backend/worker)
 
 **Node:** >=20 <25 | TypeScript strict mode
 
@@ -23,7 +23,7 @@ SGS é um SaaS multi-tenant de SST (Saúde e Segurança do Trabalho) para empres
 - Nunca usar URL com `-pooler` em `DATABASE_URL` (quebra RLS). `DATABASE_MIGRATION_URL` pode usar pooler.
 - Role runtime (`sgs_app`) sem `BYPASSRLS`. Role migrations (`owner`) com permissão DDL.
 - Índices: `CONCURRENTLY IF NOT EXISTS`. Migrations com `CREATE/DROP INDEX CONCURRENTLY` usam `transaction = false`.
-- Próximo timestamp de migration: `1709000000362`.
+- Próximo timestamp de migration: `1709000000375`.
 - Rota de admin em `/admin/queues` (Bull Board) com Basic Auth.
 
 ## Regras Absolutas — Frontend
@@ -230,13 +230,15 @@ Heartbeat do worker em Redis (`WORKER_HEARTBEAT_KEY`) para health check.
 
 | Componente | Plataforma |
 |---|---|
-| API (NestJS) | Vultr + Coolify (Docker) |
-| Worker | Vultr + Coolify (Docker) |
+| API (NestJS) | Hostinger VPS + Coolify (Docker) |
+| Worker | Hostinger VPS + Coolify (Docker) |
 | Frontend | Vercel |
 | DB | Neon (PostgreSQL) |
-| Redis | Upstash |
+| Redis | Self-hosted na mesma VPS (container `sgs-redis`, rede Docker interna) |
 | Storage | Backblaze B2 (S3-compatible) |
 | DR Storage | Backblaze B2 secundário |
+
+**Infra atual (desde 2026-07-31):** VPS única na Hostinger (Brasil) hospeda API, Worker, Redis e ClamAV — todos via Coolify na mesma máquina, comunicando-se pela rede Docker interna `coolify`. Substituiu a VPS Vultr/Integrator (Virgínia, EUA), que tinha ~118-205ms de RTT até o banco/Redis por estar fora do Brasil. Detalhes completos: `docs/deploy/hostinger-coolify-infra-atual.md`.
 
 ### Docker
 - `Dockerfile` — Multi-stage build (web, inclui Chromium para Puppeteer)
@@ -253,7 +255,9 @@ Heartbeat do worker em Redis (`WORKER_HEARTBEAT_KEY`) para health check.
 - `required-checks.yml` — Quality gates
 
 ### Runbooks
-- `docs/deploy/coolify-vultr-backend-web-worker.md` — Deploy
+- `docs/deploy/hostinger-coolify-infra-atual.md` — Infra atual (Hostinger VPS, IPs, Coolify, Redis self-hosted) — **fonte da verdade**
+- `docs/deploy/coolify-vultr-backend-web-worker.md` — Deploy (documento histórico, infra Vultr desativada)
+- `docs/deploy/COMO-COLOCAR-EM-PRODUCAO.md` — Checklist de deploy manual
 - `backend/docs/security-hardening-operations.md` — Hardening
 - `backend/docs/RUNBOOK_PRODUCTION.md` — Operações em produção
 - `backend/docs/OBSERVABILITY.md` — Observabilidade
@@ -384,6 +388,7 @@ Testes de carga em `backend/test/load/` com k6.
 | `docs/database-schema.md` | Schema completo do banco (todas as tabelas, colunas, tipos, relacionamentos) |
 | `docs/troubleshooting.md` | Guia de problemas comuns e soluções |
 | `docs/component-library.md` | Catálogo completo de componentes React (55+) |
+| `docs/frontend-cache-strategy.md` | Quando usar useCachedFetch vs fetchAllPages vs offline-cache vs localStorage |
 | `docs/state-machines.md` | Máquinas de estado de todas as entidades (APR, DDS, PT, etc.) |
 | `docs/env-reference.md` | Referência rápida das 400+ variáveis de ambiente |
 | `docs/test-patterns.md` | Padrões de teste: unit, E2E, load, mocks, factories |

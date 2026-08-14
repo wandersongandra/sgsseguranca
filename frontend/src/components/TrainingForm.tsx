@@ -13,6 +13,7 @@ import { ArrowLeft, Save, PenTool, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { toInputDateValue } from '@/lib/date/safeFormat';
+import { logger } from '@/lib/logger';
 import { PageHeader } from '@/components/layout';
 import { InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
@@ -143,12 +144,12 @@ export function TrainingForm({ id }: TrainingFormProps) {
               if (cancelled) {
                 return;
               }
-              console.error('Erro ao carregar assinaturas do treinamento:', error);
+              logger.error('Erro ao carregar assinaturas do treinamento:', error);
               toast.error('As assinaturas do treinamento não puderam ser carregadas agora.');
             });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
         router.push('/dashboard/trainings');
       } finally {
@@ -201,7 +202,7 @@ export function TrainingForm({ id }: TrainingFormProps) {
         setUsers(companyUsers);
         setFilteredUsers(companyUsers);
       } catch (error) {
-        console.error('Erro ao carregar colaboradores por empresa:', error);
+        logger.error('Erro ao carregar colaboradores por empresa:', error);
         if (!cancelled) {
           setUsers([]);
           setFilteredUsers([]);
@@ -270,7 +271,7 @@ export function TrainingForm({ id }: TrainingFormProps) {
       router.push('/dashboard/trainings');
       router.refresh();
     } catch (error) {
-      console.error('Erro ao salvar treinamento:', error);
+      logger.error('Erro ao salvar treinamento:', error);
       toast.error('Erro ao salvar treinamento. Verifique os dados e tente novamente.');
     } finally {
       setLoading(false);

@@ -18,6 +18,26 @@ type CatAttachmentLike = {
   uploaded_at?: string;
 };
 
+const CAT_STATUS_LABEL: Record<string, string> = {
+  aberta: "Aberta",
+  investigacao: "Em Investigação",
+  fechada: "Fechada",
+};
+
+const CAT_GRAVIDADE_LABEL: Record<string, string> = {
+  leve: "Leve",
+  moderada: "Moderada",
+  grave: "Grave",
+  fatal: "Fatal",
+};
+
+function catStatusTone(status?: string): "danger" | "warning" | "success" | "default" {
+  if (status === "aberta") return "danger";
+  if (status === "investigacao") return "warning";
+  if (status === "fechada") return "success";
+  return "default";
+}
+
 function resolveCriticality(gravidade?: string) {
   const value = sanitize(gravidade).toLowerCase();
   if (value.includes("fatal")) return "critical";
@@ -81,9 +101,9 @@ export async function drawCatBlueprint(
     summary:
       "Documento institucional de registro de acidente, evolução da apuração, medidas adotadas e rastreabilidade operacional.",
     metrics: [
-      { label: "Status", value: sanitize(cat.status), tone: "warning" },
+      { label: "Status", value: CAT_STATUS_LABEL[cat.status] ?? sanitize(cat.status), tone: catStatusTone(cat.status) },
       { label: "Tipo", value: sanitize(cat.tipo), tone: "info" },
-      { label: "Gravidade", value: sanitize(cat.gravidade), tone: "danger" },
+      { label: "Gravidade", value: CAT_GRAVIDADE_LABEL[cat.gravidade] ?? sanitize(cat.gravidade), tone: "danger" },
       {
         label: "Trabalhador",
         value: sanitize(cat.worker?.nome),
@@ -116,7 +136,7 @@ export async function drawCatBlueprint(
       { label: "Colaborador", value: cat.worker?.nome || "-" },
       { label: "Local", value: cat.local_ocorrencia || "-" },
       { label: "Tipo", value: cat.tipo },
-      { label: "Gravidade", value: cat.gravidade },
+      { label: "Gravidade", value: CAT_GRAVIDADE_LABEL[cat.gravidade] ?? sanitize(cat.gravidade) },
       {
         label: "Aberta em",
         value: cat.opened_at ? formatDateTime(cat.opened_at) : "-",
@@ -129,7 +149,7 @@ export async function drawCatBlueprint(
         label: "Fechada em",
         value: cat.closed_at ? formatDateTime(cat.closed_at) : "-",
       },
-      { label: "Status atual", value: cat.status },
+      { label: "Status atual", value: CAT_STATUS_LABEL[cat.status] ?? sanitize(cat.status) },
     ],
   });
 

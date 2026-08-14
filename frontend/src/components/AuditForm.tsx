@@ -14,6 +14,7 @@ import { Camera, Save, Plus, Trash2, Loader2, ClipboardCheck } from 'lucide-reac
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 import { attachPdfIfProvided } from '@/lib/document-upload';
 import { selectedTenantStore } from '@/lib/selectedTenantStore';
 import { sessionStore } from '@/lib/sessionStore';
@@ -230,7 +231,7 @@ export function AuditForm({ id }: AuditFormProps) {
             }
           })
           .catch((error) => {
-            console.error('Erro ao carregar auditoria:', error);
+            logger.error('Erro ao carregar auditoria:', error);
             toast.error('A auditoria não pôde ser carregada agora.');
           });
       } catch {

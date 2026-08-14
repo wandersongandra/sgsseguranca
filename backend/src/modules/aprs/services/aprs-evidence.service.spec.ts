@@ -38,7 +38,7 @@ describe('AprsEvidenceService', () => {
   let service: AprsEvidenceService;
   let aprRepository: {
     findOne: jest.Mock;
-    manager: { getRepository: jest.Mock };
+    manager: { getRepository: jest.Mock; query: jest.Mock };
   };
   let aprLogsRepository: { create: jest.Mock; save: jest.Mock };
   let tenantService: Pick<TenantService, 'getTenantId' | 'getContext' | 'run'>;
@@ -67,6 +67,7 @@ describe('AprsEvidenceService', () => {
     aprRepository = {
       findOne: jest.fn(),
       manager: {
+        query: jest.fn(() => Promise.resolve([{ count: '0' }])),
         getRepository: jest.fn((entity: { name?: string }) => {
           if (entity?.name === 'AprRiskItem') return riskItemRepository;
           if (entity?.name === 'AprRiskEvidence') return evidenceRepository;
@@ -137,10 +138,20 @@ describe('AprsEvidenceService', () => {
     );
     expect(result).toMatchObject({
       id: 'evidence-1',
-      fileKey: 'documents/company-1/apr-evidences/apr-1/evidence.jpg',
       originalName: 'evidence.jpg',
     });
+    expect(result).not.toHaveProperty('fileKey');
     expect(result.hashSha256).toHaveLength(64);
+  });
+
+  it('bloqueia evidência quando já existe assinatura da APR', async () => {
+    aprRepository.findOne.mockResolvedValue(makeApr());
+    aprRepository.manager.query.mockResolvedValue([{ count: '1' }]);
+
+    await expect(
+      service.uploadRiskEvidence('apr-1', 'risk-1', makeFile(), {}, 'user-1'),
+    ).rejects.toThrow('APR com assinatura registrada é imutável');
+    expect(documentStorageService.uploadFile).not.toHaveBeenCalled();
   });
 
   // ─── uploadRiskEvidence — permissões ─────────────────────────────────────
@@ -537,9 +548,6 @@ describe('AprsEvidenceService', () => {
       id: 'evidence-1',
       uploaded_by_name: 'Carlos',
       risk_item_ordem: 3,
-      latitude: -23.5505,
-      longitude: -46.6333,
-      accuracy_m: 5.4,
     });
     expect(documentStorageService.getSignedUrl).toHaveBeenCalledTimes(1);
     expect(result[0]?.url).toContain('signed.example');

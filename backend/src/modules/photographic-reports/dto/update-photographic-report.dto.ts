@@ -1,9 +1,14 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsDateString,
+  IsEmpty,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   Length,
+  MaxLength,
 } from 'class-validator';
 import {
   PhotographicReportAreaStatus,
@@ -11,6 +16,11 @@ import {
   PhotographicReportStatus,
   PhotographicReportTone,
 } from '../entities/photographic-report.entity';
+import {
+  MAX_APPLICABLE_NRS,
+  REGISTRATION_TYPE_OPTIONS,
+  type PhotographicReportRegistrationType,
+} from '../photographic-reports.constants';
 
 export class UpdatePhotographicReportDto {
   @IsOptional()
@@ -84,9 +94,46 @@ export class UpdatePhotographicReportDto {
   responsible_name?: string;
 
   @IsOptional()
+  @IsIn(REGISTRATION_TYPE_OPTIONS)
+  responsible_registration_type?: PhotographicReportRegistrationType;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 60)
+  responsible_registration_number?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(2, 2)
+  responsible_registration_state?: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 60)
+  art_number?: string;
+
+  @IsOptional()
   @IsString()
   @Length(2, 180)
   contractor_company?: string;
+
+  /** Pertinência conferida no serviço — NR desconhecida é descartada, não 400. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(MAX_APPLICABLE_NRS)
+  @IsString({ each: true })
+  @MaxLength(20, { each: true })
+  applicable_nrs?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  inspection_methodology?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(4000)
+  scope_and_limitations?: string;
 
   @IsOptional()
   @IsString()
@@ -103,4 +150,19 @@ export class UpdatePhotographicReportDto {
   @IsOptional()
   @IsEnum(PhotographicReportStatus)
   status?: PhotographicReportStatus;
+
+  // Governança: escrita exclusiva do backend. Ver create-photographic-report.dto.ts.
+  @IsOptional()
+  @IsEmpty({
+    message:
+      'verification_code não é permitido no payload. O código é emitido pelo sistema.',
+  })
+  verification_code?: never;
+
+  @IsOptional()
+  @IsEmpty({
+    message:
+      'final_pdf_hash_sha256 não é permitido no payload. O hash é calculado na emissão.',
+  })
+  final_pdf_hash_sha256?: never;
 }

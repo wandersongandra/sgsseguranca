@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 import { PageHeader } from '@/components/layout';
 import { InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
@@ -101,7 +102,7 @@ export function SiteForm({ id }: SiteFormProps) {
           });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
         router.push('/dashboard/sites');
       } finally {
@@ -127,7 +128,7 @@ export function SiteForm({ id }: SiteFormProps) {
       router.push('/dashboard/sites');
       router.refresh();
     } catch (error) {
-      console.error('Erro ao salvar obra/setor:', error);
+      logger.error('Erro ao salvar obra/setor:', error);
       const errorMessage = getFormErrorMessage(error, {
         badRequest: 'Dados inválidos. Revise os campos obrigatórios.',
         unauthorized: 'Sessão expirada. Faça login novamente.',

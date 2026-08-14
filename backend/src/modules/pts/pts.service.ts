@@ -683,6 +683,10 @@ export class PtsService {
       return null;
     }
 
+    // Teto de segurança: lista de IDs permitidos usada só como allow-list em
+    // memória para filtrar documentos (document_registry não tem site_id).
+    // Não deveria ser atingido na prática — mesma técnica de
+    // ProfilesService.findAll / findAllForExport.
     const scopedPts = await this.ptsRepository.find({
       select: ['id'],
       where: {
@@ -690,6 +694,7 @@ export class PtsService {
         site_id: In(siteIds),
         deleted_at: IsNull(),
       },
+      take: 50000,
     });
 
     return new Set(scopedPts.map((pt) => pt.id));

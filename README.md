@@ -113,7 +113,7 @@ A arquitetura foi estruturada para separar responsabilidades, reduzir acoplament
 ### Infraestrutura
 
 * Vercel
-* Vultr
+* Hostinger
 * Coolify
 * Neon PostgreSQL
 * Backblaze B2
@@ -287,8 +287,8 @@ Vulnerabilidades não devem ser relatadas em issues públicas. O processo corret
 | Componente             | Ambiente                            |
 | ---------------------- | ----------------------------------- |
 | Frontend               | Vercel                              |
-| Backend web            | Vultr e Coolify                     |
-| Backend worker         | Vultr e Coolify                     |
+| Backend web            | Hostinger e Coolify                 |
+| Backend worker         | Hostinger e Coolify                 |
 | Banco de dados         | Neon PostgreSQL                     |
 | Cache e filas          | Redis e BullMQ                      |
 | Storage                | Backblaze B2 com compatibilidade S3 |

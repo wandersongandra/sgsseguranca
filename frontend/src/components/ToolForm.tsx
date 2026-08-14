@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout';
 import { InlineLoadingState } from '@/components/ui/state';
@@ -78,7 +79,7 @@ export function ToolForm({ id }: ToolFormProps) {
           });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
         router.push('/dashboard/tools');
       } finally {
@@ -103,7 +104,7 @@ export function ToolForm({ id }: ToolFormProps) {
       router.push('/dashboard/tools');
       router.refresh();
     } catch (error) {
-      console.error('Erro ao salvar ferramenta:', error);
+      logger.error('Erro ao salvar ferramenta:', error);
       const errorMessage = getFormErrorMessage(error, {
         badRequest: 'Dados inválidos. Revise os campos obrigatórios.',
         unauthorized: 'Sessão expirada. Faça login novamente.',

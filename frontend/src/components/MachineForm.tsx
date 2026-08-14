@@ -12,6 +12,7 @@ import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Card,
@@ -86,7 +87,7 @@ export function MachineForm({ id }: MachineFormProps) {
           });
         }
       } catch (error) {
-        console.error('Erro ao carregar dados:', error);
+        logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
         router.push('/dashboard/machines');
       } finally {
@@ -111,7 +112,7 @@ export function MachineForm({ id }: MachineFormProps) {
       router.push('/dashboard/machines');
       router.refresh();
     } catch (error) {
-      console.error('Erro ao salvar máquina:', error);
+      logger.error('Erro ao salvar máquina:', error);
       const errorMessage = getFormErrorMessage(error, {
         badRequest: 'Dados inválidos. Revise os campos obrigatórios.',
         unauthorized: 'Sessão expirada. Faça login novamente.',

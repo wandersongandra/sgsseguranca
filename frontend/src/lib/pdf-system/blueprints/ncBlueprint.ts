@@ -1,4 +1,5 @@
 import type { NonConformity } from "@/services/nonConformitiesService";
+import { NC_STATUS_LABEL, NcStatus } from "@/services/nonConformitiesService";
 import type { AutoTableFn, PdfContext } from "../core/types";
 import { formatDate, sanitize } from "../core/format";
 import {
@@ -11,6 +12,21 @@ import {
 import { drawActionPlanTable, drawComplianceTable } from "../tables";
 import type { ActionPlanRow } from "../tables/actionPlanTable";
 
+const NC_RISCO_NIVEL_LABEL: Record<string, string> = {
+  critico: "Crítico",
+  alto: "Alto",
+  medio: "Médio",
+  baixo: "Baixo",
+};
+
+function ncStatusTone(status: string): "danger" | "warning" | "info" | "success" | "default" {
+  if (status === NcStatus.ENCERRADA) return "success";
+  if (status === NcStatus.AGUARDANDO_VALIDACAO) return "info";
+  if (status === NcStatus.EM_ANDAMENTO) return "warning";
+  if (status === NcStatus.ABERTA) return "danger";
+  return "default";
+}
+
 export async function drawNcBlueprint(
   ctx: PdfContext,
   autoTable: AutoTableFn,
@@ -18,9 +34,12 @@ export async function drawNcBlueprint(
   code: string,
   validationUrl: string,
 ) {
+  const statusLabel = NC_STATUS_LABEL[nc.status as NcStatus] ?? sanitize(nc.status);
+  const riscoLabel = NC_RISCO_NIVEL_LABEL[nc.risco_nivel?.toLowerCase()] ?? sanitize(nc.risco_nivel);
+
   drawDocumentIdentityRail(ctx, {
     documentType: "NC",
-    criticality: sanitize(nc.risco_nivel),
+    criticality: riscoLabel,
     validity: sanitize(nc.verificacao_data ? formatDate(nc.verificacao_data) : "Em aberto"),
     documentClass: "compliance",
   });
@@ -66,7 +85,7 @@ export async function drawNcBlueprint(
       item: sanitize(nc.tipo),
       requirement: [sanitize(nc.requisito_nr), sanitize(nc.requisito_item), sanitize(nc.requisito_procedimento)].filter((x) => x !== "-").join(" | "),
       evidence: sanitize(nc.evidencia_observada),
-      classification: sanitize((nc.classificacao || []).join(", ") || nc.risco_nivel),
+      classification: sanitize((nc.classificacao || []).join(", ") || riscoLabel),
     },
   ], { semanticRules: { profile: "nc", columns: [3] } });
 
@@ -82,16 +101,44 @@ export async function drawNcBlueprint(
     actionRows.push({
       action: `Imediata: ${sanitize(nc.acao_imediata_descricao)}`,
       owner: sanitize(nc.acao_imediata_responsavel),
-      dueDate: sanitize(nc.acao_imediata_data),
+      dueDate: formatDate(nc.acao_imediata_data),
       status: sanitize(nc.acao_imediata_status || "Pendente"),
     });
   }
   if (nc.acao_definitiva_descricao) {
+    const definitiveLines = [
+      `Definitiva: ${sanitize(nc.acao_definitiva_descricao)}`,
+      nc.acao_definitiva_recursos ? `Recursos: ${sanitize(nc.acao_definitiva_recursos)}` : "",
+      nc.acao_definitiva_prazo && nc.acao_definitiva_data_prevista
+        ? `Previsão: ${formatDate(nc.acao_definitiva_data_prevista)}`
+        : "",
+    ].filter(Boolean);
     actionRows.push({
-      action: `Definitiva: ${sanitize(nc.acao_definitiva_descricao)}`,
+      action: definitiveLines.join("\n"),
       owner: sanitize(nc.acao_definitiva_responsavel),
-      dueDate: sanitize(nc.acao_definitiva_prazo || nc.acao_definitiva_data_prevista),
-      status: sanitize(nc.status),
+      dueDate: formatDate(nc.acao_definitiva_prazo || nc.acao_definitiva_data_prevista),
+      status: statusLabel,
+    });
+  }
+  if (
+    nc.acao_preventiva_medidas ||
+    nc.acao_preventiva_treinamento ||
+    nc.acao_preventiva_revisao_procedimento ||
+    nc.acao_preventiva_melhoria_processo ||
+    nc.acao_preventiva_epc_epi
+  ) {
+    const preventivaLines = [
+      nc.acao_preventiva_medidas ? `Medidas: ${sanitize(nc.acao_preventiva_medidas)}` : "",
+      nc.acao_preventiva_treinamento ? `Treinamento: ${sanitize(nc.acao_preventiva_treinamento)}` : "",
+      nc.acao_preventiva_revisao_procedimento ? `Revisão procedimento: ${sanitize(nc.acao_preventiva_revisao_procedimento)}` : "",
+      nc.acao_preventiva_melhoria_processo ? `Melhoria processo: ${sanitize(nc.acao_preventiva_melhoria_processo)}` : "",
+      nc.acao_preventiva_epc_epi ? `EPC/EPI: ${sanitize(nc.acao_preventiva_epc_epi)}` : "",
+    ].filter(Boolean);
+    actionRows.push({
+      action: preventivaLines.join("\n"),
+      owner: "-",
+      dueDate: "-",
+      status: "Preventiva",
     });
   }
   drawActionPlanTable(ctx, autoTable, actionRows, { semanticRules: { profile: "nc" } });

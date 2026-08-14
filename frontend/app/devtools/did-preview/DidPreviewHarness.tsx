@@ -8,7 +8,7 @@ import {
   DidFormPageShell,
   DidOperationalSection,
   DidParticipantsSection,
-} from '@/app/dashboard/dids/components/DidFormSections';
+} from '../../dashboard/dids/components/DidFormSections';
 import { base64ToPdfBlob } from '@/lib/pdf/pdfFile';
 import { generateDidPdf } from '@/lib/pdf/didGenerator';
 import type { Did } from '@/services/didsService';

@@ -4,6 +4,7 @@ import {
   isCompanyWideProfile,
   type ResolvedSiteAccessScope,
 } from './site-access-scope.util';
+import type { TenantContext } from './tenant.service';
 import { Role } from '../../modules/auth/enums/roles.enum';
 import type { TenantContext } from './tenant.service';
 

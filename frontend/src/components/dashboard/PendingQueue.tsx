@@ -321,7 +321,7 @@ function PendingQueueFiltersComponent({
   const filteredSites = useMemo(() => {
     const q = siteSearchQuery.trim().toLowerCase();
     if (!q) return sites;
-    return sites.filter((site) => site.nome.toLowerCase().includes(q));
+    return sites.filter((site) => (site.nome ?? '').toLowerCase().includes(q));
   }, [sites, siteSearchQuery]);
   const siteDropdownId = "site-filter-dropdown";
 

@@ -94,7 +94,6 @@ const OPENAI_MODEL_RECOVERY_CANDIDATES = [DEFAULT_OPENAI_MODEL] as const;
 const NVIDIA_MODEL_RECOVERY_CANDIDATES = [DEFAULT_NVIDIA_MODEL] as const;
 const MAX_JSON_TOKENS = 1600;
 const PHASE2_DEFAULT_NC_THRESHOLD = 3;
-const MAX_IMPORTED_EVIDENCE_ATTACHMENTS = 6;
 const pdfJobOptions = withDefaultJobOptions({
   timeout: getPdfQueueJobTimeoutMs(),
 });
@@ -113,8 +112,41 @@ type ChecklistLike = {
   foto_equipamento?: unknown;
   inspetor_id?: unknown;
 };
-type InspectionLike = {
-  evidencias?: unknown;
+type ChecklistPromptMetadata = {
+  checklist_status: 'Pendente' | 'Conforme' | 'Não Conforme' | 'Não informado';
+  total_items: number;
+  nonconforming_items: number;
+  criticality_counts: {
+    critico: number;
+    alto: number;
+    medio: number;
+    baixo: number;
+    nao_informado: number;
+  };
+  response_type_counts: {
+    sim_nao: number;
+    conforme: number;
+    texto: number;
+    foto: number;
+    sim_nao_na: number;
+    nao_informado: number;
+  };
+  rule_flags: {
+    blocks_operation_when_nonconforming: number;
+    requires_photo_when_nonconforming: number;
+    requires_observation_when_nonconforming: number;
+  };
+};
+type NonConformitySourcePromptMetadata = {
+  source_type: 'manual' | 'image' | 'checklist' | 'inspection';
+  source_context_provided: boolean;
+  image_analysis?: {
+    summary_available: boolean;
+    risk_signal_count: number;
+    action_signal_count: number;
+    notes_available: boolean;
+  };
+  checklist?: ChecklistPromptMetadata;
 };
 type DraftContextOption = {
   id: string;
@@ -707,17 +739,6 @@ export class AiService {
       itens: record.itens,
       foto_equipamento: record.foto_equipamento,
       inspetor_id: record.inspetor_id,
-    };
-  }
-
-  private toInspectionLike(value: unknown): InspectionLike | null {
-    const record = this.toLooseRecord(value);
-    if (!record) {
-      return null;
-    }
-
-    return {
-      evidencias: record.evidencias,
     };
   }
 
@@ -1394,7 +1415,7 @@ export class AiService {
     const interaction = this.interactionRepo.create({
       company_id: tenantId,
       user_id: this.getCurrentUserIdOrThrow('analyzeChecklist'),
-      question: `ANALYZE_CHECKLIST: ${id}`,
+      question: 'ANALYZE_CHECKLIST',
       model: this.openaiModel,
       provider: this.llmProvider,
       status: AiInteractionStatus.SUCCESS,
@@ -1402,15 +1423,11 @@ export class AiService {
 
     try {
       const checklistRecord = this.toChecklistLike(checklist);
-      const checklistSnapshot = {
-        id: checklist.id,
-        titulo: checklist.titulo,
-        descricao: checklist.descricao,
-        equipamento: checklist.equipamento,
-        maquina: checklist.maquina,
-        status: checklist.status,
-        itens: this.getChecklistItems(checklistRecord, 80),
-      };
+      const checklistItems = this.getChecklistItems(checklistRecord, 80);
+      const checklistMetadata = this.buildChecklistPromptMetadata(
+        checklistRecord,
+        80,
+      );
 
       const { data, inputTokens, outputTokens } =
         await this.callOpenAiJson<SophieChecklistJsonResponse>({
@@ -1419,7 +1436,7 @@ export class AiService {
             task: 'checklist',
             sections: [
               'Analise este checklist de SST e aponte pontos de atenção e melhorias.',
-              `Checklist:\n${JSON.stringify(checklistSnapshot)}`,
+              `Metadados técnicos minimizados do checklist:\n${JSON.stringify(checklistMetadata)}`,
             ],
             additionalRules: [
               'suggestions deve ter de 4 a 12 itens curtos',
@@ -1431,9 +1448,8 @@ export class AiService {
         });
       const confidence = this.normalizeConfidence(data.confidence);
       const notes = this.normalizeStringArray(data.notes, 8);
-      const nonConformCount = this.countChecklistNonConformities(
-        checklistSnapshot.itens || [],
-      );
+      const nonConformCount =
+        this.countChecklistNonConformities(checklistItems);
       const automation = await this.tryAutoOpenNcFromChecklist({
         checklist: checklistRecord,
         summary: String(data.summary || '').trim(),
@@ -2130,54 +2146,106 @@ export class AiService {
     );
   }
 
-  private collectChecklistEvidenceAttachments(
+  /**
+   * Boundary de minimização para prompts da SOPHIE. Nomes, descrições,
+   * observações, respostas e ações livres ficam no registro interno do tenant;
+   * somente indicadores técnicos controlados cruzam para o provedor externo.
+   */
+  private buildChecklistPromptMetadata(
     checklist: ChecklistLike | null,
-  ): Array<{ url: string; label: string }> {
-    const evidence: Array<{ url: string; label: string }> = [];
+    maxItems: number,
+  ): ChecklistPromptMetadata {
+    const items = this.getChecklistItems(checklist, maxItems);
+    const criticalityCounts: ChecklistPromptMetadata['criticality_counts'] = {
+      critico: 0,
+      alto: 0,
+      medio: 0,
+      baixo: 0,
+      nao_informado: 0,
+    };
+    const responseTypeCounts: ChecklistPromptMetadata['response_type_counts'] =
+      {
+        sim_nao: 0,
+        conforme: 0,
+        texto: 0,
+        foto: 0,
+        sim_nao_na: 0,
+        nao_informado: 0,
+      };
+    const ruleFlags: ChecklistPromptMetadata['rule_flags'] = {
+      blocks_operation_when_nonconforming: 0,
+      requires_photo_when_nonconforming: 0,
+      requires_observation_when_nonconforming: 0,
+    };
 
-    const equipmentPhoto = this.toSafeString(checklist?.foto_equipamento);
-    if (equipmentPhoto) {
-      evidence.push({
-        url: equipmentPhoto,
-        label: 'Foto do equipamento do checklist',
-      });
-    }
-
-    const items = this.getChecklistItems(checklist, 80);
     for (const item of items) {
       const record = this.toLooseRecord(item);
-      const photos = Array.isArray(record?.fotos) ? record.fotos : [];
-      for (const photo of photos.slice(0, 1)) {
-        const normalized = this.toSafeString(photo);
-        if (!normalized) continue;
-        evidence.push({
-          url: normalized,
-          label: `Foto do item: ${
-            this.toSafeString(record?.item) || 'Checklist'
-          }`,
-        });
-        if (evidence.length >= MAX_IMPORTED_EVIDENCE_ATTACHMENTS) {
-          return evidence;
-        }
+      if (!record) {
+        criticalityCounts.nao_informado += 1;
+        responseTypeCounts.nao_informado += 1;
+        continue;
+      }
+
+      const criticality = this.toSafeString(record.criticidade)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+      if (criticality === 'critico') {
+        criticalityCounts.critico += 1;
+      } else if (criticality === 'alto') {
+        criticalityCounts.alto += 1;
+      } else if (criticality === 'medio') {
+        criticalityCounts.medio += 1;
+      } else if (criticality === 'baixo') {
+        criticalityCounts.baixo += 1;
+      } else {
+        criticalityCounts.nao_informado += 1;
+      }
+
+      const responseType = this.toSafeString(record.tipo_resposta)
+        .trim()
+        .toLowerCase();
+      if (responseType === 'sim_nao') {
+        responseTypeCounts.sim_nao += 1;
+      } else if (responseType === 'conforme') {
+        responseTypeCounts.conforme += 1;
+      } else if (responseType === 'texto') {
+        responseTypeCounts.texto += 1;
+      } else if (responseType === 'foto') {
+        responseTypeCounts.foto += 1;
+      } else if (responseType === 'sim_nao_na') {
+        responseTypeCounts.sim_nao_na += 1;
+      } else {
+        responseTypeCounts.nao_informado += 1;
+      }
+
+      if (record.bloqueia_operacao_quando_nc === true) {
+        ruleFlags.blocks_operation_when_nonconforming += 1;
+      }
+      if (record.exige_foto_quando_nc === true) {
+        ruleFlags.requires_photo_when_nonconforming += 1;
+      }
+      if (record.exige_observacao_quando_nc === true) {
+        ruleFlags.requires_observation_when_nonconforming += 1;
       }
     }
 
-    return evidence.slice(0, MAX_IMPORTED_EVIDENCE_ATTACHMENTS);
-  }
+    const rawStatus = this.toSafeString(checklist?.status);
+    const checklistStatus: ChecklistPromptMetadata['checklist_status'] =
+      rawStatus === 'Pendente' ||
+      rawStatus === 'Conforme' ||
+      rawStatus === 'Não Conforme'
+        ? rawStatus
+        : 'Não informado';
 
-  private collectInspectionEvidenceAttachments(
-    inspection: InspectionLike | null,
-  ): Array<{ url: string; label: string }> {
-    return this.toLooseRecordArray(inspection?.evidencias)
-      .map((item) => ({
-        url: this.toSafeString(item.url),
-        label:
-          this.toSafeString(item.descricao) ||
-          this.toSafeString(item.original_name) ||
-          'Evidência da inspeção',
-      }))
-      .filter((item) => item.url)
-      .slice(0, MAX_IMPORTED_EVIDENCE_ATTACHMENTS);
+    return {
+      checklist_status: checklistStatus,
+      total_items: items.length,
+      nonconforming_items: this.countChecklistNonConformities(items),
+      criticality_counts: criticalityCounts,
+      response_type_counts: responseTypeCounts,
+      rule_flags: ruleFlags,
+    };
   }
 
   private normalizeActionPlan(
@@ -2286,46 +2354,38 @@ export class AiService {
     description?: string;
     localSetorArea?: string;
     evidenceAttachments: Array<{ url: string; label: string }>;
-    promptSections: string[];
+    promptMetadata: NonConformitySourcePromptMetadata;
     notes: string[];
   }> {
-    const sourceType = params.source_type || 'manual';
+    const sourceType =
+      params.source_type === 'image' ||
+      params.source_type === 'checklist' ||
+      params.source_type === 'inspection'
+        ? params.source_type
+        : 'manual';
 
-    const promptSections: string[] = [];
     const notes: string[] = [];
     let siteId = params.site_id;
     let title = params.title;
     let description = params.description;
     let localSetorArea = params.local_setor_area;
-    let evidenceAttachments: Array<{ url: string; label: string }> = [];
-
-    if (params.source_context?.trim()) {
-      promptSections.push(
-        `Contexto adicional da origem: ${params.source_context.trim()}`,
-      );
-    }
+    const evidenceAttachments: Array<{ url: string; label: string }> = [];
+    const promptMetadata: NonConformitySourcePromptMetadata = {
+      source_type: sourceType,
+      source_context_provided: Boolean(params.source_context?.trim()),
+    };
 
     if (sourceType === 'image') {
-      if (params.image_analysis_summary?.trim()) {
-        promptSections.push(
-          `Síntese da análise da imagem: ${params.image_analysis_summary.trim()}`,
-        );
-      }
-      if (params.image_risks?.length) {
-        promptSections.push(
-          `Riscos visíveis na imagem: ${params.image_risks.join('; ')}`,
-        );
-      }
-      if (params.image_actions?.length) {
-        promptSections.push(
-          `Ações imediatas sugeridas para a imagem: ${params.image_actions.join('; ')}`,
-        );
-      }
-      if (params.image_notes?.trim()) {
-        promptSections.push(
-          `Notas da análise da imagem: ${params.image_notes.trim()}`,
-        );
-      }
+      promptMetadata.image_analysis = {
+        summary_available: Boolean(params.image_analysis_summary?.trim()),
+        risk_signal_count: (params.image_risks || [])
+          .filter((risk) => Boolean(this.toSafeString(risk)))
+          .slice(0, 20).length,
+        action_signal_count: (params.image_actions || [])
+          .filter((action) => Boolean(this.toSafeString(action)))
+          .slice(0, 20).length,
+        notes_available: Boolean(params.image_notes?.trim()),
+      };
     }
 
     if (sourceType === 'checklist' && params.source_reference) {
@@ -2345,33 +2405,16 @@ export class AiService {
           checklist.maquina ||
           checklist.equipamento ||
           'Área operacional';
-        promptSections.push(
-          `Origem checklist: ${JSON.stringify({
-            id: checklist.id,
-            titulo: checklist.titulo,
-            descricao: checklist.descricao,
-            equipamento: checklist.equipamento,
-            maquina: checklist.maquina,
-            status: checklist.status,
-            site: checklist.site?.nome,
-            itens: this.getChecklistItems(this.toChecklistLike(checklist), 20),
-          })}`,
-        );
-        evidenceAttachments = this.collectChecklistEvidenceAttachments(
+        promptMetadata.checklist = this.buildChecklistPromptMetadata(
           this.toChecklistLike(checklist),
+          20,
         );
-        if (evidenceAttachments.length) {
-          promptSections.push(
-            `Evidencias visuais disponiveis no checklist: ${evidenceAttachments
-              .map((item) => item.label)
-              .join('; ')}`,
-          );
-        }
-      } catch (error) {
+        notes.push(
+          'Fotos e anexos do checklist permanecem somente no registro de origem; não foram copiados para a NC assistida.',
+        );
+      } catch {
         this.logger.warn(
-          `[SOPHIE] Não foi possível carregar checklist ${params.source_reference} para NC assistida: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          '[SOPHIE] Não foi possível carregar checklist para NC assistida.',
         );
         notes.push('Origem checklist não pôde ser carregada integralmente.');
       }
@@ -2388,7 +2431,7 @@ export class AiService {
       description,
       localSetorArea,
       evidenceAttachments,
-      promptSections,
+      promptMetadata,
       notes,
     };
   }
@@ -3163,16 +3206,11 @@ export class AiService {
         prompt:
           `Crie um rascunho estruturado de Não Conformidade (NC) para SST em ambiente corporativo.\n\n` +
           `Contexto:\n` +
-          `- Título: ${title}\n` +
-          `- Descrição: ${description}\n` +
-          `- Local/setor/área: ${localSetorArea}\n` +
-          `- Tipo sugerido: ${tipo}\n` +
           `- Origem do desvio: ${sourceSnapshot.sourceType}\n` +
-          `${
-            sourceSnapshot.promptSections.length
-              ? `- Dados adicionais da origem:\n${sourceSnapshot.promptSections.map((entry) => `  • ${entry}`).join('\n')}\n`
-              : ''
-          }\n` +
+          `- Metadados técnicos minimizados da origem: ${JSON.stringify(
+            sourceSnapshot.promptMetadata,
+          )}\n` +
+          `- Nenhum texto livre, nome, foto, URL, observação ou ação interna foi compartilhado.\n\n` +
           `Objetivo:\n` +
           `- gerar um cadastro inicial consistente para revisão humana\n` +
           `- manter linguagem corporativa, técnica e objetiva\n` +
@@ -3251,11 +3289,6 @@ export class AiService {
         type: 'preventive',
       },
     ]);
-    const importedEvidence = sourceSnapshot.evidenceAttachments
-      .map((item) => item.url)
-      .filter(Boolean)
-      .slice(0, MAX_IMPORTED_EVIDENCE_ATTACHMENTS);
-
     const createDto: CreateNonConformityDto = {
       codigo_nc: this.generateNonConformityCode(),
       tipo: String(generated.tipo || tipo).trim() || 'DESVIO_OPERACIONAL',
@@ -3309,16 +3342,13 @@ export class AiService {
         String(generated.acao_preventiva_medidas || '').trim() ||
         'Revisar controles, orientar equipe e reforçar monitoramento.',
       status: 'ABERTA',
-      anexos: importedEvidence.length ? importedEvidence : undefined,
-      verificacao_evidencias: importedEvidence.length
-        ? `${importedEvidence.length} evidência(s) importada(s) automaticamente da origem ${sourceSnapshot.sourceType}.`
-        : undefined,
+      checklist_id:
+        sourceSnapshot.sourceType === 'checklist'
+          ? params.source_reference
+          : undefined,
       observacoes_gerais: [
         'NC criada pela SOPHIE em modo assistido.',
         `Origem da análise: ${sourceSnapshot.sourceType}.`,
-        importedEvidence.length
-          ? `Evidências importadas automaticamente: ${importedEvidence.length}.`
-          : null,
         confidence ? `Confiança da geração: ${confidence}.` : null,
         ...notes,
       ]
@@ -3335,11 +3365,8 @@ export class AiService {
         riskLevel: normalizedRiskLevel,
         sourceType: sourceSnapshot.sourceType,
         actionPlan,
-        evidenceCount: importedEvidence.length,
-        evidenceAttachments: sourceSnapshot.evidenceAttachments.slice(
-          0,
-          MAX_IMPORTED_EVIDENCE_ATTACHMENTS,
-        ),
+        evidenceCount: 0,
+        evidenceAttachments: [],
         confidence,
         notes: notes.length ? notes : undefined,
       },
@@ -3410,7 +3437,9 @@ export class AiService {
     const interaction = this.interactionRepo.create({
       company_id: tenantId,
       user_id: userId,
-      question: `GENERATE_JSON(${params.task}): ${String(params.prompt || '').slice(0, 220)}`,
+      // O prompt pode conter texto livre do usuário. O registro de auditoria
+      // guarda somente a operação, nunca uma amostra do conteúdo enviado.
+      question: `GENERATE_JSON(${params.task})`,
       model: this.openaiModel,
       provider: this.llmProvider,
       status: AiInteractionStatus.SUCCESS,

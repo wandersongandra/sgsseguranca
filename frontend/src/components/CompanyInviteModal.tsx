@@ -8,6 +8,7 @@ import { Input } from './ui/input';
 import { ModalBody, ModalFooter, ModalFrame, ModalHeader } from './ui/modal-frame';
 import { tenantLifecycleService } from '@/services/tenantLifecycleService';
 import { extractApiErrorMessage } from '@/lib/error-handler';
+import { logger } from '@/lib/logger';
 
 interface Props {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export function CompanyInviteModal({ isOpen, onClose }: Props) {
       setCompanyName('');
       onClose();
     } catch (error) {
-      console.error('Erro ao enviar convite:', error);
+      logger.error('Erro ao enviar convite:', error);
       const message = await extractApiErrorMessage(error, 'Falha ao gerar convite de cadastro.');
       toast.error(message);
     } finally {

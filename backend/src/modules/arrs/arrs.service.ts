@@ -24,6 +24,7 @@ import {
 } from '../../shared/dto/governed-pdf-access-response.dto';
 import { Site } from '../sites/entities/site.entity';
 import { User } from '../users/entities/user.entity';
+import { UserSite } from '../users/entities/user-site.entity';
 import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import { Arr, ArrStatus, ARR_ALLOWED_TRANSITIONS } from './entities/arr.entity';
@@ -608,7 +609,19 @@ export class ArrsService {
       select: ['id'],
     });
 
+    const siteLinks = await this.arrRepository.manager
+      .getRepository(UserSite)
+      .find({
+        where: {
+          user_id: In(uniqueUserIds),
+          company_id: companyId,
+          site_id: siteId,
+        },
+        select: ['user_id'],
+      });
+
     const foundIds = new Set(users.map((user) => user.id));
+    siteLinks.forEach((link) => foundIds.add(link.user_id));
     const missingIds = uniqueUserIds.filter((userId) => !foundIds.has(userId));
 
     if (missingIds.length > 0) {

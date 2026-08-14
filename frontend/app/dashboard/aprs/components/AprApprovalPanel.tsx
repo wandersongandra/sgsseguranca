@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { aprsService } from "@/services/aprsService";
 import { cn } from "@/lib/utils";
+import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { CheckCircle2, Clock, Circle, AlertCircle, ThumbsUp, ThumbsDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AprReopenModal } from "./AprReopenModal";
@@ -73,6 +74,11 @@ export function AprApprovalPanel({ aprId, onStatusChange }: AprApprovalPanelProp
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [reopenModalOpen, setReopenModalOpen] = useState(false);
   const [confirmApproveOpen, setConfirmApproveOpen] = useState(false);
+  const confirmDialogRef = useRef<HTMLDivElement>(null);
+
+  useFocusTrap(confirmDialogRef, confirmApproveOpen, () =>
+    setConfirmApproveOpen(false),
+  );
 
   const loadStatus = useCallback(async () => {
     try {
@@ -317,6 +323,7 @@ export function AprApprovalPanel({ aprId, onStatusChange }: AprApprovalPanelProp
       {/* Confirmação de aprovação */}
       {confirmApproveOpen && (
         <div
+          ref={confirmDialogRef}
           className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--component-overlay)] px-4"
           role="dialog"
           aria-modal="true"

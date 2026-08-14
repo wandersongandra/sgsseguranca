@@ -27,6 +27,8 @@ describe('HealthController readiness', () => {
       redis as never,
       {} as never,
       {} as never,
+      // PrivilegedDbService — só usado por /health/detailed.
+      { isEnabled: () => true } as never,
       undefined,
       undefined,
     );

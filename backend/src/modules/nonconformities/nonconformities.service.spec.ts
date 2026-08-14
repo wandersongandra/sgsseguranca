@@ -1,5 +1,5 @@
 ﻿import { Repository } from 'typeorm';
-import { NonConformitiesService } from './nonconformities.service';
+import { NonConformitiesService, NcStatus } from './nonconformities.service';
 import { NonConformity } from './entities/nonconformity.entity';
 import { NonConformityResponseDto } from './dto/nonconformity-response.dto';
 import { Checklist } from '../checklists/entities/checklist.entity';
@@ -9,10 +9,8 @@ import type { DocumentStorageService } from '../../shared/services/document-stor
 import type { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import type { AuditService } from '../audit-trail/audit.service';
 import type { Site } from '../sites/entities/site.entity';
+import type { NonConformityWorkflowLockService } from './services/nonconformity-workflow-lock.service';
 
-type RegisterFinalDocumentInput = Parameters<
-  DocumentGovernanceService['registerFinalDocument']
->[0];
 type RemoveFinalDocumentReferenceInput = Parameters<
   DocumentGovernanceService['removeFinalDocumentReference']
 >[0];
@@ -23,6 +21,7 @@ describe('NonConformitiesService', () => {
   let repository: {
     create: jest.Mock;
     findOne: jest.Mock;
+    find: jest.Mock;
     save: jest.Mock;
     update: jest.Mock;
     createQueryBuilder: jest.Mock;
@@ -47,12 +46,15 @@ describe('NonConformitiesService', () => {
     | 'removeFinalDocumentReference'
     | 'listFinalDocuments'
   >;
+  let auditService: Pick<AuditService, 'log'>;
+  let workflowLock: { runExclusive: jest.Mock };
 
   beforeEach(() => {
     _lockedNcRow = null;
     repository = {
       create: jest.fn((input: Partial<NonConformity>) => input),
       findOne: jest.fn(),
+      find: jest.fn(() => Promise.resolve([])),
       save: jest.fn((input) =>
         Promise.resolve(input as unknown as NonConformity),
       ),
@@ -115,6 +117,15 @@ describe('NonConformitiesService', () => {
       removeFinalDocumentReference: jest.fn(),
       listFinalDocuments: jest.fn(),
     };
+    auditService = { log: jest.fn() };
+    workflowLock = {
+      runExclusive: jest.fn(
+        async (
+          _id: string,
+          operation: (assertLeaseHealthy: () => void) => Promise<unknown>,
+        ): Promise<unknown> => operation(() => undefined),
+      ),
+    };
 
     sitesRepository.findOne.mockResolvedValue({
       id: 'site-1',
@@ -138,66 +149,16 @@ describe('NonConformitiesService', () => {
       documentStorageService as DocumentStorageService,
       documentBundleService as DocumentBundleService,
       documentGovernanceService as DocumentGovernanceService,
-      { log: jest.fn() } as unknown as AuditService,
+      auditService as AuditService,
       {
         issueToken: jest.fn().mockResolvedValue('token-mock'),
       } as unknown as import('../../shared/services/public-validation-grant.service').PublicValidationGrantService,
+      workflowLock as unknown as NonConformityWorkflowLockService,
     );
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('passa o documento final da NC pelo caminho central de governança', async () => {
-    const nc = {
-      id: 'nc-1',
-      company_id: 'company-1',
-      codigo_nc: 'NC-001',
-      tipo: 'Operacional',
-      data_identificacao: new Date('2026-03-10T00:00:00.000Z'),
-    } as unknown as NonConformity;
-    const update = jest.fn();
-    const manager = {
-      getRepository: jest.fn(() => ({ update })),
-    };
-    repository.findOne.mockResolvedValue(nc);
-    jest.spyOn(service, 'findOneEntity').mockResolvedValue(nc);
-    (
-      documentGovernanceService.registerFinalDocument as jest.Mock
-    ).mockImplementation(async (input: RegisterFinalDocumentInput) => {
-      await input.persistEntityMetadata?.(manager as never, 'hash-1');
-      return { hash: 'hash-1', registryEntry: { id: 'registry-1' } };
-    });
-
-    const buffer = Buffer.from('pdf-content');
-    await service.attachPdf('nc-1', buffer, 'nc-001.pdf', 'application/pdf');
-
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      expect.stringContaining('nc-1.pdf'),
-      buffer,
-      'application/pdf',
-    );
-    expect(
-      documentGovernanceService.registerFinalDocument,
-    ).toHaveBeenCalledWith(
-      expect.objectContaining({
-        companyId: 'company-1',
-        module: 'nonconformity',
-        entityId: 'nc-1',
-        originalName: 'nc-001.pdf',
-        mimeType: 'application/pdf',
-        documentDate: nc.data_identificacao,
-        fileBuffer: buffer,
-      }),
-    );
-    const [updateCriteria, updatePayload] = update.mock.calls[0] as [
-      { id: string },
-      { pdf_file_key: string; pdf_original_name: string },
-    ];
-    expect(updateCriteria).toEqual({ id: 'nc-1' });
-    expect(updatePayload.pdf_file_key).toContain('/nc-1.pdf');
-    expect(updatePayload.pdf_original_name).toBe('nc-001.pdf');
   });
 
   it('remove a NC via esteira central para limpar o registry corretamente', async () => {
@@ -207,7 +168,11 @@ describe('NonConformitiesService', () => {
     } as unknown as NonConformity;
     const softDelete = jest.fn();
     const manager = {
-      getRepository: jest.fn(() => ({ softDelete })),
+      query: jest.fn().mockResolvedValue([nc]),
+      getRepository: jest.fn(() => ({
+        create: jest.fn((row: NonConformity) => row),
+        softDelete,
+      })),
     };
     jest.spyOn(service, 'findOneEntity').mockResolvedValue(nc);
     (
@@ -228,6 +193,44 @@ describe('NonConformitiesService', () => {
     expect(softDelete).toHaveBeenCalledWith('nc-1');
   });
 
+  it('não exclui do storage uma referência governada que pertença a outra NC ou obra', async () => {
+    const foreignAttachmentReference = `gst:nc-attachment:${Buffer.from(
+      JSON.stringify({
+        v: 1,
+        kind: 'governed-storage',
+        fileKey:
+          'documents/company-1/nonconformity-attachments/sites/site-outra/nc-outra/foto.png',
+        originalName: 'foto-de-outra-nc.png',
+        mimeType: 'image/png',
+        uploadedAt: new Date().toISOString(),
+      }),
+    ).toString('base64url')}`;
+    const nc = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      site_id: 'site-1',
+      anexos: [foreignAttachmentReference],
+      pdf_file_key: null,
+    } as unknown as NonConformity;
+    const manager = {
+      query: jest.fn().mockResolvedValue([nc]),
+      getRepository: jest.fn(() => ({
+        create: jest.fn((row: NonConformity) => row),
+        softDelete: jest.fn(),
+      })),
+    };
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(nc);
+    (
+      documentGovernanceService.removeFinalDocumentReference as jest.Mock
+    ).mockImplementation(async (input: RemoveFinalDocumentReferenceInput) => {
+      await input.removeEntityState?.(manager as never);
+    });
+
+    await service.remove('nc-1');
+
+    expect(documentStorageService.deleteFile).not.toHaveBeenCalled();
+  });
+
   it('bloqueia remocao de NC que ja tem PDF final emitido', async () => {
     const nc = {
       id: 'nc-1',
@@ -242,48 +245,193 @@ describe('NonConformitiesService', () => {
     ).not.toHaveBeenCalled();
   });
 
-  it('remove o arquivo da NC do storage quando a governanca falha', async () => {
-    const nc = {
-      id: 'nc-1',
-      company_id: 'company-1',
-      codigo_nc: 'NC-001',
-      tipo: 'Operacional',
-      data_identificacao: new Date('2026-03-10T00:00:00.000Z'),
-    } as unknown as NonConformity;
-    repository.findOne.mockResolvedValue(nc);
-    jest.spyOn(service, 'findOneEntity').mockResolvedValue(nc);
-    (
-      documentGovernanceService.registerFinalDocument as jest.Mock
-    ).mockRejectedValue(new Error('governance failed'));
-
-    await expect(
-      service.attachPdf(
-        'nc-1',
-        Buffer.from('pdf-content'),
-        'nc-001.pdf',
-        'application/pdf',
-      ),
-    ).rejects.toThrow('governance failed');
-
-    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      expect.stringContaining('nc-1.pdf'),
-    );
-  });
-
-  it('bloqueia edicao quando a NC já possui PDF final emitido', async () => {
+  it('bloqueia edição quando a NC tem PDF final emitido', async () => {
     jest.spyOn(service, 'findOneEntity').mockResolvedValue({
       id: 'nc-1',
       company_id: 'company-1',
+      status: NcStatus.ENCERRADA,
       pdf_file_key: 'nonconformities/company-1/2026/week-11/nc-1.pdf',
     } as unknown as NonConformity);
 
     await expect(
       service.update('nc-1', { descricao: 'Novo texto' }),
-    ).rejects.toThrow(
-      'Não conformidade com PDF final anexado. Edição bloqueada. Gere uma nova NC para alterar o documento.',
+    ).rejects.toThrow('Não conformidade com PDF final emitido é imutável');
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia edição mesmo se uma NC legada com PDF final estiver reaberta', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.EM_ANDAMENTO,
+      pdf_file_key: 'nonconformities/company-1/2026/week-11/nc-1.pdf',
+      anexos: [],
+      descricao: 'Texto antigo',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
+
+    await expect(
+      service.update('nc-1', { descricao: 'Novo texto' }),
+    ).rejects.toThrow('Não conformidade com PDF final emitido é imutável');
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia reabertura de NC com PDF final já emitido', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.ENCERRADA,
+      pdf_file_key: 'nonconformities/company-1/2026/week-11/nc-1.pdf',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+
+    await expect(service.updateStatus('nc-1', NcStatus.ABERTA)).rejects.toThrow(
+      'PDF final emitido não pode ter o status alterado',
     );
 
     expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('trata PATCH do mesmo status de uma NC finalizada como idempotente', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.ENCERRADA,
+      pdf_file_key: 'nonconformities/company-1/2026/week-11/nc-1.pdf',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+
+    await expect(
+      service.updateStatus('nc-1', NcStatus.ENCERRADA),
+    ).resolves.toBeDefined();
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('update() rejeita transição de status fora do fluxo permitido (pula etapas)', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.ABERTA,
+      anexos: [],
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+
+    await expect(
+      service.update('nc-1', { status: NcStatus.ENCERRADA }),
+    ).rejects.toThrow('Transição de "ABERTA" para "ENCERRADA" não permitida');
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('update() carimba closed_at/resolved_by ao encerrar por uma transição válida', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.AGUARDANDO_VALIDACAO,
+      anexos: [],
+      closed_at: null,
+      resolved_by: null,
+      acao_definitiva_descricao: 'Instalar a proteção coletiva especificada.',
+      acao_definitiva_responsavel: 'Responsável da manutenção',
+      acao_definitiva_prazo: new Date('2026-03-20T00:00:00.000Z'),
+      verificacao_resultado: 'Sim',
+      verificacao_evidencias: 'Proteção instalada e testada em campo.',
+      verificacao_data: new Date('2026-03-21T00:00:00.000Z'),
+      verificacao_responsavel: 'Técnico SST',
+      assinatura_responsavel_area: 'Responsável da área',
+      assinatura_tecnico_auditor: 'Técnico SST',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
+
+    const result = await service.update('nc-1', {
+      status: NcStatus.ENCERRADA,
+    });
+
+    expect(result.status).toBe(NcStatus.ENCERRADA);
+    expect(result.closed_at).toBeInstanceOf(Date);
+  });
+
+  it('bloqueia encerramento sem ação, eficácia, evidência e assinaturas', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.AGUARDANDO_VALIDACAO,
+      anexos: [],
+      verificacao_resultado: 'Não',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
+
+    await expect(
+      service.updateStatus('nc-1', NcStatus.ENCERRADA),
+    ).rejects.toThrow('Não é possível encerrar a não conformidade');
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('update() não reprocessa transição quando o status enviado é igual ao atual', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.EM_ANDAMENTO,
+      anexos: [],
+      descricao: 'Texto antigo',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
+
+    await expect(
+      service.update('nc-1', {
+        status: NcStatus.EM_ANDAMENTO,
+        descricao: 'Texto novo',
+      }),
+    ).resolves.toBeDefined();
+
+    expect(
+      (repository as unknown as { manager: { transaction: jest.Mock } }).manager
+        .transaction,
+    ).toHaveBeenCalled();
+  });
+
+  it('recusa salvar uma edição stale depois que outra operação atualiza a NC', async () => {
+    const baseline = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.EM_ANDAMENTO,
+      anexos: [],
+      descricao: 'Texto original',
+      updated_at: new Date('2026-08-03T12:00:00.000Z'),
+    } as unknown as NonConformity;
+    const changedByAnotherOperation = {
+      ...baseline,
+      descricao: 'Texto da outra operação',
+      updated_at: new Date('2026-08-03T12:01:00.000Z'),
+    };
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(baseline);
+    _lockedNcRow = changedByAnotherOperation;
+
+    await expect(
+      service.update('nc-1', { descricao: 'Minha edição antiga' }),
+    ).rejects.toThrow('foi alterada por outra operação');
+  });
+
+  it('gera o código de validação a partir da data civil da NC, sem deslocamento de fuso', async () => {
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue({
+      id: 'nc-1',
+      company_id: 'company-1',
+      data_identificacao: '2021-01-01',
+      created_at: new Date('2021-01-01T03:30:00.000Z'),
+    } as unknown as NonConformity);
+
+    await expect(service.getValidationContext('nc-1')).resolves.toMatchObject({
+      documentCode: 'NONCONFORMITY-2021-53-NC-1',
+      token: 'token-mock',
+    });
   });
 
   it('filtra arquivos semanais pela data documental da NC', async () => {
@@ -302,6 +450,14 @@ describe('NonConformitiesService', () => {
         module: 'nonconformity',
       },
     ]);
+    repository.find.mockResolvedValue([
+      {
+        id: 'nc-1',
+        pdf_file_key: 'nonconformities/company-1/2025/week-01/nc-1.pdf',
+        pdf_folder_path: 'nonconformities/company-1/2025/week-01',
+        pdf_original_name: 'nc-1.pdf',
+      },
+    ]);
 
     const files = await service.listStoredFiles({ year: 2025 });
 
@@ -311,6 +467,41 @@ describe('NonConformitiesService', () => {
       'nonconformity',
       { year: 2025 },
     );
+  });
+
+  it('lista de arquivos semanais reflete o PDF atual da NC, não o congelado no document_registry', async () => {
+    (
+      documentGovernanceService.listFinalDocuments as jest.Mock
+    ).mockResolvedValue([
+      {
+        entityId: 'nc-1',
+        id: 'nc-1',
+        title: 'NC-001',
+        date: new Date('2026-03-10T00:00:00.000Z'),
+        companyId: 'company-1',
+        fileKey: 'nonconformities/company-1/2026/week-11/old-emissao.pdf',
+        folderPath: 'nonconformities/company-1/2026/week-11',
+        originalName: 'old-emissao.pdf',
+        module: 'nonconformity',
+      },
+    ]);
+    repository.find.mockResolvedValue([
+      {
+        id: 'nc-1',
+        pdf_file_key:
+          'nonconformities/company-1/2026/week-11/regenerado-mais-recente.pdf',
+        pdf_folder_path: 'nonconformities/company-1/2026/week-11',
+        pdf_original_name: 'regenerado-mais-recente.pdf',
+      },
+    ]);
+
+    const files = await service.listStoredFiles({ year: 2026 });
+
+    expect(files).toHaveLength(1);
+    expect(files[0].fileKey).toBe(
+      'nonconformities/company-1/2026/week-11/regenerado-mais-recente.pdf',
+    );
+    expect(files[0].originalName).toBe('regenerado-mais-recente.pdf');
   });
 
   it('retorna metadados do PDF mesmo quando a URL assinada falha', async () => {
@@ -359,7 +550,7 @@ describe('NonConformitiesService', () => {
     });
   });
 
-  it('bloqueia criação com anexo inline acima do limite operacional', async () => {
+  it('bloqueia criação com anexo inline, mesmo dentro de limites de tamanho', async () => {
     const oversizedInlineAttachment = `data:image/jpeg;base64,${Buffer.alloc(
       1024 * 1024 + 32,
       1,
@@ -385,9 +576,7 @@ describe('NonConformitiesService', () => {
         status: 'ABERTA',
         anexos: [oversizedInlineAttachment],
       }),
-    ).rejects.toThrow(
-      'Anexo inline excede o limite de 1.00MB para criação ou edição.',
-    );
+    ).rejects.toThrow('Novos anexos devem ser enviados pelo endpoint dedicado');
 
     expect(repository.save).not.toHaveBeenCalled();
   });
@@ -429,6 +618,43 @@ describe('NonConformitiesService', () => {
     );
 
     expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('registra no audit trail apenas metadados da NC, sem PII ou blobs de anexos', async () => {
+    const inlineBlob = `data:image/jpeg;base64,${Buffer.from(
+      'imagem confidencial',
+    ).toString('base64')}`;
+    repository.save.mockImplementation((input: NonConformity) =>
+      Promise.resolve({ ...input, id: 'nc-audit' }),
+    );
+
+    await service.create({
+      codigo_nc: 'NC-AUD-001',
+      tipo: 'Operacional',
+      data_identificacao: '2026-03-10',
+      local_setor_area: 'Área 1',
+      atividade_envolvida: 'Inspeção',
+      responsavel_area: 'Responsável confidencial',
+      auditor_responsavel: 'Auditor confidencial',
+      descricao: 'Descrição confidencial com CPF 123.456.789-09',
+      evidencia_observada: 'Evidência confidencial',
+      condicao_insegura: 'Condição insegura',
+      requisito_nr: 'NR-1',
+      requisito_item: '1.1',
+      risco_perigo: 'Perigo',
+      risco_associado: 'Risco',
+      risco_nivel: 'Alto',
+      status: 'ABERTA',
+    });
+
+    const [auditInput] = (auditService.log as jest.Mock).mock.calls[0] as [
+      { changes: unknown },
+    ];
+    const serialized = JSON.stringify(auditInput.changes);
+    expect(serialized).not.toContain('Descrição confidencial');
+    expect(serialized).not.toContain('123.456.789-09');
+    expect(serialized).not.toContain(inlineBlob);
+    expect(serialized).toContain('nonconformity-audit-v2');
   });
 
   it('bloqueia criação quando já existe código NC ativo na empresa', async () => {
@@ -582,14 +808,13 @@ describe('NonConformitiesService', () => {
 
     const result = await service.attachAttachment(
       'nc-1',
-      Buffer.from('image-content'),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
       'foto.png',
-      'image/png',
     );
 
     expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
       expect.stringContaining('nonconformity-attachments'),
-      Buffer.from('image-content'),
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
       'image/png',
     );
     // A partir do fix, o save acontece dentro do manager.transaction (innerRepo.save),
@@ -606,6 +831,84 @@ describe('NonConformitiesService', () => {
     expect(result.attachments).toEqual(
       expect.arrayContaining([expect.stringContaining('gst:nc-attachment:')]),
     );
+  });
+
+  it('attachAttachment rejeita conteúdo sem assinatura de arquivo permitida', async () => {
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue({
+      id: 'nc-1',
+      company_id: 'company-1',
+      anexos: [],
+      pdf_file_key: null,
+    } as unknown as NonConformity);
+
+    await expect(
+      service.attachAttachment(
+        'nc-1',
+        Buffer.from('conteúdo forjado'),
+        'foto.png',
+      ),
+    ).rejects.toThrow('conteúdo do anexo não corresponde');
+
+    expect(documentStorageService.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it('removeAttachment exclui a referência e o arquivo governado imediatamente', async () => {
+    const attachmentReference = `gst:nc-attachment:${Buffer.from(
+      JSON.stringify({
+        v: 1,
+        kind: 'governed-storage',
+        fileKey: 'documents/company-1/nonconformity-attachments/nc-1/foto.png',
+        originalName: 'foto.png',
+        mimeType: 'image/png',
+        uploadedAt: new Date().toISOString(),
+      }),
+    ).toString('base64url')}`;
+    const ncData = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      anexos: [attachmentReference],
+      pdf_file_key: null,
+      deleted_at: null,
+    };
+    jest
+      .spyOn(service, 'findOneEntity')
+      .mockResolvedValue(ncData as unknown as NonConformity);
+    _lockedNcRow = ncData;
+
+    await expect(service.removeAttachment('nc-1', 0)).resolves.toMatchObject({
+      entityId: 'nc-1',
+      attachments: [],
+      attachmentCount: 0,
+      storageCleanup: 'removed',
+    });
+
+    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
+      'documents/company-1/nonconformity-attachments/nc-1/foto.png',
+    );
+  });
+
+  it('getAttachmentAccess rejeita referência governada fora da pasta da NC', async () => {
+    const governedReference = `gst:nc-attachment:${Buffer.from(
+      JSON.stringify({
+        v: 1,
+        kind: 'governed-storage',
+        fileKey:
+          'documents/company-1/nonconformity-attachments/nc-outra/foto.png',
+        originalName: 'foto.png',
+        mimeType: 'image/png',
+        uploadedAt: new Date().toISOString(),
+      }),
+    ).toString('base64url')}`;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue({
+      id: 'nc-1',
+      company_id: 'company-1',
+      anexos: [governedReference],
+    } as unknown as NonConformity);
+
+    await expect(service.getAttachmentAccess('nc-1', 0)).rejects.toThrow(
+      'não corresponde à não conformidade solicitada',
+    );
+    expect(documentStorageService.getSignedUrl).not.toHaveBeenCalled();
   });
 
   it('getAttachmentAccess: sinaliza modo degradado quando a URL segura do anexo falha', async () => {
@@ -688,8 +991,7 @@ describe('NonConformitiesService', () => {
     expect(queryBuilder.getManyAndCount).not.toHaveBeenCalled();
   });
 
-  it('aceita status válido conforme CHECK constraint da migration 0310', async () => {
-    // The DB CHECK enforces the statuses matching the enum
+  it('bloqueia criação já encerrada para impedir bypass do workflow', async () => {
     const validNc = {
       codigo_nc: 'NC-VALID',
       tipo: 'Operacional',
@@ -709,13 +1011,9 @@ describe('NonConformitiesService', () => {
       status: 'ENCERRADA',
     };
 
-    repository.save.mockResolvedValue({
-      ...validNc,
-      id: 'nc-test',
-    });
-
-    const result = await service.create(validNc);
-    expect(result.status).toBe('ENCERRADA');
-    expect(repository.save).toHaveBeenCalled();
+    await expect(service.create(validNc)).rejects.toThrow(
+      'Uma não conformidade deve ser criada com status ABERTA',
+    );
+    expect(repository.save).not.toHaveBeenCalled();
   });
 });

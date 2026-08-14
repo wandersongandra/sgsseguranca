@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { sophieService } from '@/services/sophieService';
 import { isAiEnabled } from '@/lib/featureFlags';
+import { logger } from '@/lib/logger';
 import { useAiConsent } from '@/hooks/useAiConsent';
 import { Button } from '@/components/ui/button';
 
@@ -89,7 +90,7 @@ export function SophieStatusCard() {
         if (!active) return;
         setStatus(data as SophieStatus);
       } catch (error) {
-        console.error('Erro ao carregar status da SOPHIE:', error);
+        logger.error('Erro ao carregar status da SOPHIE:', error);
       } finally {
         if (active) setLoading(false);
       }

@@ -5,6 +5,19 @@ import type {
 } from "@/services/dossiersService";
 import type { AutoTableFn, PdfContext } from "../core/types";
 import { formatDate, formatDateTime, sanitize } from "../core/format";
+
+const DOSSIER_CAT_STATUS_LABEL: Record<string, string> = {
+  aberta: "Aberta",
+  investigacao: "Em Investigação",
+  fechada: "Fechada",
+};
+
+const DOSSIER_CAT_GRAVIDADE_LABEL: Record<string, string> = {
+  leve: "Leve",
+  moderada: "Moderada",
+  grave: "Grave",
+  fatal: "Fatal",
+};
 import {
   drawDocumentIdentityRail,
   drawExecutiveSummaryStrip,
@@ -181,8 +194,8 @@ function drawEmployeeSections(
       context.cats.length > 0
         ? context.cats.map((item) => [
             sanitize(item.numero),
-            sanitize(item.status),
-            sanitize(item.gravidade),
+            DOSSIER_CAT_STATUS_LABEL[item.status] ?? sanitize(item.status),
+            DOSSIER_CAT_GRAVIDADE_LABEL[item.gravidade] ?? sanitize(item.gravidade),
             formatDateTime(item.dataOcorrencia),
             sanitize(item.descricao),
           ])
@@ -292,7 +305,7 @@ function drawSiteSections(
             ...context.cats.map((item) => [
               "CAT",
               sanitize(item.numero),
-              sanitize(item.status),
+              DOSSIER_CAT_STATUS_LABEL[item.status] ?? sanitize(item.status),
               sanitize(item.workerName),
               formatDateTime(item.dataOcorrencia),
             ]),

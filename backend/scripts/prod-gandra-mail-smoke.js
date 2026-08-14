@@ -2,7 +2,7 @@
  * prod-gandra-mail-smoke.js
  *
  * Valida o pipeline de e-mail em produção:
- *  1. Checa provider configurado (Brevo / SMTP / Resend)
+ *  1. Checa provider configurado (Resend / SMTP)
  *  2. Checa logs recentes (últimos 20)
  *  3. Dispara alerta de conformidade e confirma entrega via mail_logs
  *  4. Envia documento (APR emitida anteriormente) por e-mail e confirma entrega
@@ -196,7 +196,7 @@ async function verifyMailProvider(accessToken) {
       nextScheduledDispatchAt: s?.nextScheduledDispatchAt,
     });
     if (!s?.providerConfigured) {
-      log('ERROR', 'Nenhum provider de e-mail configurado no servidor! (BREVO_API_KEY / MAIL_HOST / RESEND_API_KEY ausentes)');
+      log('ERROR', 'Nenhum provider de e-mail configurado no servidor! (RESEND_API_KEY / MAIL_HOST ausentes)');
       process.exitCode = 1;
     }
   }

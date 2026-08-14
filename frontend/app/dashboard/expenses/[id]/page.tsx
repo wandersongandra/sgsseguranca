@@ -168,6 +168,25 @@ export default function ExpenseReportDetailPage() {
     }
   }
 
+  function handleReceiptFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      toast.error('Formato não suportado. Use PDF, PNG, JPEG ou WebP.');
+      event.target.value = '';
+      setItemForm((current) => ({ ...current, file: null }));
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Comprovante muito grande. O limite é 5 MB.');
+      event.target.value = '';
+      setItemForm((current) => ({ ...current, file: null }));
+      return;
+    }
+    setItemForm((current) => ({ ...current, file }));
+  }
+
   async function handleRemoveItem(itemId: string) {
     if (!report || !confirm('Remover esta despesa da prestação?')) return;
     try {
@@ -329,7 +348,7 @@ export default function ExpenseReportDetailPage() {
                   <TableCell className="text-right">{formatMoney(item.amount)}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
-                      <Button type="button" size="icon" variant="ghost" title="Abrir comprovante" onClick={() => void handleOpenReceipt(item.id)}>
+                      <Button type="button" size="icon" variant="ghost" title="Abrir comprovante" aria-label={`Abrir comprovante de ${item.description}`} onClick={() => void handleOpenReceipt(item.id)}>
                         <ExternalLink className="h-4 w-4" />
                       </Button>
                       {!isClosed && canManage ? (
@@ -338,6 +357,7 @@ export default function ExpenseReportDetailPage() {
                           size="icon"
                           variant="ghost"
                           title="Remover despesa"
+                          aria-label={`Remover despesa ${item.description}`}
                           className="text-[var(--ds-color-danger)]"
                           onClick={() => void handleRemoveItem(item.id)}
                         >
@@ -411,7 +431,7 @@ export default function ExpenseReportDetailPage() {
               <input className={inputClassName} type="date" value={itemForm.expense_date} onChange={(event) => setItemForm((current) => ({ ...current, expense_date: event.target.value }))} required />
               <input className={inputClassName} type="text" placeholder="Fornecedor" value={itemForm.vendor} onChange={(event) => setItemForm((current) => ({ ...current, vendor: event.target.value }))} />
               <input className={inputClassName} type="text" placeholder="Local" value={itemForm.location} onChange={(event) => setItemForm((current) => ({ ...current, location: event.target.value }))} />
-              <input className={inputClassName} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => setItemForm((current) => ({ ...current, file: event.target.files?.[0] || null }))} required />
+              <input className={inputClassName} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={(event) => handleReceiptFileChange(event)} required />
               <textarea className={cn(inputClassName, 'md:col-span-2')} rows={3} placeholder="Descrição da despesa" value={itemForm.description} onChange={(event) => setItemForm((current) => ({ ...current, description: event.target.value }))} required />
             </div>
             <div className="mt-4 flex justify-end">

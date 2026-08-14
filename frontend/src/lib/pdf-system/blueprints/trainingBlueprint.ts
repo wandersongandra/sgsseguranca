@@ -88,7 +88,7 @@ export async function drawTrainingBlueprint(
       { label: "Treinamento", value: training.nome },
       { label: "Colaborador", value: training.user?.nome },
       { label: "NR/Código", value: training.nr_codigo },
-      { label: "Empresa", value: training.company_id },
+      { label: "Empresa", value: training.company?.razao_social || training.company_id },
       { label: "Conclusão", value: formatDate(training.data_conclusao) },
       { label: "Vencimento", value: formatDate(training.data_vencimento) },
       {

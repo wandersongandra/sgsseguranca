@@ -41,9 +41,9 @@ import { DbTimingsService } from './db-timings.service';
  *   permite acesso cross-tenant.
  *
  * CONTEXTO ADICIONAL:
- *   `app.current_user_id` e `app.current_site_id` são preenchidos por requisição
- *   para suportar policies RLS mais granulares, como isolamento por obra em
- *   tabelas críticas de identidade.
+ *   `app.current_user_id`, `app.current_site_id` e `app.current_site_ids` são
+ *   preenchidos por requisição para suportar policies RLS mais granulares,
+ *   inclusive usuários autorizados para mais de uma obra.
  *   `app.current_site_scope` diferencia navegação de usuário normal
  *   (`single`) de jobs internos e rotinas administrativas (`all`).
  *
@@ -180,6 +180,7 @@ export class TenantDbContextService
       const ctx = tenantService.getContext();
       const siteScope =
         ctx?.siteScope ?? (ctx?.isSuperAdmin ? 'all' : 'single');
+      const siteIds = this.serializeSiteIds(ctx);
       const allowRlsBypass = Boolean(ctx?.isSuperAdmin && !ctx.companyId);
       const contextKey = this.buildContextKey(ctx);
       const anyClient = client as unknown as Record<string | symbol, unknown>;
@@ -205,15 +206,17 @@ export class TenantDbContextService
                set_config('app.is_super_admin',                      $2, false),
                set_config('app.current_user_id',                     $3, false),
                set_config('app.current_site_id',                     $4, false),
-               set_config('app.current_site_scope',                  $5, false),
-               set_config('statement_timeout',                       $6, false),
-               set_config('lock_timeout',                            $7, false),
-               set_config('idle_in_transaction_session_timeout',     $8, false)`,
+               set_config('app.current_site_ids',                    $5, false),
+               set_config('app.current_site_scope',                  $6, false),
+               set_config('statement_timeout',                       $7, false),
+               set_config('lock_timeout',                            $8, false),
+               set_config('idle_in_transaction_session_timeout',     $9, false)`,
             [
               ctx?.companyId ?? '',
               String(allowRlsBypass),
               ctx?.userId ?? '',
               ctx?.siteId ?? '',
+              siteIds,
               siteScope,
               String(this.pgTimeouts.statementTimeoutMs),
               String(this.pgTimeouts.lockTimeoutMs),
@@ -239,13 +242,15 @@ export class TenantDbContextService
                set_config('app.is_super_admin',                      $2, false),
                set_config('app.current_user_id',                     $3, false),
                set_config('app.current_site_id',                     $4, false),
-               set_config('app.current_site_scope',                  $5, false),
-               set_config('statement_timeout',                       $6, false),
-               set_config('lock_timeout',                            $7, false),
-               set_config('idle_in_transaction_session_timeout',     $8, false)`,
+               set_config('app.current_site_ids',                    $5, false),
+               set_config('app.current_site_scope',                  $6, false),
+               set_config('statement_timeout',                       $7, false),
+               set_config('lock_timeout',                            $8, false),
+               set_config('idle_in_transaction_session_timeout',     $9, false)`,
             [
               '',
               'false',
+              '',
               '',
               '',
               'single',
@@ -331,6 +336,7 @@ export class TenantDbContextService
     isSuperAdmin?: boolean;
     userId?: string;
     siteId?: string;
+    siteIds?: string[];
     siteScope?: string;
   }): string {
     const siteScope = ctx?.siteScope ?? (ctx?.isSuperAdmin ? 'all' : 'single');
@@ -340,11 +346,25 @@ export class TenantDbContextService
       String(allowRlsBypass),
       ctx?.userId ?? '',
       ctx?.siteId ?? '',
+      this.serializeSiteIds(ctx),
       siteScope,
       String(this.pgTimeouts.statementTimeoutMs),
       String(this.pgTimeouts.lockTimeoutMs),
       String(this.pgTimeouts.idleInTransactionTimeoutMs),
     ].join('|');
+  }
+
+  private serializeSiteIds(ctx?: {
+    siteId?: string;
+    siteIds?: string[];
+  }): string {
+    return Array.from(
+      new Set(
+        [...(ctx?.siteIds ?? []), ctx?.siteId]
+          .map((siteId) => String(siteId || '').trim())
+          .filter(Boolean),
+      ),
+    ).join(',');
   }
 }
 

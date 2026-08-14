@@ -23,6 +23,8 @@ export const OFFLINE_CAPABILITY_MATRIX: Readonly<
   apr: "read-write",
   pt: "read-write",
   checklists: "read-write",
+  // Mutações passam pela barreira coarse aqui. O controle granular por ação
+  // fica em NONCONFORMITY_OFFLINE_ACTIONS (assertNonConformityActionAvailable).
   nonconformities: "read-write",
   arr: "read-only",
   did: "read-only",
@@ -40,6 +42,8 @@ export type NonConformityOfflineAction =
   | "update"
   | "update-status"
   | "remove"
+  | "upload"
+  | "generate-pdf"
   | "capa"
   | "email"
   | "export";
@@ -49,10 +53,12 @@ export type OfflineActionCapability = "queue" | "online-required";
 export const NONCONFORMITY_OFFLINE_ACTIONS: Readonly<
   Record<NonConformityOfflineAction, OfflineActionCapability>
 > = Object.freeze({
-  create: "queue",
-  update: "queue",
+  create: "online-required",
+  update: "online-required",
   "update-status": "online-required",
   remove: "online-required",
+  upload: "online-required",
+  "generate-pdf": "online-required",
   capa: "online-required",
   email: "online-required",
   export: "online-required",
@@ -88,6 +94,8 @@ export function nonConformityOfflineActionMessage(
     update: "editar a não conformidade",
     "update-status": "alterar o status da não conformidade",
     remove: "excluir a não conformidade",
+    upload: "anexar evidências à não conformidade",
+    "generate-pdf": "gerar o PDF oficial da não conformidade",
     capa: "gerar a CAPA",
     email: "enviar a não conformidade por e-mail",
     export: "exportar não conformidades",

@@ -26,7 +26,11 @@ import {
 import { plainToClass } from 'class-transformer';
 import { NonConformityResponseDto } from './dto/nonconformity-response.dto';
 import { TenantService } from '../../shared/tenant/tenant.service';
-import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
+import {
+  getScopedSiteIds,
+  isSiteVisibleToScope,
+  resolveSiteAccessScopeFromTenantService,
+} from '../../shared/tenant/site-access-scope.util';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
 import {
@@ -45,10 +49,8 @@ import {
 } from '../../shared/utils/offset-pagination.util';
 import { normalizeOptionalSearchQuery } from '../../shared/utils/query-normalization.util';
 import { escapeLikePattern } from '../../shared/utils/sql.util';
-import {
-  coerceDocumentDate,
-  getIsoWeekNumber,
-} from '../../shared/utils/document-calendar.util';
+import { coerceDocumentDate } from '../../shared/utils/document-calendar.util';
+import { detectMimeFromMagicBytes } from '../../shared/utils/detect-mime.util';
 import { sanitizePlainText } from '../../shared/utils/plain-text-sanitizer.util';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import {
@@ -56,6 +58,13 @@ import {
   GovernedPdfAccessResponseDto,
 } from '../../shared/dto/governed-pdf-access-response.dto';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
+import { NonConformityWorkflowLockService } from './services/nonconformity-workflow-lock.service';
+import { getNonConformityClosureMissingFields } from './utils/nonconformity-closure.util';
+import {
+  getNonConformityCivilCalendar,
+  parseNonConformityCivilDate,
+  parseNonConformityTimestampDate,
+} from './utils/nonconformity-document-calendar.util';
 
 export enum NcStatus {
   ABERTA = 'ABERTA',
@@ -109,8 +118,26 @@ export type NonConformityAttachmentAttachResponse = {
   };
 };
 
-const MAX_INLINE_ATTACHMENT_BYTES = 1 * 1024 * 1024;
+export type NonConformityAttachmentRemoveResponse = {
+  entityId: string;
+  attachments: string[];
+  attachmentCount: number;
+  removedAttachmentReference: string;
+  storageCleanup: 'removed' | 'pending';
+  message: string;
+};
+
+const MAX_NC_ATTACHMENTS = 24;
 const GOVERNED_ATTACHMENT_REF_PREFIX = 'gst:nc-attachment:';
+const SUPPORTED_NC_ATTACHMENT_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+
+type SupportedNcAttachmentMimeType =
+  (typeof SUPPORTED_NC_ATTACHMENT_MIME_TYPES)[number];
 
 // Coordenação de concorrência para append de anexos (espelha APR/PT/Checklist).
 // FOR UPDATE NOWAIT falha com 55P03 quando a linha já está travada; reprocessamos
@@ -135,6 +162,28 @@ const ALLOWED_TRANSITIONS: Record<NcStatus, NcStatus[]> = {
   [NcStatus.ENCERRADA]: [NcStatus.ABERTA],
 };
 
+const NC_AUDITABLE_FIELDS = [
+  'codigo_nc',
+  'tipo',
+  'status',
+  'risco_nivel',
+  'site_id',
+  'checklist_id',
+  'closed',
+  'has_final_pdf',
+  'attachment_count',
+  'governed_attachment_count',
+  'legacy_attachment_count',
+  'has_assinatura_responsavel_area',
+  'has_assinatura_tecnico_auditor',
+  'has_assinatura_gestao',
+] as const;
+
+type NonConformityAuditSnapshot = Record<
+  (typeof NC_AUDITABLE_FIELDS)[number],
+  string | number | boolean | null
+>;
+
 @Injectable()
 export class NonConformitiesService {
   private readonly logger = new Logger(NonConformitiesService.name);
@@ -152,6 +201,7 @@ export class NonConformitiesService {
     private readonly documentGovernanceService: DocumentGovernanceService,
     private readonly auditService: AuditService,
     private readonly publicValidationGrantService: PublicValidationGrantService,
+    private readonly workflowLock: NonConformityWorkflowLockService,
   ) {}
 
   /**
@@ -192,13 +242,21 @@ export class NonConformitiesService {
   private buildNcDocumentCode(
     nc: Pick<NonConformity, 'id' | 'data_identificacao' | 'created_at'>,
   ): string {
-    const documentDate =
-      coerceDocumentDate(nc.data_identificacao) ||
-      coerceDocumentDate(nc.created_at) ||
-      new Date();
-    const year = documentDate.getFullYear();
-    const week = String(getIsoWeekNumber(documentDate) || 1).padStart(2, '0');
-    return `NONCONFORMITY-${year}-${week}-${nc.id.slice(0, 8).toUpperCase()}`;
+    const civilDate =
+      parseNonConformityCivilDate(nc.data_identificacao) ||
+      parseNonConformityTimestampDate(nc.created_at, 'America/Araguaina') ||
+      parseNonConformityTimestampDate(new Date(), 'America/Araguaina');
+    if (!civilDate) {
+      throw new BadRequestException(
+        'Não foi possível determinar a data documental da não conformidade.',
+      );
+    }
+
+    const calendar = getNonConformityCivilCalendar(civilDate);
+    const week = String(calendar.isoWeek).padStart(2, '0');
+    return `NONCONFORMITY-${calendar.year}-${week}-${nc.id
+      .slice(0, 8)
+      .toUpperCase()}`;
   }
 
   private getTenantIdOrThrow(): string {
@@ -220,30 +278,116 @@ export class NonConformitiesService {
   }
 
   private assertNcDocumentMutable(
-    nc: Pick<NonConformity, 'pdf_file_key'>,
+    nc: Pick<NonConformity, 'status' | 'pdf_file_key'>,
   ): void {
+    // O PDF final é a versão oficial e imutável da NC. Não é suficiente
+    // bloquear somente pelo status: um registro legado/reaberto poderia ficar
+    // ABERTO com pdf_file_key e voltar a divergir do documento registrado.
     if (nc.pdf_file_key) {
       throw new BadRequestException(
-        'Não conformidade com PDF final anexado. Edição bloqueada. Gere uma nova NC para alterar o documento.',
+        'Não conformidade com PDF final emitido é imutável. Para corrigir dados, utilize o fluxo formal de retificação.',
+      );
+    }
+
+    // Comparação direta (não normalizeStatus, que lança para status
+    // ausente/malformado): o valor persistido já é sempre canônico
+    // (gravado via normalizeStatus em create/update), então checar a
+    // trava não deve exigir um status válido só para permitir edição.
+    if (nc.status === (NcStatus.ENCERRADA as string)) {
+      throw new BadRequestException(
+        'Não conformidade encerrada. Edição bloqueada. Reabra a NC pelo fluxo de status antes de alterar o documento.',
+      );
+    }
+  }
+
+  private hasMeaningfulText(value: unknown): boolean {
+    return typeof value === 'string' && value.trim().length >= 3;
+  }
+
+  private isSupportedNcAttachmentMimeType(
+    mimeType: string,
+  ): mimeType is SupportedNcAttachmentMimeType {
+    return (SUPPORTED_NC_ATTACHMENT_MIME_TYPES as readonly string[]).includes(
+      mimeType,
+    );
+  }
+
+  private resolveSupportedNcAttachmentMimeType(
+    buffer: Buffer,
+  ): SupportedNcAttachmentMimeType {
+    const detectedMimeType = detectMimeFromMagicBytes(buffer);
+    if (
+      !detectedMimeType ||
+      !this.isSupportedNcAttachmentMimeType(detectedMimeType)
+    ) {
+      throw new BadRequestException(
+        'O conteúdo do anexo não corresponde a um tipo de evidência permitido.',
+      );
+    }
+
+    return detectedMimeType;
+  }
+
+  private assertExpectedNcVersion(
+    nc: Pick<NonConformity, 'updated_at'>,
+    expectedUpdatedAt?: Date | string | null,
+  ): void {
+    const expected = coerceDocumentDate(expectedUpdatedAt);
+    if (!expected) {
+      return;
+    }
+
+    const current = coerceDocumentDate(nc.updated_at);
+    if (!current || current.getTime() !== expected.getTime()) {
+      throw new ConflictException(
+        'A não conformidade foi alterada por outra operação. Recarregue o registro antes de salvar novamente.',
+      );
+    }
+  }
+
+  private isExpectedAttachmentStorageKey(
+    nc: Pick<NonConformity, 'id' | 'company_id' | 'site_id'>,
+    fileKey: string,
+  ): boolean {
+    const basePrefix = `documents/${nc.company_id}/nonconformity-attachments/`;
+    const directPrefix = `${basePrefix}${nc.id}/`;
+    const sitePrefix = nc.site_id
+      ? `${basePrefix}sites/${nc.site_id}/${nc.id}/`
+      : null;
+
+    return (
+      fileKey.startsWith(directPrefix) ||
+      Boolean(sitePrefix && fileKey.startsWith(sitePrefix))
+    );
+  }
+
+  /**
+   * O encerramento é a atestação de que a ação corretiva funcionou; portanto
+   * não pode depender só de uma mudança de enum feita pelo cliente.
+   */
+  private assertReadyForClosure(nc: NonConformity): void {
+    const missing = getNonConformityClosureMissingFields(nc);
+
+    if (missing.length > 0) {
+      throw new UnprocessableEntityException(
+        `Não é possível encerrar a não conformidade. Preencha: ${missing.join(', ')}.`,
       );
     }
   }
 
   /**
-   * Executa uma mutação no JSONB de anexos da NC sob SELECT FOR UPDATE NOWAIT,
-   * tornando o read-modify-write atômico. Sem isso, dois uploads concorrentes
-   * de anexo na mesma NC (ex.: burst/retry do app mobile) fazem `.save()` da
-   * linha inteira e a segunda escrita sobrescreve o append da primeira —
-   * referência de anexo perdida do documento + arquivo órfão no storage.
-   * Espelha mutateChecklistLocked do ChecklistsService.
-   *
-   * A autorização e o scope já foram validados por findOneEntity antes da
-   * chamada; o lock apenas serializa escritores concorrentes na mesma linha.
+   * Serializa uma mutação de NC no banco. O Redis reduz contenção entre
+   * réplicas, mas este lock de linha é a barreira definitiva contra uma escrita
+   * stale caso o lease Redis expire durante uma operação lenta.
    */
-  private async mutateNcAttachmentsLocked<T>(
+  private async mutateNcLocked<T>(
     id: string,
     companyId: string,
     apply: (nc: NonConformity, manager: EntityManager) => T | Promise<T>,
+    options?: {
+      expectedUpdatedAt?: Date | string | null;
+      assertLeaseHealthy?: () => void;
+    },
   ): Promise<{ saved: NonConformity; result: T }> {
     for (
       let attempt = 0;
@@ -263,7 +407,9 @@ export class NonConformitiesService {
               );
             }
             const nc = manager.getRepository(NonConformity).create(rows[0]);
+            this.assertExpectedNcVersion(nc, options?.expectedUpdatedAt);
             const result = await apply(nc, manager);
+            options?.assertLeaseHealthy?.();
             const saved = await manager.getRepository(NonConformity).save(nc);
             return { saved, result };
           },
@@ -397,33 +543,65 @@ export class NonConformitiesService {
     this.logger.log(loggerPayload);
   }
 
-  private countInlineAttachments(values?: string[]): number {
+  private countLegacyAttachments(values?: string[]): number {
     return (values ?? []).filter(
-      (item) => typeof item === 'string' && item.startsWith('data:'),
+      (item) =>
+        typeof item === 'string' &&
+        !item.startsWith(GOVERNED_ATTACHMENT_REF_PREFIX),
     ).length;
   }
 
-  private getInlineAttachmentPayloadBytes(dataUrl: string): number | null {
-    const base64Marker = ';base64,';
-    const markerIndex = dataUrl.indexOf(base64Marker);
-    if (!dataUrl.startsWith('data:') || markerIndex <= 'data:'.length) {
+  /**
+   * O audit trail precisa explicar a mutação sem replicar descrições, nomes,
+   * assinaturas ou conteúdo de anexos (inclusive data URLs) em três colunas
+   * JSONB. Mantemos apenas metadados operacionais e indicadores booleanos.
+   */
+  private toAuditSnapshot(value: unknown): NonConformityAuditSnapshot | null {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
       return null;
     }
 
-    const base64Payload = dataUrl
-      .slice(markerIndex + base64Marker.length)
-      .replace(/\s+/g, '');
-    if (!base64Payload) {
-      return 0;
-    }
+    const record = value as Record<string, unknown>;
+    const attachments = Array.isArray(record.anexos)
+      ? record.anexos.filter(
+          (attachment): attachment is string => typeof attachment === 'string',
+        )
+      : [];
+    const governedAttachmentCount = attachments.filter((attachment) =>
+      attachment.startsWith(GOVERNED_ATTACHMENT_REF_PREFIX),
+    ).length;
+    const textOrNull = (entry: unknown): string | null =>
+      typeof entry === 'string' && entry.trim() ? entry.trim() : null;
 
-    const padding = base64Payload.endsWith('==')
-      ? 2
-      : base64Payload.endsWith('=')
-        ? 1
-        : 0;
+    return {
+      codigo_nc: textOrNull(record.codigo_nc),
+      tipo: textOrNull(record.tipo),
+      status: textOrNull(record.status),
+      risco_nivel: textOrNull(record.risco_nivel),
+      site_id: textOrNull(record.site_id),
+      checklist_id: textOrNull(record.checklist_id),
+      closed: Boolean(record.closed_at),
+      has_final_pdf: Boolean(record.pdf_file_key),
+      attachment_count: attachments.length,
+      governed_attachment_count: governedAttachmentCount,
+      legacy_attachment_count: attachments.length - governedAttachmentCount,
+      has_assinatura_responsavel_area: this.hasMeaningfulText(
+        record.assinatura_responsavel_area,
+      ),
+      has_assinatura_tecnico_auditor: this.hasMeaningfulText(
+        record.assinatura_tecnico_auditor,
+      ),
+      has_assinatura_gestao: this.hasMeaningfulText(record.assinatura_gestao),
+    };
+  }
 
-    return Math.max(0, Math.floor((base64Payload.length * 3) / 4) - padding);
+  private getAuditChangedFields(
+    before: NonConformityAuditSnapshot | null,
+    after: NonConformityAuditSnapshot | null,
+  ): string[] {
+    return NC_AUDITABLE_FIELDS.filter(
+      (field) => before?.[field] !== after?.[field],
+    );
   }
 
   private buildGovernedAttachmentReference(
@@ -499,6 +677,7 @@ export class NonConformitiesService {
     value?: string | null,
     options?: {
       allowedGovernedReferences?: Set<string>;
+      allowedLegacyReferences?: Set<string>;
     },
   ): string | undefined {
     const normalized = this.normalizeOptionalText(value) || undefined;
@@ -517,28 +696,24 @@ export class NonConformitiesService {
       return normalized;
     }
 
-    if (!normalized.startsWith('data:')) {
+    // Registros antigos podem preservar a referência legada para leitura e
+    // migração posterior, mas nunca podem introduzir URLs/data URLs novas por
+    // create/update. Todo novo arquivo deve passar pelo endpoint multipart,
+    // que valida magic bytes, antimalware e storage tenantizado.
+    if (options?.allowedLegacyReferences?.has(normalized)) {
       return normalized;
     }
 
-    const payloadBytes = this.getInlineAttachmentPayloadBytes(normalized);
-    if (payloadBytes === null) {
-      throw new BadRequestException('Anexo inline inválido.');
-    }
-
-    if (payloadBytes > MAX_INLINE_ATTACHMENT_BYTES) {
-      throw new BadRequestException(
-        `Anexo inline excede o limite de ${(MAX_INLINE_ATTACHMENT_BYTES / 1024 / 1024).toFixed(2)}MB para criação ou edição.`,
-      );
-    }
-
-    return normalized;
+    throw new BadRequestException(
+      'Novos anexos devem ser enviados pelo endpoint dedicado do módulo. URLs e dados inline não são aceitos.',
+    );
   }
 
   private normalizeAttachments(
     values?: string[],
     options?: {
       allowedGovernedReferences?: Set<string>;
+      allowedLegacyReferences?: Set<string>;
     },
   ): string[] {
     return Array.from(
@@ -558,8 +733,18 @@ export class NonConformitiesService {
     );
   }
 
+  private getAllowedLegacyAttachmentReferences(values?: string[]): Set<string> {
+    return new Set(
+      (values ?? []).filter(
+        (value) =>
+          typeof value === 'string' &&
+          !value.startsWith(GOVERNED_ATTACHMENT_REF_PREFIX),
+      ),
+    );
+  }
+
   private async cleanupGovernedAttachmentFiles(
-    entityId: string,
+    nc: Pick<NonConformity, 'id' | 'company_id' | 'site_id'>,
     attachments: Array<{
       reference: string;
       payload: GovernedAttachmentReferencePayload;
@@ -567,18 +752,21 @@ export class NonConformitiesService {
   ): Promise<void> {
     await Promise.all(
       attachments.map(async ({ payload }) => {
+        if (!this.isExpectedAttachmentStorageKey(nc, payload.fileKey)) {
+          this.logNcEvent('warn', 'nc_attachment_storage_scope_mismatch', {
+            entityId: nc.id,
+          });
+          return;
+        }
+
         try {
           await this.documentStorageService.deleteFile(payload.fileKey);
           this.logNcEvent('log', 'nc_attachment_removed_from_storage', {
-            entityId,
-            fileKey: payload.fileKey,
-            originalName: payload.originalName,
+            entityId: nc.id,
           });
         } catch (error) {
           this.logNcEvent('warn', 'nc_attachment_storage_cleanup_failed', {
-            entityId,
-            fileKey: payload.fileKey,
-            originalName: payload.originalName,
+            entityId: nc.id,
             errorMessage: error instanceof Error ? error.message : 'unknown',
           });
         }
@@ -738,6 +926,8 @@ export class NonConformitiesService {
     const payload: Partial<NonConformity> = {};
     const allowedGovernedReferences =
       this.getAllowedGovernedAttachmentReferences(existingAttachments);
+    const allowedLegacyReferences =
+      this.getAllowedLegacyAttachmentReferences(existingAttachments);
 
     if (dto.codigo_nc !== undefined)
       payload.codigo_nc = this.normalizeNcCode(dto.codigo_nc);
@@ -992,6 +1182,7 @@ export class NonConformitiesService {
     if (dto.anexos !== undefined) {
       payload.anexos = this.normalizeAttachments(dto.anexos, {
         allowedGovernedReferences,
+        allowedLegacyReferences,
       });
     }
     if (dto.assinatura_responsavel_area !== undefined) {
@@ -1008,6 +1199,9 @@ export class NonConformitiesService {
       payload.assinatura_gestao = this.normalizeOptionalText(
         dto.assinatura_gestao,
       );
+    }
+    if (dto.checklist_id !== undefined) {
+      payload.checklist_id = dto.checklist_id;
     }
 
     return payload;
@@ -1037,16 +1231,17 @@ export class NonConformitiesService {
   }
 
   private async validateChecklistLink(
-    payload: Partial<NonConformity>,
+    checklistId: string | null | undefined,
+    siteId: string | null | undefined,
     tenantId: string,
   ): Promise<void> {
-    if (!payload.checklist_id) {
+    if (!checklistId) {
       return;
     }
 
     const checklist = await this.checklistsRepository.findOne({
       where: {
-        id: payload.checklist_id,
+        id: checklistId,
         company_id: tenantId,
         deleted_at: IsNull(),
       },
@@ -1056,6 +1251,12 @@ export class NonConformitiesService {
     if (!checklist) {
       throw new BadRequestException(
         'O checklist informado não foi encontrado ou não pertence à empresa atual.',
+      );
+    }
+
+    if (!siteId || !checklist.site_id || checklist.site_id !== siteId) {
+      throw new BadRequestException(
+        'O checklist vinculado deve pertencer à mesma obra da não conformidade.',
       );
     }
   }
@@ -1069,17 +1270,22 @@ export class NonConformitiesService {
       'nao conformidades',
     );
     const payload = this.buildCreatePayload(createNonConformityDto, tenantId);
-    if (!scope.hasCompanyWideAccess && payload.site_id !== scope.siteId) {
+    if (!isSiteVisibleToScope(payload.site_id, scope)) {
       throw new BadRequestException(
-        'Não conformidade deve ser criada na obra atual do usuário.',
+        'Não conformidade deve ser criada em uma obra autorizada para o usuário.',
       );
     }
-    if (payload.status === NcStatus.ENCERRADA) {
-      payload.closed_at = new Date();
-      payload.resolved_by = RequestContext.getUserId() || null;
+    if (payload.status !== NcStatus.ABERTA) {
+      throw new UnprocessableEntityException(
+        'Uma não conformidade deve ser criada com status ABERTA e seguir o fluxo de tratamento e validação.',
+      );
     }
     await this.validateLinkedRecords(payload, tenantId);
-    await this.validateChecklistLink(payload, tenantId);
+    await this.validateChecklistLink(
+      payload.checklist_id,
+      payload.site_id,
+      tenantId,
+    );
     await this.ensureUniqueCodigoNc(tenantId, payload.codigo_nc!);
 
     const nonConformity = this.nonConformitiesRepository.create(payload);
@@ -1094,12 +1300,11 @@ export class NonConformitiesService {
       }
       throw error;
     }
-    const inlineAttachmentCount = this.countInlineAttachments(saved.anexos);
-    if (inlineAttachmentCount > 0) {
-      this.logNcEvent('warn', 'nc_inline_attachments_persisted', {
+    const legacyAttachmentCount = this.countLegacyAttachments(saved.anexos);
+    if (legacyAttachmentCount > 0) {
+      this.logNcEvent('warn', 'nc_legacy_attachments_preserved', {
         entityId: saved.id,
-        inlineAttachmentCount,
-        degradedInlineAttachments: true,
+        legacyAttachmentCount,
       });
     }
     await this.logAudit(AuditAction.CREATE, saved.id, null, saved);
@@ -1118,7 +1323,9 @@ export class NonConformitiesService {
       where: {
         company_id: scope.companyId,
         deleted_at: IsNull(),
-        ...(!scope.hasCompanyWideAccess ? { site_id: scope.siteId } : {}),
+        ...(!scope.hasCompanyWideAccess
+          ? { site_id: In(getScopedSiteIds(scope)) }
+          : {}),
       },
       ...(options?.select?.length
         ? { select: options.select }
@@ -1154,7 +1361,9 @@ export class NonConformitiesService {
 
     query.andWhere('nc.company_id = :tenantId', { tenantId: scope.companyId });
     if (!scope.hasCompanyWideAccess) {
-      query.andWhere('nc.site_id = :siteId', { siteId: scope.siteId });
+      query.andWhere('nc.site_id IN (:...siteIds)', {
+        siteIds: getScopedSiteIds(scope),
+      });
     }
 
     if (opts?.status) {
@@ -1219,7 +1428,9 @@ export class NonConformitiesService {
         .where('nc.deleted_at IS NULL')
         .andWhere('nc.company_id = :tenantId', { tenantId });
       if (!scope.hasCompanyWideAccess) {
-        query.andWhere('nc.site_id = :siteId', { siteId: scope.siteId });
+        query.andWhere('nc.site_id IN (:...siteIds)', {
+          siteIds: getScopedSiteIds(scope),
+        });
       }
     } else {
       query.where('nc.deleted_at IS NULL');
@@ -1244,7 +1455,9 @@ export class NonConformitiesService {
 
     query.andWhere('nc.company_id = :tenantId', { tenantId: scope.companyId });
     if (!scope.hasCompanyWideAccess) {
-      query.andWhere('nc.site_id = :siteId', { siteId: scope.siteId });
+      query.andWhere('nc.site_id IN (:...siteIds)', {
+        siteIds: getScopedSiteIds(scope),
+      });
     }
 
     const rows = await query.getRawMany<{ status: string; total: string }>();
@@ -1282,7 +1495,9 @@ export class NonConformitiesService {
         id,
         company_id: scope.companyId,
         deleted_at: IsNull(),
-        ...(!scope.hasCompanyWideAccess ? { site_id: scope.siteId } : {}),
+        ...(!scope.hasCompanyWideAccess
+          ? { site_id: In(getScopedSiteIds(scope)) }
+          : {}),
       },
       relations: ['site', 'company'],
     });
@@ -1300,9 +1515,18 @@ export class NonConformitiesService {
     id: string,
     updateNonConformityDto: UpdateNonConformityDto,
   ): Promise<NonConformityResponseDto> {
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.updateLocked(id, updateNonConformityDto, assertLeaseHealthy),
+    );
+  }
+
+  private async updateLocked(
+    id: string,
+    updateNonConformityDto: UpdateNonConformityDto,
+    assertLeaseHealthy: () => void,
+  ): Promise<NonConformityResponseDto> {
     const nonConformity = await this.findOneEntity(id);
     this.assertNcDocumentMutable(nonConformity);
-    const before = { ...nonConformity };
     const previousGovernedAttachments = this.getGovernedAttachmentEntries(
       nonConformity.anexos,
     );
@@ -1315,16 +1539,19 @@ export class NonConformitiesService {
       'nao conformidades',
     );
     if (
-      !scope.hasCompanyWideAccess &&
       payload.site_id !== undefined &&
-      payload.site_id !== scope.siteId
+      !isSiteVisibleToScope(payload.site_id, scope)
     ) {
       throw new BadRequestException(
-        'Não conformidade não pode ser movida para outra obra.',
+        'Não conformidade não pode ser movida para uma obra não autorizada.',
       );
     }
     await this.validateLinkedRecords(payload, nonConformity.company_id);
-    await this.validateChecklistLink(payload, nonConformity.company_id);
+    await this.validateChecklistLink(
+      payload.checklist_id ?? nonConformity.checklist_id,
+      payload.site_id ?? nonConformity.site_id,
+      nonConformity.company_id,
+    );
     if (payload.codigo_nc) {
       await this.ensureUniqueCodigoNc(
         nonConformity.company_id,
@@ -1332,10 +1559,46 @@ export class NonConformitiesService {
         nonConformity.id,
       );
     }
-    Object.assign(nonConformity, payload);
-    let saved: NonConformity;
+    // Status é aplicado à parte (via applyValidatedStatusTransition) em vez
+    // de deixar o Object.assign abaixo sobrescrevê-lo diretamente: o
+    // formulário completo de edição envia o status atual em toda gravação
+    // (campo obrigatório), então só validamos/transicionamos quando o valor
+    // realmente muda — evita reprocessar uma "transição" para o mesmo status
+    // a cada Salvar.
+    const requestedStatus = payload.status as NcStatus | undefined;
+    delete payload.status;
+    if (
+      requestedStatus !== undefined &&
+      requestedStatus !== this.normalizeStatus(nonConformity.status)
+    ) {
+      const transitionPreview = Object.assign({ ...nonConformity }, payload);
+      this.applyValidatedStatusTransition(transitionPreview, requestedStatus);
+    }
+    let mutation: {
+      saved: NonConformity;
+      result: NonConformity;
+    };
     try {
-      saved = await this.nonConformitiesRepository.save(nonConformity);
+      mutation = await this.mutateNcLocked(
+        id,
+        nonConformity.company_id,
+        (locked) => {
+          this.assertNcDocumentMutable(locked);
+          const before = { ...locked };
+          Object.assign(locked, payload);
+          if (
+            requestedStatus !== undefined &&
+            requestedStatus !== this.normalizeStatus(before.status)
+          ) {
+            this.applyValidatedStatusTransition(locked, requestedStatus);
+          }
+          return before;
+        },
+        {
+          expectedUpdatedAt: nonConformity.updated_at,
+          assertLeaseHealthy,
+        },
+      );
     } catch (error) {
       if (this.isDuplicateCodigoNcError(error)) {
         throw new BadRequestException(
@@ -1344,39 +1607,46 @@ export class NonConformitiesService {
       }
       throw error;
     }
+    const { saved, result: before } = mutation;
     const nextAttachmentReferences = new Set(saved.anexos ?? []);
     const removedGovernedAttachments = previousGovernedAttachments.filter(
       ({ reference }) => !nextAttachmentReferences.has(reference),
     );
     if (removedGovernedAttachments.length > 0) {
       await this.cleanupGovernedAttachmentFiles(
-        saved.id,
+        nonConformity,
         removedGovernedAttachments,
       );
     }
-    const inlineAttachmentCount = this.countInlineAttachments(saved.anexos);
-    if (inlineAttachmentCount > 0) {
-      this.logNcEvent('warn', 'nc_inline_attachments_persisted', {
+    const legacyAttachmentCount = this.countLegacyAttachments(saved.anexos);
+    if (legacyAttachmentCount > 0) {
+      this.logNcEvent('warn', 'nc_legacy_attachments_preserved', {
         entityId: saved.id,
-        inlineAttachmentCount,
-        degradedInlineAttachments: true,
+        legacyAttachmentCount,
       });
     }
     await this.logAudit(AuditAction.UPDATE, saved.id, before, saved);
-    return this.toNonConformityResponse(saved);
+    return this.toNonConformityResponse(await this.findOneEntity(saved.id));
   }
 
   async remove(id: string) {
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.removeLocked(id, assertLeaseHealthy),
+    );
+  }
+
+  private async removeLocked(id: string, assertLeaseHealthy: () => void) {
     const nonConformity = await this.findOneEntity(id);
     if (nonConformity.pdf_file_key) {
       throw new BadRequestException(
         'Somente não conformidades sem PDF final podem ser removidas. Use os fluxos formais de cancelamento/encerramento para registros já emitidos.',
       );
     }
-    const before = { ...nonConformity };
-    const governedAttachments = this.getGovernedAttachmentEntries(
-      nonConformity.anexos,
-    );
+    let before: NonConformity | null = null;
+    let governedAttachments: Array<{
+      reference: string;
+      payload: GovernedAttachmentReferencePayload;
+    }> = [];
     await this.documentGovernanceService.removeFinalDocumentReference({
       companyId: nonConformity.company_id,
       module: 'nonconformity',
@@ -1386,14 +1656,40 @@ export class NonConformitiesService {
         removalMode: 'soft_delete',
       },
       removeEntityState: async (manager) => {
-        await manager.getRepository(NonConformity).softDelete(nonConformity.id);
+        const rows = await manager.query<NonConformity[]>(
+          `SELECT * FROM "nonconformities" WHERE "id" = $1 AND "company_id" = $2 AND "deleted_at" IS NULL FOR UPDATE NOWAIT`,
+          [id, nonConformity.company_id],
+        );
+        if (!rows || rows.length === 0) {
+          throw new NotFoundException(
+            `Não conformidade com ID ${id} não encontrada`,
+          );
+        }
+
+        const locked = manager.getRepository(NonConformity).create(rows[0]);
+        this.assertExpectedNcVersion(locked, nonConformity.updated_at);
+        if (locked.pdf_file_key) {
+          throw new BadRequestException(
+            'Somente não conformidades sem PDF final podem ser removidas. Use os fluxos formais de cancelamento/encerramento para registros já emitidos.',
+          );
+        }
+
+        assertLeaseHealthy();
+        before = { ...locked };
+        governedAttachments = this.getGovernedAttachmentEntries(locked.anexos);
+        await manager.getRepository(NonConformity).softDelete(locked.id);
       },
       cleanupStoredFile: (fileKey) =>
         this.documentStorageService.deleteFile(fileKey),
     });
+    if (!before) {
+      throw new ConflictException(
+        'A não conformidade não pôde ser bloqueada para remoção. Tente novamente.',
+      );
+    }
     if (governedAttachments.length > 0) {
       await this.cleanupGovernedAttachmentFiles(
-        nonConformity.id,
+        nonConformity,
         governedAttachments,
       );
     }
@@ -1405,28 +1701,57 @@ export class NonConformitiesService {
       'nonconformity',
       filters,
     );
+    if (files.length === 0) {
+      return files;
+    }
+
     const scope = resolveSiteAccessScopeFromTenantService(
       this.tenantService,
       'nao conformidades',
     );
-    if (scope.hasCompanyWideAccess || files.length === 0) {
-      return files;
-    }
-
-    const visibleNonConformities = await this.nonConformitiesRepository.find({
-      select: { id: true },
+    const relevantNonConformities = await this.nonConformitiesRepository.find({
+      select: {
+        id: true,
+        pdf_file_key: true,
+        pdf_folder_path: true,
+        pdf_original_name: true,
+      },
       where: {
         id: In(files.map((file) => file.entityId)),
         company_id: scope.companyId,
-        site_id: scope.siteId,
         deleted_at: IsNull(),
+        ...(!scope.hasCompanyWideAccess
+          ? { site_id: In(getScopedSiteIds(scope)) }
+          : {}),
       },
     });
-    const visibleIds = new Set(
-      visibleNonConformities.map((nonConformity) => nonConformity.id),
+    const byId = new Map(
+      relevantNonConformities.map((nonConformity) => [
+        nonConformity.id,
+        nonConformity,
+      ]),
     );
 
-    return files.filter((file) => visibleIds.has(file.entityId));
+    // O document_registry fica congelado no arquivo da 1ª emissão do PDF
+    // oficial (a NC permite regenerar o PDF livremente enquanto não estiver
+    // Encerrada, sem re-registrar a governança — ver NonConformitiesPdfService).
+    // A própria NC é sempre a fonte da verdade do arquivo atual; sobrepomos
+    // aqui para o painel de arquivos e o pacote semanal nunca servirem uma
+    // versão desatualizada.
+    return files
+      .filter((file) => byId.has(file.entityId))
+      .map((file) => {
+        const nonConformity = byId.get(file.entityId);
+        if (!nonConformity?.pdf_file_key) {
+          return file;
+        }
+        return {
+          ...file,
+          fileKey: nonConformity.pdf_file_key,
+          folderPath: nonConformity.pdf_folder_path || file.folderPath,
+          originalName: nonConformity.pdf_original_name || file.originalName,
+        };
+      });
   }
 
   async getWeeklyBundle(filters: WeeklyBundleFilters) {
@@ -1509,10 +1834,21 @@ export class NonConformitiesService {
     id: string,
     buffer: Buffer,
     originalName: string,
-    mimetype: string,
+  ): Promise<NonConformityAttachmentAttachResponse> {
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.attachAttachmentLocked(id, buffer, originalName, assertLeaseHealthy),
+    );
+  }
+
+  private async attachAttachmentLocked(
+    id: string,
+    buffer: Buffer,
+    originalName: string,
+    assertLeaseHealthy: () => void,
   ): Promise<NonConformityAttachmentAttachResponse> {
     const nc = await this.findOneEntity(id);
     this.assertNcDocumentMutable(nc);
+    const mimeType = this.resolveSupportedNcAttachmentMimeType(buffer);
 
     const fileKey = this.documentStorageService.generateDocumentKey(
       nc.company_id,
@@ -1525,13 +1861,12 @@ export class NonConformitiesService {
     );
 
     try {
-      await this.documentStorageService.uploadFile(fileKey, buffer, mimetype);
+      assertLeaseHealthy();
+      await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
     } catch (error) {
       this.logNcEvent('warn', 'nc_attachment_upload_failed', {
         entityId: nc.id,
-        fileKey,
-        originalName,
-        mimeType: mimetype,
+        mimeType,
         errorMessage: error instanceof Error ? error.message : 'unknown',
       });
       throw error;
@@ -1542,7 +1877,7 @@ export class NonConformitiesService {
       kind: 'governed-storage',
       fileKey,
       originalName,
-      mimeType: mimetype,
+      mimeType,
       uploadedAt: new Date().toISOString(),
       sizeBytes: buffer.byteLength,
     });
@@ -1553,14 +1888,28 @@ export class NonConformitiesService {
     let beforeSnapshot: NonConformity;
     try {
       const { saved: lockedSaved, result: snapshot } =
-        await this.mutateNcAttachmentsLocked(id, nc.company_id, (locked) => {
-          this.assertNcDocumentMutable(locked);
-          const snap = { ...locked };
-          locked.anexos = Array.from(
-            new Set([...(locked.anexos ?? []), reference]),
-          );
-          return snap;
-        });
+        await this.mutateNcLocked(
+          id,
+          nc.company_id,
+          (locked) => {
+            this.assertNcDocumentMutable(locked);
+            const snap = { ...locked };
+            const currentAttachments = locked.anexos ?? [];
+            if (
+              !currentAttachments.includes(reference) &&
+              currentAttachments.length >= MAX_NC_ATTACHMENTS
+            ) {
+              throw new BadRequestException(
+                `Máximo de ${MAX_NC_ATTACHMENTS} anexos por não conformidade. Remova um anexo antes de enviar outro.`,
+              );
+            }
+            locked.anexos = Array.from(
+              new Set([...currentAttachments, reference]),
+            );
+            return snap;
+          },
+          { assertLeaseHealthy },
+        );
       saved = lockedSaved;
       beforeSnapshot = snapshot;
     } catch (error) {
@@ -1572,9 +1921,7 @@ export class NonConformitiesService {
       );
       this.logNcEvent('warn', 'nc_attachment_persist_failed', {
         entityId: nc.id,
-        fileKey,
-        originalName,
-        mimeType: mimetype,
+        mimeType,
         errorMessage: error instanceof Error ? error.message : 'unknown',
       });
       throw error;
@@ -1583,9 +1930,8 @@ export class NonConformitiesService {
     await this.logAudit(AuditAction.UPDATE, saved.id, beforeSnapshot, saved);
     this.logNcEvent('log', 'nc_attachment_uploaded', {
       entityId: saved.id,
-      fileKey,
-      originalName,
-      mimeType: mimetype,
+      mimeType,
+      sizeBytes: buffer.byteLength,
       attachmentCount: saved.anexos?.length ?? 0,
       governedAttachment: true,
     });
@@ -1596,15 +1942,113 @@ export class NonConformitiesService {
       attachmentCount: saved.anexos?.length ?? 0,
       storageMode: 'governed-storage',
       degraded: false,
-      message:
-        'Anexo governado salvo no storage oficial. URLs manuais e anexos inline permanecem como caminho degradado.',
+      message: 'Anexo governado salvo no storage oficial.',
       attachmentReference: reference,
       attachment: {
         index: (saved.anexos ?? []).findIndex((item) => item === reference),
         originalName,
-        mimeType: mimetype,
+        mimeType,
       },
     };
+  }
+
+  async removeAttachment(
+    id: string,
+    index: number,
+  ): Promise<NonConformityAttachmentRemoveResponse> {
+    if (!Number.isSafeInteger(index) || index < 0) {
+      throw new BadRequestException('Índice de anexo inválido.');
+    }
+
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.removeAttachmentLocked(id, index, assertLeaseHealthy),
+    );
+  }
+
+  private async removeAttachmentLocked(
+    id: string,
+    index: number,
+    assertLeaseHealthy: () => void,
+  ): Promise<NonConformityAttachmentRemoveResponse> {
+    const nc = await this.findOneEntity(id);
+    this.assertNcDocumentMutable(nc);
+    const attachmentReference = nc.anexos?.[index];
+    const attachment =
+      this.parseGovernedAttachmentReference(attachmentReference);
+    if (!attachment || !attachmentReference) {
+      throw new BadRequestException(
+        'Somente anexos governados podem ser removidos imediatamente.',
+      );
+    }
+    if (!this.isExpectedAttachmentStorageKey(nc, attachment.fileKey)) {
+      throw new BadRequestException(
+        'A referência de anexo não corresponde à não conformidade solicitada.',
+      );
+    }
+
+    const { saved, result: before } = await this.mutateNcLocked(
+      id,
+      nc.company_id,
+      (locked) => {
+        this.assertNcDocumentMutable(locked);
+        const lockedReference = locked.anexos?.[index];
+        if (lockedReference !== attachmentReference) {
+          throw new ConflictException(
+            'A lista de anexos foi alterada por outra operação. Recarregue a não conformidade antes de tentar remover novamente.',
+          );
+        }
+
+        const lockedAttachment =
+          this.parseGovernedAttachmentReference(lockedReference);
+        if (!lockedAttachment) {
+          throw new BadRequestException(
+            'O anexo solicitado não está disponível no storage governado.',
+          );
+        }
+
+        const beforeSnapshot = { ...locked };
+        locked.anexos = (locked.anexos ?? []).filter(
+          (_item, attachmentIndex) => attachmentIndex !== index,
+        );
+        return beforeSnapshot;
+      },
+      {
+        expectedUpdatedAt: nc.updated_at,
+        assertLeaseHealthy,
+      },
+    );
+
+    await this.logAudit(AuditAction.UPDATE, saved.id, before, saved);
+
+    try {
+      await this.documentStorageService.deleteFile(attachment.fileKey);
+      this.logNcEvent('log', 'nc_attachment_removed_immediately', {
+        entityId: saved.id,
+        attachmentCount: saved.anexos?.length ?? 0,
+      });
+      return {
+        entityId: saved.id,
+        attachments: saved.anexos ?? [],
+        attachmentCount: saved.anexos?.length ?? 0,
+        removedAttachmentReference: attachmentReference,
+        storageCleanup: 'removed',
+        message: 'Anexo removido da não conformidade e do storage oficial.',
+      };
+    } catch (error) {
+      this.logNcEvent('warn', 'nc_attachment_storage_cleanup_pending', {
+        entityId: saved.id,
+        errorMessage: error instanceof Error ? error.message : 'unknown',
+      });
+      return {
+        entityId: saved.id,
+        attachments: saved.anexos ?? [],
+        attachmentCount: saved.anexos?.length ?? 0,
+        removedAttachmentReference: attachmentReference,
+        storageCleanup: 'pending',
+        message:
+          'Anexo removido da não conformidade; a limpeza do storage será conciliada.',
+      };
+    }
   }
 
   async getAttachmentAccess(
@@ -1619,6 +2063,11 @@ export class NonConformitiesService {
     if (!governedAttachment) {
       throw new BadRequestException(
         'O anexo solicitado não está disponível no storage governado.',
+      );
+    }
+    if (!this.isExpectedAttachmentStorageKey(nc, governedAttachment.fileKey)) {
+      throw new BadRequestException(
+        'A referência de anexo não corresponde à não conformidade solicitada.',
       );
     }
 
@@ -1642,7 +2091,6 @@ export class NonConformitiesService {
         entityId: nc.id,
         index,
         availability: response.availability,
-        fileKey: governedAttachment.fileKey,
       });
       return response;
     } catch (error) {
@@ -1662,98 +2110,10 @@ export class NonConformitiesService {
       this.logNcEvent('warn', 'nc_attachment_storage_degraded', {
         entityId: nc.id,
         index,
-        fileKey: governedAttachment.fileKey,
         errorMessage: error instanceof Error ? error.message : 'unknown',
       });
       return response;
     }
-  }
-
-  async attachPdf(
-    id: string,
-    buffer: Buffer,
-    originalName: string,
-    mimetype: string,
-  ): Promise<NonConformityResponseDto> {
-    const nc = await this.findOneEntity(id);
-    this.assertNcDocumentMutable(nc);
-    const documentDate =
-      coerceDocumentDate(nc.data_identificacao) || new Date();
-    const year = documentDate.getFullYear();
-    const week = String(getIsoWeekNumber(documentDate) || 1).padStart(2, '0');
-    const fileKey = this.documentStorageService.generateDocumentKey(
-      nc.company_id,
-      'nonconformities',
-      id,
-      `${id}.pdf`,
-      {
-        folderSegments: [
-          ...(nc.site_id ? ['sites', nc.site_id] : []),
-          String(year),
-          `week-${week}`,
-        ],
-      },
-    );
-    const folderPath = fileKey.split('/').slice(0, -1).join('/');
-
-    try {
-      await this.documentStorageService.uploadFile(fileKey, buffer, mimetype);
-    } catch (error) {
-      this.logNcEvent('warn', 'nc_pdf_upload_failed', {
-        entityId: nc.id,
-        fileKey,
-        folderPath,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
-      });
-      throw error;
-    }
-    try {
-      await this.documentGovernanceService.registerFinalDocument({
-        companyId: nc.company_id,
-        module: 'nonconformity',
-        entityId: nc.id,
-        title: nc.codigo_nc || nc.tipo || 'Nao Conformidade',
-        documentDate,
-        fileKey,
-        folderPath,
-        originalName,
-        mimeType: mimetype,
-        createdBy: RequestContext.getUserId() || undefined,
-        fileBuffer: buffer,
-        persistEntityMetadata: async (manager) => {
-          await manager.getRepository(NonConformity).update(
-            { id: nc.id },
-            {
-              pdf_file_key: fileKey,
-              pdf_folder_path: folderPath,
-              pdf_original_name: originalName,
-            },
-          );
-        },
-      });
-      this.logNcEvent('log', 'nc_pdf_attached', {
-        entityId: nc.id,
-        fileKey,
-        folderPath,
-        originalName,
-      });
-    } catch (error) {
-      await cleanupUploadedFile(
-        this.logger,
-        `nonconformity:${nc.id}`,
-        fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
-      );
-      this.logNcEvent('warn', 'nc_pdf_governance_failed', {
-        entityId: nc.id,
-        fileKey,
-        folderPath,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
-      });
-      throw error;
-    }
-
-    return this.findOne(id);
   }
 
   async getMonthlyAnalytics(): Promise<{ mes: string; total: number }[]> {
@@ -1772,8 +2132,13 @@ export class NonConformitiesService {
       .groupBy("DATE_TRUNC('month', nc.created_at)")
       .orderBy("DATE_TRUNC('month', nc.created_at)", 'ASC');
 
-    if (!scope.hasCompanyWideAccess && scope.siteId) {
-      qb.andWhere('nc.site_id = :siteId', { siteId: scope.siteId });
+    if (!scope.hasCompanyWideAccess) {
+      const siteIds = getScopedSiteIds(scope);
+      if (siteIds.length === 0) {
+        qb.andWhere('1 = 0');
+      } else {
+        qb.andWhere('nc.site_id IN (:...siteIds)', { siteIds });
+      }
     }
 
     const rows = await qb.getRawMany<{ mes: string; total: string }>();
@@ -1791,14 +2156,28 @@ export class NonConformitiesService {
     };
   }
 
-  async updateStatus(
-    id: string,
+  /**
+   * Valida a transição de status contra ALLOWED_TRANSITIONS e carimba
+   * closed_at/resolved_by de forma consistente. Usado tanto por
+   * updateStatus() (ação rápida "Mover status" da listagem) quanto por
+   * update() (formulário completo de edição) — sem isso, o formulário
+   * completo conseguia pular o fluxo de aprovação (ex.: Aberta -> Encerrada
+   * direto) e encerrar a NC sem preencher closed_at/resolved_by, já que só
+   * updateStatus() aplicava essas regras.
+   */
+  private applyValidatedStatusTransition(
+    nc: NonConformity,
     newStatus: NcStatus,
-  ): Promise<NonConformityResponseDto> {
-    const nc = await this.findOneEntity(id);
-    this.assertNcDocumentMutable(nc);
-    const before = { ...nc };
+  ): void {
     const current = this.normalizeStatus(nc.status);
+    if (current === newStatus) {
+      return;
+    }
+    if (nc.pdf_file_key) {
+      throw new BadRequestException(
+        'Não conformidade com PDF final emitido não pode ter o status alterado. Para corrigir dados, utilize o fluxo formal de retificação.',
+      );
+    }
     const allowed = ALLOWED_TRANSITIONS[current] ?? [];
     if (!allowed.includes(newStatus)) {
       throw new UnprocessableEntityException(
@@ -1807,15 +2186,54 @@ export class NonConformitiesService {
     }
     nc.status = newStatus;
     if (newStatus === NcStatus.ENCERRADA) {
+      this.assertReadyForClosure(nc);
       nc.closed_at = new Date();
       nc.resolved_by = RequestContext.getUserId() || null;
     } else if (current === NcStatus.ENCERRADA) {
       nc.closed_at = null;
       nc.resolved_by = null;
     }
-    const saved = await this.nonConformitiesRepository.save(nc);
+  }
+
+  async updateStatus(
+    id: string,
+    newStatus: NcStatus,
+  ): Promise<NonConformityResponseDto> {
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.updateStatusLocked(id, newStatus, assertLeaseHealthy),
+    );
+  }
+
+  private async updateStatusLocked(
+    id: string,
+    newStatus: NcStatus,
+    assertLeaseHealthy: () => void,
+  ): Promise<NonConformityResponseDto> {
+    const nc = await this.findOneEntity(id);
+    const requestedStatus = this.normalizeStatus(newStatus);
+    if (requestedStatus === this.normalizeStatus(nc.status)) {
+      // PATCH idempotente: não regrava nem acrescenta evento de auditoria
+      // quando o cliente apenas repete o status já persistido.
+      return this.toNonConformityResponse(nc);
+    }
+    const transitionPreview = { ...nc };
+    this.applyValidatedStatusTransition(transitionPreview, requestedStatus);
+    const { saved, result: before } = await this.mutateNcLocked(
+      id,
+      nc.company_id,
+      (locked) => {
+        this.assertNcDocumentMutable(locked);
+        const beforeSnapshot = { ...locked };
+        this.applyValidatedStatusTransition(locked, requestedStatus);
+        return beforeSnapshot;
+      },
+      {
+        expectedUpdatedAt: nc.updated_at,
+        assertLeaseHealthy,
+      },
+    );
     await this.logAudit(AuditAction.UPDATE, saved.id, before, saved);
-    return this.toNonConformityResponse(saved);
+    return this.toNonConformityResponse(await this.findOneEntity(saved.id));
   }
 
   async count(options?: FindManyOptions<NonConformity>): Promise<number> {
@@ -1841,8 +2259,13 @@ export class NonConformitiesService {
       .andWhere('nc.company_id = :companyId', { companyId: scope.companyId })
       .orderBy('nc.created_at', 'DESC')
       .take(5000);
-    if (!scope.hasCompanyWideAccess && scope.siteId) {
-      qb.andWhere('nc.site_id = :siteId', { siteId: scope.siteId });
+    if (!scope.hasCompanyWideAccess) {
+      const siteIds = getScopedSiteIds(scope);
+      if (siteIds.length === 0) {
+        qb.andWhere('1 = 0');
+      } else {
+        qb.andWhere('nc.site_id IN (:...siteIds)', { siteIds });
+      }
     }
     const ncs = await qb.getMany();
 
@@ -1867,12 +2290,22 @@ export class NonConformitiesService {
   ) {
     const companyId = this.tenantService.getTenantId();
     if (!companyId) return;
+    const beforeSnapshot = this.toAuditSnapshot(before);
+    const afterSnapshot = this.toAuditSnapshot(after);
     await this.auditService.log({
       userId: RequestContext.getUserId() || 'system',
       action,
       entity: 'NonConformity',
       entityId,
-      changes: { before, after },
+      changes: {
+        schema: 'nonconformity-audit-v2',
+        changedFields: this.getAuditChangedFields(
+          beforeSnapshot,
+          afterSnapshot,
+        ),
+        before: beforeSnapshot,
+        after: afterSnapshot,
+      },
       ip: (RequestContext.get('ip') as string) || 'unknown',
       userAgent: RequestContext.get('userAgent') || 'unknown',
       companyId,

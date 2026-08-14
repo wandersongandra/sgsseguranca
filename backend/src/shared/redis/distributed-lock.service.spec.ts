@@ -69,4 +69,42 @@ describe('DistributedLockService', () => {
       'token-1',
     );
   });
+
+  it('renova somente o lease que ainda pertence ao proprio token', async () => {
+    const { service, client } = createService();
+    client.eval.mockResolvedValue(1);
+
+    await expect(
+      service.extend(
+        {
+          key: 'lock:nonconformity:workflow:nc-1',
+          token: 'token-1',
+        },
+        600_000,
+      ),
+    ).resolves.toBe(true);
+
+    expect(client.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('PEXPIRE', KEYS[1], ARGV[2])"),
+      1,
+      'lock:nonconformity:workflow:nc-1',
+      'token-1',
+      '600000',
+    );
+  });
+
+  it('não reporta renovação quando o token não é mais dono do lock', async () => {
+    const { service, client } = createService();
+    client.eval.mockResolvedValue(0);
+
+    await expect(
+      service.extend(
+        {
+          key: 'lock:nonconformity:workflow:nc-1',
+          token: 'token-expirado',
+        },
+        600_000,
+      ),
+    ).resolves.toBe(false);
+  });
 });

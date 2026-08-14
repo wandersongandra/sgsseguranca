@@ -193,6 +193,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
         diagnostic:
           exception instanceof Error ? { stack: exception.stack } : undefined,
       });
+    } else if (exception instanceof QueryFailedError) {
+      const dbError = exception as Error & { code?: string };
+      this.logger.warn({
+        ...logMeta,
+        diagnostic: { pgCode: dbError.code, pgMessage: exception.message },
+      });
     } else {
       this.logger.warn(logMeta);
     }

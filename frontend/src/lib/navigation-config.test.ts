@@ -53,7 +53,9 @@ describe('navigation-config', () => {
     expect(getActiveNavigationItem('/dashboard/aprs/new')?.id).toBe('aprs');
     expect(getActiveNavigationItem('/dashboard/aprs/edit/42')?.id).toBe('aprs');
     expect(getActiveNavigationItem('/dashboard/aprs/42/detalhes')?.id).toBe('aprs');
-    expect(getActiveNavigationItem('/dashboard/checklist-models/operacionais/edit/1')?.id).toBe('checklist-operacionais');
+    // Sub-rotas de categorias de modelos foram removidas (#252): a rota
+    // operacionais/* agora resolve para a Central de modelos.
+    expect(getActiveNavigationItem('/dashboard/checklist-models/operacionais/edit/1')?.id).toBe('checklist-models');
     expect(getActiveNavigationItem('/dashboarding')).toBeUndefined();
   });
 });

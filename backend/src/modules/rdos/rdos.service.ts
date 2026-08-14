@@ -9,6 +9,8 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import {
   EntityManager,
   In,
@@ -39,6 +41,7 @@ import {
 } from '../../shared/utils/offset-pagination.util';
 import { MailService } from '../../infra/mail/mail.service';
 import { DocumentMailDispatchResponseDto } from '../../infra/mail/dto/document-mail-dispatch-response.dto';
+import { defaultJobOptions } from '../../infra/queue/default-job-options';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
@@ -172,6 +175,8 @@ export class RdosService {
     private tenantService: TenantService,
     @Inject(forwardRef(() => MailService))
     private mailService: MailService,
+    @InjectQueue('mail')
+    private readonly mailQueue: Queue,
     private documentStorageService: DocumentStorageService,
     private documentGovernanceService: DocumentGovernanceService,
     private documentRegistryService: DocumentRegistryService,
@@ -294,9 +299,14 @@ export class RdosService {
       return null;
     }
 
+    // Teto de segurança: lista de IDs permitidos usada só como allow-list em
+    // memória para filtrar documentos (document_registry não tem site_id).
+    // Não deveria ser atingido na prática — mesma técnica de
+    // ProfilesService.findAll / findAllForExport.
     const scopedRdos = await this.rdosRepository.find({
       select: ['id'],
       where: { company_id: companyId, site_id: In(siteIds) },
+      take: 50000,
     });
 
     return new Set(scopedRdos.map((rdo) => rdo.id));
@@ -2202,32 +2212,72 @@ export class RdosService {
       );
     }
 
+    const scope = this.getTenantContextOrThrow();
+    const workerTenantContext = {
+      companyId: scope.companyId,
+      isSuperAdmin: scope.isSuperAdmin,
+      siteScope: scope.siteScope,
+      ...(scope.siteScope === 'single' ? { siteIds: scope.siteIds } : {}),
+    };
+
+    let queuedCount = 0;
+    let syncFallbackUsed = false;
+
     for (const email of to) {
-      await this.mailService.sendStoredDocument(
-        rdo.id,
-        'RDO',
-        email,
-        rdo.company_id,
-      );
+      try {
+        await this.mailQueue.add(
+          'send-document',
+          {
+            documentId: rdo.id,
+            documentType: 'RDO',
+            email,
+            companyId: rdo.company_id,
+            tenantContext: workerTenantContext,
+          },
+          defaultJobOptions,
+        );
+        queuedCount++;
+      } catch (error) {
+        this.logger.warn(
+          `Fila de e-mail indisponível para RDO ${rdo.id}, aplicando fallback síncrono: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        await this.mailService.sendStoredDocument(
+          rdo.id,
+          'RDO',
+          email,
+          rdo.company_id,
+        );
+        syncFallbackUsed = true;
+      }
     }
+
+    const deliveryMode: 'queued' | 'sent' =
+      queuedCount === to.length ? 'queued' : 'sent';
 
     this.logRdoEvent('rdo_email_sent', rdo, {
       recipients: to.length,
       hasGovernedPdf: true,
       artifactType: 'governed_final_pdf',
-      fallbackUsed: false,
+      deliveryMode,
+      queueFallbackUsed: syncFallbackUsed,
     });
     await this.rdoAuditService.recordEvent(rdo.id, 'EMAIL_SENT', {
       recipients: to.length,
       hasGovernedPdf: true,
       artifactType: 'governed_final_pdf',
-      fallbackUsed: false,
+      deliveryMode,
+      queueFallbackUsed: syncFallbackUsed,
     });
 
     return {
       success: true,
-      message: `O RDO foi enviado com o PDF final governado para ${to.length} destinatário(s).`,
-      deliveryMode: 'sent',
+      message:
+        deliveryMode === 'queued'
+          ? `O envio do RDO com o PDF final governado foi agendado para ${to.length} destinatário(s).`
+          : `O RDO foi enviado com o PDF final governado para ${to.length} destinatário(s).`,
+      deliveryMode,
       artifactType: 'governed_final_pdf',
       isOfficial: true,
       fallbackUsed: false,

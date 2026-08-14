@@ -1,4 +1,5 @@
 import { sanitizeSensitiveDraftValue } from "./sensitive-draft-sanitizer";
+import { logger } from "./logger";
 
 const DB_NAME = "sgs-offline-secure";
 const DB_VERSION = 1;
@@ -131,7 +132,7 @@ async function decrypt(data: string): Promise<string> {
     );
     return new TextDecoder().decode(decrypted);
   } catch (err) {
-    console.error("Falha ao decodificar storage local seguro:", err);
+    logger.error("Falha ao decodificar storage local seguro:", err);
     throw new Error("Decryption failed");
   }
 }
@@ -153,7 +154,7 @@ export const secureOfflineDB = {
       const decrypted = await decrypt(rawEncrypted);
       return JSON.parse(decrypted) as T;
     } catch (err) {
-      console.warn(`Erro na leitura segura do IndexedDB [store: ${storeName}, key: ${key}]:`, err);
+      logger.warn(`Erro na leitura segura do IndexedDB [store: ${storeName}, key: ${key}]:`, err);
       return null;
     }
   },
@@ -172,7 +173,7 @@ export const secureOfflineDB = {
         req.onerror = () => reject(req.error);
       });
     } catch (err) {
-      console.warn(`Erro na gravacao segura do IndexedDB [store: ${storeName}, key: ${key}]:`, err);
+      logger.warn(`Erro na gravacao segura do IndexedDB [store: ${storeName}, key: ${key}]:`, err);
     }
   },
 
@@ -187,7 +188,7 @@ export const secureOfflineDB = {
         req.onerror = () => reject(req.error);
       });
     } catch (err) {
-      console.warn(`Erro ao excluir do IndexedDB [store: ${storeName}, key: ${key}]:`, err);
+      logger.warn(`Erro ao excluir do IndexedDB [store: ${storeName}, key: ${key}]:`, err);
     }
   },
 
@@ -202,7 +203,7 @@ export const secureOfflineDB = {
         req.onerror = () => reject(req.error);
       });
     } catch (err) {
-      console.warn(`Erro ao carregar chaves do IndexedDB [store: ${storeName}]:`, err);
+      logger.warn(`Erro ao carregar chaves do IndexedDB [store: ${storeName}]:`, err);
       return [];
     }
   },
@@ -218,7 +219,7 @@ export const secureOfflineDB = {
         req.onerror = () => reject(req.error);
       });
     } catch (err) {
-      console.warn(`Erro ao limpar IndexedDB [store: ${storeName}]:`, err);
+      logger.warn(`Erro ao limpar IndexedDB [store: ${storeName}]:`, err);
     }
   }
 };

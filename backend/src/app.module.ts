@@ -244,6 +244,18 @@ export const validationSchema = Joi.object({
     .default('postgres'),
   SQLITE_DB_PATH: Joi.string().default('dev.sqlite'),
   DATABASE_URL: Joi.string().optional().allow(''),
+  // Opcional POR DECISÃO, inclusive em produção — mas a ausência não é
+  // silenciosa nem permissiva.
+  //
+  // Tornar obrigatória no boot converteria um erro de configuração em queda
+  // total da API (login incluso). O contrato adotado é mais cirúrgico e dá a
+  // mesma garantia onde importa:
+  //   1. `PrivilegedDbService.onModuleInit` loga ERROR em produção se faltar;
+  //   2. toda operação cross-tenant usa `withRequiredPrivilegedClient` /
+  //      `requiredTransaction` e responde 503 em vez de cair na conexão de
+  //      runtime, que desde a migration 361 enxerga 0 linhas por RLS;
+  //   3. `GET /health/detailed` expõe `checks.admin_operations`.
+  // Ver `docs/RUNBOOK_RLS_BYPASS_HARDENING.md`.
   DATABASE_ADMIN_URL: Joi.string().optional().allow(''),
   DATABASE_PRIVATE_URL: Joi.string().optional().allow(''),
   DATABASE_REPLICA_URL: Joi.string().optional().allow(''),
@@ -322,6 +334,9 @@ export const validationSchema = Joi.object({
   REDIS_PORT: Joi.number().default(6379),
   REDIS_PASSWORD: Joi.string().optional().allow(''),
   REDIS_TLS: Joi.boolean().default(false),
+  // Dispensa a exigência de TLS quando o Redis está na mesma rede interna do
+  // host (ver assertSecureRedisConnection). Só deve ser ligado nesse cenário.
+  REDIS_ALLOW_INSECURE_INTERNAL: Joi.boolean().default(false),
   ALERTS_DLQ_COOLDOWN_MS: Joi.number().integer().min(60_000).default(900_000),
   AI_RECOVERY_MAX_AGE_MS: Joi.number()
     .integer()
@@ -1783,10 +1798,9 @@ export class AppModule implements OnModuleInit {
     const smtpHost = process.env.MAIL_HOST?.trim();
     const smtpUser = process.env.MAIL_USER?.trim();
     const smtpPass = process.env.MAIL_PASS?.trim();
-    const brevoApiKey = process.env.BREVO_API_KEY?.trim();
     const resendApiKey = process.env.RESEND_API_KEY?.trim();
     const hasMailProviderCredentials = Boolean(
-      (smtpHost && smtpUser && smtpPass) || brevoApiKey || resendApiKey,
+      (smtpHost && smtpUser && smtpPass) || resendApiKey,
     );
 
     if (failures.length > 0) {
@@ -1800,7 +1814,7 @@ export class AppModule implements OnModuleInit {
     if (mailEnabled && !hasMailProviderCredentials) {
       this.logger.warn(
         'AVISO DE SEGURANÇA: MAIL_ENABLED=true sem credenciais de provedor completas. ' +
-          'O runtime vai iniciar, mas os envios de e-mail permanecerão desativados até configurar MAIL_HOST, MAIL_USER, MAIL_PASS, BREVO_API_KEY ou RESEND_API_KEY.',
+          'O runtime vai iniciar, mas os envios de e-mail permanecerão desativados até configurar RESEND_API_KEY ou MAIL_HOST, MAIL_USER, MAIL_PASS.',
       );
     }
 

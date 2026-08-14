@@ -5,6 +5,7 @@ import { Send, X, Loader2, Sparkles, ImagePlus, TriangleAlert } from 'lucide-rea
 import Image from 'next/image';
 import { aiService } from '@/services/aiService';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import type { AiRouteContext } from '@/lib/ai-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -185,7 +186,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Erro no chat da SOPHIE:', error);
+      logger.error('Erro no chat da SOPHIE:', error);
       const errorMessage: Message = {
         role: 'assistant',
         content: getFriendlyErrorMessage(error),

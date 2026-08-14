@@ -188,8 +188,12 @@ describe('Document flows smoke', () => {
       }),
       getPdfAccess: jest.fn().mockResolvedValue(notEmittedAccess),
     };
+    const nonConformitiesPdfService = {
+      generateFinalPdf: jest.fn(),
+    };
     const controller = new NonConformitiesController(
       nonConformitiesService as never,
+      nonConformitiesPdfService as never,
       fileInspectionService as never,
     );
 

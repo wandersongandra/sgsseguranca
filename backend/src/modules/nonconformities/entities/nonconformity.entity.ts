@@ -253,6 +253,15 @@ export class NonConformity extends BaseAuditEntity {
   @Column({ type: 'text', nullable: true })
   pdf_original_name: string;
 
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  final_pdf_hash_sha256: string | null;
+
+  @Column({ type: 'varchar', length: 24, nullable: true })
+  verification_code: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  pdf_generated_at: Date | null;
+
   // Link opcional para o checklist de inspeção que originou a NC (para rastreabilidade)
   @ManyToOne(() => Checklist, { nullable: true })
   @JoinColumn({ name: 'checklist_id' })

@@ -1,5 +1,6 @@
 import { sanitizeSensitiveDraftValue } from "./sensitive-draft-sanitizer";
 import { secureOfflineDB } from "./offline-db-secure";
+import { logger } from "./logger";
 
 type CacheEnvelope<T> = {
   value: T;
@@ -93,7 +94,7 @@ if (isBrowser()) {
       }
     })
     .catch((err) => {
-      console.warn("Falha ao inicializar cache do IndexedDB em memoria:", err);
+      logger.warn("Falha ao inicializar cache do IndexedDB em memoria:", err);
     });
 }
 

@@ -8,6 +8,7 @@ import type {
   GovernedDocumentVideoAttachment,
   GovernedDocumentVideoMutationResponse,
 } from "@/lib/videos/documentVideos";
+import { logger } from "@/lib/logger";
 
 type UseDocumentVideosOptions = {
   documentId?: string | null;
@@ -139,7 +140,7 @@ export function useDocumentVideos({
       setAttachments(result);
     } catch (error) {
       if (!isRefreshCurrent()) return;
-      console.error("Erro ao carregar vídeos governados:", error);
+      logger.error("Erro ao carregar vídeos governados:", error);
       toast.error(
         extractVideoApiMessage(error) ||
           labels?.loadError ||
@@ -172,7 +173,7 @@ export function useDocumentVideos({
         return result;
       } catch (error) {
         if (!isCurrent(generation)) return null;
-        console.error("Erro ao enviar vídeo governado:", error);
+        logger.error("Erro ao enviar vídeo governado:", error);
         toast.error(
           extractVideoApiMessage(error) ||
             labels?.uploadError ||
@@ -202,7 +203,7 @@ export function useDocumentVideos({
         return result;
       } catch (error) {
         if (!isCurrent(generation)) return null;
-        console.error("Erro ao remover vídeo governado:", error);
+        logger.error("Erro ao remover vídeo governado:", error);
         toast.error(
           extractVideoApiMessage(error) ||
             labels?.removeError ||
@@ -232,7 +233,7 @@ export function useDocumentVideos({
         return result;
       } catch (error) {
         if (!isCurrent(generation)) return null;
-        console.error("Erro ao resolver acesso ao vídeo governado:", error);
+        logger.error("Erro ao resolver acesso ao vídeo governado:", error);
         toast.error(
           extractVideoApiMessage(error) ||
             labels?.accessError ||

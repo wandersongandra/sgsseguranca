@@ -30,6 +30,7 @@ import { UpdateDdsDto } from './dto/update-dds.dto';
 import { UpdateDdsAuditDto } from './dto/update-dds-audit.dto';
 import { ReplaceDdsSignaturesDto } from './dto/replace-dds-signatures.dto';
 import { User } from '../users/entities/user.entity';
+import { UserSite } from '../users/entities/user-site.entity';
 import { Site } from '../sites/entities/site.entity';
 import {
   DocumentBundleService,
@@ -1906,7 +1907,20 @@ export class DdsService {
       ],
       select: ['id'],
     });
+
+    const siteLinks = await this.ddsRepository.manager
+      .getRepository(UserSite)
+      .find({
+        where: {
+          user_id: In(uniqueUserIds),
+          company_id: companyId,
+          site_id: siteId,
+        },
+        select: ['user_id'],
+      });
+
     const foundIds = new Set(users.map((user) => user.id));
+    siteLinks.forEach((link) => foundIds.add(link.user_id));
     const missingIds = uniqueUserIds.filter((userId) => !foundIds.has(userId));
     if (missingIds.length > 0) {
       throw new BadRequestException(

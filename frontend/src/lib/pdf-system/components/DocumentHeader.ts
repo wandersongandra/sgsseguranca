@@ -1,5 +1,6 @@
 import type { PdfContext } from "../core/types";
 import { sanitize } from "../core/format";
+import { logger } from "../../logger";
 
 export type DocumentHeaderOptions = {
   title: string;
@@ -241,7 +242,7 @@ export function drawDocumentHeader(
 
       doc.addImage(options.logoUrl, imgProps.fileType, lx, ly, w, h);
     } catch {
-      console.warn("[PDF] Failed to add logo to header.");
+      logger.warn("[PDF] Failed to add logo to header.");
     }
   }
 

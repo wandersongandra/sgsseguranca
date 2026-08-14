@@ -8,12 +8,15 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   StreamableFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import type { Request } from 'express';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TenantGuard } from '../../shared/guards/tenant.guard';
 import { FeatureAiGuard } from '../../shared/guards/feature-ai.guard';
@@ -176,16 +179,25 @@ export class PhotographicReportsController {
     FilesInterceptor(
       'files',
       30,
-      createTemporaryUploadOptions({ maxFileSize: 15 * 1024 * 1024 }),
+      createTemporaryUploadOptions({
+        maxFileSize: 15 * 1024 * 1024,
+        maxFiles: 30,
+      }),
     ),
   )
   uploadImages(
     @Param('id', new ParseUUIDPipe()) id: string,
     @UploadedFiles() files: Express.Multer.File[],
     @Body() dto: UploadPhotographicReportImagesDto,
+    @Req() req: Request,
   ) {
     const uploadedFiles = Array.isArray(files) ? files : [];
-    return this.photographicReportsService.uploadImages(id, uploadedFiles, dto);
+    return this.photographicReportsService.uploadImages(
+      id,
+      uploadedFiles,
+      dto,
+      getRequestIp(req),
+    );
   }
 
   @Patch(':id/images/:imageId')

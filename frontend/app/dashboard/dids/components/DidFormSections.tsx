@@ -22,8 +22,8 @@ import {
 } from '@/components/layout';
 import { cn } from '@/lib/utils';
 import { DID_STATUS_LABEL } from '@/services/didsService';
-import { DID_TURNO_LABEL } from '@/app/dashboard/dids/didMeta';
-import type { DidFormData } from '@/app/dashboard/dids/didForm.schema';
+import { DID_TURNO_LABEL } from '../didMeta';
+import type { DidFormData } from '../didForm.schema';
 
 export const inputClassName =
   'mt-2 block min-h-12 w-full rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--component-field-bg)] px-3.5 py-3 text-sm font-medium leading-6 text-[var(--ds-color-text-primary)] shadow-[0_1px_2px_rgba(15,23,42,0.05)] placeholder:text-[color:var(--ds-color-text-secondary)] motion-safe:transition-all motion-safe:duration-[var(--ds-motion-base)] focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';

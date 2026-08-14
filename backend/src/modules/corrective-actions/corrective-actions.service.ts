@@ -318,8 +318,9 @@ export class CorrectiveActionsService extends BaseService<CorrectiveAction> {
         site_id: nc.site_id,
         due_date:
           nc.acao_definitiva_data_prevista || nc.acao_definitiva_prazo
-            ? (nc.acao_definitiva_data_prevista ||
-                nc.acao_definitiva_prazo)!.toISOString()
+            ? new Date(
+                nc.acao_definitiva_data_prevista || nc.acao_definitiva_prazo!,
+              ).toISOString()
             : this.addDays(7).toISOString(),
         responsible_name:
           nc.acao_definitiva_responsavel || nc.responsavel_area || undefined,
@@ -330,43 +331,80 @@ export class CorrectiveActionsService extends BaseService<CorrectiveAction> {
     );
   }
 
-  async getSlaOverview() {
+  private scopedActionsQuery() {
     const scope = this.getSiteAccessScopeOrThrow();
-    const actions = await this.correctiveActionsRepository.find({
-      where: this.scopedWhere(scope),
-    });
+    const qb = this.correctiveActionsRepository
+      .createQueryBuilder('ca')
+      .where('ca.deleted_at IS NULL')
+      .andWhere('ca.company_id = :companyId', { companyId: scope.companyId });
+    if (!scope.hasCompanyWideAccess) {
+      qb.andWhere('ca.site_id = :siteId', { siteId: scope.siteId });
+    }
+    return qb;
+  }
+
+  async getSlaOverview() {
     const now = new Date();
     const next48Hours = new Date(now);
     next48Hours.setHours(now.getHours() + 48);
 
-    const total = actions.length;
-    const overdue = actions.filter((a) => a.status === 'overdue').length;
-    const done = actions.filter((a) => a.status === 'done').length;
-    const dueSoon = actions.filter((action) => {
-      if (action.status === 'done' || action.status === 'cancelled')
-        return false;
-      const dueDate = new Date(action.due_date);
-      return dueDate >= now && dueDate <= next48Hours;
-    }).length;
-    const criticalOpen = actions.filter(
-      (action) =>
-        action.priority === 'critical' &&
-        !['done', 'cancelled'].includes(action.status),
-    ).length;
-    const highOpen = actions.filter(
-      (action) =>
-        action.priority === 'high' &&
-        !['done', 'cancelled'].includes(action.status),
-    ).length;
-    const resolutionActions = actions.filter((action) => action.closed_at);
+    const counters = await this.scopedActionsQuery()
+      .select('COUNT(*)', 'total')
+      .addSelect(
+        "SUM(CASE WHEN ca.status = 'overdue' THEN 1 ELSE 0 END)",
+        'overdue',
+      )
+      .addSelect("SUM(CASE WHEN ca.status = 'done' THEN 1 ELSE 0 END)", 'done')
+      .addSelect(
+        "SUM(CASE WHEN ca.status NOT IN ('done', 'cancelled') AND ca.due_date >= :now AND ca.due_date <= :next48Hours THEN 1 ELSE 0 END)",
+        'dueSoon',
+      )
+      .addSelect(
+        "SUM(CASE WHEN ca.priority = 'critical' AND ca.status NOT IN ('done', 'cancelled') THEN 1 ELSE 0 END)",
+        'criticalOpen',
+      )
+      .addSelect(
+        "SUM(CASE WHEN ca.priority = 'high' AND ca.status NOT IN ('done', 'cancelled') THEN 1 ELSE 0 END)",
+        'highOpen',
+      )
+      .setParameters({ now, next48Hours })
+      .getRawOne<{
+        total: string;
+        overdue: string;
+        done: string;
+        dueSoon: string;
+        criticalOpen: string;
+        highOpen: string;
+      }>();
+
+    const total = Number.parseInt(counters?.total ?? '0', 10);
+    const overdue = Number.parseInt(counters?.overdue ?? '0', 10);
+    const done = Number.parseInt(counters?.done ?? '0', 10);
+    const dueSoon = Number.parseInt(counters?.dueSoon ?? '0', 10);
+    const criticalOpen = Number.parseInt(counters?.criticalOpen ?? '0', 10);
+    const highOpen = Number.parseInt(counters?.highOpen ?? '0', 10);
+
+    // Só busca os campos mínimos das ações já concluídas (não o conjunto
+    // completo, que domina o volume) para calcular a média de dias de
+    // resolução. Teto de segurança na mesma linha de findAllForExport
+    // (dds.service.ts) — cálculo de média em JS porque AVG(data - data)
+    // portável entre Postgres (produção) e SQLite (testes) exigiria
+    // funções de data incompatíveis entre os dois drivers.
+    const RESOLUTION_SAMPLE_LIMIT = 20000;
+    const closedActions = await this.scopedActionsQuery()
+      .andWhere('ca.closed_at IS NOT NULL')
+      .select(['ca.id', 'ca.created_at', 'ca.closed_at'])
+      .take(RESOLUTION_SAMPLE_LIMIT)
+      .getMany();
+
     const avgResolutionDays =
-      resolutionActions.length > 0
+      closedActions.length > 0
         ? (
-            resolutionActions.reduce((sum, action) => {
+            closedActions.reduce((sum, action) => {
               const closedAt = new Date(action.closed_at as Date).getTime();
               const createdAt = new Date(action.created_at).getTime();
               return sum + (closedAt - createdAt) / 86400000;
-            }, 0) / resolutionActions.length
+            }, 0) / closedActions.length
           ).toFixed(1)
         : '0.0';
 
@@ -384,13 +422,7 @@ export class CorrectiveActionsService extends BaseService<CorrectiveAction> {
   }
 
   async getSlaBySite() {
-    const scope = this.getSiteAccessScopeOrThrow();
-    const actions = await this.correctiveActionsRepository.find({
-      where: this.scopedWhere(scope),
-      relations: ['site'],
-    });
-    const sitesQuery = this.correctiveActionsRepository
-      .createQueryBuilder('ca')
+    const sitesQuery = this.scopedActionsQuery()
       .leftJoinAndSelect('ca.site', 'site')
       .select('site.id', 'siteId')
       .addSelect('site.nome', 'siteName')
@@ -399,18 +431,18 @@ export class CorrectiveActionsService extends BaseService<CorrectiveAction> {
         "SUM(CASE WHEN ca.status = 'overdue' THEN 1 ELSE 0 END)",
         'overdue',
       )
-      .where('ca.deleted_at IS NULL')
-      .andWhere('ca.company_id = :companyId', { companyId: scope.companyId })
+      .addSelect(
+        "SUM(CASE WHEN ca.priority = 'critical' AND ca.status NOT IN ('done', 'cancelled') THEN 1 ELSE 0 END)",
+        'criticalOpen',
+      )
       .groupBy('site.nome')
       .addGroupBy('site.id');
-    if (!scope.hasCompanyWideAccess) {
-      sitesQuery.andWhere('ca.site_id = :siteId', { siteId: scope.siteId });
-    }
     const sites = await sitesQuery.getRawMany<{
       siteId: string | null;
       siteName: string | null;
       total: string;
       overdue: string;
+      criticalOpen: string;
     }>();
 
     return sites.map((s) => ({
@@ -418,12 +450,7 @@ export class CorrectiveActionsService extends BaseService<CorrectiveAction> {
       site: s.siteName || 'Sem Unidade',
       total: Number.parseInt(s.total, 10),
       overdue: Number.parseInt(s.overdue, 10),
-      criticalOpen: actions.filter(
-        (action) =>
-          action.site_id === s.siteId &&
-          action.priority === 'critical' &&
-          !['done', 'cancelled'].includes(action.status),
-      ).length,
+      criticalOpen: Number.parseInt(s.criticalOpen, 10),
       complianceRate:
         Number.parseInt(s.total, 10) > 0
           ? ((Number.parseInt(s.total, 10) - Number.parseInt(s.overdue, 10)) /

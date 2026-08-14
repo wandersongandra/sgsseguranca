@@ -1,6 +1,7 @@
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 import { siteStore } from "@/lib/siteStore";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
+import { logger } from "@/lib/logger";
 import type { UseFormSetValue } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -60,7 +61,7 @@ function mergeTenantCatalog<T extends { id: string; company_id: string }>(
   }
 
   failures.push(label);
-  console.error("Erro ao carregar catálogo da APR: %s", label, result.reason);
+  logger.error("Erro ao carregar catálogo da APR: %s", label, result.reason);
 }
 
 export function useAprCatalogs({
@@ -91,7 +92,7 @@ export function useAprCatalogs({
 
       if (!isUuidLike(selectedCompanyId)) {
         if (cancelled) return;
-        console.warn(
+        logger.warn(
           "Empresa inválida ao carregar catálogos operacionais da APR:",
           selectedCompanyId,
         );
@@ -151,7 +152,7 @@ export function useAprCatalogs({
         if (cancelled) {
           return;
         }
-        console.error(
+        logger.error(
           "Erro inesperado ao carregar catálogos operacionais da APR:",
           error,
         );
@@ -180,7 +181,7 @@ export function useAprCatalogs({
 
       if (!isUuidLike(selectedCompanyId)) {
         if (cancelled) return;
-        console.warn(
+        logger.warn(
           "Empresa inválida ao carregar catálogos de apoio da APR:",
           selectedCompanyId,
         );
@@ -237,7 +238,7 @@ export function useAprCatalogs({
         if (cancelled) {
           return;
         }
-        console.error(
+        logger.error(
           "Erro inesperado ao carregar catálogos de apoio da APR:",
           error,
         );
@@ -283,7 +284,7 @@ export function useAprCatalogs({
         if (cancelled) {
           return;
         }
-        console.error("Erro ao carregar usuários da APR:", error);
+        logger.error("Erro ao carregar usuários da APR:", error);
         toast.error("Alguns responsáveis da APR não puderam ser carregados.");
       }
     }

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Mail, Send } from 'lucide-react';
 import { toast } from 'sonner';
@@ -7,6 +9,7 @@ import {
   DocumentMailDispatchResponse,
   extractMailDispatchErrorMessage,
 } from '@/services/mailService';
+import { logger } from '@/lib/logger';
 import {
   ModalBody,
   ModalFooter,
@@ -52,7 +55,7 @@ export function DocumentEmailModal({
       onClose();
       setEmail('');
     } catch (error) {
-      console.error('Erro ao enviar e-mail:', error);
+      logger.error('Erro ao enviar e-mail:', error);
       toast.error(await extractMailDispatchErrorMessage(error));
     } finally {
       setSending(false);

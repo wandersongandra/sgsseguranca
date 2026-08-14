@@ -39,8 +39,8 @@ function maskEmail(value) {
 }
 
 function resolveProvider(env) {
-  if ((env.BREVO_API_KEY || '').trim()) {
-    return 'brevo';
+  if ((env.RESEND_API_KEY || '').trim()) {
+    return 'resend';
   }
   if (
     (env.MAIL_HOST || '').trim() &&
@@ -48,9 +48,6 @@ function resolveProvider(env) {
     (env.MAIL_PASS || '').trim()
   ) {
     return 'smtp';
-  }
-  if ((env.RESEND_API_KEY || '').trim()) {
-    return 'resend';
   }
   return 'none';
 }
@@ -297,7 +294,7 @@ async function runAudit() {
           `Falha na verificação SMTP: ${report.provider.verification.error}`,
         );
       }
-    } else if (provider === 'brevo' || provider === 'resend') {
+    } else if (provider === 'resend') {
       report.provider.verification = {
         ok: null,
         provider,

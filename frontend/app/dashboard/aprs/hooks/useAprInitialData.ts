@@ -26,6 +26,7 @@ import {
   type Signature,
 } from "@/services/signaturesService";
 import { toInputDateValue } from "@/lib/date/safeFormat";
+import { logger } from "@/lib/logger";
 import type {
   SophieDraftChecklistSuggestion,
   SophieDraftRiskSuggestion,
@@ -161,7 +162,7 @@ export function useAprInitialData({
           });
           nextCompanies = companiesPage.data;
         } catch (error) {
-          console.error("Erro ao carregar lista de empresas da APR:", error);
+          logger.error("Erro ao carregar lista de empresas da APR:", error);
         }
       } else {
         const fallbackCompanyId =
@@ -173,7 +174,7 @@ export function useAprInitialData({
               await companiesService.findOne(fallbackCompanyId);
             nextCompanies = [selectedCompany];
           } catch (error) {
-            console.error(
+            logger.error(
               "Erro ao carregar empresa padrão da APR para o usuário:",
               error,
             );
@@ -252,7 +253,7 @@ export function useAprInitialData({
               if (cancelled) {
                 return;
               }
-              console.error("Erro ao carregar assinaturas da APR:", error);
+              logger.error("Erro ao carregar assinaturas da APR:", error);
               toast.error(
                 "Algumas assinaturas da APR não puderam ser carregadas.",
               );
@@ -298,7 +299,7 @@ export function useAprInitialData({
               );
             } catch (error) {
               if (!cancelled) {
-                console.error(
+                logger.error(
                   "Erro ao carregar a linha do tempo da APR:",
                   error,
                 );
@@ -519,7 +520,7 @@ export function useAprInitialData({
         await loadCompanies(companySeedId);
       } catch (error) {
         if (!cancelled) {
-          console.error("Erro ao carregar dados:", error);
+          logger.error("Erro ao carregar dados:", error);
           toast.error("Erro ao carregar dados para o formulário.");
         }
       } finally {

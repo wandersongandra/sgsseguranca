@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { companiesService, Company } from "@/services/companiesService";
 import { aiService } from "@/services/aiService";
 import { isAiEnabled } from "@/lib/featureFlags";
+import { logger } from "@/lib/logger";
 import { SignatureModal } from "../../app/dashboard/checklists/components/SignatureModal";
 import { DdsThemeLibraryModal } from "./DdsThemeLibraryModal";
 import {
@@ -278,7 +279,7 @@ export function DdsForm({ id }: DdsFormProps) {
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (err) {
       toast.error("Não foi possível gerar a prévia do PDF.");
-      console.error("handlePreviewPdf:", err);
+      logger.error("handlePreviewPdf:", err);
     } finally {
       setPreviewLoading(false);
     }
@@ -484,7 +485,7 @@ export function DdsForm({ id }: DdsFormProps) {
         duration: 5000,
       });
     } catch (error) {
-      console.error("Erro na sugestão com Sophie:", error);
+      logger.error("Erro na sugestão com Sophie:", error);
       const message = await extractApiErrorMessage(
         error,
         "Não foi possível obter uma sugestão no momento.",
@@ -642,7 +643,7 @@ export function DdsForm({ id }: DdsFormProps) {
           setInitialSignatureSnapshot(null);
         }
       } catch (error) {
-        console.error("Erro ao carregar dados:", error);
+        logger.error("Erro ao carregar dados:", error);
         toast.error(
           getFormErrorMessage(error, {
             fallback: "Erro ao carregar dados para o formulário.",
@@ -778,7 +779,7 @@ export function DdsForm({ id }: DdsFormProps) {
         });
         setHistoricalPhotoHashes(nextHashes);
       } catch (error) {
-        console.error(
+        logger.error(
           "Erro ao carregar hashes históricos de fotos do DDS:",
           error,
         );
@@ -904,7 +905,7 @@ export function DdsForm({ id }: DdsFormProps) {
         );
       }
     } catch (error) {
-      console.error("Erro ao processar fotos da equipe:", error);
+      logger.error("Erro ao processar fotos da equipe:", error);
       toast.error("Não foi possível processar uma ou mais fotos.");
     } finally {
       event.target.value = "";
@@ -1085,7 +1086,7 @@ export function DdsForm({ id }: DdsFormProps) {
         }
         return;
       }
-      console.error("Erro ao salvar DDS:", error);
+      logger.error("Erro ao salvar DDS:", error);
       const errorMessage = getFormErrorMessage(error, {
         badRequest: "Dados inválidos. Revise os campos obrigatórios.",
         unauthorized: "Sessão expirada. Faça login novamente.",
@@ -1864,7 +1865,7 @@ export function DdsForm({ id }: DdsFormProps) {
               setConfirmResetDialogOpen(false);
               setPendingResetCallback(null);
             } catch (error) {
-              console.error("Erro ao confirmar reset de assinaturas:", error);
+              logger.error("Erro ao confirmar reset de assinaturas:", error);
             }
           }}
           title="Confirmar invalidação de assinaturas"

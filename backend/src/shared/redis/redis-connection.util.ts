@@ -21,9 +21,21 @@ export function assertSecureRedisConnection(
 ): void {
   const isRemoteProduction =
     environment === 'production' && !isLocalRedisConnection(connection);
-  if (isRemoteProduction && !connection.tls) {
+
+  // Opt-in explícito para um Redis na MESMA rede interna do host (ex.: um
+  // container Redis na mesma VPS, acessível apenas pela rede docker interna).
+  // Nesse cenário o tráfego nunca sai da máquina, então a exigência de TLS —
+  // pensada para Redis remoto atravessando a internet — pode ser dispensada.
+  // Continua sendo exigida por padrão: só é relaxada quando esta flag é
+  // ligada deliberadamente. A autenticação (senha) permanece obrigatória.
+  const trustInternalNetwork = /^true$/i.test(
+    process.env.REDIS_ALLOW_INSECURE_INTERNAL || '',
+  );
+
+  if (isRemoteProduction && !connection.tls && !trustInternalNetwork) {
     throw new Error(
-      'Redis remoto em produção exige TLS. Use rediss:// ou habilite REDIS_<TIER>_TLS=true com endpoint TLS válido.',
+      'Redis remoto em produção exige TLS. Use rediss:// ou habilite REDIS_<TIER>_TLS=true com endpoint TLS válido. ' +
+        'Para um Redis na mesma rede interna do host, defina REDIS_ALLOW_INSECURE_INTERNAL=true.',
     );
   }
   if (isRemoteProduction && !connection.password) {

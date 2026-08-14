@@ -207,12 +207,7 @@ export class AuthPrincipalService {
     const hasSiteMismatch =
       Boolean(claimCache.site_id) && claimCache.site_id !== bridge.siteId;
 
-    if (
-      hasAppUserMismatch ||
-      hasAuthUserMismatch ||
-      hasCompanyMismatch ||
-      hasSiteMismatch
-    ) {
+    if (hasAppUserMismatch || hasAuthUserMismatch || hasCompanyMismatch) {
       this.securityAudit.emit({
         event: SecurityEventType.CROSS_TENANT_ATTEMPT,
         severity: SecuritySeverity.CRITICAL,
@@ -265,6 +260,30 @@ export class AuthPrincipalService {
         ...mismatchMetadata,
       });
     }
+
+    // Divergência de obra (site): o banco é a fonte da verdade — o bridge
+    // (find_user_bridge) é quem alimenta RLS e escopo de obra em todo request.
+    // O claim de site no token é apenas um hint congelado no login; quando o
+    // admin move o usuário de obra, ele diverge até a sessão ser renovada.
+    // Tratamos como override (igual ao profile), nunca como bloqueio — evita o
+    // 401 espúrio "divergência de contexto de acesso" e o refresh já re-emite
+    // o token com a obra atual do banco.
+    if (hasSiteMismatch) {
+      this.securityAudit.emit({
+        event: SecurityEventType.ROLE_CHANGED,
+        severity: SecuritySeverity.WARNING,
+        userId: bridge.id,
+        metadata: {
+          ...mismatchMetadata,
+          mismatchType: { siteId: true },
+          action: 'site_claim_overridden_by_db',
+        },
+      });
+      this.logger.warn({
+        event: 'auth_site_claim_mismatch_overridden',
+        ...mismatchMetadata,
+      });
+    }
   }
 
   private async findUserBridge(params: {
@@ -302,6 +321,47 @@ export class AuthPrincipalService {
 
     this.bridgeLookupsInFlight.set(inflightKey, lookupPromise);
     return lookupPromise;
+  }
+
+  /**
+   * Invalida o cache em memória do bridge (e lookups em andamento) de um usuário.
+   * Deve ser chamado sempre que a obra/empresa/perfil do usuário for alterada
+   * administrativamente, para que o próximo request resolva o escopo no banco.
+   */
+  invalidateBridgeCache(params: {
+    authUserId?: string;
+    appUserId?: string;
+  }): void {
+    for (const cacheKey of this.getBridgeCacheKeys(params)) {
+      this.bridgeCache.delete(cacheKey);
+      this.bridgeLookupsInFlight.delete(cacheKey);
+    }
+  }
+
+  /**
+   * Resolve os dados atuais de contexto do usuário DIRECTAMENTE no banco
+   * (sem cache), usado pelo refresh de token para re-emitir claims atualizadas
+   * (ex.: obra trocada pelo admin enquanto a sessão estava ativa).
+   */
+  async resolveCurrentUserContext(params: {
+    authUserId?: string;
+    appUserId?: string;
+  }): Promise<{
+    siteId?: string;
+    siteIds?: string[];
+    companyId?: string;
+    profileName?: string;
+  } | null> {
+    const bridge = await this.lookupUserBridge(params);
+    if (!bridge) {
+      return null;
+    }
+    return {
+      siteId: bridge.siteId ?? undefined,
+      siteIds: bridge.siteIds,
+      companyId: bridge.companyId ?? undefined,
+      profileName: bridge.profileName ?? undefined,
+    };
   }
 
   private async lookupUserBridge(params: {

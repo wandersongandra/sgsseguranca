@@ -269,42 +269,32 @@ export default function DocumentPendenciesPage() {
   const loadPendencies = useCallback(async (filters: PendencyQueryFilters) => {
     const requestId = ++requestSequenceRef.current;
     const timeoutMs = 5000;
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout loading pendencies')), timeoutMs),
-    );
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error('Timeout loading pendencies')),
+        timeoutMs,
+      );
+    });
     try {
       setLoading(true);
       setError(null);
-      const response = await (process.env.NODE_ENV === 'test'
-        ? dashboardService.getDocumentPendencies({
-            ...(filters.companyId ? { companyId: filters.companyId } : {}),
-            ...(filters.siteId ? { siteId: filters.siteId } : {}),
-            ...(filters.module ? { module: filters.module } : {}),
-            ...(filters.status ? { status: filters.status } : {}),
-            ...(filters.criticality
-              ? { criticality: filters.criticality as DocumentPendencyCriticality }
-              : {}),
-            ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
-            ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
-            page: filters.page,
-            limit: 20,
-          })
-        : Promise.race([
-            dashboardService.getDocumentPendencies({
-              ...(filters.companyId ? { companyId: filters.companyId } : {}),
-              ...(filters.siteId ? { siteId: filters.siteId } : {}),
-              ...(filters.module ? { module: filters.module } : {}),
-              ...(filters.status ? { status: filters.status } : {}),
-              ...(filters.criticality
-                ? { criticality: filters.criticality as DocumentPendencyCriticality }
-                : {}),
-              ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
-              ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
-              page: filters.page,
-              limit: 20,
-            }),
-            timeoutPromise,
-          ]));
+      const response = await Promise.race([
+        dashboardService.getDocumentPendencies({
+          ...(filters.companyId ? { companyId: filters.companyId } : {}),
+          ...(filters.siteId ? { siteId: filters.siteId } : {}),
+          ...(filters.module ? { module: filters.module } : {}),
+          ...(filters.status ? { status: filters.status } : {}),
+          ...(filters.criticality
+            ? { criticality: filters.criticality as DocumentPendencyCriticality }
+            : {}),
+          ...(filters.dateFrom ? { dateFrom: filters.dateFrom } : {}),
+          ...(filters.dateTo ? { dateTo: filters.dateTo } : {}),
+          page: filters.page,
+          limit: 20,
+        }),
+        timeoutPromise,
+      ]);
       if (requestId === requestSequenceRef.current) {
         setData(response);
       }
@@ -322,6 +312,7 @@ export default function DocumentPendenciesPage() {
         );
       }
     } finally {
+      clearTimeout(timeoutId);
       if (requestId === requestSequenceRef.current) {
         setLoading(false);
       }

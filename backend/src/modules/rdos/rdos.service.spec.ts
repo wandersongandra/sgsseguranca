@@ -90,6 +90,7 @@ describe('RdosService', () => {
     MailService,
     'sendMail' | 'sendMailSimple' | 'sendStoredDocument'
   >;
+  let mailQueue: { add: jest.Mock };
   let documentStorageService: Pick<
     DocumentStorageService,
     | 'uploadFile'
@@ -225,6 +226,9 @@ describe('RdosService', () => {
         fallbackUsed: false,
       }),
     };
+    mailQueue = {
+      add: jest.fn().mockResolvedValue(undefined),
+    };
     documentStorageService = {
       uploadFile: jest.fn().mockResolvedValue(undefined),
       getSignedUrl: jest.fn().mockResolvedValue('https://storage.test/rdo.pdf'),
@@ -295,6 +299,7 @@ describe('RdosService', () => {
       repository as unknown as Repository<Rdo>,
       tenantService as TenantService,
       mailService as MailService,
+      mailQueue as unknown as import('bullmq').Queue,
       documentStorageService as DocumentStorageService,
       documentGovernanceService as DocumentGovernanceService,
       documentRegistryService as DocumentRegistryService,
@@ -1021,22 +1026,58 @@ describe('RdosService', () => {
       'eng@empresa.com',
     ]);
 
-    expect(mailService.sendStoredDocument).toHaveBeenCalledTimes(2);
-    expect(mailService.sendStoredDocument).toHaveBeenNthCalledWith(
+    expect(mailQueue.add).toHaveBeenCalledTimes(2);
+    expect(mailQueue.add).toHaveBeenNthCalledWith(
       1,
-      RDO_ID,
-      'RDO',
-      'gestor@empresa.com',
-      COMPANY_ID,
+      'send-document',
+      expect.objectContaining({
+        documentId: RDO_ID,
+        documentType: 'RDO',
+        email: 'gestor@empresa.com',
+        companyId: COMPANY_ID,
+      }),
+      expect.anything(),
     );
+    expect(mailService.sendStoredDocument).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       success: true,
+      deliveryMode: 'queued',
       artifactType: 'governed_final_pdf',
       isOfficial: true,
       fallbackUsed: false,
       recipients: 2,
       documentType: 'RDO',
       documentId: RDO_ID,
+    });
+  });
+
+  it('recorre ao envio síncrono quando a fila de e-mail está indisponível', async () => {
+    const rdo = makeRdo({
+      numero: 'RDO-202603-001',
+      pdf_file_key: 'documents/rdo.pdf',
+    });
+    repository.findOne.mockResolvedValue(rdo);
+    (documentRegistryService.findByDocument as jest.Mock).mockResolvedValueOnce(
+      {
+        file_key: 'documents/rdo.pdf',
+        original_name: 'rdo.pdf',
+        folder_path: 'rdos/company-1/week-12',
+      },
+    );
+    mailQueue.add.mockRejectedValueOnce(new Error('fila indisponível'));
+
+    const result = await service.sendEmail(RDO_ID, ['gestor@empresa.com']);
+
+    expect(mailQueue.add).toHaveBeenCalledTimes(1);
+    expect(mailService.sendStoredDocument).toHaveBeenCalledWith(
+      RDO_ID,
+      'RDO',
+      'gestor@empresa.com',
+      COMPANY_ID,
+    );
+    expect(result).toMatchObject({
+      deliveryMode: 'sent',
+      recipients: 1,
     });
   });
 
@@ -1059,6 +1100,7 @@ describe('RdosService', () => {
     );
 
     expect(mailService.sendStoredDocument).not.toHaveBeenCalled();
+    expect(mailQueue.add).not.toHaveBeenCalled();
   });
 
   // ─── listFiles ───────────────────────────────────────────────────────────────

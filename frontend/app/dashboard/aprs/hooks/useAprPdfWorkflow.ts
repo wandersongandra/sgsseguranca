@@ -7,6 +7,7 @@ import { aprsService } from "@/services/aprsService";
 import { signaturesService } from "@/services/signaturesService";
 import type { Signature } from "@/services/signaturesService";
 import { openPdfForPrint } from "@/lib/print-utils";
+import { logger } from "@/lib/logger";
 
 import type { AprFormData } from "../components/aprForm.schema";
 import type { AprLogEntry } from "../components/AprTimeline";
@@ -99,7 +100,7 @@ export function useAprPdfWorkflow({
         })),
       );
     } catch (error) {
-      console.error("Erro ao atualizar a linha do tempo da APR:", error);
+      logger.error("Erro ao atualizar a linha do tempo da APR:", error);
     }
   }, [setAprEvidences, setAprLogs, setVersionHistory]);
 

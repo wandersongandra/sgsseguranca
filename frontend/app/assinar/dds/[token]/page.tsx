@@ -26,6 +26,7 @@ import {
   PublicDdsSignatureContext,
   publicDdsSignatureService,
 } from "@/services/publicDdsSignatureService";
+import { logger } from "@/lib/logger";
 
 declare global {
   interface Window {
@@ -69,7 +70,7 @@ function setSessionToken(token: string) {
   try {
     sessionStorage.setItem(SESSION_KEY, token);
   } catch {
-    // sessionStorage indisponível (ex:私 mode) — falha silenciosa
+    // sessionStorage indisponível (ex: modo privado) — falha silenciosa
   }
 }
 
@@ -276,7 +277,7 @@ export default function PublicDdsSignaturePage() {
         }
       }
     } catch (error) {
-      console.warn("Falha ao recortar assinatura (getTrimmedCanvas), usando fallback:", error);
+      logger.warn("Falha ao recortar assinatura (getTrimmedCanvas), usando fallback:", error);
     }
 
     try {
@@ -284,7 +285,7 @@ export default function PublicDdsSignaturePage() {
         return signatureCanvas.toDataURL("image/png");
       }
     } catch (error) {
-      console.error("Falha ao gerar assinatura via toDataURL:", error);
+      logger.error("Falha ao gerar assinatura via toDataURL:", error);
     }
 
     return "";

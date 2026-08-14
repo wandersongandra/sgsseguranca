@@ -5,6 +5,7 @@ import { TenantService } from './tenant/tenant.service';
 import { TenantDbContextService } from './database/tenant-db-context.service';
 import { DbTimingsService } from './database/db-timings.service';
 import { PrivilegedDbService } from './database/privileged-db.service';
+import { ProvisioningDataSourceService } from './database/provisioning-datasource.service';
 import { PasswordService } from './services/password.service';
 import { CacheService } from './cache/cache.service';
 import { StorageService } from './services/storage.service';
@@ -56,6 +57,7 @@ import { FileInspectionModule } from './security/file-inspection.module';
     TenantDbContextService,
     DbTimingsService,
     PrivilegedDbService,
+    ProvisioningDataSourceService,
     PasswordService,
     CacheService,
     StorageService,
@@ -84,6 +86,7 @@ import { FileInspectionModule } from './security/file-inspection.module';
     TenantDbContextService,
     DbTimingsService,
     PrivilegedDbService,
+    ProvisioningDataSourceService,
     PasswordService,
     CacheService,
     StorageService,

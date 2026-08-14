@@ -57,6 +57,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { aiService } from "@/services/aiService";
 import { isAiEnabled } from "@/lib/featureFlags";
+import { logger } from "@/lib/logger";
 import { signaturesService } from "@/services/signaturesService";
 import { useFormSubmit } from "@/hooks/useFormSubmit";
 import { siteStore } from "@/lib/siteStore";
@@ -818,7 +819,7 @@ export function AprForm({ id }: AprFormProps) {
         }
       })
       .catch((error) => {
-        console.error("Erro ao carregar templates de atividade da APR:", error);
+        logger.error("Erro ao carregar templates de atividade da APR:", error);
       });
 
     return () => {
@@ -848,7 +849,7 @@ export function AprForm({ id }: AprFormProps) {
         }
       })
       .catch((error) => {
-        console.error(
+        logger.error(
           "Erro ao carregar detalhes do template de atividade da APR:",
           error,
         );
@@ -1268,7 +1269,7 @@ export function AprForm({ id }: AprFormProps) {
           `Preview da planilha concluído: ${preview.importedRows} linha(s) pronta(s) para revisão.`,
         );
       } catch (error) {
-        console.error("Erro ao importar planilha APR:", error);
+        logger.error("Erro ao importar planilha APR:", error);
         const message =
           typeof error === "object" &&
           error !== null &&
@@ -1816,7 +1817,7 @@ export function AprForm({ id }: AprFormProps) {
             didNavigateToPdf = result.didNavigateToPdf;
             usedPopup = result.usedPopup;
           } catch (printError) {
-            console.error(
+            logger.error(
               "Erro ao preparar impressão automática da APR:",
               printError,
             );
@@ -1880,7 +1881,7 @@ export function AprForm({ id }: AprFormProps) {
         duration: 5000,
       });
     } catch (error) {
-      console.error("Erro na análise do SGS:", error);
+      logger.error("Erro na análise do SGS:", error);
       toast.error("Não foi possível realizar a análise no momento.");
     } finally {
       setAnalyzing(false);

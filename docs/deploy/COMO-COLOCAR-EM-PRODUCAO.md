@@ -5,8 +5,12 @@
 
 > **A regra que resume tudo:** neste projeto, **PR mergeado ≠ está em produção**.
 > Nada sobe sozinho de forma confiável. Sempre confirme o commit que está realmente rodando.
+>
+> **Infra desde 2026-07-31:** Backend Web, Worker, Redis e ClamAV rodam todos na **mesma VPS
+> Hostinger** (Brasil), via Coolify. Substituiu a VPS Vultr/Integrator (Virgínia, EUA — desativada).
+> Detalhes completos: [`hostinger-coolify-infra-atual.md`](./hostinger-coolify-infra-atual.md).
 
-Detalhe de configuração do Coolify (env vars, recursos, domínios):
+Detalhe histórico da configuração antiga (Vultr — desativada):
 [`coolify-vultr-backend-web-worker.md`](./coolify-vultr-backend-web-worker.md).
 
 Para mudanças de Redis/TLS, use também:
@@ -19,8 +23,8 @@ Para mudanças de Redis/TLS, use também:
 | Componente | Plataforma | Sobe sozinho? | Como subir |
 |---|---|---|---|
 | **Frontend** | Vercel | **Não** — sem integração git | `vercel --prod` manual |
-| **Backend Web** | Coolify/Vultr | Webhook existe, **não é confiável** | API ou painel |
-| **Worker** | Coolify/Vultr (2ª VPS) | idem | API ou painel |
+| **Backend Web** | Coolify/Hostinger VPS | Webhook existe, **não é confiável** | API ou painel |
+| **Worker** | Coolify/Hostinger VPS (mesma VPS do Web) | idem | API ou painel |
 | **Migrations** | Neon | **Não** — por decisão de projeto | `npm run migration:run` manual |
 
 ---
@@ -75,33 +79,44 @@ reexibido depois de criado).
 
 ```bash
 TOKEN="<seu token>"
-COOLIFY="http://216.22.43.246:8000"
+COOLIFY="http://179.198.107.5:8000"
 
 # Backend Web
 curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  "$COOLIFY/api/v1/deploy?uuid=zdz9pgctj4k0gpds0sj2az6s&force=false"
+  "$COOLIFY/api/v1/deploy?uuid=s2jgvkq9trtm8c9itahmn7og&force=false"
 
-# Worker
+# Worker — SÓ DEPOIS que o Web acima terminar (ver aviso abaixo)
 curl -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  "$COOLIFY/api/v1/deploy?uuid=jos9vyejobbagk1yejqlsfhd&force=false"
+  "$COOLIFY/api/v1/deploy?uuid=x3k7efj1x3pcl4ipcuswwmll&force=false"
 ```
 
 > **`Accept: application/json` é obrigatório.** Sem esse header a API responde
 > `{"message":"Unauthenticated."}` mesmo com o token correto — parece erro de credencial e não é.
+>
+> **NUNCA dispare um novo deploy do mesmo app enquanto o anterior está `in_progress`.**
+> O Coolify cancela o build em andamento (BuildKit: `rpc error: code = Canceled desc = context
+> canceled`) e remove o container que estava rodando **sem subir um novo no lugar** — a aplicação
+> fica fora do ar até alguém perceber e disparar de novo. Já aconteceu em produção (2026-07-31):
+> vários redeploys em sequência (ajustando env vars) sem esperar cada um terminar derrubaram o
+> backend-web e o backend-worker ao mesmo tempo. Sempre espere `status == finished` (ou `failed`)
+> antes do próximo `deploy?uuid=...` — inclusive entre Web e Worker, dispare um de cada vez.
+>
+> O build deste projeto é pesado (Chromium/Puppeteer): normal levar **15–25 minutos**. Não é motivo
+> para redisparar — é motivo para esperar.
 
 | Aplicação | UUID |
 |---|---|
-| Backend WEB | `zdz9pgctj4k0gpds0sj2az6s` |
-| Backend Worker | `jos9vyejobbagk1yejqlsfhd` |
+| Backend WEB | `s2jgvkq9trtm8c9itahmn7og` |
+| Backend Worker | `x3k7efj1x3pcl4ipcuswwmll` |
 
 Painel do ambiente atual:
-`http://216.22.43.246:8000/project/e90jc1p5csbhj21cii0xybf4/environment/dmsy07hd8g2gz5bqqctokf9n`.
+`http://179.198.107.5:8000/project/k4tvj4jbsu1vc7jqggwzvv1f/environment/r2j049cg1r2ocoi4lx57xzuj`.
 
 ### Confirmar que subiu o commit certo
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
-  "$COOLIFY/api/v1/deployments/applications/zdz9pgctj4k0gpds0sj2az6s" \
+  "$COOLIFY/api/v1/deployments/applications/s2jgvkq9trtm8c9itahmn7og" \
   | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{
       const x=JSON.parse(d).deployments[0];
       console.log(x.status, x.commit, x.created_at);
@@ -110,6 +125,16 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
 
 Compare o `commit` com o HEAD da `main` (`git log --oneline -1`). Se não bater, **o deploy não
 aconteceu** — independente do que o `/health` diga.
+
+### Verificar status de um deploy específico (antes de disparar outro)
+
+```bash
+DEPLOYMENT_UUID="<retornado pelo /deploy acima>"
+curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/json" \
+  "$COOLIFY/api/v1/deployments/$DEPLOYMENT_UUID" \
+  | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{console.log(JSON.parse(d).status)})"
+# só dispare o proximo deploy quando isto disser "finished" ou "failed"
+```
 
 ---
 

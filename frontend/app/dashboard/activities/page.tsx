@@ -184,10 +184,10 @@ export default function ActivitiesPage() {
                     <TableCell>{safeToLocaleDateString(activity.createdAt, 'pt-BR', undefined, '—')}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
-                        <Link href={`/dashboard/activities/edit/${activity.id}`} className={buttonVariants({ size: 'icon', variant: 'ghost' })} title="Editar atividade">
+                        <Link href={`/dashboard/activities/edit/${activity.id}`} className={buttonVariants({ size: 'icon', variant: 'ghost' })} title="Editar atividade" aria-label={`Editar atividade ${activity.nome}`}>
                           <Pencil className="h-4 w-4" />
                         </Link>
-                        <Button type="button" size="icon" variant="ghost" onClick={() => handleDelete(activity.id)} className="text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 hover:text-[var(--ds-color-danger)]" title="Excluir atividade">
+                        <Button type="button" size="icon" variant="ghost" onClick={() => handleDelete(activity.id)} className="text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 hover:text-[var(--ds-color-danger)]" title="Excluir atividade" aria-label={`Excluir atividade ${activity.nome}`}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>

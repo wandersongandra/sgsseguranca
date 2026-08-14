@@ -1,8 +1,6 @@
-import api from "@/lib/api";
+import api, { TIMEOUT_PDF } from "@/lib/api";
 import type { GovernedPdfAccessResponse, GovernedPdfAccessAvailability } from "@/lib/api/generated/governed-contracts.client";
-import { AxiosError } from "axios";
 import { Site } from "./sitesService";
-import { enqueueOfflineMutation } from "@/lib/offline-sync";
 import { fetchAllPages, PaginatedResponse } from "./pagination";
 import { assertNonConformityActionAvailable } from "@/lib/offline-capabilities";
 
@@ -136,6 +134,15 @@ export interface NonConformityAttachmentAttachResponse {
   };
 }
 
+export interface NonConformityAttachmentRemoveResponse {
+  entityId: string;
+  attachments: string[];
+  attachmentCount: number;
+  removedAttachmentReference: string;
+  storageCleanup: "removed" | "pending";
+  message: string;
+}
+
 export enum NcStatus {
   ABERTA = "ABERTA",
   EM_ANDAMENTO = "EM_ANDAMENTO",
@@ -172,7 +179,11 @@ function decodeBase64Url(value: string): string {
     normalized.length + ((4 - (normalized.length % 4 || 4)) % 4),
     "=",
   );
-  return atob(padded);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (character) =>
+    character.charCodeAt(0),
+  );
+  return new TextDecoder().decode(bytes);
 }
 
 export function parseGovernedNcAttachmentReference(
@@ -302,69 +313,18 @@ export const nonConformitiesService = {
   },
 
   create: async (data: Partial<NonConformity>) => {
-    try {
-      const response = await api.post<NonConformity>("/nonconformities", data);
-      return normalizeNonConformity(response.data);
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      if (axiosError.code !== "ERR_NETWORK") {
-        throw error;
-      }
-
-      const queued = await enqueueOfflineMutation({
-        url: "/nonconformities",
-        method: "post",
-        data,
-        label: "NC",
-      });
-
-      return {
-        ...(data as NonConformity),
-        id: queued.id,
-        created_at: queued.createdAt,
-        updated_at: queued.createdAt,
-        offlineQueued: true,
-      } as NonConformity & { offlineQueued: true };
-    }
+    assertNonConformityActionAvailable("create");
+    const response = await api.post<NonConformity>("/nonconformities", data);
+    return normalizeNonConformity(response.data);
   },
 
   update: async (id: string, data: Partial<NonConformity>) => {
-    try {
-      const response = await api.patch<NonConformity>(
-        `/nonconformities/${id}`,
-        data,
-      );
-      return normalizeNonConformity(response.data);
-    } catch (error) {
-      const axiosError = error as AxiosError;
-      if (axiosError.code !== "ERR_NETWORK") {
-        throw error;
-      }
-
-      const queued = await enqueueOfflineMutation({
-        url: `/nonconformities/${id}`,
-        method: "patch",
-        data,
-        label: "NC",
-      });
-
-      return {
-        ...(data as NonConformity),
-        id,
-        created_at: queued.createdAt,
-        updated_at: queued.createdAt,
-        offlineQueued: true,
-      } as NonConformity & { offlineQueued: true };
-    }
-  },
-
-  attachFile: async (id: string, file: File) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    const response = await api.post(`/nonconformities/${id}/file`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-    return response.data;
+    assertNonConformityActionAvailable("update");
+    const response = await api.patch<NonConformity>(
+      `/nonconformities/${id}`,
+      data,
+    );
+    return normalizeNonConformity(response.data);
   },
 
   getPdfAccess: async (id: string) => {
@@ -374,10 +334,21 @@ export const nonConformitiesService = {
     return response.data;
   },
 
+  generateFinalPdf: async (id: string) => {
+    assertNonConformityActionAvailable("generate-pdf");
+    const response = await api.post<NonConformityPdfAccessResponse & { generated: boolean }>(
+      `/nonconformities/${id}/generate-final-pdf`,
+      undefined,
+      { timeout: TIMEOUT_PDF },
+    );
+    return response.data;
+  },
+
   attachAttachment: async (
     id: string,
     file: File,
   ): Promise<NonConformityAttachmentAttachResponse> => {
+    assertNonConformityActionAvailable("upload");
     const formData = new FormData();
     formData.append("file", file);
     const response = await api.post<NonConformityAttachmentAttachResponse>(
@@ -386,6 +357,17 @@ export const nonConformitiesService = {
       {
         headers: { "Content-Type": "multipart/form-data" },
       },
+    );
+    return response.data;
+  },
+
+  removeAttachment: async (
+    id: string,
+    index: number,
+  ): Promise<NonConformityAttachmentRemoveResponse> => {
+    assertNonConformityActionAvailable("remove");
+    const response = await api.delete<NonConformityAttachmentRemoveResponse>(
+      `/nonconformities/${id}/attachments/${index}`,
     );
     return response.data;
   },

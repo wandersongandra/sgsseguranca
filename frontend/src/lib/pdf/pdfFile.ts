@@ -1,3 +1,5 @@
+import { logger } from "@/lib/logger";
+
 export async function blobToBase64(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -38,7 +40,7 @@ export async function fetchImageAsDataUrl(url: string): Promise<string | null> {
     const blob = await response.blob();
     return await blobToDataUrl(blob);
   } catch {
-    console.warn('[PDF] Erro ao buscar imagem para o documento.');
+    logger.warn('[PDF] Erro ao buscar imagem para o documento.');
     return null;
   }
 }
