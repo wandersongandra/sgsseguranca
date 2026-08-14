@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { BaseAuditEntity } from '../../../shared/entities/base-audit.entity';
 import { Company } from '../../companies/entities/company.entity';
+import type { PhotographicReportRegistrationType } from '../photographic-reports.constants';
 import { PhotographicReportDay } from './photographic-report-day.entity';
 import { PhotographicReportImage } from './photographic-report-image.entity';
 import { PhotographicReportExport } from './photographic-report-export.entity';
@@ -114,8 +115,37 @@ export class PhotographicReport extends BaseAuditEntity {
   @Column({ type: 'varchar', length: 160 })
   responsible_name: string;
 
+  // ── Credencial do responsável técnico ─────────────────────────────────────
+  // Um relatório técnico de SST é julgado pelo registro profissional de quem
+  // assina. Sem estes campos o documento é apenas um álbum de fotos.
+
+  @Column({ type: 'varchar', length: 12, nullable: true })
+  responsible_registration_type: PhotographicReportRegistrationType | null;
+
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  responsible_registration_number: string | null;
+
+  @Column({ type: 'varchar', length: 2, nullable: true })
+  responsible_registration_state: string | null;
+
+  /** Anotação de Responsabilidade Técnica, quando houver. */
+  @Column({ type: 'varchar', length: 60, nullable: true })
+  art_number: string | null;
+
   @Column({ type: 'varchar', length: 180 })
   contractor_company: string;
+
+  // ── Escopo normativo e método ─────────────────────────────────────────────
+
+  /** NRs aplicáveis, validadas contra APPLICABLE_NR_OPTIONS no serviço. */
+  @Column({ type: 'jsonb', nullable: true })
+  applicable_nrs: string[] | null;
+
+  @Column({ type: 'text', nullable: true })
+  inspection_methodology: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  scope_and_limitations: string | null;
 
   @Column({ type: 'text', nullable: true })
   general_observations: string | null;
@@ -132,6 +162,29 @@ export class PhotographicReport extends BaseAuditEntity {
     default: PhotographicReportStatus.RASCUNHO,
   })
   status: PhotographicReportStatus;
+
+  // ── Governança do documento emitido ───────────────────────────────────────
+  // Escritos EXCLUSIVAMENTE pelo backend, dentro da transação de
+  // registerFinalDocument. Nunca aceitos no payload — os DTOs os rejeitam.
+
+  /** Código público impresso no PDF e no QR (RFP-<ano>-<8>). */
+  @Column({ type: 'varchar', length: 24, nullable: true })
+  verification_code: string | null;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  final_pdf_hash_sha256: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  pdf_file_key: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  pdf_folder_path: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  pdf_original_name: string | null;
+
+  @Column({ type: 'timestamp', nullable: true })
+  pdf_generated_at: Date | null;
 
   @Column({ type: 'uuid', nullable: true })
   created_by: string | null;

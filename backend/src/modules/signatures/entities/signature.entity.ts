@@ -72,6 +72,19 @@ export class Signature {
   @Column({ type: 'jsonb', nullable: true })
   integrity_payload?: Record<string, unknown>;
 
+  /** Hash do conteúdo semântico protegido; nulo em assinaturas legadas. */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  content_hash?: string | null;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  hash_algorithm?: string | null;
+
+  @Column({ type: 'int', nullable: true })
+  canonicalization_version?: number | null;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  integrity_scheme?: string | null;
+
   @CreateDateColumn()
   created_at: Date;
 

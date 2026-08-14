@@ -79,6 +79,9 @@ const signatureDocumentTypeToRegistryModule = new Map<string, GovernedModule>([
   ['NAO_CONFORMIDADE', 'nonconformity'],
   ['NC', 'nonconformity'],
   ['RDO', 'rdo'],
+  ['PHOTOGRAPHIC_REPORT', 'photographic_report'],
+  ['RELATORIO_FOTOGRAFICO', 'photographic_report'],
+  ['RFP', 'photographic_report'],
 ]);
 
 function normalizeSignatureDocumentType(documentType: string): string {

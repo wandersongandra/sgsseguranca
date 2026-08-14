@@ -186,12 +186,12 @@ describeE2E(
 
       it('VISUALIZADOR (Trabalhador): POST /signatures -> 201 quando permitido', async () => {
         const tenantA = testApp.getTenant('tenantA');
-        const tecnico = testApp.getUser('tenantA', Role.TST);
         const apr = await createApr(testApp, tecnicoSession, {
           numero: 'APR-VIEWER-SIGN-001',
           titulo: 'APR para validar assinatura do visualizador',
           siteId: tenantA.siteId,
-          elaboradorId: tecnico.id,
+          elaboradorId: trabalhadorSession.userId,
+          participantIds: [trabalhadorSession.userId],
         });
 
         const response = await testApp

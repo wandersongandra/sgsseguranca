@@ -18,6 +18,11 @@ export type PhotographicReportStatus =
   | 'Exportado'
   | 'Cancelado';
 export type PhotographicReportExportType = 'word' | 'pdf';
+export type PhotographicReportRegistrationType =
+  | 'CREA'
+  | 'CFT'
+  | 'MTE'
+  | 'Outro';
 
 export interface PhotographicReportDay {
   id: string;
@@ -44,6 +49,26 @@ export interface PhotographicReportImage {
   ai_condition_classification: string | null;
   ai_recommendations: string[] | null;
   photo_conditions: string[] | null;
+
+  // Não conformidade
+  is_nonconformity: boolean;
+  recommended_action: string | null;
+  action_deadline: string | null;
+  action_responsible: string | null;
+
+  // Integridade da evidência. `device_id` e `ip_address` não são expostos pela
+  // API por decisão de projeto — só o manifesto do PDF os consome.
+  original_name: string | null;
+  mime_type: string | null;
+  file_size_bytes: number | null;
+  hash_sha256: string | null;
+  captured_at: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  accuracy_m: number | null;
+  exif_datetime: string | null;
+  integrity_flags: Record<string, unknown> | null;
+
   created_at: string;
   updated_at: string;
   day?: PhotographicReportDay | null;
@@ -77,7 +102,14 @@ export interface PhotographicReportListItem {
   start_time: string;
   end_time: string;
   responsible_name: string;
+  responsible_registration_type: PhotographicReportRegistrationType | null;
+  responsible_registration_number: string | null;
+  responsible_registration_state: string | null;
+  art_number: string | null;
   contractor_company: string;
+  applicable_nrs: string[] | null;
+  inspection_methodology: string | null;
+  scope_and_limitations: string | null;
   general_observations: string | null;
   ai_summary: string | null;
   final_conclusion: string | null;
@@ -89,6 +121,11 @@ export interface PhotographicReportListItem {
   image_count: number;
   export_count: number;
   last_exported_at: string | null;
+
+  // Governança — somente leitura. Escritos pelo backend na emissão do PDF.
+  verification_code: string | null;
+  final_pdf_hash_sha256: string | null;
+  pdf_generated_at: string | null;
 }
 
 export interface PhotographicReport extends PhotographicReportListItem {
@@ -113,7 +150,14 @@ export interface CreatePhotographicReportDto {
   start_time: string;
   end_time: string;
   responsible_name: string;
+  responsible_registration_type?: PhotographicReportRegistrationType | null;
+  responsible_registration_number?: string | null;
+  responsible_registration_state?: string | null;
+  art_number?: string | null;
   contractor_company: string;
+  applicable_nrs?: string[] | null;
+  inspection_methodology?: string | null;
+  scope_and_limitations?: string | null;
   general_observations?: string | null;
   created_by?: string | null;
 }
@@ -145,6 +189,10 @@ export interface UpdatePhotographicReportImageDto {
   ai_condition_classification?: string | null;
   ai_recommendations?: string[] | null;
   photo_conditions?: string[] | null;
+  is_nonconformity?: boolean;
+  recommended_action?: string | null;
+  action_deadline?: string | null;
+  action_responsible?: string | null;
 }
 
 export interface ReorderPhotographicReportImagesDto {
@@ -155,6 +203,19 @@ export interface UploadPhotographicReportImagesDto {
   report_day_id?: string | null;
   activity_date?: string | null;
   manual_caption?: string | null;
+
+  /** Posição do operador no momento do envio — uma por lote, não por foto. */
+  latitude?: number | null;
+  longitude?: number | null;
+  accuracy_m?: number | null;
+  device_id?: string | null;
+
+  /** O processamento no cliente re-encoda a imagem; ver manifesto do PDF. */
+  client_reencoded?: boolean;
+
+  /** Listas posicionais: o índice N descreve o arquivo N em `files`. */
+  captured_at_list?: string[];
+  exif_datetime_list?: string[];
 }
 
 export interface PhotographicReportPdfAccess {
@@ -185,6 +246,37 @@ function buildFormData(
   if (dto?.manual_caption) {
     formData.append('manual_caption', dto.manual_caption);
   }
+
+  // Guarda por `!= null`, não por truthiness: latitude/longitude/accuracy 0 são
+  // valores legítimos (Equador, meridiano de Greenwich, precisão perfeita) e
+  // desapareceriam num teste de verdade.
+  if (dto?.latitude != null) {
+    formData.append('latitude', String(dto.latitude));
+  }
+  if (dto?.longitude != null) {
+    formData.append('longitude', String(dto.longitude));
+  }
+  if (dto?.accuracy_m != null) {
+    formData.append('accuracy_m', String(dto.accuracy_m));
+  }
+  if (dto?.device_id) {
+    formData.append('device_id', dto.device_id);
+  }
+  if (dto?.client_reencoded != null) {
+    formData.append('client_reencoded', String(dto.client_reencoded));
+  }
+
+  // Listas posicionais viajam como JSON num único campo do form.
+  if (dto?.captured_at_list?.length) {
+    formData.append('captured_at_list', JSON.stringify(dto.captured_at_list));
+  }
+  if (dto?.exif_datetime_list?.length) {
+    formData.append(
+      'exif_datetime_list',
+      JSON.stringify(dto.exif_datetime_list),
+    );
+  }
+
   return formData;
 }
 

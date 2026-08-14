@@ -1503,25 +1503,20 @@ export class AuthService {
         });
       }
 
-      // Busca o usuário ignorando RLS (rota pública, sem contexto de tenant)
+      // Busca o usuário sem contexto de tenant (rota pública) através da mesma
+      // função SECURITY DEFINER que o login usa.
+      //
+      // Antes daqui saía uma CTE com `set_config('app.is_super_admin','true')`,
+      // que virou letra morta na migration 361 — `is_super_admin()` passou a
+      // exigir membership em `sgs_rls_bypass`, e `sgs_app` não tem mais. A RLS
+      // de `users` devolvia 0 linhas, `canIssueRealToken` ficava false e o
+      // e-mail de redefinição nunca era enviado. Como a resposta ao usuário é
+      // genérica por antienumeração, a falha era invisível dos dois lados.
       const cpfHash = hashSensitiveValue(normalizedCpf);
       const legacyPlaintextLookupEnabled = isLegacyCpfPlaintextLookupEnabled();
       const userRows = (await this.dataSource.query(
-        `
-          WITH _ctx AS (
-            SELECT set_config('app.is_super_admin', 'true', true)
-          )
-          SELECT u.id, u.email, u.nome, u.status
-          FROM _ctx, users u
-          WHERE ${
-            legacyPlaintextLookupEnabled
-              ? '(u.cpf_hash = $1 OR u.cpf = $2)'
-              : 'u.cpf_hash = $1'
-          }
-            AND u.deleted_at IS NULL
-          LIMIT 1
-        `,
-        legacyPlaintextLookupEnabled ? [cpfHash, normalizedCpf] : [cpfHash],
+        `SELECT id, email, nome, status FROM find_login_user($1, $2)`,
+        [cpfHash, legacyPlaintextLookupEnabled ? normalizedCpf : null],
       )) as unknown;
       const user =
         Array.isArray(userRows) && userRows.length > 0
@@ -1664,21 +1659,33 @@ export class AuthService {
     await this.pwnedPasswordService.assertNotPwned(newPassword);
 
     const hashedPassword = await this.passwordService.hash(newPassword);
-    let resetUserCompanyId: string | null = null;
-    await this.dataSource.transaction(async (manager) => {
-      await manager.query("SET LOCAL app.is_super_admin = 'true'");
-      const rows: { company_id: string }[] =
-        (await manager.query<{ company_id: string }[]>(
-          `SELECT company_id FROM "users" WHERE id = $1`,
-          [userId],
-        )) ?? [];
-      resetUserCompanyId = rows[0]?.company_id ?? null;
-      await manager.update(
-        User,
-        { id: userId },
-        { password: hashedPassword, must_change_password: false },
+
+    // Grava por função SECURITY DEFINER, pela mesma razão do lookup em
+    // forgotPassword: esta rota é pública e não tem tenant, e a flag de sessão
+    // deixou de conceder bypass na migration 361. O `UPDATE users` que havia
+    // aqui era descartado pela RLS com 0 linhas afetadas — sem erro. O fluxo
+    // seguia, invalidava os refresh tokens e respondia "senha alterada", com a
+    // senha antiga intacta.
+    const resetRows = await this.dataSource.query<
+      Array<{ user_id: string; company_id: string | null }>
+    >(`SELECT user_id, company_id FROM reset_login_user_password($1, $2)`, [
+      userId,
+      hashedPassword,
+    ]);
+
+    // Zero linhas = nada foi atualizado (usuário inexistente ou já excluído).
+    // Falhar alto: responder sucesso sem ter trocado a senha é exatamente o
+    // defeito que esta mudança corrige.
+    if (!resetRows?.length) {
+      this.logger.error({
+        event: 'reset_password_no_row_updated',
+        tokenHashPrefix,
+      });
+      throw new BadRequestException(
+        'Não foi possível redefinir a senha. Solicite um novo link de redefinição.',
       );
-    });
+    }
+    const resetUserCompanyId = resetRows[0].company_id;
 
     // Token invalidado com marcação NX + timestamp de consumo para bloquear replay concorrente.
 

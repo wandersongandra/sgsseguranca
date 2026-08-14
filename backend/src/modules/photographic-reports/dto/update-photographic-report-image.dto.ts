@@ -1,6 +1,8 @@
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
+  IsDateString,
   IsInt,
   IsOptional,
   IsString,
@@ -8,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { MAX_PHOTO_CONDITIONS } from '../photographic-reports.constants';
 
 export class UpdatePhotographicReportImageDto {
   @IsOptional()
@@ -55,6 +58,30 @@ export class UpdatePhotographicReportImageDto {
   @IsArray()
   @IsString({ each: true })
   @MaxLength(100, { each: true })
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(MAX_PHOTO_CONDITIONS)
   photo_conditions?: string[] | null;
+
+  // ── Não conformidade ──────────────────────────────────────────────────────
+  // Marcar a foto sem informar a ação produz uma pendência sem dono — o
+  // frontend bloqueia o salvamento nesse caso. Aqui os campos são
+  // independentes de propósito: desmarcar a NC não deve exigir reenviar a
+  // ação, e limpar a ação não deve exigir desmarcar a NC.
+
+  @IsOptional()
+  @IsBoolean()
+  is_nonconformity?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  recommended_action?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  action_deadline?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  action_responsible?: string | null;
 }

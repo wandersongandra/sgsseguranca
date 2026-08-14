@@ -1,5 +1,6 @@
 import type {
   PhotographicReportAreaStatus,
+  PhotographicReportRegistrationType,
   PhotographicReportShift,
   PhotographicReportStatus,
   PhotographicReportTone,
@@ -24,7 +25,14 @@ export type ReportFormState = {
   start_time: string;
   end_time: string;
   responsible_name: string;
+  responsible_registration_type: PhotographicReportRegistrationType | '';
+  responsible_registration_number: string;
+  responsible_registration_state: string;
+  art_number: string;
   contractor_company: string;
+  applicable_nrs: string[];
+  inspection_methodology: string;
+  scope_and_limitations: string;
   general_observations: string;
   ai_summary: string;
   final_conclusion: string;
@@ -38,4 +46,22 @@ export type PendingPhoto = {
   previewUrl?: string;
   status: 'processing' | 'ready' | 'error' | 'cancelled';
   error?: string;
+  /**
+   * Data de captura, lida de `original.lastModified` ANTES do processamento.
+   * O `processMobileImage` re-encoda via canvas e destrói o EXIF, mas
+   * `lastModified` sobrevive — em câmera de celular, é a hora da foto.
+   */
+  capturedAt?: string;
+};
+
+/**
+ * Posição do operador no momento do envio — uma por lote, não por foto.
+ * Vazio quando o navegador nega ou não suporta geolocalização.
+ */
+export type UploadGeoContext = {
+  latitude?: number;
+  longitude?: number;
+  accuracy_m?: number;
+  /** Distingue "negado/indisponível" de "ainda não tentado". */
+  denied?: boolean;
 };

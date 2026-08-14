@@ -23,7 +23,7 @@ SGS é um SaaS multi-tenant de SST (Saúde e Segurança do Trabalho) para empres
 - Nunca usar URL com `-pooler` em `DATABASE_URL` (quebra RLS). `DATABASE_MIGRATION_URL` pode usar pooler.
 - Role runtime (`sgs_app`) sem `BYPASSRLS`. Role migrations (`owner`) com permissão DDL.
 - Índices: `CONCURRENTLY IF NOT EXISTS`. Migrations com `CREATE/DROP INDEX CONCURRENTLY` usam `transaction = false`.
-- Próximo timestamp de migration: `1709000000362`.
+- Próximo timestamp de migration: `1709000000375`.
 - Rota de admin em `/admin/queues` (Bull Board) com Basic Auth.
 
 ## Regras Absolutas — Frontend

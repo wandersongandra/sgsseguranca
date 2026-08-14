@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await */
 import {
   BadRequestException,
+  ConflictException,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
@@ -102,7 +103,7 @@ describe('AprWorkflowService', () => {
     create: jest.Mock;
     notifyEligibleApprovers: jest.Mock;
   };
-  let tenantService: { getTenantId: jest.Mock };
+  let tenantService: { getTenantId: jest.Mock; getContext?: jest.Mock };
   let forensicTrailService: { append: jest.Mock };
   let service: AprWorkflowService;
 
@@ -189,6 +190,47 @@ describe('AprWorkflowService', () => {
 
       await service.executeAprWorkflowTransition('apr-1', mockFn);
       expect(mockFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('inclui o escopo de site no lock para perfis limitados à obra', async () => {
+      tenantService.getContext = jest.fn(() => ({
+        companyId: 'company-1',
+        isSuperAdmin: false,
+        userId: 'user-1',
+        siteIds: ['site-allowed'],
+        siteScope: 'single',
+      }));
+      const query = jest
+        .fn()
+        .mockResolvedValue([
+          { id: 'apr-1', company_id: 'company-1', site_id: 'site-allowed' },
+        ]);
+      aprsRepository.manager.transaction = jest.fn(async (fn) =>
+        fn({
+          query,
+          getRepository: jest.fn().mockReturnValue({
+            create: jest.fn((i) => i),
+          }),
+        }),
+      );
+
+      await service.executeAprWorkflowTransition('apr-1', async (apr) => apr);
+
+      expect(query).toHaveBeenCalledWith(
+        expect.stringContaining('"site_id" = ANY($3::uuid[])'),
+        ['apr-1', 'company-1', ['site-allowed']],
+      );
+    });
+
+    it('converte 55P03 em conflito após retry limitado, inclusive em driverError', async () => {
+      aprsRepository.manager.transaction = jest
+        .fn()
+        .mockRejectedValue({ driverError: { code: '55P03' } });
+
+      await expect(
+        service.executeAprWorkflowTransition('apr-1', async (apr) => apr),
+      ).rejects.toThrow(ConflictException);
+      expect(aprsRepository.manager.transaction).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -1476,6 +1518,35 @@ describe('AprWorkflowService', () => {
         { id: apr.id, company_id: apr.company_id },
         expect.objectContaining({ status: expect.any(String) }),
       );
+    });
+
+    it('REABERTO: bloqueia APR encerrada mesmo com histórico aprovado', async () => {
+      const { svc, updateMock } = buildServiceWithUpdate();
+      const apr = makeApr({
+        workflowConfigId: 'wf-1',
+        status: AprStatus.ENCERRADA,
+        pdf_file_key: 'documents/company-1/apr/final.pdf',
+      });
+
+      approvalRecordRepo.find.mockResolvedValue([
+        {
+          aprId: apr.id,
+          action: ApprovalRecordAction.APROVADO,
+          stepOrder: 1,
+          occurredAt: new Date(),
+        },
+      ]);
+
+      await expect(
+        svc.processApproval(
+          apr as never,
+          'user-1',
+          ['Técnico de Segurança do Trabalho (TST)'],
+          ApprovalRecordAction.REABERTO,
+          'Motivo de reabertura suficientemente longo',
+        ),
+      ).rejects.toThrow(BadRequestException);
+      expect(updateMock).not.toHaveBeenCalled();
     });
 
     it('APROVADO (último passo): update usa { id, company_id } ao marcar APROVADA', async () => {

@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { mkdtemp, rm } from 'fs/promises';
-import * as puppeteer from 'puppeteer';
 import { PuppeteerPoolService } from './puppeteer-pool.service';
+import { loadPuppeteer } from './puppeteer-runtime';
+
+jest.mock('./puppeteer-runtime', () => ({
+  loadPuppeteer: jest.fn(),
+}));
 
 jest.mock('fs/promises', () => ({
   mkdtemp: jest.fn(),
@@ -32,9 +36,11 @@ describe('PuppeteerPoolService', () => {
     const browser = {
       process: jest.fn(() => ({ pid: 1234 })),
     } as never;
-    const launchSpy = jest
-      .spyOn(puppeteer, 'launch')
-      .mockResolvedValue(browser);
+    const launchSpy = jest.fn().mockResolvedValue(browser);
+    (loadPuppeteer as jest.Mock).mockResolvedValue({
+      launch: launchSpy,
+      executablePath: jest.fn(),
+    });
 
     const result = await service['launchBrowser']();
 
@@ -66,9 +72,10 @@ describe('PuppeteerPoolService', () => {
 
   it('limpa o diretório temporário quando o launch falha', async () => {
     const service = new PuppeteerPoolService();
-    jest
-      .spyOn(puppeteer, 'launch')
-      .mockRejectedValue(new Error('launch failed'));
+    (loadPuppeteer as jest.Mock).mockResolvedValue({
+      launch: jest.fn().mockRejectedValue(new Error('launch failed')),
+      executablePath: jest.fn(),
+    });
 
     await expect(service['launchBrowser']()).rejects.toThrow('launch failed');
 
@@ -86,14 +93,15 @@ describe('PuppeteerPoolService', () => {
       process: jest.fn(() => ({ pid: 5678 })),
     } as never;
 
-    jest
-      .spyOn(puppeteer, 'executablePath')
-      .mockReturnValue(
-        '/workspace/backend/.cache/puppeteer/chrome/linux/chrome',
-      );
-    const launchSpy = jest
-      .spyOn(puppeteer, 'launch')
-      .mockResolvedValue(browser);
+    const launchSpy = jest.fn().mockResolvedValue(browser);
+    (loadPuppeteer as jest.Mock).mockResolvedValue({
+      executablePath: jest
+        .fn()
+        .mockResolvedValue(
+          '/workspace/backend/.cache/puppeteer/chrome/linux/chrome',
+        ),
+      launch: launchSpy,
+    });
 
     await service['launchBrowser']();
 

@@ -16,7 +16,10 @@ type ReportRepoMock = Pick<
   'create' | 'save' | 'delete' | 'softDelete' | 'findOne' | 'createQueryBuilder'
 >;
 type DayRepoMock = Pick<Repository<PhotographicReportDay>, 'create' | 'save'>;
-type ImageRepoMock = Pick<Repository<PhotographicReportImage>, 'save'>;
+type ImageRepoMock = Pick<
+  Repository<PhotographicReportImage>,
+  'save' | 'findOne'
+>;
 type ExportRepoMock = Pick<Repository<PhotographicReportExport>, 'save'>;
 
 describe('PhotographicReportsService', () => {
@@ -34,6 +37,7 @@ describe('PhotographicReportsService', () => {
   };
   const imageRepository: jest.Mocked<ImageRepoMock> = {
     save: jest.fn(),
+    findOne: jest.fn(),
   };
   const exportRepository: jest.Mocked<ExportRepoMock> = {
     save: jest.fn(),
@@ -59,6 +63,12 @@ describe('PhotographicReportsService', () => {
   };
   const fileInspectionService = {
     inspect: jest.fn(),
+  };
+  const publicValidationGrantService = {
+    issueToken: jest.fn().mockResolvedValue('token-de-teste'),
+  };
+  const signaturesService = {
+    findByDocument: jest.fn().mockResolvedValue([]),
   };
 
   let service: PhotographicReportsService;
@@ -101,6 +111,8 @@ describe('PhotographicReportsService', () => {
       aiAnalysisService as never,
       fileInspectionService as never,
       { findOne: jest.fn().mockResolvedValue(null) } as never,
+      publicValidationGrantService as never,
+      signaturesService as never,
     );
   });
 
@@ -246,5 +258,169 @@ describe('PhotographicReportsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(reportQueryBuilder.getManyAndCount).not.toHaveBeenCalled();
+  });
+
+  describe('updateImage', () => {
+    /**
+     * Monta o mínimo para exercitar updateImage: um relatório com uma imagem,
+     * ambos resolvidos pelos mocks de repositório.
+     */
+    function arrangeImage(
+      overrides: Partial<PhotographicReportImage> = {},
+    ): PhotographicReportImage {
+      const image = {
+        id: 'image-1',
+        company_id: 'company-1',
+        report_id: 'report-1',
+        report_day_id: null,
+        image_url: 'key/foto.jpg',
+        image_order: 1,
+        manual_caption: null,
+        ai_title: null,
+        ai_description: null,
+        ai_positive_points: null,
+        ai_technical_assessment: null,
+        ai_condition_classification: null,
+        ai_recommendations: null,
+        photo_conditions: null,
+        is_nonconformity: false,
+        recommended_action: null,
+        action_deadline: null,
+        action_responsible: null,
+        created_at: new Date('2026-08-08T10:00:00.000Z'),
+        updated_at: new Date('2026-08-08T10:00:00.000Z'),
+        ...overrides,
+      } as unknown as PhotographicReportImage;
+
+      const report = {
+        id: 'report-1',
+        company_id: 'company-1',
+        status: PhotographicReportStatus.AGUARDANDO_ANALISE,
+        days: [],
+        images: [image],
+        exports: [],
+      } as unknown as PhotographicReport;
+
+      reportRepository.findOne.mockResolvedValue(report);
+      // updateImage resolve a foto por imageRepository.findOne, não pela
+      // coleção carregada no relatório.
+      imageRepository.findOne.mockResolvedValue(image);
+      imageRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as PhotographicReportImage),
+      );
+      reportRepository.save.mockImplementation((entity) =>
+        Promise.resolve(entity as PhotographicReport),
+      );
+      documentStorageService.deleteFile.mockResolvedValue(undefined);
+
+      return image;
+    }
+
+    /**
+     * REGRESSÃO: `photo_conditions` era declarado no DTO, devolvido pelo
+     * mapeamento e enviado pelo PhotoCard, mas não tinha branch de escrita em
+     * updateImage — todo checkbox marcado era descartado em silêncio. Este
+     * teste é a trava contra a recorrência.
+     */
+    it('persiste photo_conditions em vez de descartar', async () => {
+      const image = arrangeImage();
+
+      await service.updateImage('report-1', 'image-1', {
+        photo_conditions: [
+          'EPIs em uso pelos trabalhadores',
+          'Área devidamente sinalizada',
+        ],
+      });
+
+      expect(image.photo_conditions).toEqual([
+        'EPIs em uso pelos trabalhadores',
+        'Área devidamente sinalizada',
+      ]);
+      expect(imageRepository.save).toHaveBeenCalledWith(image);
+    });
+
+    it('não toca photo_conditions quando o campo não vem no payload', async () => {
+      const image = arrangeImage({
+        photo_conditions: ['Risco identificado na imagem'],
+      });
+
+      await service.updateImage('report-1', 'image-1', {
+        manual_caption: 'nova legenda',
+      });
+
+      expect(image.photo_conditions).toEqual(['Risco identificado na imagem']);
+    });
+
+    it('persiste a marcação de não conformidade com ação, prazo e responsável', async () => {
+      const image = arrangeImage();
+
+      await service.updateImage('report-1', 'image-1', {
+        is_nonconformity: true,
+        recommended_action: 'Instalar barreira rígida no corredor.',
+        action_deadline: '2026-09-01',
+        action_responsible: 'Equipe de manutenção',
+      });
+
+      expect(image.is_nonconformity).toBe(true);
+      expect(image.recommended_action).toBe(
+        'Instalar barreira rígida no corredor.',
+      );
+      expect(image.action_deadline).toBe('2026-09-01');
+      expect(image.action_responsible).toBe('Equipe de manutenção');
+    });
+
+    it('permite desmarcar a não conformidade sem reenviar a ação', async () => {
+      const image = arrangeImage({
+        is_nonconformity: true,
+        recommended_action: 'Ação anterior',
+      });
+
+      await service.updateImage('report-1', 'image-1', {
+        is_nonconformity: false,
+      });
+
+      expect(image.is_nonconformity).toBe(false);
+      // A ação permanece: os campos são independentes de propósito.
+      expect(image.recommended_action).toBe('Ação anterior');
+    });
+  });
+
+  describe('normalização de NRs', () => {
+    // `normalizeApplicableNrs` é privado; o cast dá acesso ao método sem
+    // afrouxar a visibilidade na produção.
+    type NrNormalizer = (
+      values?: Array<string | null | undefined> | null,
+    ) => string[] | null;
+
+    function getNormalizer(): NrNormalizer {
+      const withPrivate = service as unknown as {
+        normalizeApplicableNrs: NrNormalizer;
+      };
+      return (values) => withPrivate.normalizeApplicableNrs(values);
+    }
+
+    it('descarta NR desconhecida em vez de rejeitar o relatório inteiro', () => {
+      expect(getNormalizer()(['NR-35', 'NR-999', 'NR-06'])).toEqual([
+        'NR-35',
+        'NR-06',
+      ]);
+    });
+
+    it('remove duplicatas e normaliza para maiúsculas', () => {
+      expect(getNormalizer()(['nr-35', 'NR-35', ' NR-06 '])).toEqual([
+        'NR-35',
+        'NR-06',
+      ]);
+    });
+
+    it('devolve null quando nenhuma NR sobrevive à filtragem', () => {
+      expect(getNormalizer()(['NR-999', 'inexistente'])).toBeNull();
+    });
+
+    it('devolve null para lista vazia ou ausente', () => {
+      expect(getNormalizer()([])).toBeNull();
+      expect(getNormalizer()(null)).toBeNull();
+      expect(getNormalizer()(undefined)).toBeNull();
+    });
   });
 });
