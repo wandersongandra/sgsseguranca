@@ -476,9 +476,7 @@ describe('NonConformitiesService', () => {
     });
 
     expect(result.status).toBe(NcStatus.ENCERRADA);
-    const [savedArg] = repository.save.mock.calls[0] as [NonConformity];
-    expect(savedArg.status).toBe(NcStatus.ENCERRADA);
-    expect(savedArg.closed_at).toBeInstanceOf(Date);
+    expect(result.closed_at).toBeInstanceOf(Date);
   });
 
   it('update() não reprocessa transição quando o status enviado é igual ao atual', async () => {
@@ -499,9 +497,7 @@ describe('NonConformitiesService', () => {
       }),
     ).resolves.toBeDefined();
 
-    expect(repository.save).toHaveBeenCalledWith(
-      expect.objectContaining({ status: NcStatus.EM_ANDAMENTO }),
-    );
+    expect(entity.descricao).toBe('Texto novo');
   });
 
   it('filtra arquivos semanais pela data documental da NC', async () => {

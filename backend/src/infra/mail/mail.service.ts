@@ -26,6 +26,7 @@ import { DidsService } from '../../modules/dids/dids.service';
 import { AuditsService } from '../../modules/audits/audits.service';
 import { RdosService } from '../../modules/rdos/rdos.service';
 import { PhotographicReportsService } from '../../modules/photographic-reports/photographic-reports.service';
+import { PhotographicReportExportType } from '../../modules/photographic-reports/entities/photographic-report-export.entity';
 import { CompaniesService } from '../../modules/companies/companies.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import type { TenantContext } from '../../shared/tenant/tenant.service';
@@ -517,7 +518,7 @@ export class MailService {
           const report =
             await this.photographicReportsService.findOne(documentId);
           const pdfExports = (report.exports ?? []).filter(
-            (e) => e.export_type === 'pdf',
+            (e) => e.export_type === PhotographicReportExportType.PDF,
           );
           if (!pdfExports.length) {
             throw new NotFoundException(

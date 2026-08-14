@@ -665,7 +665,12 @@ export class NonConformitiesPdfService {
       );
       return;
     }
-    this.tryAddPdfImage(state, `data:${mimeType};base64,${buffer.toString('base64')}`, label, buffer);
+    this.tryAddPdfImage(
+      state,
+      `data:${mimeType};base64,${buffer.toString('base64')}`,
+      label,
+      buffer,
+    );
   }
 
   private async appendGovernedPdfAttachment(
@@ -675,14 +680,19 @@ export class NonConformitiesPdfService {
     index: number,
   ): Promise<void> {
     const label = governed.originalName || `Anexo governado ${index + 1}`;
-    if (!governed.mimeType.startsWith('image/') || !this.isExpectedAttachmentStorageKey(nc, governed.fileKey)) {
+    if (
+      !governed.mimeType.startsWith('image/') ||
+      !this.isExpectedAttachmentStorageKey(nc, governed.fileKey)
+    ) {
       state.unembeddedAttachments.push(
         `${label} (arquivo ${governed.mimeType}, disponível no storage oficial da não conformidade)`,
       );
       return;
     }
     try {
-      const buffer = await this.documentStorageService.downloadFileBuffer(governed.fileKey);
+      const buffer = await this.documentStorageService.downloadFileBuffer(
+        governed.fileKey,
+      );
       const mimeType = this.resolveSupportedImageMimeType(buffer);
       if (!mimeType) {
         state.unembeddedAttachments.push(
@@ -690,7 +700,12 @@ export class NonConformitiesPdfService {
         );
         return;
       }
-      this.tryAddPdfImage(state, `data:${mimeType};base64,${buffer.toString('base64')}`, label, buffer);
+      this.tryAddPdfImage(
+        state,
+        `data:${mimeType};base64,${buffer.toString('base64')}`,
+        label,
+        buffer,
+      );
     } catch (error) {
       this.logger.warn(
         `Falha ao incorporar anexo governado no PDF (${governed.fileKey}): ${error instanceof Error ? error.message : 'unknown'}`,
