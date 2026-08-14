@@ -1009,7 +1009,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     "Outro",
   ];
 
-  const tiposNc = ["Crítica", "Maior", "Menor"];
   const tiposNcCategorias = ["NC_MAIOR", "NC_MENOR", "OBSERVACAO", "MELHORIA"];
   const tiposNcSubcategorias = [
     "Segurança operacional",
@@ -1020,23 +1019,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     "Treinamento",
     "Outro",
   ];
-  const categoriasCausa = [
-    "ORGANIZACIONAL",
-    "PROCESSO",
-    "EQUIPAMENTO",
-    "HUMANO",
-    "AMBIENTE",
-    "GERENCIAL",
-  ];
-  const requisitosNrCategorias = [
-    "NR_4", "NR_5", "NR_6", "NR_7", "NR_10", "NR_11", "NR_12", "NR_15",
-    "NR_17", "NR_18", "NR_20", "NR_21", "NR_22", "NR_23", "NR_24", "NR_25",
-    "NR_26", "NR_28", "NR_30", "NR_31", "NR_32", "NR_33", "NR_34", "NR_35", "NR_36",
-  ];
-  const riscosCategoria = ["QUEDA", "CHOQUE", "INCENDIO", "CORTE", "ESMAGAMENTO", "INTOXICACAO", "RUIDO", "VIBRACAO", "ERGONOMIA", "OUTRO"];
   const niveisRisco = ["Baixo", "Médio", "Alto", "Crítico"];
-  const boolOptions = ["true", "false"];
-  const statusOptions = Object.values(NcStatus);
   const statusAcao = ["Implementada", "Em andamento", "Não implementada"];
   const resultadoEficacia = ["Sim", "Parcialmente", "Não"];
 
@@ -1443,11 +1426,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             <p className="mt-1 text-xs text-[var(--ds-color-text-muted)]">
               O campo permanece livre para suportar diferentes obras/empresas sem travar o fluxo.
             </p>
-            {errors.local_setor_area && (
-              <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
-                {errors.local_setor_area.message}
-              </p>
-            )}
           </div>
           <div className="md:col-span-2">
             <label
@@ -1470,7 +1448,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               <option value="Limpeza / organização">Limpeza / organização</option>
               <option value="Outro">Outro</option>
             </Select>
-            <input className="mt-2 w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-3 py-2.5 text-[13px] font-semibold text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] transition-colors duration-[120ms] focus:border-[var(--component-field-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-1" placeholder="Detalhe complementar da atividade" {...register("atividade_envolvida")} />
             {errors.atividade_envolvida && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.atividade_envolvida.message}

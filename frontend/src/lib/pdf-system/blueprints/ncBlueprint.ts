@@ -65,6 +65,45 @@ function buildNcActionRows(nc: NonConformity, statusLabel: string): ActionPlanRo
   return rows;
 }
 
+function buildNcMetrics(nc: NonConformity, statusLabel: string, riscoLabel: string) {
+  return [
+    { label: "Código", value: sanitize(nc.codigo_nc), tone: "info" as const },
+    { label: "Status", value: sanitize(nc.status), tone: "warning" as const },
+    { label: "Risco", value: sanitize(nc.risco_nivel), tone: "danger" as const },
+    { label: "Setor", value: sanitize(nc.local_setor_area), tone: "info" as const },
+    { label: "Status oficial", value: statusLabel, tone: ncStatusTone(nc.status) },
+    { label: "Risco normalizado", value: riscoLabel, tone: "default" as const },
+  ];
+}
+
+function buildNcMetadataFields(nc: NonConformity, statusLabel: string) {
+  return [
+    { label: "Código", value: nc.codigo_nc },
+    { label: "Tipo", value: nc.tipo },
+    { label: "Categoria", value: nc.tipo_categoria || nc.tipo_subcategoria || "-" },
+    { label: "Data identificação", value: formatDate(nc.data_identificacao) },
+    { label: "Local/Setor", value: nc.local_setor_area },
+    { label: "Atividade", value: nc.atividade_envolvida },
+    { label: "Responsável área", value: nc.responsavel_area },
+    { label: "Auditor", value: nc.auditor_responsavel },
+    { label: "Status", value: statusLabel },
+    { label: "Risco", value: nc.risco_categoria || nc.risco_nivel },
+    { label: "NR", value: nc.requisito_nr_categoria || nc.requisito_nr },
+    { label: "Causa", value: nc.causa_categoria || (nc.causa || []).join(", ") || "-" },
+  ];
+}
+
+function drawNcSupportingNarratives(ctx: PdfContext, nc: NonConformity) {
+  drawNarrativeSection(ctx, { title: "Descrição do desvio", content: nc.descricao });
+  drawNarrativeSection(ctx, { title: "Evidência observada", content: nc.evidencia_observada });
+  drawNarrativeSection(ctx, { title: "Descrição das evidências fotográficas", content: nc.evidencia_descricao_foto });
+  drawNarrativeSection(ctx, { title: "Risco/Perigo", content: `${sanitize(nc.risco_perigo)} | ${sanitize(nc.risco_associado)}` });
+  drawNarrativeSection(ctx, { title: "Descrição da verificação", content: nc.verificacao_descricao_foto || nc.verificacao_evidencias });
+  if ((nc.anexos || []).length > 0) {
+    drawNarrativeSection(ctx, { title: "Anexos/evidências", content: `${(nc.anexos || []).length} anexo(s) vinculado(s) à NC.` });
+  }
+}
+
 export async function drawNcBlueprint(
   ctx: PdfContext,
   autoTable: AutoTableFn,
@@ -85,38 +124,16 @@ export async function drawNcBlueprint(
   drawExecutiveSummaryStrip(ctx, {
     title: "Resumo executivo da NC",
     summary: "Documento de compliance com foco em desvio identificado, requisito violado, plano corretivo e evidências de verificação.",
-    metrics: [
-      { label: "Código", value: sanitize(nc.codigo_nc), tone: "info" },
-      { label: "Status", value: sanitize(nc.status), tone: "warning" },
-      { label: "Risco", value: sanitize(nc.risco_nivel), tone: "danger" },
-      { label: "Setor", value: sanitize(nc.local_setor_area), tone: "info" },
-    ],
+    metrics: buildNcMetrics(nc, statusLabel, riscoLabel),
   });
 
   drawMetadataGrid(ctx, {
     title: "Identificação da não conformidade",
     columns: 2,
-    fields: [
-      { label: "Código", value: nc.codigo_nc },
-      { label: "Tipo", value: nc.tipo },
-      { label: "Categoria", value: nc.tipo_categoria || nc.tipo_subcategoria || "-" },
-      { label: "Data identificação", value: formatDate(nc.data_identificacao) },
-      { label: "Local/Setor", value: nc.local_setor_area },
-      { label: "Atividade", value: nc.atividade_envolvida },
-      { label: "Responsável área", value: nc.responsavel_area },
-      { label: "Auditor", value: nc.auditor_responsavel },
-      { label: "Status", value: nc.status },
-      { label: "Risco", value: nc.risco_categoria || nc.risco_nivel },
-      { label: "NR", value: nc.requisito_nr_categoria || nc.requisito_nr },
-      { label: "Causa", value: nc.causa_categoria || (nc.causa || []).join(", ") || "-" },
-    ],
+    fields: buildNcMetadataFields(nc, statusLabel),
   });
 
-  drawNarrativeSection(ctx, { title: "Descrição do desvio", content: nc.descricao });
-  drawNarrativeSection(ctx, { title: "Evidência observada", content: nc.evidencia_observada });
-  drawNarrativeSection(ctx, { title: "Descrição das evidências fotográficas", content: nc.evidencia_descricao_foto });
-  drawNarrativeSection(ctx, { title: "Risco/Perigo", content: `${sanitize(nc.risco_perigo)} | ${sanitize(nc.risco_associado)}` });
-  drawNarrativeSection(ctx, { title: "Descrição da verificação", content: nc.verificacao_descricao_foto || nc.verificacao_evidencias });
+  drawNcSupportingNarratives(ctx, nc);
 
   drawComplianceTable(ctx, autoTable, "Requisito violado e classificação", [
     {
@@ -126,13 +143,6 @@ export async function drawNcBlueprint(
       classification: sanitize((nc.classificacao || []).join(", ") || riscoLabel),
     },
   ], { semanticRules: { profile: "nc", columns: [3] } });
-
-  if ((nc.anexos || []).length > 0) {
-    drawNarrativeSection(ctx, {
-      title: "Anexos/evidências",
-      content: `${(nc.anexos || []).length} anexo(s) vinculado(s) à NC.`,
-    });
-  }
 
   const actionRows = buildNcActionRows(nc, statusLabel);
   drawActionPlanTable(ctx, autoTable, actionRows, { semanticRules: { profile: "nc" } });

@@ -919,6 +919,31 @@ export class NonConformitiesService {
     };
   }
 
+  private applyQuestionnaireUpdateFields(
+    payload: Partial<NonConformity>,
+    dto: UpdateNonConformityDto,
+  ): void {
+    if (dto.causa_categoria !== undefined) payload.causa_categoria = this.normalizeOptionalText(dto.causa_categoria);
+    if (dto.causa_fator_humano !== undefined) payload.causa_fator_humano = dto.causa_fator_humano;
+    if (dto.causa_fator_equipamento !== undefined) payload.causa_fator_equipamento = dto.causa_fator_equipamento;
+    if (dto.causa_fator_processo !== undefined) payload.causa_fator_processo = dto.causa_fator_processo;
+    if (dto.causa_fator_ambiente !== undefined) payload.causa_fator_ambiente = dto.causa_fator_ambiente;
+    if (dto.causa_fator_gerencial !== undefined) payload.causa_fator_gerencial = dto.causa_fator_gerencial;
+    if (dto.tipo_categoria !== undefined) payload.tipo_categoria = this.normalizeOptionalText(dto.tipo_categoria);
+    if (dto.tipo_subcategoria !== undefined) payload.tipo_subcategoria = this.normalizeOptionalText(dto.tipo_subcategoria);
+    if (dto.requisito_nr_categoria !== undefined) payload.requisito_nr_categoria = this.normalizeOptionalText(dto.requisito_nr_categoria);
+    if (dto.risco_categoria !== undefined) payload.risco_categoria = this.normalizeOptionalText(dto.risco_categoria);
+    if (dto.risco_fonte !== undefined) payload.risco_fonte = this.normalizeOptionalText(dto.risco_fonte);
+    if (dto.evidencia_descricao_foto !== undefined) payload.evidencia_descricao_foto = this.normalizeOptionalText(dto.evidencia_descricao_foto);
+    if (dto.evidencia_foto1_key !== undefined) payload.evidencia_foto1_key = this.normalizeOptionalText(dto.evidencia_foto1_key);
+    if (dto.evidencia_foto2_key !== undefined) payload.evidencia_foto2_key = this.normalizeOptionalText(dto.evidencia_foto2_key);
+    if (dto.evidencia_foto3_key !== undefined) payload.evidencia_foto3_key = this.normalizeOptionalText(dto.evidencia_foto3_key);
+    if (dto.verificacao_descricao_foto !== undefined) payload.verificacao_descricao_foto = this.normalizeOptionalText(dto.verificacao_descricao_foto);
+    if (dto.verificacao_foto1_key !== undefined) payload.verificacao_foto1_key = this.normalizeOptionalText(dto.verificacao_foto1_key);
+    if (dto.verificacao_foto2_key !== undefined) payload.verificacao_foto2_key = this.normalizeOptionalText(dto.verificacao_foto2_key);
+    if (dto.verificacao_foto3_key !== undefined) payload.verificacao_foto3_key = this.normalizeOptionalText(dto.verificacao_foto3_key);
+  }
+
   private buildUpdatePayload(
     dto: UpdateNonConformityDto,
     existingAttachments?: string[],
@@ -1008,85 +1033,9 @@ export class NonConformitiesService {
     if (dto.causa !== undefined) {
       payload.causa = this.normalizeStringArray(dto.causa);
     }
-    if (dto.causa_categoria !== undefined) {
-      payload.causa_categoria = this.normalizeOptionalText(dto.causa_categoria);
-    }
-    if (dto.causa_fator_humano !== undefined) {
-      payload.causa_fator_humano = dto.causa_fator_humano;
-    }
-    if (dto.causa_fator_equipamento !== undefined) {
-      payload.causa_fator_equipamento = dto.causa_fator_equipamento;
-    }
-    if (dto.causa_fator_processo !== undefined) {
-      payload.causa_fator_processo = dto.causa_fator_processo;
-    }
-    if (dto.causa_fator_ambiente !== undefined) {
-      payload.causa_fator_ambiente = dto.causa_fator_ambiente;
-    }
-    if (dto.causa_fator_gerencial !== undefined) {
-      payload.causa_fator_gerencial = dto.causa_fator_gerencial;
-    }
+    this.applyQuestionnaireUpdateFields(payload, dto);
     if (dto.causa_outro !== undefined) {
       payload.causa_outro = this.normalizeOptionalText(dto.causa_outro);
-    }
-    if (dto.tipo_categoria !== undefined) {
-      payload.tipo_categoria = this.normalizeOptionalText(dto.tipo_categoria);
-    }
-    if (dto.tipo_subcategoria !== undefined) {
-      payload.tipo_subcategoria = this.normalizeOptionalText(
-        dto.tipo_subcategoria,
-      );
-    }
-    if (dto.requisito_nr_categoria !== undefined) {
-      payload.requisito_nr_categoria = this.normalizeOptionalText(
-        dto.requisito_nr_categoria,
-      );
-    }
-    if (dto.risco_categoria !== undefined) {
-      payload.risco_categoria = this.normalizeOptionalText(dto.risco_categoria);
-    }
-    if (dto.risco_fonte !== undefined) {
-      payload.risco_fonte = this.normalizeOptionalText(dto.risco_fonte);
-    }
-    if (dto.evidencia_descricao_foto !== undefined) {
-      payload.evidencia_descricao_foto = this.normalizeOptionalText(
-        dto.evidencia_descricao_foto,
-      );
-    }
-    if (dto.evidencia_foto1_key !== undefined) {
-      payload.evidencia_foto1_key = this.normalizeOptionalText(
-        dto.evidencia_foto1_key,
-      );
-    }
-    if (dto.evidencia_foto2_key !== undefined) {
-      payload.evidencia_foto2_key = this.normalizeOptionalText(
-        dto.evidencia_foto2_key,
-      );
-    }
-    if (dto.evidencia_foto3_key !== undefined) {
-      payload.evidencia_foto3_key = this.normalizeOptionalText(
-        dto.evidencia_foto3_key,
-      );
-    }
-    if (dto.verificacao_descricao_foto !== undefined) {
-      payload.verificacao_descricao_foto = this.normalizeOptionalText(
-        dto.verificacao_descricao_foto,
-      );
-    }
-    if (dto.verificacao_foto1_key !== undefined) {
-      payload.verificacao_foto1_key = this.normalizeOptionalText(
-        dto.verificacao_foto1_key,
-      );
-    }
-    if (dto.verificacao_foto2_key !== undefined) {
-      payload.verificacao_foto2_key = this.normalizeOptionalText(
-        dto.verificacao_foto2_key,
-      );
-    }
-    if (dto.verificacao_foto3_key !== undefined) {
-      payload.verificacao_foto3_key = this.normalizeOptionalText(
-        dto.verificacao_foto3_key,
-      );
     }
     if (dto.acao_imediata_descricao !== undefined) {
       payload.acao_imediata_descricao = this.normalizeOptionalText(
