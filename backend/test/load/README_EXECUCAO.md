@@ -1,5 +1,46 @@
 # README_EXECUCAO - benchmark auth (login + /auth/me)
 
+## Emissão concorrente de APRs no teste local
+
+O runner `test/load/apr-emit-batch.ts` emite APRs sintéticas em paralelo e
+executa o fluxo completo por APR: criação, assinatura, aprovação, PDF final,
+finalização e leitura de confirmação. Ele usa o `TestApp` com HTTP real dentro
+do Nest, limite de concorrência e relatório opcional em JSON.
+
+O runner é deliberadamente bloqueado fora do banco local `sst_test`. O bootstrap
+reseta somente esse banco de teste para garantir perfis, usuários, empresa e
+site sintéticos; não use esse comando com qualquer URL externa.
+
+```powershell
+cd backend
+$env:NODE_ENV="test"
+$env:E2E_PRESERVE_MIGRATED_SCHEMA="true"
+$env:APR_BATCH_CONFIRM_TEST="true"
+$env:APR_BATCH_BOOTSTRAP="true"
+$env:APR_BATCH_TOTAL="10"
+$env:APR_BATCH_CONCURRENCY="3"
+$env:APR_BATCH_REPORT_FILE="temp/apr-batch-report.json"
+npm run test:apr:batch
+```
+
+`APR_BATCH_TOTAL` aceita 1–100 APRs e `APR_BATCH_CONCURRENCY` aceita 1–20
+workers. Os registros e PDFs permanecem no banco/storage local para inspeção;
+o relatório lista IDs, status, tempos, chaves de PDF e hashes finais.
+
+## Emissão no VPS de load-test
+
+Para a VPS isolada, use `test/load/apr-emit-remote-batch.mjs` dentro do
+container `api-loadtest`. Ele exige `APP_ENV=loadtest` e
+`APP_LOADTEST_MARKER=sgs-loadtest`, usa somente as credenciais sintéticas do
+`.env.loadtest` da VPS e não reseta o banco remoto. O runner aceita até 100
+APRs, mas o padrão é `APR_REMOTE_CONCURRENCY=5`; a geração de PDF usa o pool
+do Puppeteer e deve permanecer limitada para não degradar a API.
+
+O rate limit por tenant do load-test é 60 requisições/minuto no plano STARTER.
+Como o fluxo completo consome várias requisições por APR, lotes grandes devem
+ser fracionados ou executados com um plano de teste explicitamente dimensionado;
+não desative o guard de rate limit para acelerar a emissão.
+
 Este pacote foi alinhado ao contrato real do backend:
 
 - `POST /auth/login` com `cpf`, `password`, `turnstileToken?`
