@@ -992,6 +992,26 @@ describe('DdsService', () => {
     ).not.toHaveBeenCalled();
   });
 
+  // Regressão de SGS-DDS-INT-001: antes desta trava, `remove()` de um DDS já
+  // emitido chamava `removeFinalDocumentReference` com `cleanupStoredFile`,
+  // apagando o PDF final no storage e a entrada do document_registry — o que
+  // quebrava permanentemente todo QR/código de validação pública já
+  // distribuído. PT e NC já tinham a guarda equivalente; o DDS não.
+  it('recusa remover DDS que já possui PDF final emitido', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'dds-1',
+      company_id: 'company-1',
+      pdf_file_key: 'sgs/company-1/dds/dds-1/final.pdf',
+    });
+
+    await expect(service.remove('dds-1')).rejects.toThrow(BadRequestException);
+
+    expect(
+      documentGovernanceService.removeFinalDocumentReference,
+    ).not.toHaveBeenCalled();
+    expect(documentStorageService.deleteFile).not.toHaveBeenCalled();
+  });
+
   it('remove o DDS via esteira central e aplica a policy de lifecycle', async () => {
     const dds = {
       id: 'dds-1',

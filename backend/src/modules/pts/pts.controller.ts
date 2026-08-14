@@ -240,10 +240,28 @@ export class PtsController {
     return this.ptsService.getAnalyticsOverview();
   }
 
+  /**
+   * Regras de aprovação têm escopo de EMPRESA INTEIRA — desligar uma delas
+   * afeta todas as PTs de todas as obras. `can_manage_pt` é concedido até ao
+   * perfil "Operador / Colaborador" (migration 1709000000103), então a
+   * permissão sozinha não é contrato de autorização suficiente aqui.
+   * O @Roles de método sobrepõe o de classe (Reflector.getAllAndOverride).
+   */
   @Patch('approval-rules')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA)
   @Authorize('can_manage_pt')
-  updateApprovalRules(@Body() payload: UpdatePtApprovalRulesDto) {
-    return this.ptsService.updateApprovalRules(payload);
+  @ForensicAuditAction('update', 'pt_approval_rules')
+  updateApprovalRules(
+    @Body() payload: UpdatePtApprovalRulesDto,
+    @Req()
+    req: Request & {
+      user?: { id?: string; userId?: string; sub?: string };
+    },
+  ) {
+    return this.ptsService.updateApprovalRules(
+      payload,
+      this.getRequestUserId(req),
+    );
   }
 
   /** Retorna URL assinada (S3) ou null do PDF armazenado */

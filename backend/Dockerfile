@@ -8,6 +8,8 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
 COPY package*.json ./
+# O postinstall do package.json executa este script durante o npm ci.
+COPY scripts/ensure-puppeteer-browser.cjs ./scripts/ensure-puppeteer-browser.cjs
 RUN npm ci
 
 COPY . .

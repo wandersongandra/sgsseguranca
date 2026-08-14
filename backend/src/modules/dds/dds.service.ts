@@ -1533,6 +1533,17 @@ export class DdsService {
 
   async remove(id: string): Promise<void> {
     const dds = await this.findOne(id);
+
+    // Mesma trava que PtsService.remove() e NonConformitiesService.remove()
+    // aplicam. Sem ela, um DDS já emitido tinha o PDF final apagado do storage
+    // e a entrada removida do document_registry — quebrando permanentemente
+    // qualquer QR/código de validação pública já distribuído do documento.
+    if (dds.pdf_file_key) {
+      throw new BadRequestException(
+        'Somente DDS sem PDF final podem ser removidos. Use os fluxos formais de arquivamento para registros já emitidos.',
+      );
+    }
+
     await this.documentGovernanceService.removeFinalDocumentReference({
       companyId: dds.company_id,
       module: 'dds',

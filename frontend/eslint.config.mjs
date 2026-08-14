@@ -18,6 +18,7 @@ const eslintConfig = [
       ".vercel/**",
       "out/**",
       "build/**",
+      "coverage/**",
       "next-env.d.ts",
       // Arquivos .js/.mjs são config/scripts sem TypeScript — excluídos do lint
       "*.js",
