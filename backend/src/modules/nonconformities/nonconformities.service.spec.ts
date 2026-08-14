@@ -458,8 +458,18 @@ describe('NonConformitiesService', () => {
       anexos: [],
       closed_at: null,
       resolved_by: null,
+      acao_definitiva_descricao: 'Instalar a proteção coletiva especificada.',
+      acao_definitiva_responsavel: 'Responsável da manutenção',
+      acao_definitiva_prazo: new Date('2026-03-20T00:00:00.000Z'),
+      verificacao_resultado: 'Sim',
+      verificacao_evidencias: 'Proteção instalada e testada em campo.',
+      verificacao_data: new Date('2026-03-21T00:00:00.000Z'),
+      verificacao_responsavel: 'Técnico SST',
+      assinatura_responsavel_area: 'Responsável da área',
+      assinatura_tecnico_auditor: 'Técnico SST',
     } as unknown as NonConformity;
     jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
 
     const result = await service.update('nc-1', {
       status: NcStatus.ENCERRADA,
@@ -480,6 +490,7 @@ describe('NonConformitiesService', () => {
       descricao: 'Texto antigo',
     } as unknown as NonConformity;
     jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
 
     await expect(
       service.update('nc-1', {

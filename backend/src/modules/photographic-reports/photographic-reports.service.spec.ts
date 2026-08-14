@@ -113,6 +113,8 @@ describe('PhotographicReportsService', () => {
       { findOne: jest.fn().mockResolvedValue(null) } as never,
       publicValidationGrantService as never,
       signaturesService as never,
+      { sendStoredDocument: jest.fn() } as never,
+      { add: jest.fn() } as never,
     );
   });
 

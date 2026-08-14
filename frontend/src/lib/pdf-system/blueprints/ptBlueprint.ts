@@ -353,6 +353,13 @@ function drawPtOverview(
   checklistTotal: number,
 ) {
   const status = (pt.status || "").toLowerCase();
+  const tone = status.includes("cancel")
+    ? "danger"
+    : status.includes("pend")
+      ? "warning"
+      : status.includes("aprov")
+        ? "success"
+        : "info";
   drawDocumentIdentityRail(ctx, {
     documentType: "PT",
     criticality: buildCriticality(pt),
