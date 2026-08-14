@@ -110,7 +110,7 @@
     "test:watch": "node scripts/run-jest.cjs --watch",
     "test:cov": "node --max-old-space-size=4096 scripts/run-jest.cjs --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "node --max-old-space-size=2048 scripts/run-jest.cjs --config ./test/jest-e2e.config.ts --runInBand",
+    "test:e2e": "node --max-old-space-size=4096 scripts/run-e2e-batched.cjs",
     "test:e2e:pdf-runtime": "node --max-old-space-size=2048 scripts/run-jest.cjs --config ./test/jest-e2e-pdf-runtime.config.cjs --runInBand",
     "test:e2e:dr": "node --max-old-space-size=2048 scripts/run-jest.cjs --config ./test/jest-e2e.config.ts --runInBand critical/tenant-backup-restore.e2e-spec.ts",
     "test:e2e:up": "docker compose -f docker-compose.test.yml up -d",
