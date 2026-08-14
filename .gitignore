@@ -147,3 +147,12 @@ temp-semgrep-scan.json
 
 # Worktrees e artefatos de ferramentas de IA
 .hermes/
+
+# Artefatos de preview/emissão de PDF gerados na raiz.
+# `npm run preview:photographic-report` escreve o PDF, o HTML e os PNGs de
+# inspeção visual na raiz do repositório por padrão (ver PREVIEW_OUT_DIR).
+# São saídas de trabalho, não fontes — e chegam a centenas de KB cada.
+/RELATORIO-FOTOGRAFICO-PREVIEW.pdf
+/RELATORIO-FOTOGRAFICO-PREVIEW.html
+/PDF-PRODUCAO.pdf
+/preview-*.png

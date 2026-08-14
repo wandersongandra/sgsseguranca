@@ -4,8 +4,15 @@ import { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { ChipSelector } from './ChipSelector';
-import { SHIFT_OPTIONS, TONE_OPTIONS, AREA_STATUS_OPTIONS } from '../constants';
+import { ChipSelector, MultiChipSelector } from './ChipSelector';
+import {
+  SHIFT_OPTIONS,
+  TONE_OPTIONS,
+  AREA_STATUS_OPTIONS,
+  APPLICABLE_NR_OPTIONS,
+  NR_LABELS,
+  REGISTRATION_TYPE_OPTIONS,
+} from '../constants';
 import type {
   PhotographicReportShift,
   PhotographicReportTone,
@@ -41,9 +48,9 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1">
+      <label className="block text-sm font-medium text-[var(--ds-color-text-primary)] mb-1">
         {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
+        {required && <span className="ml-0.5 text-[var(--ds-color-danger)]">*</span>}
       </label>
       <input
         type={type}
@@ -51,7 +58,7 @@ function Field({
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+        className="w-full rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm placeholder:text-[var(--ds-color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
       />
     </div>
   );
@@ -72,13 +79,13 @@ function TextArea({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
+      <label className="block text-sm font-medium text-[var(--ds-color-text-primary)] mb-1">{label}</label>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         rows={rows}
-        className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+        className="w-full resize-none rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm placeholder:text-[var(--ds-color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
       />
     </div>
   );
@@ -118,8 +125,8 @@ export function WizardStep1BasicData({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold text-foreground">Dados do relatório</h2>
-        <p className="text-sm text-muted-foreground mt-0.5">
+        <h2 className="text-lg font-semibold text-[var(--ds-color-text-primary)]">Dados do relatório</h2>
+        <p className="text-sm text-[var(--ds-color-text-muted)] mt-0.5">
           Informações básicas sobre a inspeção ou atividade realizada.
         </p>
       </div>
@@ -201,12 +208,91 @@ export function WizardStep1BasicData({
         />
       </div>
 
+      {/* Credencial técnica — é por este bloco que um relatório de SST é
+          julgado. Opcional no formulário, mas destacado para que a ausência
+          seja uma escolha e não um esquecimento. */}
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/40 p-4">
+        <div className="mb-3">
+          <h3 className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
+            Credencial do responsável técnico
+          </h3>
+          <p className="mt-0.5 text-xs text-[var(--ds-color-text-muted)]">
+            Preenchido, aparece no PDF junto do nome do responsável. Sem
+            registro profissional, o documento vale como registro fotográfico,
+            não como parecer técnico.
+          </p>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--ds-color-text-primary)] mb-1">
+              Conselho
+            </label>
+            <select
+              value={form.responsible_registration_type}
+              onChange={(e) =>
+                onFormChange(
+                  'responsible_registration_type',
+                  e.target.value as ReportFormState['responsible_registration_type'],
+                )
+              }
+              disabled={!canManage}
+              className="w-full rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
+            >
+              <option value="">Não informado</option>
+              {REGISTRATION_TYPE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          <Field
+            label="Número do registro"
+            value={form.responsible_registration_number}
+            onChange={(v) => onFormChange('responsible_registration_number', v)}
+            disabled={!canManage}
+            placeholder="Ex: 5069874521"
+          />
+          <Field
+            label="UF"
+            value={form.responsible_registration_state}
+            onChange={(v) =>
+              onFormChange(
+                'responsible_registration_state',
+                v.toUpperCase().slice(0, 2),
+              )
+            }
+            disabled={!canManage}
+            placeholder="SP"
+          />
+          <Field
+            label="ART"
+            value={form.art_number}
+            onChange={(v) => onFormChange('art_number', v)}
+            disabled={!canManage}
+            placeholder="Nº da ART, se houver"
+          />
+        </div>
+      </div>
+
+      {/* Escopo normativo */}
+      <MultiChipSelector
+        label="Normas regulamentadoras aplicáveis"
+        description="Selecione as NRs que a inspeção observou. Aparecem em seção própria do relatório."
+        options={APPLICABLE_NR_OPTIONS}
+        values={form.applicable_nrs}
+        onChange={(values) => onFormChange('applicable_nrs', values)}
+        optionLabels={NR_LABELS}
+        disabled={!canManage}
+      />
+
       {/* Advanced section */}
       <div>
         <button
           type="button"
           onClick={() => setAdvancedOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-sm text-[var(--ds-color-text-muted)] hover:text-[var(--ds-color-text-primary)] transition-colors"
         >
           <ChevronDown
             className={`h-4 w-4 transition-transform ${advancedOpen ? 'rotate-180' : ''}`}
@@ -215,7 +301,7 @@ export function WizardStep1BasicData({
         </button>
 
         {advancedOpen && (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 rounded-lg border border-dashed border-border p-4 bg-muted/30">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 rounded-lg border border-dashed border-[var(--ds-color-border-subtle)] p-4 bg-[var(--ds-color-surface-muted)]/30">
             <Field
               label="Unidade / seção"
               value={form.unit_name}

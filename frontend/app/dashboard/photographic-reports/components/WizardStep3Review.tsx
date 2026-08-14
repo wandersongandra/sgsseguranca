@@ -74,8 +74,8 @@ export function WizardStep3Review({
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-semibold text-foreground">Revisão e exportação</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h2 className="text-lg font-semibold text-[var(--ds-color-text-primary)]">Revisão e exportação</h2>
+          <p className="text-sm text-[var(--ds-color-text-muted)] mt-0.5">
             Gere o resumo com IA, finalize e exporte o relatório.
           </p>
         </div>
@@ -85,29 +85,29 @@ export function WizardStep3Review({
       </div>
 
       {/* Summary info */}
-      <div className="rounded-lg border border-border bg-muted/30 p-4">
+      <div className="rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/30 p-4">
         <div className="grid gap-2 sm:grid-cols-3 text-sm">
           <div>
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            <p className="text-[var(--ds-color-text-muted)] text-xs font-medium uppercase tracking-wide">
               Cliente
             </p>
-            <p className="font-medium text-foreground mt-0.5">
+            <p className="font-medium text-[var(--ds-color-text-primary)] mt-0.5">
               {report.client_name || '—'}
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            <p className="text-[var(--ds-color-text-muted)] text-xs font-medium uppercase tracking-wide">
               Obra
             </p>
-            <p className="font-medium text-foreground mt-0.5">
+            <p className="font-medium text-[var(--ds-color-text-primary)] mt-0.5">
               {report.project_name || '—'}
             </p>
           </div>
           <div>
-            <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            <p className="text-[var(--ds-color-text-muted)] text-xs font-medium uppercase tracking-wide">
               Fotos
             </p>
-            <p className="font-medium text-foreground mt-0.5">
+            <p className="font-medium text-[var(--ds-color-text-primary)] mt-0.5">
               {report.images?.length ?? 0} foto(s)
             </p>
           </div>
@@ -118,7 +118,7 @@ export function WizardStep3Review({
       <div className="space-y-4">
         <div>
           <div className="flex items-center justify-between gap-3 mb-2">
-            <label className="block text-sm font-medium text-foreground">
+            <label className="block text-sm font-medium text-[var(--ds-color-text-primary)]">
               Síntese do relatório
             </label>
             {canUseAi && hasImages && (
@@ -142,12 +142,12 @@ export function WizardStep3Review({
             disabled={!canManage}
             rows={5}
             placeholder="Síntese gerada pela IA ou escrita manualmente..."
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            className="w-full resize-none rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm placeholder:text-[var(--ds-color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-foreground mb-2">
+          <label className="block text-sm font-medium text-[var(--ds-color-text-primary)] mb-2">
             Conclusão final
           </label>
           <textarea
@@ -156,7 +156,7 @@ export function WizardStep3Review({
             disabled={!canManage}
             rows={4}
             placeholder="Conclusão e recomendações finais..."
-            className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            className="w-full resize-none rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm placeholder:text-[var(--ds-color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
           />
         </div>
 
@@ -173,8 +173,8 @@ export function WizardStep3Review({
       </div>
 
       {/* Actions */}
-      <div className="rounded-lg border border-border p-4 space-y-3">
-        <p className="text-sm font-medium text-foreground">Ações do relatório</p>
+      <div className="rounded-lg border border-[var(--ds-color-border-subtle)] p-4 space-y-3">
+        <p className="text-sm font-medium text-[var(--ds-color-text-primary)]">Ações do relatório</p>
         <div className="flex flex-wrap gap-2">
           {canFinalize && !isFinalized && (
             <Button
@@ -228,18 +228,18 @@ export function WizardStep3Review({
       {/* Export history */}
       {report.exports.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">Histórico de exportações</p>
+          <p className="text-sm font-medium text-[var(--ds-color-text-primary)]">Histórico de exportações</p>
           <div className="space-y-2">
             {report.exports.map((entry) => (
               <div
                 key={entry.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3"
+                className="flex items-center justify-between gap-3 rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-elevated)] p-3"
               >
                 <div>
-                  <p className="text-sm font-semibold text-foreground">
+                  <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
                     {entry.export_type.toUpperCase()}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-[var(--ds-color-text-muted)]">
                     {format(new Date(entry.generated_at), 'dd/MM/yyyy HH:mm', {
                       locale: ptBR,
                     })}
@@ -248,7 +248,7 @@ export function WizardStep3Review({
                 <button
                   type="button"
                   onClick={() => onDownloadExport(entry)}
-                  className="text-sm font-medium text-primary hover:underline"
+                  className="text-sm font-medium text-[var(--ds-color-action-primary)] hover:underline"
                 >
                   Baixar
                 </button>
@@ -259,7 +259,7 @@ export function WizardStep3Review({
       )}
 
       {/* Navigation */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-[var(--ds-color-border-subtle)]">
         <Button type="button" variant="outline" onClick={onBack} disabled={saving || analyzing}>
           ← Voltar às fotos
         </Button>

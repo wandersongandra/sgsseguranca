@@ -4,7 +4,7 @@ import { PhotographicReportWorkspace } from "../components/PhotographicReportWor
 
 function FallbackLoader() {
   return (
-    <div className="flex min-h-[320px] items-center justify-center text-muted-foreground">
+    <div className="flex min-h-[320px] items-center justify-center text-[var(--ds-color-text-muted)]">
       <Loader2 className="h-6 w-6 animate-spin" />
     </div>
   );

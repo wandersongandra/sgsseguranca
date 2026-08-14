@@ -244,6 +244,18 @@ export const validationSchema = Joi.object({
     .default('postgres'),
   SQLITE_DB_PATH: Joi.string().default('dev.sqlite'),
   DATABASE_URL: Joi.string().optional().allow(''),
+  // Opcional POR DECISÃO, inclusive em produção — mas a ausência não é
+  // silenciosa nem permissiva.
+  //
+  // Tornar obrigatória no boot converteria um erro de configuração em queda
+  // total da API (login incluso). O contrato adotado é mais cirúrgico e dá a
+  // mesma garantia onde importa:
+  //   1. `PrivilegedDbService.onModuleInit` loga ERROR em produção se faltar;
+  //   2. toda operação cross-tenant usa `withRequiredPrivilegedClient` /
+  //      `requiredTransaction` e responde 503 em vez de cair na conexão de
+  //      runtime, que desde a migration 361 enxerga 0 linhas por RLS;
+  //   3. `GET /health/detailed` expõe `checks.admin_operations`.
+  // Ver `docs/RUNBOOK_RLS_BYPASS_HARDENING.md`.
   DATABASE_ADMIN_URL: Joi.string().optional().allow(''),
   DATABASE_PRIVATE_URL: Joi.string().optional().allow(''),
   DATABASE_REPLICA_URL: Joi.string().optional().allow(''),
