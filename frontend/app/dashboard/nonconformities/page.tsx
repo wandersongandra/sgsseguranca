@@ -305,6 +305,7 @@ export default function NonConformitiesPage() {
     causaFilter,
     nrFilter,
     riskFilter,
+    activeCompanyId,
   ]);
 
   const loadSummary = useCallback(async () => {

@@ -150,7 +150,7 @@ function DashboardShell({
   };
 
   const handleLoginRedirect = () => {
-    window.location.assign('/login?expired=1');
+    router.push('/login?expired=1');
   };
 
   // Mesma checagem do useEffect acima (linhas 102-127), calculada de forma

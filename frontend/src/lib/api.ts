@@ -233,7 +233,7 @@ function scheduleLoginRedirect() {
   window.setTimeout(() => {
     const currentPath = window.location.pathname;
     if (!currentPath.startsWith('/login')) {
-      window.location.assign('/login?expired=1');
+      window.location.replace('/login?expired=1');
     }
     loginRedirectScheduled = false;
   }, 0);
@@ -744,4 +744,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
