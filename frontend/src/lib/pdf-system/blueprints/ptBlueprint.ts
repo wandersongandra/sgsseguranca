@@ -339,6 +339,252 @@ function buildReadinessSummary(
   };
 }
 
+function drawPtOverview(
+  ctx: PdfContext,
+  autoTable: AutoTableFn,
+  pt: Pt,
+  aprReference: string,
+  validityWindow: string,
+  riskInitial: string | number,
+  riskResidual: string,
+  vigiaLabel: string | undefined,
+  fireWatchLabel: string | undefined,
+  readiness: PtReadinessSummary,
+  checklistTotal: number,
+) {
+  const status = (pt.status || "").toLowerCase();
+  drawDocumentIdentityRail(ctx, {
+    documentType: "PT",
+    criticality: buildCriticality(pt),
+    validity: validityWindow,
+    documentClass: "Permissão de Trabalho",
+  });
+  drawExecutiveSummaryStrip(ctx, {
+    title: "Liberação executiva",
+    summary: "Documento de autorização para atividade crítica com requisitos mandatórios, checklist técnico e responsabilização formal.",
+    metrics: [
+      { label: "Número", value: sanitize(pt.numero), tone: "info" },
+      { label: "Status", value: sanitize(pt.status), tone },
+      { label: "Prontidão", value: readiness.ready ? "Pronta" : "Bloqueada", tone: readiness.ready ? "success" : "warning" },
+      { label: "Responsável", value: sanitize(pt.responsavel?.nome), tone: "default" },
+      { label: "Assinaturas", value: `${readiness.signedCount}/${readiness.requiredSignatureCount || 0}`, tone: "default" },
+      { label: "Risco residual", value: riskResidual, tone: riskResidual === "HIGH" || riskResidual === "CRITICAL" ? "warning" : "info" },
+      { label: "Site", value: sanitize(pt.site?.nome), tone: "info" },
+    ],
+  });
+  drawMetadataGrid(ctx, {
+    title: "Dados de liberação",
+    columns: 2,
+    fields: [
+      { label: "Número", value: pt.numero },
+      { label: "Título", value: pt.titulo },
+      { label: "Responsável", value: pt.responsavel?.nome },
+      { label: "Site/Obra", value: pt.site?.nome },
+      { label: "APR vinculada", value: aprReference },
+      { label: "Início", value: formatDateTime(pt.data_hora_inicio) },
+      { label: "Fim", value: formatDateTime(pt.data_hora_fim) },
+      { label: "Status", value: pt.status },
+    ],
+  });
+  drawMetadataGrid(ctx, {
+    title: "Prontidão operacional",
+    columns: 3,
+    fields: [
+      { label: "Atividades críticas", value: readiness.selectedActivities.length ? readiness.selectedActivities.join(" • ") : "PT geral" },
+      { label: "Checklist respondido", value: `${checklistTotal - readiness.unanswered}/${checklistTotal || 0}` },
+      { label: "Respostas críticas", value: readiness.adverse },
+      { label: "Assinaturas pendentes", value: readiness.pendingSignatures },
+      { label: "Evidências fase inicial", value: readiness.beforeEvidenceCount },
+      { label: "Leituras NR-33", value: readiness.atmosphericReadingsCount },
+    ],
+  });
+  if (readiness.blockers.length) {
+    drawSemanticTable(ctx, {
+      title: "Bloqueios antes da liberação",
+      tone: "action",
+      autoTable,
+      head: [["Pendência", "Ação requerida"]],
+      body: readiness.blockers.map((blocker) => [blocker.issue, blocker.action]),
+      semanticRules: false,
+      overrides: { styles: { fontSize: 7.6, cellPadding: 2.1 }, columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 108 } } },
+    });
+  }
+  drawMetadataGrid(ctx, {
+    title: "Risco, APR e controles",
+    columns: 2,
+    fields: [
+      { label: "APR vinculada", value: aprReference },
+      { label: "Executantes", value: pt.executantes?.length || 0 },
+      { label: "Risco inicial", value: riskInitial },
+      { label: "Risco residual", value: riskResidual },
+      { label: "Probabilidade", value: pt.probability ?? "-" },
+      { label: "Severidade", value: pt.severity ?? "-" },
+      { label: "Exposição", value: pt.exposure ?? "-" },
+      { label: "Evidência de controle", value: pt.control_evidence ? "Registrada" : "Não registrada" },
+      { label: "Status de liberação", value: readiness.ready ? "Sem bloqueios críticos" : "Com pendências" },
+    ],
+  });
+  if (pt.control_description) {
+    drawNarrativeSection(ctx, { title: "Controles críticos e condições de liberação", content: pt.control_description });
+  }
+  drawMetadataGrid(ctx, {
+    title: "Categorias de trabalho autorizadas",
+    columns: 3,
+    fields: [
+      { label: "Trabalho em altura", value: pt.trabalho_altura ? "Sim" : "Não" },
+      { label: "Espaço confinado", value: pt.espaco_confinado ? "Sim" : "Não" },
+      { label: "Trabalho a quente", value: pt.trabalho_quente ? "Sim" : "Não" },
+      { label: "Eletricidade", value: pt.eletricidade ? "Sim" : "Não" },
+      { label: "Escavação", value: pt.escavacao ? "Sim" : "Não" },
+    ],
+  });
+  const hasEmergencyInfo = Boolean(pt.trabalho_altura || pt.contato_emergencia || pt.ponto_encontro || vigiaLabel || fireWatchLabel || pt.epis_obrigatorios?.length || pt.plano_resgate);
+  if (!hasEmergencyInfo) return;
+  drawMetadataGrid(ctx, {
+    title: "Emergência, resgate e EPIs",
+    columns: 2,
+    fields: [
+      { label: "Contato de emergência", value: pt.contato_emergencia },
+      { label: "Ponto de encontro", value: pt.ponto_encontro },
+      { label: "Vigia NR-33", value: vigiaLabel },
+      { label: "Vigia de incêndio", value: fireWatchLabel },
+      { label: "EPIs obrigatórios", value: pt.epis_obrigatorios?.length ? pt.epis_obrigatorios.join(" • ") : undefined },
+    ],
+  });
+  if (pt.plano_resgate) {
+    drawNarrativeSection(ctx, { title: "Plano de resgate", content: pt.plano_resgate });
+  }
+}
+
+function drawPtRiskAndChecklists(
+  ctx: PdfContext,
+  autoTable: AutoTableFn,
+  pt: Pt,
+  visibleChecklistGroups: PtChecklistGroup[],
+) {
+  drawNarrativeSection(ctx, { title: "Escopo da atividade autorizada", content: pt.descricao });
+  const rapidRiskItems = (pt.analise_risco_rapida_checklist ?? []) as RapidRiskChecklistItem[];
+  for (const section of [
+    { title: "Análise de risco rápida — Verificações", secao: "basica" as const },
+    { title: "Análise de risco rápida — Verificações adicionais", secao: "adicional" as const },
+  ]) {
+    const items = rapidRiskItems.filter((item) => item.secao === section.secao);
+    if (!items.length) continue;
+    drawChecklistTable(ctx, autoTable, section.title, items.map((item) => ({ question: item.pergunta, answer: item.resposta })), { semanticRules: { profile: "pt", columns: [1] } });
+  }
+  if (pt.analise_risco_rapida_observacoes) {
+    drawNarrativeSection(ctx, { title: "Análise de risco rápida — Observações", content: pt.analise_risco_rapida_observacoes });
+  }
+  const recomendacoesItems = pt.recomendacoes_gerais_checklist ?? [];
+  if (recomendacoesItems.length) {
+    drawChecklistTable(ctx, autoTable, "Recomendações gerais", recomendacoesItems.map((item) => ({ question: item.pergunta, answer: item.resposta, justification: item.justificativa })), { semanticRules: { profile: "pt", columns: [1] } });
+  }
+  drawParticipantTable(ctx, autoTable, `Equipe executante (${pt.executantes?.length || 0})`, (pt.executantes || []).map((executor: PtExecutorLike) => ({ name: executor.nome, role: executor.funcao })));
+  for (const group of visibleChecklistGroups) {
+    const items = group.items ?? [];
+    const sections = Array.from(new Set(items.map((item) => item.section).filter(Boolean))) as string[];
+    if (sections.length) {
+      for (const section of sections) {
+        const sectionItems = items.filter((item) => item.section === section);
+        drawChecklistTable(ctx, autoTable, `${group.title} — ${sanitize(section)}`, sectionItems.map((item) => ({ question: item.pergunta, answer: item.resposta, justification: item.justificativa })), { semanticRules: { profile: "pt", columns: [1] } });
+      }
+      const unsectioned = items.filter((item) => !item.section);
+      if (unsectioned.length) {
+        drawChecklistTable(ctx, autoTable, group.title, unsectioned.map((item) => ({ question: item.pergunta, answer: item.resposta, justification: item.justificativa })), { semanticRules: { profile: "pt", columns: [1] } });
+      }
+      continue;
+    }
+    drawChecklistTable(ctx, autoTable, group.title, items.map((item) => ({ question: item.pergunta, answer: item.resposta, justification: item.justificativa })), { semanticRules: { profile: "pt", columns: [1] } });
+  }
+}
+
+async function drawPtEvidenceAndAtmosphere(
+  ctx: PdfContext,
+  autoTable: AutoTableFn,
+  pt: Pt,
+  readiness: PtReadinessSummary,
+  options?: PtBlueprintOptions,
+) {
+  if (pt.espaco_confinado && pt.medicoes_atmosfericas?.length) {
+    const firstReading = pt.medicoes_atmosfericas[0];
+    const lastReading = pt.medicoes_atmosfericas[pt.medicoes_atmosfericas.length - 1];
+    drawMetadataGrid(ctx, {
+      title: "Controle atmosférico e monitoramento",
+      columns: 2,
+      fields: [
+        { label: "Leituras registradas", value: pt.medicoes_atmosfericas.length },
+        { label: "Regime de monitoramento", value: readiness.monitoringLabel },
+        { label: "Primeira leitura", value: firstReading ? `${sanitize(firstReading.hora)} • ${sanitize(firstReading.responsavel)}` : undefined },
+        { label: "Última leitura", value: lastReading ? `${sanitize(lastReading.hora)} • ${sanitize(lastReading.responsavel)}` : undefined },
+      ],
+    });
+    drawSemanticTable(ctx, {
+      title: "Medições atmosféricas (NR-33)", tone: "risk", autoTable,
+      head: [["#", "Hora", "O2 (%)", "LEL (%)", "CO (ppm)", "H2S (ppm)", "Instrumento", "Responsável"]],
+      body: pt.medicoes_atmosfericas.map((reading, index) => [index + 1, sanitize(reading.hora), reading.oxigenio, reading.inflamaveis_lel, reading.co, reading.h2s, sanitize(reading.instrumento), sanitize(reading.responsavel)]),
+      semanticRules: false,
+      overrides: { tableWidth: ctx.contentWidth, styles: { fontSize: 7.4, cellPadding: 2 } },
+    });
+    drawNarrativeSection(ctx, { title: "Critério operacional de parada", content: "Qualquer alteração de atmosfera, perda de ventilação, falha de comunicação ou mudança relevante de cenário exige interrupção imediata, evacuação segura e revalidação da PT/APR antes do reinício." });
+  }
+  const evidencePhotos = pt.fotos_evidencia ?? [];
+  if (evidencePhotos.length) {
+    await drawEvidenceGallery(ctx, {
+      title: "Evidências fotográficas da área",
+      items: evidencePhotos.map((photo) => ({ title: PT_EVIDENCE_FASE_LABELS[photo.fase] ?? photo.fase, description: photo.legenda, meta: photo.uploaded_at ? formatDateTime(photo.uploaded_at) : undefined })),
+      resolveImageDataUrl: options?.resolveEvidencePhotoDataUrl ? (_item, index) => options.resolveEvidencePhotoDataUrl!(index) : undefined,
+    });
+  }
+}
+
+async function drawPtClosing(
+  ctx: PdfContext,
+  pt: Pt,
+  signatures: Signature[],
+  code: string,
+  validationUrl: string,
+  options?: PtBlueprintOptions,
+) {
+  if (pt.status === "Encerrada") {
+    drawMetadataGrid(ctx, {
+      title: "Encerramento e devolução da área", columns: 2,
+      fields: [
+        { label: "Encerrado por", value: pt.encerrado_por?.nome },
+        { label: "Término real", value: pt.data_hora_real_fim ? formatDateTime(pt.data_hora_real_fim) : undefined },
+        { label: "Condição da área", value: pt.condicao_area_encerramento },
+      ],
+    });
+    if (pt.observacoes_encerramento) drawNarrativeSection(ctx, { title: "Observações de encerramento", content: pt.observacoes_encerramento });
+  }
+  if (pt.aprovado_por_id || pt.reprovado_por_id) {
+    const approvalFields = [
+      pt.aprovado_por_id ? { label: "Aprovado por (ID)", value: pt.aprovado_por_id } : null,
+      pt.aprovado_em ? { label: "Aprovado em", value: formatDateTime(pt.aprovado_em) } : null,
+      pt.aprovado_motivo ? { label: "Motivo da aprovação", value: pt.aprovado_motivo } : null,
+      pt.reprovado_por_id ? { label: "Reprovado por (ID)", value: pt.reprovado_por_id } : null,
+      pt.reprovado_em ? { label: "Reprovado em", value: formatDateTime(pt.reprovado_em) } : null,
+      pt.reprovado_motivo ? { label: "Motivo da reprovação", value: pt.reprovado_motivo } : null,
+    ].filter((f): f is { label: string; value: string } => Boolean(f));
+    if (approvalFields.length) drawMetadataGrid(ctx, { title: "Cadeia de aprovação", columns: 2, fields: approvalFields });
+  }
+  if (pt.auditado_por_id || pt.data_auditoria) {
+    const auditFields = [
+      pt.auditado_por?.nome || pt.auditado_por_id ? { label: "Auditado por", value: pt.auditado_por?.nome || pt.auditado_por_id } : null,
+      pt.data_auditoria ? { label: "Data da auditoria", value: formatDate(pt.data_auditoria) } : null,
+      pt.resultado_auditoria ? { label: "Resultado", value: pt.resultado_auditoria } : null,
+    ].filter((f): f is { label: string; value: string } => Boolean(f));
+    if (auditFields.length) drawMetadataGrid(ctx, { title: "Auditoria de segurança", columns: 2, fields: auditFields });
+    if (pt.notas_auditoria) drawNarrativeSection(ctx, { title: "Notas de auditoria", content: pt.notas_auditoria });
+  }
+  await drawGovernanceClosingBlock(ctx, {
+    signatures: signatures.map((signature) => ({ label: resolveSignatureTypeLabel(signature.type), name: resolveSignatureSignerName(signature), role: resolveSignatureSignerRole(signature), date: formatDate(signature.signed_at || signature.created_at), image: signature.signature_data ?? null })),
+    code, hash: options?.finalPdfHash ?? undefined, url: validationUrl,
+    title: "Governança, autenticidade e autorização",
+    subtitle: ctx.isDraft ? "Prévia local para revisão interna. A emissão oficial exige fluxo governado no SGS." : "Documento válido para auditoria por QR code e identificador público.",
+    draft: Boolean(ctx.isDraft),
+  });
+}
+
 export async function drawPtBlueprint(
   ctx: PdfContext,
   autoTable: AutoTableFn,

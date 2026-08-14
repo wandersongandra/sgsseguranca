@@ -56,6 +56,12 @@ type PdfImagePresentation = {
   orientation: 'portrait' | 'landscape' | 'square' | 'unknown';
 };
 
+type PdfAttachmentAccumulator = {
+  images: PdfImagePresentation[];
+  unembeddedAttachments: string[];
+  embeddedImageBytes: number;
+};
+
 type PublicValidationPresentation = {
   url: string | null;
   qrDataUri: string | null;
@@ -599,6 +605,102 @@ export class NonConformitiesPdfService {
    * Qualquer outra URL manual (http/https digitado pelo usuário) nunca é
    * baixada — só listada como texto.
    */
+  private tryAddPdfImage(
+    state: PdfAttachmentAccumulator,
+    dataUri: string,
+    label: string,
+    buffer: Buffer,
+  ): boolean {
+    if (state.images.length >= MAX_EMBEDDED_PHOTOS) {
+      state.unembeddedAttachments.push(
+        `${label} (foto não incorporada: limite de ${MAX_EMBEDDED_PHOTOS} fotos por PDF atingido)`,
+      );
+      return false;
+    }
+    if (state.embeddedImageBytes + buffer.length > MAX_EMBEDDED_IMAGE_BYTES) {
+      state.unembeddedAttachments.push(
+        `${label} (foto não incorporada: limite total de evidências visuais do PDF atingido)`,
+      );
+      return false;
+    }
+    state.images.push({
+      dataUri,
+      label,
+      orientation: this.resolveImageOrientation(buffer),
+    });
+    state.embeddedImageBytes += buffer.length;
+    return true;
+  }
+
+  private appendUnsupportedPdfAttachment(
+    state: PdfAttachmentAccumulator,
+    entry: string,
+    index: number,
+  ): void {
+    state.unembeddedAttachments.push(
+      entry.startsWith('data:')
+        ? `Anexo legado ${index + 1} não incorporado (formato não suportado)`
+        : `Referência manual: ${entry.slice(0, 320)}`,
+    );
+  }
+
+  private appendDataUriPdfAttachment(
+    state: PdfAttachmentAccumulator,
+    entry: string,
+    index: number,
+  ): void {
+    const label = `Foto anexada ${index + 1}`;
+    const sizeBytes = this.estimateDataUriBytes(entry);
+    if (sizeBytes === 0 || sizeBytes > MAX_EMBEDDED_IMAGE_BYTES) {
+      state.unembeddedAttachments.push(
+        `${label} (foto legada não incorporada: tamanho inválido para o PDF)`,
+      );
+      return;
+    }
+    const buffer = Buffer.from(entry.slice(entry.indexOf(',') + 1), 'base64');
+    const mimeType = this.resolveSupportedImageMimeType(buffer);
+    if (!mimeType) {
+      state.unembeddedAttachments.push(
+        `${label} (foto legada não incorporada: formato não suportado)`,
+      );
+      return;
+    }
+    this.tryAddPdfImage(state, `data:${mimeType};base64,${buffer.toString('base64')}`, label, buffer);
+  }
+
+  private async appendGovernedPdfAttachment(
+    state: PdfAttachmentAccumulator,
+    nc: Pick<NonConformity, 'id' | 'company_id' | 'site_id'>,
+    governed: GovernedAttachmentReferencePayload,
+    index: number,
+  ): Promise<void> {
+    const label = governed.originalName || `Anexo governado ${index + 1}`;
+    if (!governed.mimeType.startsWith('image/') || !this.isExpectedAttachmentStorageKey(nc, governed.fileKey)) {
+      state.unembeddedAttachments.push(
+        `${label} (arquivo ${governed.mimeType}, disponível no storage oficial da não conformidade)`,
+      );
+      return;
+    }
+    try {
+      const buffer = await this.documentStorageService.downloadFileBuffer(governed.fileKey);
+      const mimeType = this.resolveSupportedImageMimeType(buffer);
+      if (!mimeType) {
+        state.unembeddedAttachments.push(
+          `${label} (foto não incorporada: conteúdo não corresponde a uma imagem suportada)`,
+        );
+        return;
+      }
+      this.tryAddPdfImage(state, `data:${mimeType};base64,${buffer.toString('base64')}`, label, buffer);
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao incorporar anexo governado no PDF (${governed.fileKey}): ${error instanceof Error ? error.message : 'unknown'}`,
+      );
+      state.unembeddedAttachments.push(
+        `${label} (falha ao carregar a pré-visualização; disponível no storage oficial da não conformidade)`,
+      );
+    }
+  }
+
   private async resolveAttachmentPresentation(
     nc: Pick<NonConformity, 'id' | 'anexos' | 'company_id' | 'site_id'>,
   ): Promise<{
@@ -606,35 +708,10 @@ export class NonConformitiesPdfService {
     unembeddedAttachments: string[];
   }> {
     const entries = Array.isArray(nc.anexos) ? nc.anexos : [];
-    const images: PdfImagePresentation[] = [];
-    const unembeddedAttachments: string[] = [];
-    let embeddedImageBytes = 0;
-
-    const addImage = (
-      dataUri: string,
-      label: string,
-      buffer: Buffer,
-    ): boolean => {
-      if (images.length >= MAX_EMBEDDED_PHOTOS) {
-        unembeddedAttachments.push(
-          `${label} (foto não incorporada: limite de ${MAX_EMBEDDED_PHOTOS} fotos por PDF atingido)`,
-        );
-        return false;
-      }
-      if (embeddedImageBytes + buffer.length > MAX_EMBEDDED_IMAGE_BYTES) {
-        unembeddedAttachments.push(
-          `${label} (foto não incorporada: limite total de evidências visuais do PDF atingido)`,
-        );
-        return false;
-      }
-
-      images.push({
-        dataUri,
-        label,
-        orientation: this.resolveImageOrientation(buffer),
-      });
-      embeddedImageBytes += buffer.length;
-      return true;
+    const state: PdfAttachmentAccumulator = {
+      images: [],
+      unembeddedAttachments: [],
+      embeddedImageBytes: 0,
     };
 
     for (const [index, rawEntry] of entries.entries()) {
@@ -642,88 +719,23 @@ export class NonConformitiesPdfService {
       if (!entry) continue;
 
       if (/^data:image\/(?:png|jpe?g|webp);base64,/i.test(entry)) {
-        const sizeBytes = this.estimateDataUriBytes(entry);
-        const label = `Foto anexada ${index + 1}`;
-        if (sizeBytes === 0 || sizeBytes > MAX_EMBEDDED_IMAGE_BYTES) {
-          unembeddedAttachments.push(
-            `${label} (foto legada não incorporada: tamanho inválido para o PDF)`,
-          );
-          continue;
-        }
-
-        const encoded = entry.slice(entry.indexOf(',') + 1);
-        const buffer = Buffer.from(encoded, 'base64');
-        const mimeType = this.resolveSupportedImageMimeType(buffer);
-        if (!mimeType) {
-          unembeddedAttachments.push(
-            `${label} (foto legada não incorporada: formato não suportado)`,
-          );
-          continue;
-        }
-
-        addImage(
-          `data:${mimeType};base64,${buffer.toString('base64')}`,
-          label,
-          buffer,
-        );
+        this.appendDataUriPdfAttachment(state, entry, index);
         continue;
       }
 
       const governed = this.parseGovernedAttachmentReference(entry);
       if (governed) {
-        const label = governed.originalName || `Anexo governado ${index + 1}`;
-        if (
-          governed.mimeType.startsWith('image/') &&
-          this.isExpectedAttachmentStorageKey(nc, governed.fileKey)
-        ) {
-          if (images.length >= MAX_EMBEDDED_PHOTOS) {
-            unembeddedAttachments.push(
-              `${label} (foto não incorporada: limite de ${MAX_EMBEDDED_PHOTOS} fotos por PDF atingido)`,
-            );
-            continue;
-          }
-          try {
-            const buffer = await this.documentStorageService.downloadFileBuffer(
-              governed.fileKey,
-            );
-            const mimeType = this.resolveSupportedImageMimeType(buffer);
-            if (!mimeType) {
-              unembeddedAttachments.push(
-                `${label} (foto não incorporada: conteúdo não corresponde a uma imagem suportada)`,
-              );
-              continue;
-            }
-            addImage(
-              `data:${mimeType};base64,${buffer.toString('base64')}`,
-              label,
-              buffer,
-            );
-          } catch (error) {
-            this.logger.warn(
-              `Falha ao incorporar anexo governado no PDF (${governed.fileKey}): ${error instanceof Error ? error.message : 'unknown'}`,
-            );
-            unembeddedAttachments.push(
-              `${label} (falha ao carregar a pré-visualização; disponível no storage oficial da não conformidade)`,
-            );
-          }
-        } else {
-          unembeddedAttachments.push(
-            `${label} (arquivo ${governed.mimeType}, disponível no storage oficial da não conformidade)`,
-          );
-        }
+        await this.appendGovernedPdfAttachment(state, nc, governed, index);
         continue;
       }
 
-      if (entry.startsWith('data:')) {
-        unembeddedAttachments.push(
-          `Anexo legado ${index + 1} não incorporado (formato não suportado)`,
-        );
-      } else {
-        unembeddedAttachments.push(`Referência manual: ${entry.slice(0, 320)}`);
-      }
+      this.appendUnsupportedPdfAttachment(state, entry, index);
     }
 
-    return { images, unembeddedAttachments };
+    return {
+      images: state.images,
+      unembeddedAttachments: state.unembeddedAttachments,
+    };
   }
 
   private isExpectedAttachmentStorageKey(

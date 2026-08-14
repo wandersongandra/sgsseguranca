@@ -434,15 +434,22 @@ export class PhotographicReportsService {
       ai_technical_assessment: image.ai_technical_assessment,
       ai_condition_classification: image.ai_condition_classification,
       ai_recommendations: image.ai_recommendations,
-      photo_conditions: image.photo_conditions,
+      ...this.mapImageGovernanceFields(image),
 
+      created_at: image.created_at.toISOString(),
+      updated_at: image.updated_at.toISOString(),
+      day: image.report_day_id ? dayMap.get(image.report_day_id) || null : null,
+    };
+  }
+
+  private mapImageGovernanceFields(image: PhotographicReportImage) {
+    return {
+      photo_conditions: image.photo_conditions,
       is_nonconformity: image.is_nonconformity ?? false,
       recommended_action: image.recommended_action ?? null,
       action_deadline: image.action_deadline ?? null,
       action_responsible: image.action_responsible ?? null,
-
-      // `device_id` e `ip_address` NÃO são expostos — ver comentário em
-      // PhotographicReportImageResponse. Só o manifesto do PDF os consome.
+      // `device_id` e `ip_address` não são expostos na resposta.
       original_name: image.original_name ?? null,
       mime_type: image.mime_type ?? null,
       file_size_bytes: image.file_size_bytes ?? null,
@@ -455,10 +462,6 @@ export class PhotographicReportsService {
         ? image.exif_datetime.toISOString()
         : null,
       integrity_flags: image.integrity_flags ?? null,
-
-      created_at: image.created_at.toISOString(),
-      updated_at: image.updated_at.toISOString(),
-      day: image.report_day_id ? dayMap.get(image.report_day_id) || null : null,
     };
   }
 
@@ -1436,6 +1439,57 @@ export class PhotographicReportsService {
     }
   }
 
+  private async applyImagePlacementUpdate(
+    report: PhotographicReport,
+    image: PhotographicReportImage,
+    dto: UpdatePhotographicReportImageDto,
+  ): Promise<void> {
+    if (dto.report_day_id !== undefined) {
+      image.report_day_id = dto.report_day_id
+        ? (await this.ensureDayBelongsToReport(report, dto.report_day_id)).id
+        : null;
+    }
+    if (dto.manual_caption !== undefined) {
+      image.manual_caption = this.normalizeText(dto.manual_caption);
+    }
+    if (dto.image_order !== undefined) image.image_order = dto.image_order;
+  }
+
+  private applyImageAnalysisUpdate(
+    image: PhotographicReportImage,
+    dto: UpdatePhotographicReportImageDto,
+  ): void {
+    if (dto.ai_title !== undefined) image.ai_title = this.normalizeText(dto.ai_title);
+    if (dto.ai_description !== undefined) image.ai_description = this.normalizeText(dto.ai_description);
+    if (dto.ai_positive_points !== undefined) {
+      image.ai_positive_points = this.normalizeStringArray(dto.ai_positive_points, 8);
+    }
+    if (dto.ai_technical_assessment !== undefined) {
+      image.ai_technical_assessment = this.normalizeText(dto.ai_technical_assessment);
+    }
+    if (dto.ai_condition_classification !== undefined) {
+      image.ai_condition_classification = this.normalizeText(dto.ai_condition_classification);
+    }
+    if (dto.ai_recommendations !== undefined) {
+      image.ai_recommendations = this.normalizeStringArray(dto.ai_recommendations, 5);
+    }
+    if (dto.photo_conditions !== undefined) {
+      image.photo_conditions = this.normalizeStringArray(dto.photo_conditions, MAX_PHOTO_CONDITIONS);
+    }
+  }
+
+  private applyImageGovernanceUpdate(
+    image: PhotographicReportImage,
+    dto: UpdatePhotographicReportImageDto,
+  ): void {
+    if (dto.is_nonconformity !== undefined) image.is_nonconformity = Boolean(dto.is_nonconformity);
+    if (dto.recommended_action !== undefined) image.recommended_action = this.normalizeText(dto.recommended_action);
+    if (dto.action_deadline !== undefined) {
+      image.action_deadline = dto.action_deadline ? this.normalizeDate(dto.action_deadline) : null;
+    }
+    if (dto.action_responsible !== undefined) image.action_responsible = this.normalizeText(dto.action_responsible);
+  }
+
   async updateImage(
     reportId: string,
     imageId: string,
@@ -1445,74 +1499,9 @@ export class PhotographicReportsService {
     const report = await this.findReportEntity(reportId, companyId);
     const image = await this.ensureImageBelongsToReport(report, imageId);
 
-    if (dto.report_day_id !== undefined) {
-      image.report_day_id = dto.report_day_id
-        ? (await this.ensureDayBelongsToReport(report, dto.report_day_id)).id
-        : null;
-    }
-    if (dto.manual_caption !== undefined) {
-      image.manual_caption = this.normalizeText(dto.manual_caption);
-    }
-    if (dto.image_order !== undefined) {
-      image.image_order = dto.image_order;
-    }
-    if (dto.ai_title !== undefined) {
-      image.ai_title = this.normalizeText(dto.ai_title);
-    }
-    if (dto.ai_description !== undefined) {
-      image.ai_description = this.normalizeText(dto.ai_description);
-    }
-    if (dto.ai_positive_points !== undefined) {
-      image.ai_positive_points = this.normalizeStringArray(
-        dto.ai_positive_points,
-        8,
-      );
-    }
-    if (dto.ai_technical_assessment !== undefined) {
-      image.ai_technical_assessment = this.normalizeText(
-        dto.ai_technical_assessment,
-      );
-    }
-    if (dto.ai_condition_classification !== undefined) {
-      image.ai_condition_classification = this.normalizeText(
-        dto.ai_condition_classification,
-      );
-    }
-    if (dto.ai_recommendations !== undefined) {
-      image.ai_recommendations = this.normalizeStringArray(
-        dto.ai_recommendations,
-        5,
-      );
-    }
-
-    // BUG CORRIGIDO: `photo_conditions` era declarado no DTO, devolvido por
-    // mapImageEntity e enviado pelo PhotoCard, mas NÃO tinha branch de escrita
-    // aqui — todo checkbox marcado pelo usuário era descartado em silêncio
-    // desde que a feature foi entregue.
-    if (dto.photo_conditions !== undefined) {
-      image.photo_conditions = this.normalizeStringArray(
-        dto.photo_conditions,
-        MAX_PHOTO_CONDITIONS,
-      );
-    }
-
-    // Não conformidade. Os campos são independentes de propósito: desmarcar a
-    // NC não deve exigir reenviar a ação, e limpar a ação não deve exigir
-    // desmarcar a NC.
-    if (dto.is_nonconformity !== undefined) {
-      image.is_nonconformity = Boolean(dto.is_nonconformity);
-    }
-    if (dto.recommended_action !== undefined) {
-      image.recommended_action = this.normalizeText(dto.recommended_action);
-    }
-    if (dto.action_deadline !== undefined) {
-      image.action_deadline = dto.action_deadline
-        ? this.normalizeDate(dto.action_deadline)
-        : null;
-    }
-    if (dto.action_responsible !== undefined) {
-      image.action_responsible = this.normalizeText(dto.action_responsible);
-    }
+    await this.applyImagePlacementUpdate(report, image, dto);
+    this.applyImageAnalysisUpdate(image, dto);
+    this.applyImageGovernanceUpdate(image, dto);
 
     this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
     await this.imageRepository.save(image);

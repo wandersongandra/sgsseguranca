@@ -339,21 +339,40 @@ function sanitizeAprWritePayload(
   };
 }
 
-export const aprsService = {
-  findPaginated: async (opts?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: string;
-    siteId?: string;
-    responsibleId?: string;
-    dueFilter?: string;
-    sort?: "priority" | "updated-desc" | "deadline-asc" | "title-asc";
-    companyId?: string;
-    isModeloPadrao?: boolean;
-    contextFilter?: "minhas" | "vence-hoje" | "preciso-assinar";
-    signal?: AbortSignal;
-  }) => {
+type AprPaginatedOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  siteId?: string;
+  responsibleId?: string;
+  dueFilter?: string;
+  sort?: "priority" | "updated-desc" | "deadline-asc" | "title-asc";
+  companyId?: string;
+  isModeloPadrao?: boolean;
+  contextFilter?: "minhas" | "vence-hoje" | "preciso-assinar";
+  signal?: AbortSignal;
+};
+
+async function fetchAprPageWithOfflineFallback(
+  params: Record<string, unknown>,
+  cacheKey: string,
+  cacheContext: ReturnType<typeof createOfflineCacheContext>,
+  signal?: AbortSignal,
+) {
+  try {
+    const response = await api.get<PaginatedResponse<Apr>>("/aprs", { params, signal });
+    setOfflineCache(cacheKey, response.data, CACHE_TTL.CRITICAL, cacheContext);
+    return response.data;
+  } catch (error) {
+    if (!isOfflineRequestError(error)) throw error;
+    const cached = consumeOfflineCache<PaginatedResponse<Apr>>(cacheKey, cacheContext);
+    if (cached) return cached;
+    throw error;
+  }
+}
+
+async function findAprsPaginated(opts?: AprPaginatedOptions) {
     const activeCompanyId = opts?.companyId;
     const activeSiteId = opts?.siteId;
     if (!activeCompanyId || !activeSiteId) {
@@ -393,22 +412,11 @@ export const aprsService = {
     const cacheContext = createOfflineCacheContext();
 
 
-    try {
-      const response = await api.get<PaginatedResponse<Apr>>("/aprs", {
-        params,
-        signal: opts?.signal,
-      });
-      setOfflineCache(cacheKey, response.data, CACHE_TTL.CRITICAL, cacheContext);
-      return response.data;
-    } catch (error) {
-      if (!isOfflineRequestError(error)) {
-        throw error;
-      }
-      const cached = consumeOfflineCache<PaginatedResponse<Apr>>(cacheKey, cacheContext);
-      if (cached) return cached;
-      throw error;
-    }
-  },
+    return fetchAprPageWithOfflineFallback(params, cacheKey, cacheContext, opts?.signal);
+}
+
+export const aprsService = {
+  findPaginated: findAprsPaginated,
 
   findAll: async (companyId?: string, siteId?: string) => {
     if (!companyId || !siteId) {
