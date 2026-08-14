@@ -15,6 +15,19 @@ type SensitiveWriteFields = {
   roles?: unknown;
   permissions?: unknown;
   permissoes?: unknown;
+  // Campos de ciclo de vida controlados pelo servidor. Precisam ser removidos
+  // aqui porque as rotas herdadas de BaseController têm o @Body() tipado com um
+  // type parameter genérico — o TypeScript emite `Object` em design:paramtypes
+  // e o ValidationPipe global PULA a validação inteira (whitelist inclusive).
+  // Sem esta limpeza:
+  //   - PATCH { deleted_at } soft-deleta o registro por uma rota cujo papel
+  //     exigido é menor que o do DELETE (escalação) e sem trilha forense;
+  //   - PATCH { deleted_at: null } ressuscita um registro apagado;
+  //   - POST { id: "<uuid existente>" } vira UPDATE (repository.save com PK).
+  id?: unknown;
+  deleted_at?: unknown;
+  created_at?: unknown;
+  updated_at?: unknown;
 };
 
 export abstract class BaseService<T extends ObjectLiteral> {
@@ -65,6 +78,10 @@ export abstract class BaseService<T extends ObjectLiteral> {
     delete next.roles;
     delete next.permissions;
     delete next.permissoes;
+    delete next.id;
+    delete next.deleted_at;
+    delete next.created_at;
+    delete next.updated_at;
 
     return next;
   }

@@ -1,5 +1,6 @@
 import { clearSensitiveBrowserStorage } from "./browser-sensitive-storage";
 import { siteStore } from "./siteStore";
+import { sessionStore } from "./sessionStore";
 
 type SelectedTenant = {
   companyId: string;
@@ -65,6 +66,9 @@ export const selectedTenantStore = {
         previousTenant?.companyId &&
         previousTenant.companyId !== tenant.companyId
       ) {
+        // Invalidar imediatamente itens offline do tenant anterior, antes da
+        // limpeza assíncrona de IndexedDB terminar.
+        sessionStore.rotateGeneration();
         await clearSensitiveBrowserStorage();
         // Quando a empresa muda, limpa a obra selecionada também
         siteStore.clear();

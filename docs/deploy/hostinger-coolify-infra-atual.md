@@ -60,7 +60,7 @@ maior nem de serviços gerenciados de Redis/antivírus enquanto o volume de dado
 - **Projeto:** `My first project` (UUID: `k4tvj4jbsu1vc7jqggwzvv1f`)
 - **Environment:** `production` (UUID: `r2j049cg1r2ocoi4lx57xzuj`)
 - **Server (localhost):** UUID `sa80fcnx6zqhdeyypcyge6oc`
-- **Source do Git:** repositório público `complianceX/sgsseguranca` — não precisa de deploy key
+- **Source do Git:** repositório público `wandersongandra/sgsseguranca` — não precisa de deploy key
   nem GitHub App; o Coolify clona direto por HTTPS.
 
 ### Apps no Coolify
@@ -70,7 +70,7 @@ maior nem de serviços gerenciados de Redis/antivírus enquanto o volume de dado
 | backend-web | `s2jgvkq9trtm8c9itahmn7og` | `/Dockerfile` | `https://api.sgsseguranca.com.br` |
 | backend-worker | `x3k7efj1x3pcl4ipcuswwmll` | `/Dockerfile.worker` | (sem domínio público — comunica só por fila/Redis) |
 
-- Repo: `complianceX/sgsseguranca`, branch: `main`
+- Repo: `wandersongandra/sgsseguranca`, branch: `main`
 - TLS: Let's Encrypt automático via Traefik (`certresolver=letsencrypt`), atrás do Cloudflare
   (proxy laranja) — mesmo esquema da infra anterior.
 

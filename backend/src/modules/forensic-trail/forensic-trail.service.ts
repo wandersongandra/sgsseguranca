@@ -57,6 +57,19 @@ export class ForensicTrailService {
     const occurredAt = input.occurredAt ?? new Date();
 
     const execute = async (manager: EntityManager) => {
+      if (this.dataSource.options.type === 'postgres' && companyId) {
+        // Login é uma rota pública e pode não ter TenantService/ALS preenchido.
+        // O company_id já foi resolvido pela autenticação; fixa o contexto
+        // somente nesta transação para satisfazer RLS sem bypass/owner.
+        await manager.query(
+          `SELECT
+             set_config('app.current_company', $1, true),
+             set_config('app.current_company_id', $1, true),
+             set_config('app.is_super_admin', 'false', true)`,
+          [companyId],
+        );
+      }
+
       const repository = manager.getRepository(ForensicTrailEvent);
       await this.acquireStreamLock(manager, streamKey);
 

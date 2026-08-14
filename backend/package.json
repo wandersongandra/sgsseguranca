@@ -117,6 +117,7 @@
     "test:e2e:down": "docker compose -f docker-compose.test.yml down -v --remove-orphans",
     "test:e2e:ci": "node scripts/run-e2e.cjs",
     "test:e2e:documental": "node --max-old-space-size=4096 scripts/run-jest.cjs --config ./test/jest-e2e.json --runInBand test/document-import-failures.e2e-spec.ts",
+    "test:apr:batch": "node --max-old-space-size=4096 ./node_modules/ts-node/dist/bin.js -r tsconfig-paths/register test/load/apr-emit-batch.ts",
     "ci:migration:check": "node scripts/check-migrations.js",
     "loadtest:smoke": "k6 run test/load/k6-enterprise-scale.js -e K6_SCENARIO_PROFILE=smoke",
     "loadtest:baseline": "k6 run test/load/k6-enterprise-scale.js -e K6_SCENARIO_PROFILE=baseline",

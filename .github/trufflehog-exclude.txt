@@ -12,4 +12,5 @@
 # guards; Gitleaks continua cobrindo o conteúdo inteiro como backstop.
 .*infra/load-test/compose\.yml$
 .*infra/load-test/scripts/guard-environment\.test\.mjs$
+.*infra/load-test/scripts/seed-baseline-users\.test\.cjs$
 security-scan

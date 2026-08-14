@@ -1,14 +1,6 @@
-'use client';
+"use client";
 
-import {
-  memo,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -18,10 +10,10 @@ import {
   Folder,
   Link2,
   Printer,
-} from 'lucide-react';
-import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { EmptyState, InlineLoadingState } from '@/components/ui/state';
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { EmptyState, InlineLoadingState } from "@/components/ui/state";
 import {
   Table,
   TableBody,
@@ -29,15 +21,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import {
-  openPdfForPrint,
-  preparePdfPrintWindow,
-  resolveSafeBrowserUrl,
-} from '@/lib/print-utils';
-import { safeFormatDate } from '@/lib/date/safeFormat';
-import { logger } from '@/lib/logger';
-import api from '@/lib/api';
+} from "@/components/ui/table";
+import { openPdfForPrint, preparePdfPrintWindow, resolveSafeBrowserUrl } from "@/lib/print-utils";
+import { safeFormatDate } from "@/lib/date/safeFormat";
+import { logger } from "@/lib/logger";
+import api from "@/lib/api";
 
 /**
  * O link de download é assinado e de uso único, vinculado à sessão que o
@@ -47,15 +35,11 @@ import api from '@/lib/api';
  * sempre rejeitado. Por isso buscamos com o client autenticado (`api`,
  * que anexa o Bearer token) e trabalhamos com o PDF como blob local.
  */
-async function fetchPdfBlob(
-  url: string,
-): Promise<{ blob: Blob; filename: string | null }> {
-  const response = await api.get<Blob>(url, { responseType: 'blob' });
-  const contentDisposition = response.headers?.['content-disposition'];
+async function fetchPdfBlob(url: string): Promise<{ blob: Blob; filename: string | null }> {
+  const response = await api.get<Blob>(url, { responseType: "blob" });
+  const contentDisposition = response.headers?.["content-disposition"];
   const match =
-    typeof contentDisposition === 'string'
-      ? contentDisposition.match(/filename="([^"]+)"/)
-      : null;
+    typeof contentDisposition === "string" ? contentDisposition.match(/filename="([^"]+)"/) : null;
   let filename: string | null = null;
   if (match?.[1]) {
     try {
@@ -98,7 +82,7 @@ interface StoredFilesPanelProps {
 }
 
 const inputClassName =
-  'w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-sm text-[var(--ds-color-text-primary)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]';
+  "w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-sm text-[var(--ds-color-text-primary)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]";
 
 function parseYearFilter(value: string) {
   if (!value || !/^\d{4}$/.test(value)) return undefined;
@@ -128,32 +112,24 @@ function StoredFilesPanelComponent({
 }: StoredFilesPanelProps) {
   const [files, setFiles] = useState<StoredFileItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [year, setYear] = useState('');
-  const [week, setWeek] = useState('');
-  const [companyId, setCompanyId] = useState('');
+  const [year, setYear] = useState("");
+  const [week, setWeek] = useState("");
+  const [companyId, setCompanyId] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const requestSequenceRef = useRef(0);
   const deferredYear = useDeferredValue(year);
   const deferredWeek = useDeferredValue(week);
   const deferredCompanyId = useDeferredValue(companyId);
-  const parsedYear = useMemo(
-    () => parseYearFilter(deferredYear),
-    [deferredYear],
-  );
-  const parsedWeek = useMemo(
-    () => parseWeekFilter(deferredWeek),
-    [deferredWeek],
-  );
+  const parsedYear = useMemo(() => parseYearFilter(deferredYear), [deferredYear]);
+  const parsedWeek = useMemo(() => parseWeekFilter(deferredWeek), [deferredWeek]);
 
   const totalPages = Math.max(1, Math.ceil(files.length / pageSize));
   const paged = useMemo(
     () => files.slice((page - 1) * pageSize, page * pageSize),
     [files, page, pageSize],
   );
-  const canBuildWeeklyBundle = Boolean(
-    downloadWeeklyBundle && parsedYear && parsedWeek,
-  );
+  const canBuildWeeklyBundle = Boolean(downloadWeeklyBundle && parsedYear && parsedWeek);
 
   useEffect(() => {
     setPage(1);
@@ -177,8 +153,8 @@ function StoredFilesPanelComponent({
         }
       } catch (error) {
         if (requestId === requestSequenceRef.current) {
-          logger.error('Erro ao carregar arquivos do storage:', error);
-          toast.error('Erro ao carregar arquivos salvos.');
+          logger.error("Erro ao carregar arquivos do storage:", error);
+          toast.error("Erro ao carregar arquivos salvos.");
         }
       } finally {
         if (mounted && requestId === requestSequenceRef.current) {
@@ -199,20 +175,20 @@ function StoredFilesPanelComponent({
       try {
         const access = await getPdfAccess(entityId);
         if (!access.url) {
-          throw new Error(access.message || 'PDF indisponível para download.');
+          throw new Error(access.message || "PDF indisponível para download.");
         }
         const { blob, filename } = await fetchPdfBlob(access.url);
         const objectUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = objectUrl;
-        link.download = filename || 'documento.pdf';
+        link.download = filename || "documento.pdf";
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(objectUrl);
       } catch (error) {
-        logger.error('Erro ao abrir PDF:', error);
-        toast.error('Não foi possível abrir o PDF.');
+        logger.error("Erro ao abrir PDF:", error);
+        toast.error("Não foi possível abrir o PDF.");
       }
     },
     [getPdfAccess],
@@ -221,10 +197,10 @@ function StoredFilesPanelComponent({
   const handleCopyFolder = useCallback(async (folderPath: string) => {
     try {
       await navigator.clipboard.writeText(folderPath);
-      toast.success('Caminho da pasta copiado.');
+      toast.success("Caminho da pasta copiado.");
     } catch (error) {
-      logger.error('Erro ao copiar caminho:', error);
-      toast.error('Não foi possível copiar o caminho.');
+      logger.error("Erro ao copiar caminho:", error);
+      toast.error("Não foi possível copiar o caminho.");
     }
   }, []);
 
@@ -233,13 +209,13 @@ function StoredFilesPanelComponent({
       try {
         const access = await getPdfAccess(entityId);
         if (!access.url) {
-          throw new Error(access.message || 'Link indisponível para este PDF.');
+          throw new Error(access.message || "Link indisponível para este PDF.");
         }
         await navigator.clipboard.writeText(resolveSafeBrowserUrl(access.url));
-        toast.success('Link do PDF copiado.');
+        toast.success("Link do PDF copiado.");
       } catch (error) {
-        logger.error('Erro ao copiar link:', error);
-        toast.error('Não foi possível copiar o link do PDF.');
+        logger.error("Erro ao copiar link:", error);
+        toast.error("Não foi possível copiar o link do PDF.");
       }
     },
     [getPdfAccess],
@@ -251,23 +227,21 @@ function StoredFilesPanelComponent({
       try {
         const access = await getPdfAccess(entityId);
         if (!access.url) {
-          throw new Error(access.message || 'PDF indisponível para impressão.');
+          throw new Error(access.message || "PDF indisponível para impressão.");
         }
         const { blob } = await fetchPdfBlob(access.url);
         const objectUrl = URL.createObjectURL(blob);
         openPdfForPrint(
           objectUrl,
           () => {
-            toast.error(
-              'Pop-up bloqueado. Permita pop-ups para imprimir sem sair do sistema.',
-            );
+            toast.error("Pop-up bloqueado. Permita pop-ups para imprimir sem sair do sistema.");
           },
           printWindow,
         );
       } catch (error) {
         printWindow?.close();
-        logger.error('Erro ao imprimir PDF arquivado:', error);
-        toast.error('Não foi possível abrir o PDF para impressão.');
+        logger.error("Erro ao imprimir PDF arquivado:", error);
+        toast.error("Não foi possível abrir o PDF para impressão.");
       }
     },
     [getPdfAccess],
@@ -275,49 +249,52 @@ function StoredFilesPanelComponent({
 
   const handleExportCsv = useCallback(() => {
     if (files.length === 0) {
-      toast.error('Não há arquivos para exportar.');
+      toast.error("Não há arquivos para exportar.");
       return;
     }
 
     const headers = [
-      'entity_id',
-      'date',
-      'title',
-      'company_id',
-      'folder_path',
-      'file_key',
-      'original_name',
+      "entity_id",
+      "date",
+      "title",
+      "company_id",
+      "folder_path",
+      "file_key",
+      "original_name",
     ];
-    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const escapeCsv = (value: string) => {
+      const safeValue = /^[=+\-@]/.test(value) ? `'${value}` : value;
+      return `"${safeValue.replace(/"/g, '""')}"`;
+    };
     const rows = files.map((file) =>
       [
         file.entityId,
-        safeFormatDate(file.date, 'yyyy-MM-dd', undefined, ''),
+        safeFormatDate(file.date, "yyyy-MM-dd", undefined, ""),
         file.title,
         file.companyId,
         file.folderPath,
         file.fileKey,
         file.originalName,
       ]
-        .map((item) => escapeCsv(String(item ?? '')))
-        .join(','),
+        .map((item) => escapeCsv(String(item ?? "")))
+        .join(","),
     );
-    const csv = [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
     link.download = `storage-files-${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    toast.success('CSV exportado com sucesso.');
+    toast.success("CSV exportado com sucesso.");
   }, [files]);
 
   const handleDownloadWeeklyBundle = useCallback(async () => {
     if (!downloadWeeklyBundle || !parsedYear || !parsedWeek) {
-      toast.error('Selecione ano e semana para gerar o pacote.');
+      toast.error("Selecione ano e semana para gerar o pacote.");
       return;
     }
 
@@ -328,23 +305,23 @@ function StoredFilesPanelComponent({
         week: parsedWeek,
       });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
-      link.download = `${slugify(title)}-semana-${parsedYear}-${String(parsedWeek).padStart(2, '0')}.pdf`;
+      link.download = `${slugify(title)}-semana-${parsedYear}-${String(parsedWeek).padStart(2, "0")}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      toast.success('Pacote semanal gerado com sucesso.');
+      toast.success("Pacote semanal gerado com sucesso.");
     } catch (error) {
-      logger.error('Erro ao baixar pacote semanal:', error);
-      toast.error('Não foi possível gerar o pacote semanal.');
+      logger.error("Erro ao baixar pacote semanal:", error);
+      toast.error("Não foi possível gerar o pacote semanal.");
     }
   }, [companyId, downloadWeeklyBundle, parsedWeek, parsedYear, title]);
 
   const handlePrintWeeklyBundle = useCallback(async () => {
     if (!downloadWeeklyBundle || !parsedYear || !parsedWeek) {
-      toast.error('Selecione ano e semana para imprimir o pacote.');
+      toast.error("Selecione ano e semana para imprimir o pacote.");
       return;
     }
 
@@ -359,17 +336,15 @@ function StoredFilesPanelComponent({
       openPdfForPrint(
         url,
         () => {
-          toast.error(
-            'Pop-up bloqueado. Permita pop-ups para imprimir sem sair do sistema.',
-          );
+          toast.error("Pop-up bloqueado. Permita pop-ups para imprimir sem sair do sistema.");
         },
         printWindow,
       );
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (error) {
       printWindow?.close();
-      logger.error('Erro ao imprimir pacote semanal:', error);
-      toast.error('Não foi possível abrir o pacote semanal para impressão.');
+      logger.error("Erro ao imprimir pacote semanal:", error);
+      toast.error("Não foi possível abrir o pacote semanal para impressão.");
     }
   }, [companyId, downloadWeeklyBundle, parsedWeek, parsedYear]);
 
@@ -378,31 +353,23 @@ function StoredFilesPanelComponent({
       <div className="ds-list-toolbar md:flex-row md:items-start md:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">
-              {title}
-            </h2>
+            <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">{title}</h2>
             <span className="ds-badge">Storage</span>
-            <span className="ds-badge ds-badge--info">
-              {files.length} arquivo(s)
-            </span>
+            <span className="ds-badge ds-badge--info">{files.length} arquivo(s)</span>
             {year && week ? (
               <span className="ds-badge ds-badge--warning">
-                Semana {String(week).padStart(2, '0')} / {year}
+                Semana {String(week).padStart(2, "0")} / {year}
               </span>
             ) : null}
           </div>
-          <p className="max-w-3xl text-sm text-[var(--ds-color-text-secondary)]">
-            {description}
-          </p>
+          <p className="max-w-3xl text-sm text-[var(--ds-color-text-secondary)]">{description}</p>
         </div>
 
         <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             variant="outline"
-            leftIcon={
-              <FileSpreadsheet className="h-4 w-4 text-[var(--ds-color-success)]" />
-            }
+            leftIcon={<FileSpreadsheet className="h-4 w-4 text-[var(--ds-color-success)]" />}
             onClick={handleExportCsv}
           >
             Exportar CSV
@@ -508,18 +475,14 @@ function StoredFilesPanelComponent({
               <TableBody>
                 {paged.map((file) => (
                   <TableRow key={`${file.entityId}-${file.fileKey}`}>
-                    <TableCell>
-                      {safeFormatDate(file.date, 'dd/MM/yyyy')}
-                    </TableCell>
+                    <TableCell>{safeFormatDate(file.date, "dd/MM/yyyy")}</TableCell>
                     <TableCell className="font-medium text-[var(--ds-color-text-primary)]">
                       {file.title}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2 text-xs text-[var(--ds-color-text-secondary)]">
                         <Folder className="h-3 w-3" />
-                        <span className="max-w-[18rem] truncate">
-                          {file.folderPath}
-                        </span>
+                        <span className="max-w-[18rem] truncate">{file.folderPath}</span>
                         <Button
                           type="button"
                           size="icon"
@@ -578,14 +541,11 @@ function StoredFilesPanelComponent({
         <div className="ds-list-footer">
           <div className="flex flex-col gap-3 text-sm text-[var(--ds-color-text-muted)] md:flex-row md:items-center md:justify-between">
             <span>
-              Página{' '}
-              <span className="font-semibold text-[var(--ds-color-text-primary)]">
-                {page}
-              </span>{' '}
-              de{' '}
+              Página{" "}
+              <span className="font-semibold text-[var(--ds-color-text-primary)]">{page}</span> de{" "}
               <span className="font-semibold text-[var(--ds-color-text-primary)]">
                 {totalPages}
-              </span>{' '}
+              </span>{" "}
               • {files.length} arquivo(s)
             </span>
             <div className="flex items-center gap-2">
@@ -604,9 +564,7 @@ function StoredFilesPanelComponent({
                 size="sm"
                 variant="outline"
                 rightIcon={<ChevronRight className="h-4 w-4" />}
-                onClick={() =>
-                  setPage((current) => Math.min(totalPages, current + 1))
-                }
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                 disabled={page >= totalPages}
               >
                 Próxima
@@ -632,15 +590,11 @@ const areCompanyOptionsEqual = (
   }
 
   return prev.every(
-    (item, index) =>
-      item.id === next[index]?.id && item.name === next[index]?.name,
+    (item, index) => item.id === next[index]?.id && item.name === next[index]?.name,
   );
 };
 
-const areStoredFilesPanelPropsEqual = (
-  prev: StoredFilesPanelProps,
-  next: StoredFilesPanelProps,
-) =>
+const areStoredFilesPanelPropsEqual = (prev: StoredFilesPanelProps, next: StoredFilesPanelProps) =>
   prev.title === next.title &&
   prev.description === next.description &&
   prev.listStoredFiles === next.listStoredFiles &&
@@ -648,10 +602,7 @@ const areStoredFilesPanelPropsEqual = (
   prev.downloadWeeklyBundle === next.downloadWeeklyBundle &&
   areCompanyOptionsEqual(prev.companyOptions || [], next.companyOptions || []);
 
-export const StoredFilesPanel = memo(
-  StoredFilesPanelComponent,
-  areStoredFilesPanelPropsEqual,
-);
+export const StoredFilesPanel = memo(StoredFilesPanelComponent, areStoredFilesPanelPropsEqual);
 
 function normalizeStoredFileItem(file: unknown): StoredFileItem {
   const record = (file ?? {}) as Record<string, unknown>;
@@ -663,7 +614,7 @@ function normalizeStoredFileItem(file: unknown): StoredFileItem {
         record.aprId ??
         record.ptId ??
         record.checklistId ??
-        '',
+        "",
     ),
     title: String(
       record.title ??
@@ -671,7 +622,7 @@ function normalizeStoredFileItem(file: unknown): StoredFileItem {
         record.tema ??
         record.numero ??
         record.codigo_nc ??
-        'Documento',
+        "Documento",
     ),
     date:
       (record.date as string | Date | undefined) ??
@@ -680,20 +631,18 @@ function normalizeStoredFileItem(file: unknown): StoredFileItem {
       (record.data_hora_inicio as string | Date | undefined) ??
       (record.data_identificacao as string | Date | undefined) ??
       new Date().toISOString(),
-    companyId: String(record.companyId ?? record.company_id ?? ''),
-    fileKey: String(record.fileKey ?? ''),
-    folderPath: String(record.folderPath ?? ''),
-    originalName: String(
-      record.originalName ?? record.fileKey ?? 'documento.pdf',
-    ),
+    companyId: String(record.companyId ?? record.company_id ?? ""),
+    fileKey: String(record.fileKey ?? ""),
+    folderPath: String(record.folderPath ?? ""),
+    originalName: String(record.originalName ?? record.fileKey ?? "documento.pdf"),
   };
 }
 
 function slugify(value: string) {
   return value
     .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '');
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }

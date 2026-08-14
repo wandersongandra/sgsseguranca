@@ -1,120 +1,185 @@
 import http from 'k6/http';
 import { check, fail } from 'k6';
 import secrets from 'k6/secrets';
-import { SharedArray } from 'k6/data';
 
 const BASE_URL = 'https://api-loadtest.sgsseguranca.com.br';
 const TEST_RUN_ID = String(__ENV.TEST_RUN_ID || `sgs-smoke-${Date.now()}`);
-const USERS = new SharedArray('synthetic-users', () => JSON.parse(open('./data/synthetic-users.json')));
-const ALLOWED_KEYS = new Set(['alias', 'login', 'user_id', 'company_id', 'role']);
+const SYNTHETIC_USER_ID = '00000000-0000-4000-8000-000000000003';
+const SYNTHETIC_TENANT_ID = '00000000-0000-4000-8000-000000000001';
 
 export const options = {
-  scenarios: { smoke: { executor: 'per-vu-iterations', vus: 1, iterations: 1, maxDuration: '60s' } },
+  scenarios: {
+    smoke: {
+      executor: 'per-vu-iterations',
+      vus: 1,
+      iterations: 1,
+      maxDuration: '60s',
+    },
+  },
   thresholds: {
-    http_reqs: ['count>0'], iterations: ['count>0'], checks: ['rate>0.99'],
-    http_req_failed: ['rate<0.01'], http_req_duration: ['p(95)<1000'],
+    http_reqs: ['count>0'],
+    iterations: ['count==1'],
+    checks: ['rate==1'],
+    http_req_failed: ['rate==0'],
+    http_req_duration: ['p(95)<1000'],
+    'http_reqs{endpoint:login}': ['count==1'],
+    'http_req_failed{endpoint:login}': ['rate==0'],
+    'http_req_duration{endpoint:login}': ['p(95)<1500'],
+    'http_req_duration{endpoint:auth_me}': ['p(95)<1000'],
   },
 };
 
-const json = (response) => { try { return response.json(); } catch { return null; } };
-const url = (path) => `${BASE_URL}${path}`;
-const isBad = (response) => response.status === 429 || response.status >= 500;
-
-function validateUser(user) {
-  if (!user || typeof user !== 'object') fail('synthetic user entry is invalid');
-  if (Object.keys(user).some((key) => !ALLOWED_KEYS.has(key))) fail('synthetic user contains a forbidden field');
-  if (!/^loadtest-[a-z0-9-]+$/.test(String(user.alias || ''))) fail('synthetic alias is not loadtest-scoped');
-  if (!/^\d{11}$/.test(String(user.login || ''))) fail('synthetic login format is invalid');
-  if (!/^[0-9a-f-]{36}$/i.test(String(user.user_id || '')) || !/^[0-9a-f-]{36}$/i.test(String(user.company_id || ''))) fail('synthetic user or tenant id is invalid');
-  if (!String(user.role || '').trim()) fail('synthetic role is missing');
+function json(response) {
+  try {
+    return response.json();
+  } catch {
+    return null;
+  }
 }
 
-function resolveFingerprint(user) {
-  return `grafana-smoke-${String(user.alias || user.user_id || 'default').replace(/[^a-zA-Z0-9]/g, '').slice(0, 24)}`;
+function url(path) {
+  return `${BASE_URL}${path}`;
 }
 
-function requestOptions(gateKey, endpoint, statuses, token = '', companyId = '', fingerprint = '', extra = {}) {
+function requestOptions(gateKey, endpoint, expectedStatuses, extra = {}) {
   return {
     ...extra,
     headers: {
-      Accept: 'application/json', 'X-Loadtest-Key': gateKey, 'X-Test-Run-ID': TEST_RUN_ID,
-      ...(companyId ? { 'x-company-id': companyId } : {}),
-      ...(fingerprint ? { 'x-client-fingerprint': fingerprint } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(extra.headers || {}),
+      Accept: 'application/json',
+      'X-Loadtest-Key': gateKey,
+      'X-Test-Run-ID': TEST_RUN_ID,
+      ...(extra.headers || {}),
     },
-    responseCallback: http.expectedStatuses(...statuses), tags: { endpoint, ...(extra.tags || {}) },
+    responseCallback: http.expectedStatuses(...expectedStatuses),
+    tags: { endpoint },
+  };
+}
+
+function publicRequestOptions(endpoint, expectedStatuses, extra = {}) {
+  return {
+    ...extra,
+    headers: {
+      Accept: 'application/json',
+      'X-Test-Run-ID': TEST_RUN_ID,
+      ...(extra.headers || {}),
+    },
+    responseCallback: http.expectedStatuses(...expectedStatuses),
+    tags: { endpoint },
   };
 }
 
 async function readSecrets() {
-  const envGateKey = String(__ENV.LOADTEST_PROXY_KEY || '').trim();
-  const envPassword = String(__ENV.LOADTEST_ADMIN_PASSWORD || '').trim();
   try {
-    const [gateKey, password] = await Promise.all([
-      secrets.get('loadtest-gate-key'), secrets.get('sgs-loadtest-password'),
+    const [gateKey, login, password] = await Promise.all([
+      secrets.get('loadtest-gate-key'),
+      secrets.get('sgs-loadtest-login'),
+      secrets.get('sgs-loadtest-password'),
     ]);
-    const resolvedGateKey = envGateKey || String(gateKey || '').trim();
-    const resolvedPassword = envPassword || String(password || '').trim();
-    if (!resolvedGateKey || !resolvedPassword) throw new Error('required secret is empty');
-    return { gateKey: resolvedGateKey, password: resolvedPassword };
+
+    if (!gateKey || !login || !password) {
+      throw new Error('required Grafana Cloud secret is empty');
+    }
+
+    return {
+      gateKey: String(gateKey),
+      login: String(login),
+      password: String(password),
+    };
   } catch {
-    if (envGateKey && envPassword) return { gateKey: envGateKey, password: envPassword };
-    throw new Error('Missing Grafana secrets or env fallback: loadtest-gate-key, sgs-loadtest-password, LOADTEST_PROXY_KEY, LOADTEST_ADMIN_PASSWORD');
+    throw new Error(
+      'Missing Grafana Cloud secrets: loadtest-gate-key, sgs-loadtest-login, sgs-loadtest-password',
+    );
   }
 }
 
-export async function setup() {
-  if (__ENV.BASE_URL && __ENV.BASE_URL !== BASE_URL) fail('BASE_URL is fixed to the loadtest hostname');
-  if (USERS.length < 1) fail('smoke requires at least one confirmed synthetic user');
-  validateUser(USERS[0]);
-  return { credentials: await readSecrets(), user: USERS[0] };
-}
+export default async function smoke() {
+  const { gateKey, login, password } = await readSecrets();
 
-export default function smoke(data) {
-  if (__VU !== 1) fail('smoke requires exactly one VU');
-  const { gateKey, password } = data.credentials;
-  const user = data.user;
-  const fingerprint = resolveFingerprint(user);
+  const health = http.get(
+    url('/health/public'),
+    publicRequestOptions('health_public', [200]),
+  );
+  if (
+    !check(health, {
+      'health public is 200': (response) => response.status === 200,
+    })
+  ) {
+    fail(`health public returned HTTP ${health.status}`);
+  }
 
-  const health = http.get(url('/health/public'), {
-    headers: { Accept: 'application/json', 'X-Test-Run-ID': TEST_RUN_ID },
-    responseCallback: http.expectedStatuses(200), tags: { endpoint: 'health_public' },
-  });
-  check(health, { 'health public is 200': (r) => r.status === 200 });
-  if (isBad(health)) fail(`health public returned ${health.status}`);
+  const csrf = http.get(
+    url('/auth/csrf'),
+    requestOptions(gateKey, 'csrf', [200]),
+  );
+  const csrfBody = json(csrf) || {};
+  const csrfToken = String(csrfBody.csrfToken || '');
+  if (
+    !check(csrf, {
+      'csrf is 200': (response) => response.status === 200,
+      'csrf token exists': () => Boolean(csrfToken),
+    })
+  ) {
+    fail(`csrf failed with HTTP ${csrf.status}`);
+  }
 
-  const csrf = http.get(url('/auth/csrf'), requestOptions(gateKey, 'csrf', [200]));
-  const csrfToken = String(json(csrf)?.csrfToken || '');
-  check(csrf, { 'csrf is 200': (r) => r.status === 200, 'csrf token exists': () => Boolean(csrfToken) });
-  if (isBad(csrf) || !csrfToken) fail(`csrf failed with ${csrf.status}`);
-
-  const login = http.post(
+  // k6 mantém automaticamente os cookies por VU entre esta requisição e o login.
+  const loginResponse = http.post(
     url('/auth/login'),
-    JSON.stringify({ cpf: user.login, password }),
-    requestOptions(gateKey, 'login', [200, 201], '', user.company_id, fingerprint, {
-      headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+    JSON.stringify({ cpf: login, password }),
+    requestOptions(gateKey, 'login', [200, 201], {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-csrf-token': csrfToken,
+      },
       redirects: 0,
     }),
   );
-  const loginBody = json(login) || {};
-  const token = String(loginBody.accessToken || '');
-  check(login, {
-    'login is successful': (r) => r.status === 200 || r.status === 201,
-    'access token exists': () => Boolean(token),
-  });
-  if (isBad(login) || !token) fail(`login failed with ${login.status}`);
+  const loginBody = json(loginResponse) || {};
+  const accessToken = String(loginBody.accessToken || '');
+  if (
+    !check(loginResponse, {
+      'login is successful': (response) =>
+        response.status === 200 || response.status === 201,
+      'login access token exists': () => Boolean(accessToken),
+    })
+  ) {
+    fail(`login failed with HTTP ${loginResponse.status}`);
+  }
 
-  const me = http.get(url('/auth/me'), requestOptions(gateKey, 'auth_me', [200], token, user.company_id, fingerprint));
-  const meUser = json(me)?.user || {};
-  check(me, {
-    'auth/me is 200': (r) => r.status === 200,
-    'auth/me confirms synthetic user': () => meUser.id === user.user_id,
-    'auth/me confirms synthetic tenant': () => meUser.company_id === user.company_id,
-  });
-  if (isBad(me)) fail(`auth/me returned ${me.status}`);
+  const authMe = http.get(
+    url('/auth/me'),
+    requestOptions(gateKey, 'auth_me', [200], {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+  );
+  const authMeUser = json(authMe)?.user || {};
+  if (
+    !check(authMe, {
+      'auth/me is 200': (response) => response.status === 200,
+      'auth/me confirms synthetic user': () =>
+        authMeUser.id === SYNTHETIC_USER_ID,
+      'auth/me confirms synthetic tenant': () =>
+        authMeUser.company_id === SYNTHETIC_TENANT_ID,
+    })
+  ) {
+    fail(`auth/me validation failed with HTTP ${authMe.status}`);
+  }
 
-  const mfa = http.get(url('/auth/mfa/status'), requestOptions(gateKey, 'auth_mfa_status', [200], token, user.company_id, fingerprint));
-  const mfaBody = json(mfa) || {};
-  check(mfa, { 'mfa status is 200': (r) => r.status === 200, 'mfa shape is read-only': () => typeof mfaBody.enabled === 'boolean' && typeof mfaBody.required === 'boolean' });
-  if (isBad(mfa)) fail(`mfa status returned ${mfa.status}`);
+  const mfaStatus = http.get(
+    url('/auth/mfa/status'),
+    requestOptions(gateKey, 'auth_mfa_status', [200], {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }),
+  );
+  const mfaBody = json(mfaStatus) || {};
+  if (
+    !check(mfaStatus, {
+      'mfa status is 200': (response) => response.status === 200,
+      'mfa status is read-only shape': () =>
+        typeof mfaBody.enabled === 'boolean' &&
+        typeof mfaBody.required === 'boolean',
+    })
+  ) {
+    fail(`mfa status failed with HTTP ${mfaStatus.status}`);
+  }
 }

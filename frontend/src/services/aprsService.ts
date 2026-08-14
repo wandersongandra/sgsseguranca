@@ -208,22 +208,11 @@ export interface Apr {
     apr_id: string;
     apr_risk_item_id: string;
     uploaded_by_id?: string;
-    file_key: string;
     original_name?: string;
-    mime_type: string;
-    file_size_bytes: number;
     hash_sha256: string;
-    watermarked_file_key?: string;
     watermarked_hash_sha256?: string;
-    watermark_text?: string;
     captured_at?: string;
     uploaded_at: string;
-    latitude?: number;
-    longitude?: number;
-    accuracy_m?: number;
-    device_id?: string;
-    ip_address?: string;
-    exif_datetime?: string;
     integrity_flags?: Record<string, unknown>;
     risk_item_ordem?: number;
     url?: string;
@@ -286,7 +275,13 @@ type AprWriteOptions = {
   };
 };
 
-export type AprPdfAccessResponse = GovernedPdfAccessResponse;
+export type AprPdfAccessResponse = Omit<
+  GovernedPdfAccessResponse,
+  "fileKey" | "folderPath"
+> & {
+  contentType: "application/pdf" | null;
+  expiresAt: string | null;
+};
 export type AprFinalPdfGenerationResponse = AprPdfAccessResponse & {
   generated: boolean;
 };
@@ -810,22 +805,11 @@ export const aprsService = {
         apr_risk_item_id: string;
         uploaded_by_id?: string;
         uploaded_by_name?: string;
-        file_key: string;
         original_name?: string;
-        mime_type: string;
-        file_size_bytes: number;
         hash_sha256: string;
-        watermarked_file_key?: string;
         watermarked_hash_sha256?: string;
-        watermark_text?: string;
         captured_at?: string;
         uploaded_at: string;
-        latitude?: number;
-        longitude?: number;
-        accuracy_m?: number;
-        device_id?: string;
-        ip_address?: string;
-        exif_datetime?: string;
         integrity_flags?: Record<string, unknown>;
         risk_item_ordem?: number;
         url?: string;

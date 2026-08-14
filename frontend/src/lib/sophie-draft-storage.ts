@@ -1,4 +1,4 @@
-import { sanitizeSensitiveDraftValue } from './sensitive-draft-sanitizer';
+import { sanitizeSensitiveDraftValue } from "./sensitive-draft-sanitizer";
 
 type WizardSignatureMap = Record<string, { data: string; type: string }>;
 
@@ -12,7 +12,7 @@ export type SophieDraftChecklistSuggestion = {
   id: string;
   label: string;
   reason: string;
-  source: 'template' | 'pt-group';
+  source: "template" | "pt-group";
 };
 
 export type SophieWizardDraftMetadata = {
@@ -31,13 +31,13 @@ export type SophieWizardDraft = {
 export type SophieNcPreview = {
   id: string;
   riskLevel?: string;
-  sourceType?: 'manual' | 'image' | 'checklist';
+  sourceType?: "manual" | "image" | "checklist";
   actionPlan?: Array<{
     title: string;
     owner: string;
-    priority: 'low' | 'medium' | 'high' | 'critical';
+    priority: "low" | "medium" | "high" | "critical";
     timeline: string;
-    type: 'immediate' | 'corrective' | 'preventive';
+    type: "immediate" | "corrective" | "preventive";
   }>;
   evidenceAttachments?: Array<{
     url: string;
@@ -47,11 +47,11 @@ export type SophieNcPreview = {
 };
 
 function resolveCompanyStorageKey(companyId?: string | null) {
-  return companyId || 'default';
+  return companyId || "default";
 }
 
 function getDraftStorage(): Storage | null {
-  if (typeof window === 'undefined') {
+  if (typeof window === "undefined") {
     return null;
   }
 
@@ -80,13 +80,22 @@ export function storeSophieAprDraft(
   draft: SophieWizardDraft,
   metadata?: SophieWizardDraftMetadata,
 ) {
-  persistDraft(
-    `gst.apr.wizard.draft.${resolveCompanyStorageKey(companyId)}`,
-    {
-      ...draft,
-      metadata: metadata || draft.metadata,
-    },
-  );
+  persistDraft(`gst.apr.wizard.draft.${resolveCompanyStorageKey(companyId)}`, {
+    ...draft,
+    metadata: metadata || draft.metadata,
+  });
+}
+
+export function readSophieAprDraft(companyId: string | null | undefined): SophieWizardDraft | null {
+  const storage = getDraftStorage();
+  if (!storage) return null;
+  const raw = storage.getItem(`gst.apr.wizard.draft.${resolveCompanyStorageKey(companyId)}`);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as SophieWizardDraft;
+  } catch {
+    return null;
+  }
 }
 
 export function storeSophiePtDraft(
@@ -94,13 +103,10 @@ export function storeSophiePtDraft(
   draft: SophieWizardDraft,
   metadata?: SophieWizardDraftMetadata,
 ) {
-  persistDraft(
-    `gst.pt.wizard.draft.${resolveCompanyStorageKey(companyId)}`,
-    {
-      ...draft,
-      metadata: metadata || draft.metadata,
-    },
-  );
+  persistDraft(`gst.pt.wizard.draft.${resolveCompanyStorageKey(companyId)}`, {
+    ...draft,
+    metadata: metadata || draft.metadata,
+  });
 }
 
 export function storeSophieNcPreview(preview: SophieNcPreview) {

@@ -102,6 +102,23 @@ const isStringArray = (value: unknown): value is string[] =>
 const POSTGRES_LOCK_NOT_AVAILABLE_CODE = '55P03';
 const PT_ROW_LOCK_RETRY_DELAYS_MS = [50, 100, 200] as const;
 
+/**
+ * Relações necessárias para avaliar os gates de aprovação/encerramento da PT.
+ *
+ * `executantes` é obrigatória: sem ela, `assertCanApprove` pula a conferência
+ * das assinaturas dos executantes e deixa de avaliar treinamento NR vencido
+ * (falha ABERTA em dois gates de segurança do trabalho).
+ */
+const PT_WORKFLOW_RELATIONS = [
+  'site',
+  'apr',
+  'responsavel',
+  'executantes',
+  'auditado_por',
+  'vigia',
+  'encerrado_por',
+] as const;
+
 const PT_FINAL_PDF_ALLOWED_STATUSES = new Set<PtStatus>([
   PtStatus.APROVADA,
   PtStatus.ENCERRADA,
@@ -1014,15 +1031,7 @@ export class PtsService {
     void this.refreshExpiredStatuses(companyId);
     const pt = await this.ptsRepository.findOne({
       where: { id, company_id: companyId },
-      relations: [
-        'site',
-        'apr',
-        'responsavel',
-        'executantes',
-        'auditado_por',
-        'vigia',
-        'encerrado_por',
-      ],
+      relations: [...PT_WORKFLOW_RELATIONS],
     });
     if (!pt) {
       throw new NotFoundException(`PT com ID ${id} não encontrada`);
@@ -1308,7 +1317,22 @@ export class PtsService {
             throw new NotFoundException(`PT com ID ${id} não encontrada`);
           }
 
-          const pt = manager.getRepository(Pt).create(rows[0]);
+          // O SELECT acima existe para adquirir o lock de linha (FOR UPDATE
+          // NOWAIT) — ele devolve apenas colunas escalares. Hidratar a entidade
+          // só com essas colunas deixa TODA relação `undefined`, e os gates de
+          // aprovação que dependem de `pt.executantes` (assinatura de cada
+          // executante e treinamento NR vencido) passavam a falhar ABERTOS.
+          // Recarregamos a entidade completa dentro da MESMA transação, já sob
+          // o lock, para que `assertCanApprove` avalie o estado real.
+          const pt = await manager.getRepository(Pt).findOne({
+            where: { id },
+            relations: [...PT_WORKFLOW_RELATIONS],
+          });
+
+          if (!pt) {
+            throw new NotFoundException(`PT com ID ${id} não encontrada`);
+          }
+
           return fn(pt, manager);
         });
       } catch (error: unknown) {
@@ -2123,14 +2147,42 @@ export class PtsService {
     return this.normalizeApprovalRules(company.pt_approval_rules || undefined);
   }
 
-  async updateApprovalRules(payload: UpdatePtApprovalRulesDto) {
+  async updateApprovalRules(
+    payload: UpdatePtApprovalRulesDto,
+    changedByUserId?: string,
+  ) {
     const company = await this.findCurrentCompanyOrFail();
+    const previous = this.normalizeApprovalRules(
+      company.pt_approval_rules || {},
+    );
     const merged = this.normalizeApprovalRules({
       ...(company.pt_approval_rules || {}),
       ...payload,
     });
     company.pt_approval_rules = merged;
     await this.companiesRepository.save(company);
+
+    // Desligar um gate de aprovação tem escopo de empresa inteira e afeta a
+    // liberação de trabalho de risco. Sem trilha, era impossível descobrir
+    // quem desligou e quando.
+    const disabled = (Object.keys(merged) as (keyof typeof merged)[]).filter(
+      (rule) => previous[rule] === true && merged[rule] === false,
+    );
+
+    await this.logAudit({
+      action: AuditAction.UPDATE,
+      entityId: company.id,
+      before: { pt_approval_rules: previous },
+      after: { pt_approval_rules: merged },
+      fallbackUserId: changedByUserId,
+    });
+    this.logger.log({
+      event: 'pt_approval_rules_updated',
+      companyId: company.id,
+      userId: changedByUserId,
+      disabledRules: disabled,
+    });
+
     return merged;
   }
 

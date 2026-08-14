@@ -5,6 +5,9 @@ import {
   removeOfflineQueueItem,
   retryOfflineQueueItem,
 } from "./offline-sync";
+import { sessionStore } from "./sessionStore";
+import { selectedTenantStore } from "./selectedTenantStore";
+import { siteStore } from "./siteStore";
 
 jest.mock("@/lib/api", () => ({
   __esModule: true,
@@ -40,7 +43,7 @@ jest.mock("./offline-db-secure", () => ({
 // ---------------------------------------------------------------------------
 
 describe("offline-sync", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     // Limpa o mock do IndexedDB entre testes
     Object.keys(mockSyncStore).forEach((k) => delete mockSyncStore[k]);
 
@@ -65,6 +68,9 @@ describe("offline-sync", () => {
     });
     window.localStorage.clear();
     window.sessionStorage.clear();
+    sessionStore.set({ userId: "user-1", companyId: "company-1", user: { id: "user-1", companyId: "company-1", isAdminGeral: false } });
+    await selectedTenantStore.set({ companyId: "company-1", companyName: "Empresa" });
+    await siteStore.set({ siteId: "site-1", siteName: "Obra", companyId: "company-1" });
     jest.clearAllMocks();
     jest.spyOn(window, "dispatchEvent").mockImplementation(() => true);
     Object.defineProperty(window.navigator, "onLine", {
@@ -205,5 +211,22 @@ describe("offline-sync", () => {
       value: originalCrypto,
       configurable: true,
     });
+  });
+
+  it("nao reproduz mutacao quando a sessao muda antes do replay", async () => {
+    const queued = await enqueueOfflineMutation({
+      url: "/aprs",
+      method: "patch",
+      data: { titulo: "APR protegida" },
+      label: "APR",
+    });
+
+    sessionStore.clear();
+    sessionStore.set({ userId: "user-2", companyId: "company-1", user: { id: "user-2", companyId: "company-1", isAdminGeral: false } });
+    const result = await retryOfflineQueueItem(queued.id);
+
+    expect(result.status).toBe("sent");
+    expect(api.request).not.toHaveBeenCalled();
+    expect(await getOfflineQueueSnapshot()).toEqual([]);
   });
 });

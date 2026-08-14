@@ -133,6 +133,16 @@ describe('PtsService', () => {
                 return {
                   create: jest.fn((input: Pt) => input),
                   save: jest.fn((input: Pt) => Promise.resolve(input)),
+                  // `executePtWorkflowTransition` usa o SELECT ... FOR UPDATE
+                  // NOWAIT apenas para adquirir o lock e, em seguida, recarrega
+                  // a entidade COM RELAÇÕES dentro da mesma transação. Sem esse
+                  // findOne, `pt.executantes` ficava undefined e os gates de
+                  // assinatura/treinamento falhavam abertos (SGS-PT-SEC-001).
+                  findOne: jest.fn((options?: { where?: { id?: string } }) =>
+                    ptsRepository.findOne({
+                      where: { id: options?.where?.id ?? '' },
+                    }),
+                  ),
                 };
               }
               return getRepositoryMock(entity) as {
@@ -147,7 +157,29 @@ describe('PtsService', () => {
               const pt = await ptsRepository.findOne({
                 where: tenantId ? { id, company_id: tenantId } : { id },
               });
-              return pt ? [pt] : [];
+              if (!pt) return [];
+              // FIDELIDADE AO POSTGRES: `SELECT * FROM "pts"` devolve APENAS
+              // colunas escalares — nenhuma relação. O mock antigo devolvia a
+              // entidade inteira (com `executantes` populado), e por isso a
+              // suíte não conseguia enxergar SGS-PT-SEC-001: em produção
+              // `pt.executantes` chegava `undefined` em `assertCanApprove` e
+              // os gates de assinatura e de treinamento falhavam ABERTOS.
+              const scalarRow = {
+                ...(pt as unknown as Record<string, unknown>),
+              };
+              for (const relation of [
+                'site',
+                'apr',
+                'responsavel',
+                'executantes',
+                'auditado_por',
+                'vigia',
+                'encerrado_por',
+                'company',
+              ]) {
+                delete scalarRow[relation];
+              }
+              return [scalarRow];
             }),
           }),
         ),
@@ -980,6 +1012,96 @@ describe('PtsService', () => {
     await expect(service.approve('pt-1', 'approver-1')).rejects.toThrow(
       BadRequestException,
     );
+  });
+
+  // Regressão de SGS-PT-SEC-001.
+  //
+  // `executePtWorkflowTransition` adquiria o lock com `SELECT * ... FOR UPDATE
+  // NOWAIT` e hidratava a entidade só com as colunas escalares devolvidas.
+  // `pt.executantes` chegava `undefined` em `assertCanApprove`, e:
+  //   - o bloco de conferência das assinaturas dos executantes era PULADO
+  //     (`if (executantes.length > 0)` com array vazio);
+  //   - `workerIds` ficava só com o responsável, então o treinamento NR vencido
+  //     dos executantes nunca era avaliado.
+  // Dois gates de segurança do trabalho falhando ABERTOS.
+  describe('SGS-PT-SEC-001 — gates que dependem da relação executantes', () => {
+    const ptComExecutantes = {
+      id: 'pt-1',
+      company_id: 'company-1',
+      status: PtStatus.PENDENTE,
+      pdf_file_key: null,
+      residual_risk: 'LOW',
+      control_evidence: true,
+      responsavel_id: 'resp-1',
+      executantes: [
+        { id: 'exec-1', nome: 'Executante Um' },
+        { id: 'exec-2', nome: 'Executante Dois' },
+      ],
+    } as unknown as Pt;
+
+    const regrasPadrao = {
+      id: 'company-1',
+      pt_approval_rules: {
+        blockCriticalRiskWithoutEvidence: true,
+        blockWorkerWithoutValidMedicalExam: false,
+        blockWorkerWithExpiredBlockingTraining: true,
+        requireAtLeastOneExecutante: false,
+      },
+    };
+
+    it('bloqueia aprovação quando um executante não assinou', async () => {
+      ptsRepository.findOne.mockResolvedValue(ptComExecutantes);
+      (companiesRepository.findOne as jest.Mock).mockResolvedValue(
+        regrasPadrao,
+      );
+      // Só o exec-1 assinou.
+      (signaturesService.findByDocument as jest.Mock).mockResolvedValue([
+        { user_id: 'exec-1' },
+      ]);
+      (
+        workerOperationalStatusService.getByUserIds as jest.Mock
+      ).mockResolvedValue([]);
+
+      await expect(service.approve('pt-1', 'approver-1')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('bloqueia aprovação quando um EXECUTANTE tem treinamento bloqueante vencido', async () => {
+      ptsRepository.findOne.mockResolvedValue(ptComExecutantes);
+      (companiesRepository.findOne as jest.Mock).mockResolvedValue(
+        regrasPadrao,
+      );
+      // Todos assinaram — o único motivo de bloqueio deve ser o treinamento.
+      (signaturesService.findByDocument as jest.Mock).mockResolvedValue([
+        { user_id: 'exec-1' },
+        { user_id: 'exec-2' },
+      ]);
+      (
+        workerOperationalStatusService.getByUserIds as jest.Mock
+      ).mockResolvedValue([
+        {
+          user: { nome: 'Executante Dois' },
+          medicalExam: { status: 'VALIDO' },
+          trainings: {
+            expiredBlocking: [{ nome: 'NR-35 Trabalho em Altura' }],
+          },
+        },
+      ]);
+
+      await expect(service.approve('pt-1', 'approver-1')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      // Prova de que a relação chegou até o gate: os executantes precisam
+      // estar na consulta de status operacional.
+      const [workerIds] = (
+        workerOperationalStatusService.getByUserIds as jest.Mock
+      ).mock.calls.at(-1) as [string[]];
+      expect(workerIds).toEqual(
+        expect.arrayContaining(['resp-1', 'exec-1', 'exec-2']),
+      );
+    });
   });
 
   it('bloqueia aprovacao quando o risco residual e CRITICAL sem evidencia de controle', async () => {

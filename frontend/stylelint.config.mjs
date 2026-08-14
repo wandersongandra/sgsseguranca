@@ -9,7 +9,13 @@ const restrictedLiteralValues = [
 ];
 
 const config = {
-  ignoreFiles: ['.next/**', 'out/**', 'build/**', 'node_modules/**'],
+  ignoreFiles: [
+    '.next/**',
+    'out/**',
+    'build/**',
+    'coverage/**',
+    'node_modules/**',
+  ],
   customSyntax: 'postcss-scss',
   rules: {
     'color-no-hex': true,

@@ -28,6 +28,28 @@ export class EpisService extends BaseService<Epi> {
     super(episRepository, tenantService, 'EPI');
   }
 
+  /**
+   * Ponte tipada DTO → entidade.
+   *
+   * `CreateEpiDto.validade_ca` é `string` (validada com `@IsDateString()`, que
+   * é o contrato correto para JSON) enquanto `Epi.validade_ca` é `Date`. Até
+   * agora essa divergência ficava escondida atrás do `DeepPartial<T>` genérico
+   * de `BaseController` — que era justamente o mecanismo que também desligava
+   * a validação inteira. Com os overrides tipados no controller, a conversão
+   * passa a ser explícita e verificada pelo compilador.
+   */
+  static toEntityPayload<T extends { validade_ca?: string }>(
+    dto: T,
+  ): Omit<T, 'validade_ca'> & { validade_ca?: Date } {
+    const { validade_ca, ...rest } = dto;
+    return {
+      ...rest,
+      ...(validade_ca !== undefined
+        ? { validade_ca: new Date(validade_ca) }
+        : {}),
+    };
+  }
+
   override async findAll(
     where: FindOptionsWhere<Epi> = {},
     options?: { take?: number; select?: (keyof Epi)[] },

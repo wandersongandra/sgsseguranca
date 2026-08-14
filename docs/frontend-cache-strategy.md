@@ -51,7 +51,7 @@ repetir isso a cada re-render/navegação.
 ## 3. `offline-cache` — persistência offline/PWA
 
 `frontend/src/lib/offline-cache.ts` + `frontend/src/lib/offline-db-secure.ts`
-(IndexedDB via `secureOfflineDB`, prefixos `gst.cache.`/`compliancex.cache.` legado)
+(IndexedDB via `secureOfflineDB`, prefixos `gst.cache.`/`compliancex.cache.` legado, preservados para compatibilidade)
 
 Não é um cache de performance — é a camada que permite o app funcionar (ler dados já vistos)
 **sem rede**, com TTLs em `CACHE_TTL` (`CRITICAL`/`LIST`/`RECORD`/`REFERENCE`, de 2min a 1h) e
