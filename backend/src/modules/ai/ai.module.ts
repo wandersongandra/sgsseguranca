@@ -55,7 +55,7 @@ import { shouldUseRedisQueueInfra } from '../../infra/queue/redis-queue-infra.ut
     TrainingsModule,
     ChecklistsModule,
     forwardRef(() => UsersModule),
-    MedicalExamsModule,
+    forwardRef(() => MedicalExamsModule),
     CatsModule,
     NonConformitiesModule,
     ServiceOrdersModule,
