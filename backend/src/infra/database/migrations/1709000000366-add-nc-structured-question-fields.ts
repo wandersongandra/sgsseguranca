@@ -63,6 +63,9 @@ export class AddNcStructuredQuestionFields1709000000366 implements MigrationInte
     await queryRunner.query(
       `ALTER TABLE "nonconformities" ADD COLUMN IF NOT EXISTS "verificacao_foto2_key" text`,
     );
+    await queryRunner.query(
+      `ALTER TABLE "nonconformities" ADD COLUMN IF NOT EXISTS "verificacao_foto3_key" text`,
+    );
 
     await queryRunner.query(
       `CREATE INDEX CONCURRENTLY IF NOT EXISTS "IDX_nonconformities_tipo_categoria" ON "nonconformities" ("tipo_categoria")`,
@@ -94,6 +97,9 @@ export class AddNcStructuredQuestionFields1709000000366 implements MigrationInte
 
     await queryRunner.query(
       `ALTER TABLE "nonconformities" DROP COLUMN IF EXISTS "verificacao_foto2_key"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "nonconformities" DROP COLUMN IF EXISTS "verificacao_foto3_key"`,
     );
     await queryRunner.query(
       `ALTER TABLE "nonconformities" DROP COLUMN IF EXISTS "verificacao_foto1_key"`,
