@@ -7,6 +7,8 @@ import { DataSource } from 'typeorm';
 import { BadRequestException } from '@nestjs/common';
 import { TenantService } from '../../../shared/tenant/tenant.service';
 import { PrivilegedDbService } from '../../../shared/database/privileged-db.service';
+import { ProvisioningDataSourceService } from '../../../shared/database/provisioning-datasource.service';
+import { ServiceUnavailableException } from '@nestjs/common';
 
 const VALID_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const OTHER_UUID = '550e8400-e29b-41d4-a716-446655440001';
@@ -31,8 +33,63 @@ describe('GDPRDeletionService', () => {
   let mockTenantService: {
     run: jest.Mock;
   };
+  /**
+   * Client `pg` da conexão privilegiada (sgs_admin). Registra o SQL executado
+   * para que os testes possam afirmar POR ONDE a operação passou — o defeito
+   * corrigido era justamente rodar pelo caminho errado, não com o SQL errado.
+   */
+  let privilegedQueries: string[];
+  let privilegedRows: unknown[];
+  let mockPrivilegedDb: {
+    isEnabled: jest.Mock;
+    withPrivilegedClient: jest.Mock;
+    withRequiredPrivilegedClient: jest.Mock;
+  };
+  let mockProvisioningDataSource: {
+    isDedicated: jest.Mock;
+    requiredTransaction: jest.Mock;
+  };
 
   beforeEach(async () => {
+    privilegedQueries = [];
+    privilegedRows = [];
+    // O client privilegiado delega ao mesmo mock de query do DataSource: os
+    // testes continuam expressando "o banco devolve X" sem precisar saber por
+    // qual conexão a chamada passou. `privilegedQueries` é o que permite
+    // afirmar o caminho quando isso importa.
+    const privilegedClient = {
+      query: jest.fn(async (sql: string, params?: unknown[]) => {
+        privilegedQueries.push(sql);
+        if (/^\s*(BEGIN|COMMIT|ROLLBACK|SET )/i.test(sql)) {
+          return { rows: [], rowCount: 0 };
+        }
+        const rows = (await mockDataSource.query(sql, params)) as unknown[];
+        privilegedRows = Array.isArray(rows) ? rows : [];
+        return { rows: privilegedRows, rowCount: privilegedRows.length || 3 };
+      }),
+    };
+    mockPrivilegedDb = {
+      isEnabled: jest.fn(() => true),
+      withPrivilegedClient: jest.fn((fn: (c: unknown) => unknown) =>
+        fn(privilegedClient),
+      ),
+      withRequiredPrivilegedClient: jest.fn(
+        (_op: string, fn: (c: unknown) => unknown) => fn(privilegedClient),
+      ),
+    };
+    // Delega ao mock do repositório de runs para que as asserções já
+    // existentes (`mockRetentionRunRepo.save` com tal payload) continuem
+    // válidas — o que mudou foi a CONEXÃO, não o conteúdo gravado.
+    mockProvisioningDataSource = {
+      isDedicated: jest.fn(() => true),
+      requiredTransaction: jest.fn((_op: string, fn: (m: unknown) => unknown) =>
+        fn({
+          save: (_entity: unknown, run: Record<string, unknown>) =>
+            mockRetentionRunRepo.save(run),
+        }),
+      ),
+    };
+
     mockDataSource = {
       query: jest.fn<Promise<unknown>, [string, unknown[]?]>(),
       transaction: jest
@@ -82,10 +139,11 @@ describe('GDPRDeletionService', () => {
         },
         {
           provide: PrivilegedDbService,
-          useValue: {
-            isEnabled: jest.fn(() => false),
-            withPrivilegedClient: jest.fn(),
-          },
+          useValue: mockPrivilegedDb,
+        },
+        {
+          provide: ProvisioningDataSourceService,
+          useValue: mockProvisioningDataSource,
         },
       ],
     }).compile();
@@ -121,20 +179,53 @@ describe('GDPRDeletionService', () => {
       );
     });
 
-    it('executa a exclusão em contexto super-admin (senão a RLS zera o efeito)', async () => {
-      // Regressão: gdpr_delete_user_data() não é SECURITY DEFINER e a role
-      // runtime (sgs_app) não tem BYPASSRLS. Todas as tabelas alvo têm RLS
-      // com FORCE — sem este contexto, a RLS filtra as linhas do titular, a
-      // função anonimiza 0 registros e o serviço reporta "completed" com
-      // sucesso. O direito de exclusão ficava sem efeito, silenciosamente.
-      mockDataSource.query.mockResolvedValue([]);
-
+    it('executa pela conexão PRIVILEGIADA, não pela de runtime', async () => {
+      // Regressão do defeito real, e da correção anterior que não corrigia.
+      //
+      // `gdpr_delete_user_data()` não é SECURITY DEFINER: roda com o privilégio
+      // de quem chama. Duas camadas impediam o runtime de fazer o trabalho:
+      //   1. a migration 341 revogou EXECUTE de PUBLIC — `sgs_app` sequer pode
+      //      executar a função;
+      //   2. desde a migration 361, `is_super_admin()` é falso para `sgs_app`,
+      //      então o FORCE RLS das tabelas alvo filtraria as linhas do titular
+      //      e a função anonimizaria 0 registros, reportando "completed".
+      //
+      // A versão anterior deste teste afirmava `tenantService.run({isSuperAdmin})`
+      // — e passava, porque o wrap de fato acontecia. Ele só não resolvia nada.
+      // Verificar a intenção não é verificar o efeito.
       await service.deleteUserData(VALID_UUID);
 
-      expect(mockTenantService.run).toHaveBeenCalledWith(
-        expect.objectContaining({ isSuperAdmin: true, companyId: undefined }),
-        expect.any(Function),
+      expect(
+        mockPrivilegedDb.withRequiredPrivilegedClient,
+      ).toHaveBeenCalledWith('gdpr_delete_user_data', expect.any(Function));
+      expect(privilegedQueries).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('gdpr_delete_user_data'),
+        ]),
       );
+      // E dentro de uma transação explícita, com a flag de sessão setada —
+      // é o `sgs_admin` que a torna efetiva.
+      expect(privilegedQueries).toEqual(
+        expect.arrayContaining([
+          'BEGIN',
+          "SET LOCAL app.is_super_admin = 'true'",
+          'COMMIT',
+        ]),
+      );
+    });
+
+    it('falha (status=failed) quando a conexão privilegiada está indisponível', async () => {
+      // Fail-closed: sem conexão privilegiada não há como provar que a
+      // anonimização ocorreu, e "não consegui provar" não pode virar
+      // "completed".
+      mockPrivilegedDb.withRequiredPrivilegedClient.mockRejectedValueOnce(
+        new ServiceUnavailableException('conexão privilegiada indisponível'),
+      );
+
+      const result = await service.deleteUserData(VALID_UUID);
+
+      expect(result.status).toBe('failed');
+      expect(result.error_message).toContain('privilegiada');
     });
 
     it('persiste o registro duas vezes (criacao + atualizacao final)', async () => {
@@ -293,7 +384,7 @@ describe('GDPRDeletionService', () => {
         { table_name: 'companies' },
         { table_name: 'users' },
       ]);
-      mockDataSource.transaction.mockRejectedValueOnce(
+      mockPrivilegedDb.withRequiredPrivilegedClient.mockRejectedValueOnce(
         new Error('relation "companies" does not exist'),
       );
 
@@ -307,14 +398,31 @@ describe('GDPRDeletionService', () => {
       }
     });
 
-    it('operacao e atomica — transacao e executada (rollback em caso de erro)', async () => {
+    it('opera pela conexão privilegiada, sem fallback para o runtime', async () => {
+      // O ramo `else` que existia aqui rodava os mesmos UPDATE em `sgs_app`
+      // com `SET LOCAL app.is_super_admin = 'true'`. Pós-361 a flag é inerte:
+      // cada UPDATE afetaria 0 linhas SEM erro, e o método retornaria
+      // `status: 'success'` com `total_rows_deleted: 0` — offboarding de tenant
+      // reportado como concluído sem ter soft-deletado nada.
       mockDataSource.query.mockResolvedValue([{ table_name: 'companies' }]);
-      mockDataSource.transaction.mockRejectedValueOnce(new Error('DB error'));
 
-      const result = await service.deleteCompanyData(VALID_UUID);
+      await service.deleteCompanyData(VALID_UUID);
 
-      expect(mockDataSource.transaction).toHaveBeenCalledTimes(1);
-      expect(result.status).toBe('failed');
+      expect(
+        mockPrivilegedDb.withRequiredPrivilegedClient,
+      ).toHaveBeenCalledWith('gdpr_delete_company_data', expect.any(Function));
+      expect(mockDataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('propaga 503 quando não há conexão privilegiada, em vez de "failed" genérico', async () => {
+      mockDataSource.query.mockResolvedValue([{ table_name: 'companies' }]);
+      mockPrivilegedDb.withRequiredPrivilegedClient.mockRejectedValueOnce(
+        new ServiceUnavailableException('conexão privilegiada indisponível'),
+      );
+
+      await expect(service.deleteCompanyData(VALID_UUID)).rejects.toThrow(
+        ServiceUnavailableException,
+      );
     });
 
     it('nao executa transacao quando nenhuma tabela e descoberta', async () => {

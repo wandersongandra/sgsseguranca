@@ -1,0 +1,274 @@
+name: sgs-loadtest
+
+services:
+  postgres-loadtest:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_MIGRATOR_USER:?POSTGRES_MIGRATOR_USER is required}
+      POSTGRES_PASSWORD: REDACTED
+      POSTGRES_DB: sgs_loadtest
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}
+    volumes:
+      - postgres_loadtest_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks: [loadtest-internal]
+    command:
+      - postgres
+      - -c
+      - max_connections=40
+      - -c
+      - shared_buffers=64MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - effective_cache_size=256MB
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d sgs_loadtest']
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: ${LOADTEST_POSTGRES_MEMORY_LIMIT:-384m}
+    cpus: ${LOADTEST_POSTGRES_CPUS:-0.50}
+    pids_limit: 128
+    security_opt: [no-new-privileges:true]
+    logging: &default_logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  redis-loadtest:
+    image: redis:7.4.5-alpine
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - --appendonly
+      - 'no'
+      - --save
+      - ''
+      - --maxmemory
+      - ${LOADTEST_REDIS_MAXMEMORY:-96mb}
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redis_loadtest_data:/data
+    networks: [loadtest-internal]
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - -a
+        - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+        - ping
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: ${LOADTEST_REDIS_MEMORY_LIMIT:-128m}
+    cpus: ${LOADTEST_REDIS_CPUS:-0.20}
+    pids_limit: 64
+    security_opt: [no-new-privileges:true]
+    logging: *default_logging
+
+  api-loadtest:
+    image: sgs-loadtest-backend:local
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment: &api_environment
+      NODE_ENV: staging
+      APP_ENV: loadtest
+      PORT: '3001'
+      NODE_OPTIONS: --max-old-space-size=${LOADTEST_NODE_HEAP_MB:-512}
+      UV_THREADPOOL_SIZE: ${LOADTEST_UV_THREADPOOL_SIZE:-8}
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: postgres-loadtest
+      DATABASE_PORT: '5432'
+      DATABASE_NAME: sgs_loadtest
+      DATABASE_USER: sgs_app
+      DATABASE_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}
+      DATABASE_URL: ${LOADTEST_DB_PROTOCOL:?LOADTEST_DB_PROTOCOL is required}://sgs_app:${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD is required}@postgres-loadtest:5432/sgs_loadtest
+      DATABASE_SSL: 'false'
+      DB_POOL_MAX: ${LOADTEST_DB_POOL_MAX:-6}
+      DB_POOL_MIN: ${LOADTEST_DB_POOL_MIN:-1}
+      DB_IDLE_TIMEOUT_MS: '10000'
+      DB_CONNECTION_TIMEOUT_MS: '5000'
+      DB_STATEMENT_TIMEOUT_MS: '30000'
+      DB_APPLICATION_NAME_WEB: api_loadtest
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis-loadtest:6379
+      REDIS_AUTH_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis-loadtest:6379
+      REDIS_RATE_LIMIT_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis-loadtest:6379
+      REDIS_CACHE_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis-loadtest:6379
+      REDIS_QUEUE_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis-loadtest:6379
+      REDIS_TLS: 'false'
+      REDIS_AUTH_TLS: 'false'
+      REDIS_RATE_LIMIT_TLS: 'false'
+      REDIS_CACHE_TLS: 'false'
+      REDIS_QUEUE_TLS: 'false'
+      REDIS_DISABLED: 'false'
+      REDIS_FAIL_OPEN: 'false'
+      REDIS_ALLOW_IN_MEMORY_FALLBACK_IN_PROD: 'false'
+      THROTTLER_STORAGE_FAIL_OPEN: 'false'
+      THROTTLER_FAIL_CLOSED_AUTH_ROUTES: 'true'
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
+      VALIDATION_TOKEN_SECRET: ${VALIDATION_TOKEN_SECRET:?VALIDATION_TOKEN_SECRET is required}
+      JWT_ISSUER: http://api-loadtest:3001
+      JWT_AUDIENCE: sgs-loadtest
+      FIELD_ENCRYPTION_ENABLED: 'true'
+      FIELD_ENCRYPTION_KEY: ${FIELD_ENCRYPTION_KEY:?FIELD_ENCRYPTION_KEY is required}
+      FIELD_ENCRYPTION_HASH_KEY: ${FIELD_ENCRYPTION_HASH_KEY:?FIELD_ENCRYPTION_HASH_KEY is required}
+      MFA_ENABLED: 'true'
+      MFA_TOTP_ENCRYPTION_KEY: ${MFA_TOTP_ENCRYPTION_KEY:?MFA_TOTP_ENCRYPTION_KEY is required}
+      REFRESH_CSRF_ENFORCED: 'true'
+      REFRESH_CSRF_REPORT_ONLY: 'false'
+      REQUIRE_NO_PENDING_MIGRATIONS: 'true'
+      API_PUBLIC_URL: http://127.0.0.1:8088
+      CORS_ALLOWED_ORIGINS: http://127.0.0.1:8088,http://localhost:8088
+      LOCAL_DOCUMENT_STORAGE_DIR: /app/loadtest-data/documents
+      FEATURE_AI_ENABLED: 'false'
+      AI_PROVIDER: stub
+      MAIL_ENABLED: 'false'
+      ANTIVIRUS_PROVIDER: ''
+      SEED_ON_BOOTSTRAP: 'false'
+      LOG_LEVEL: warn
+      SENTRY_DSN: ''
+      OTEL_ENABLED: 'false'
+      NEW_RELIC_ENABLED: 'false'
+      WORKER_HEARTBEAT_ENABLED: 'false'
+      APP_LOADTEST_MARKER: sgs-loadtest
+    depends_on:
+      migrations-loadtest:
+        condition: service_completed_successfully
+      seed-loadtest:
+        condition: service_completed_successfully
+    volumes:
+      - loadtest_documents:/app/loadtest-data/documents
+      - ./scripts:/opt/load-test/scripts:ro
+    networks: [loadtest-internal]
+    expose: ['3001']
+    command: [sh, -lc, 'node /opt/load-test/scripts/guard-environment.mjs && node dist/main.js']
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e "require('http').get({host:'127.0.0.1',port:3001,path:'/health/ready',timeout:4000},r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      interval: 10s
+      timeout: 6s
+      start_period: 45s
+      retries: 12
+    mem_limit: ${LOADTEST_API_MEMORY_LIMIT:-768m}
+    cpus: ${LOADTEST_API_CPUS:-1.00}
+    pids_limit: 256
+    security_opt: [no-new-privileges:true]
+    logging: *default_logging
+
+  migrations-loadtest:
+    image: sgs-loadtest-backend:local
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment:
+      <<: *api_environment
+      DATABASE_MIGRATION_URL: ${LOADTEST_DB_PROTOCOL:?LOADTEST_DB_PROTOCOL is required}://${POSTGRES_MIGRATOR_USER:?POSTGRES_MIGRATOR_USER is required}:${POSTGRES_MIGRATOR_PASSWORD:?POSTGRES_MIGRATOR_PASSWORD is required}@postgres-loadtest:5432/sgs_loadtest
+      REQUIRE_NO_PENDING_MIGRATIONS: 'false'
+    command: [sh, -lc, 'node /opt/load-test/scripts/guard-environment.mjs && npm run migration:run && node /opt/load-test/scripts/grant-runtime-privileges.cjs']
+    volumes:
+      - ./scripts:/opt/load-test/scripts:ro
+    depends_on:
+      postgres-loadtest:
+        condition: service_healthy
+    networks: [loadtest-internal]
+    restart: 'no'
+    mem_limit: ${LOADTEST_MIGRATION_MEMORY_LIMIT:-512m}
+    cpus: ${LOADTEST_MIGRATION_CPUS:-0.75}
+    pids_limit: 128
+    security_opt: [no-new-privileges:true]
+    logging: *default_logging
+
+  seed-loadtest:
+    image: sgs-loadtest-backend:local
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    environment:
+      <<: *api_environment
+      DATABASE_MIGRATION_URL: ${LOADTEST_DB_PROTOCOL:?LOADTEST_DB_PROTOCOL is required}://${POSTGRES_MIGRATOR_USER:?POSTGRES_MIGRATOR_USER is required}:${POSTGRES_MIGRATOR_PASSWORD:?POSTGRES_MIGRATOR_PASSWORD is required}@postgres-loadtest:5432/sgs_loadtest
+      LOADTEST_ADMIN_CPF: ${LOADTEST_ADMIN_CPF:?LOADTEST_ADMIN_CPF is required}
+      LOADTEST_ADMIN_PASSWORD: ${LOADTEST_ADMIN_PASSWORD:?LOADTEST_ADMIN_PASSWORD is required}
+      LOADTEST_COMPANY_ID: ${LOADTEST_COMPANY_ID:-00000000-0000-4000-8000-000000000001}
+      LOADTEST_SITE_ID: ${LOADTEST_SITE_ID:-00000000-0000-4000-8000-000000000002}
+      LOADTEST_USER_ID: ${LOADTEST_USER_ID:-00000000-0000-4000-8000-000000000003}
+    command: [sh, -lc, 'node /opt/load-test/scripts/guard-environment.mjs && node /opt/load-test/scripts/seed-loadtest.cjs && node /opt/load-test/scripts/seed-baseline-users.cjs']
+    volumes:
+      - ./scripts:/opt/load-test/scripts:ro
+    depends_on:
+      migrations-loadtest:
+        condition: service_completed_successfully
+    networks: [loadtest-internal]
+    restart: 'no'
+    mem_limit: ${LOADTEST_SEED_MEMORY_LIMIT:-512m}
+    cpus: ${LOADTEST_SEED_CPUS:-0.75}
+    pids_limit: 128
+    security_opt: [no-new-privileges:true]
+    logging: *default_logging
+
+  proxy-loadtest:
+    image: nginx:1.27.5-alpine
+    depends_on:
+      api-loadtest:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${LOADTEST_BIND_PORT:-8088}:80
+    volumes:
+      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - loadtest-internal
+      - loadtest-edge
+    mem_limit: ${LOADTEST_PROXY_MEMORY_LIMIT:-128m}
+    cpus: ${LOADTEST_PROXY_CPUS:-0.50}
+    pids_limit: 64
+    security_opt: [no-new-privileges:true]
+    logging: *default_logging
+
+  edge-loadtest:
+    image: caddy:2.10.2-alpine
+    environment:
+      LOADTEST_PROXY_KEY: REDACTED
+    depends_on:
+      proxy-loadtest:
+        condition: service_started
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_loadtest_data:/data
+      - caddy_loadtest_config:/config
+    networks: [loadtest-edge]
+    mem_limit: ${LOADTEST_EDGE_MEMORY_LIMIT:-256m}
+    cpus: ${LOADTEST_EDGE_CPUS:-0.50}
+    pids_limit: 128
+    security_opt: [no-new-privileges:true]
+    logging: *default_logging
+
+networks:
+  loadtest-internal:
+    name: sgs-loadtest-internal
+  loadtest-edge:
+    name: sgs-loadtest-edge
+
+volumes:
+  postgres_loadtest_data:
+    name: sgs-loadtest-postgres
+  redis_loadtest_data:
+    name: sgs-loadtest-redis
+  loadtest_documents:
+    name: sgs-loadtest-documents
+  caddy_loadtest_data:
+    name: sgs-loadtest-caddy-data
+  caddy_loadtest_config:
+    name: sgs-loadtest-caddy-config

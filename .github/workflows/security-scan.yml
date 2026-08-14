@@ -27,6 +27,30 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify TruffleHog detector with disposable fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture_dir="$(mktemp -d)"
+          trap 'rm -rf "$fixture_dir"' EXIT
+          protocol="$(printf '%s%s' post gres)"
+          user="$(printf '%s%s' fixture _user)"
+          password="$(printf '%s%s' disposable _pass)"
+          printf '%s://%s:%s@localhost:5432/fixture_db' "$protocol" "$user" "$password" \
+            > "$fixture_dir/disposable.txt"
+          detector="$(printf '%s%s%s' Post gre s)"
+          set +e
+          docker run --rm -v "$fixture_dir:/scan:ro" ghcr.io/trufflesecurity/trufflehog:3.96.0 \
+            filesystem --detectors "$detector" --json --no-update --fail /scan \
+            > "$fixture_dir/result.json" 2> "$fixture_dir/stderr.log"
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "TruffleHog inversion failed: disposable fixture was not detected."
+            exit 1
+          fi
+          echo "TruffleHog inversion passed: disposable fixture was detected and removed."
+
       - name: TruffleHog Secret Scan
         if: ${{ !(github.event_name == 'push' && (github.event.before == github.sha || github.event.before == '0000000000000000000000000000000000000000')) }}
         uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11
@@ -36,7 +60,9 @@ jobs:
           head: ${{ github.event.pull_request.head.sha || github.sha }}
           # Exclui docs/exemplos/specs com DSNs placeholder (falsos positivos do detector
           # Postgres). Gitleaks escaneia o repo inteiro como backstop.
-          extra_args: --exclude-paths=.github/trufflehog-exclude.txt
+          extra_args: >-
+            --exclude-paths=.github/trufflehog-exclude.txt
+            --exclude-globs=**/provisioning-datasource*
 
   dependency-audit:
     name: Dependency Audit

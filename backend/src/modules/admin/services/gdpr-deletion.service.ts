@@ -1,6 +1,11 @@
-﻿import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+﻿import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { v4 as uuid } from 'uuid';
 import { GdprDeletionRequest } from '../entities/gdpr-deletion-request.entity';
 import {
@@ -9,6 +14,7 @@ import {
 } from '../entities/gdpr-retention-cleanup-run.entity';
 import { TenantService } from '../../../shared/tenant/tenant.service';
 import { PrivilegedDbService } from '../../../shared/database/privileged-db.service';
+import { ProvisioningDataSourceService } from '../../../shared/database/provisioning-datasource.service';
 
 export type { GdprDeletionRequest as GDPRDeleteRequest };
 
@@ -60,6 +66,7 @@ export class GDPRDeletionService {
     private retentionCleanupRunRepo: Repository<GdprRetentionCleanupRun>,
     private readonly tenantService: TenantService,
     private readonly privilegedDb: PrivilegedDbService,
+    private readonly provisioningDataSource: ProvisioningDataSourceService,
   ) {}
 
   private async queryRows<T>(
@@ -83,15 +90,27 @@ export class GDPRDeletionService {
     return 0;
   }
 
-  private getAffectedRowCount(result: unknown): number {
-    if (typeof result === 'number') return Number.isFinite(result) ? result : 0;
-    if (Array.isArray(result)) {
-      const firstItem: unknown = result[0];
-      if (typeof firstItem === 'number')
-        return Number.isFinite(firstItem) ? firstItem : 0;
-      return result.length;
-    }
-    return 0;
+  /**
+   * Persiste o registro de execução da retenção pela conexão privilegiada.
+   *
+   * `gdpr_retention_cleanup_runs` está classificada como OPERATIONAL_GLOBAL na
+   * migration 187: a policy é `FOR ALL USING/WITH CHECK (is_super_admin() = true)`,
+   * **sem cláusula de tenant**. Para `sgs_app` isso é escrita morta em qualquer
+   * circunstância desde a migration 361.
+   *
+   * O efeito prático era perverso: mesmo depois de a limpeza em si voltar a
+   * funcionar, gravar o run estouraria — inclusive dentro do `catch`, que tenta
+   * registrar a falha e falha de novo. O operador via um erro de RLS sobre a
+   * *tabela de auditoria*, não "0 linhas apagadas", e o diagnóstico ia para o
+   * lugar errado.
+   */
+  private saveRetentionRun(
+    run: GdprRetentionCleanupRun,
+  ): Promise<GdprRetentionCleanupRun> {
+    return this.provisioningDataSource.requiredTransaction(
+      'gdpr_retention_cleanup_run_persist',
+      (manager) => manager.save(GdprRetentionCleanupRun, run),
+    );
   }
 
   private isValidUUID(id: string): boolean {
@@ -137,17 +156,41 @@ export class GDPRDeletionService {
     );
 
     try {
-      // Contexto super-admin OBRIGATÓRIO: gdpr_delete_user_data() não é
-      // SECURITY DEFINER e a role runtime (sgs_app) não tem BYPASSRLS. Todas
-      // as tabelas alvo têm RLS com FORCE — sem este wrap, a RLS filtra as
-      // linhas do titular e a função anonimiza 0 registros, reportando
-      // "completed" com sucesso. O direito de exclusão (LGPD Art. 18, VI)
-      // ficava sem efeito, silenciosamente.
-      const result = await this.runAsGlobalSuperAdmin(() =>
-        this.queryRows<GDPRDeletionCountRow>(
-          `SELECT * FROM gdpr_delete_user_data($1)`,
-          [userId],
-        ),
+      // Roda OBRIGATORIAMENTE na conexão privilegiada (sgs_admin).
+      //
+      // `gdpr_delete_user_data()` não é SECURITY DEFINER: executa com os
+      // privilégios de quem chama. Duas coisas impediam isso de funcionar pela
+      // conexão de runtime:
+      //
+      //  1. a migration 341 revogou EXECUTE de PUBLIC — `sgs_app` não tem
+      //     permissão de executar a função (verificado no catálogo);
+      //  2. mesmo que tivesse, a migration 361 tornou `is_super_admin()`
+      //     inerte para `sgs_app`, então todas as tabelas alvo (com FORCE RLS)
+      //     filtrariam as linhas do titular e a função anonimizaria 0
+      //     registros, reportando "completed".
+      //
+      // O wrap anterior era `runAsGlobalSuperAdmin`, que só ajusta a
+      // AsyncLocalStorage e a flag de sessão — nenhuma das duas resolve o
+      // problema acima. O direito de exclusão (LGPD Art. 18, VI) ficava sem
+      // efeito. A migration 374 concede EXECUTE a `sgs_admin`, e é por ela que
+      // esta chamada passa a correr.
+      const result = await this.privilegedDb.withRequiredPrivilegedClient(
+        'gdpr_delete_user_data',
+        async (client) => {
+          await client.query('BEGIN');
+          try {
+            await client.query("SET LOCAL app.is_super_admin = 'true'");
+            const rows = await client.query<GDPRDeletionCountRow>(
+              `SELECT * FROM gdpr_delete_user_data($1)`,
+              [userId],
+            );
+            await client.query('COMMIT');
+            return rows.rows;
+          } catch (err) {
+            await client.query('ROLLBACK');
+            throw err;
+          }
+        },
       );
 
       for (const row of result) {
@@ -197,8 +240,29 @@ export class GDPRDeletionService {
 
     return this.runAsGlobalSuperAdmin(async () => {
       try {
-        const result = await this.queryRows<GDPRDeletionCountRow>(
-          `SELECT * FROM cleanup_expired_data()`,
+        // Mesma história de `deleteUserData`: `cleanup_expired_data()` não é
+        // SECURITY DEFINER e teve EXECUTE revogado de PUBLIC pela migration
+        // 341. Enquanto o runtime de produção era `neondb_owner` (dono da
+        // função) isto funcionava; quando passou a ser `sgs_app`, em
+        // 2026-07-25, virou "permission denied" — e a política de retenção
+        // parou de rodar sem que ninguém percebesse, porque o catch abaixo
+        // apenas grava o run como 'failed'.
+        const result = await this.privilegedDb.withRequiredPrivilegedClient(
+          'cleanup_expired_data',
+          async (client) => {
+            await client.query('BEGIN');
+            try {
+              await client.query("SET LOCAL app.is_super_admin = 'true'");
+              const rows = await client.query<GDPRDeletionCountRow>(
+                `SELECT * FROM cleanup_expired_data()`,
+              );
+              await client.query('COMMIT');
+              return rows.rows;
+            } catch (err) {
+              await client.query('ROLLBACK');
+              throw err;
+            }
+          },
         );
 
         let totalRows = 0;
@@ -214,7 +278,7 @@ export class GDPRDeletionService {
 
         const duration = Date.now() - startTime;
         const completedAt = new Date();
-        const run = await this.retentionCleanupRunRepo.save(
+        const run = await this.saveRetentionRun(
           this.retentionCleanupRunRepo.create({
             status: 'success',
             triggered_by: triggeredBy,
@@ -243,7 +307,7 @@ export class GDPRDeletionService {
         const message = this.getErrorMessage(error);
         const completedAt = new Date();
         const duration = Date.now() - startTime;
-        const run = await this.retentionCleanupRunRepo.save(
+        const run = await this.saveRetentionRun(
           this.retentionCleanupRunRepo.create({
             status: 'error',
             triggered_by: triggeredBy,
@@ -331,8 +395,17 @@ export class GDPRDeletionService {
     let failedTable = '<unknown>';
 
     try {
-      if (this.privilegedDb.isEnabled()) {
-        await this.privilegedDb.withPrivilegedClient(async (client) => {
+      // Sem ramo alternativo para a conexão de runtime.
+      //
+      // O `else` que existia aqui rodava os mesmos UPDATE na conexão `sgs_app`
+      // com `SET LOCAL app.is_super_admin = 'true'`. Depois da migration 361
+      // essa flag é inerte, então cada UPDATE afetaria 0 linhas **sem erro** e
+      // este método retornaria `status: 'success'` com `total_rows_deleted: 0`
+      // — offboarding de tenant reportado como concluído sem ter soft-deletado
+      // nada. Ausência da conexão privilegiada agora é 503, não caminho B.
+      await this.privilegedDb.withRequiredPrivilegedClient(
+        'gdpr_delete_company_data',
+        async (client) => {
           await client.query('BEGIN');
           try {
             await client.query("SET LOCAL app.is_super_admin = 'true'");
@@ -353,24 +426,8 @@ export class GDPRDeletionService {
             await client.query('ROLLBACK');
             throw err;
           }
-        });
-      } else {
-        await this.dataSource.transaction(async (manager: EntityManager) => {
-          // Garante bypass de RLS para o offboarding cross-tenant, independentemente
-          // do tenant que o ADMIN_GERAL chamador tenha selecionado (x-company-id).
-          await manager.query("SET LOCAL app.is_super_admin = 'true'");
-          for (const table of tables) {
-            failedTable = table;
-            const result: unknown = await manager.query(
-              `UPDATE "${table}" SET deleted_at = $1 WHERE company_id = $2 AND deleted_at IS NULL`,
-              [now, companyId],
-            );
-            const affectedRows = this.getAffectedRowCount(result);
-            totalRows += affectedRows;
-            this.logger.log(`  ✓ ${table}: ${affectedRows} rows soft-deleted`);
-          }
-        });
-      }
+        },
+      );
 
       this.logger.warn(
         `[GDPR] ENTERPRISE: Company ${companyId} soft-deleted — ${tables.length} tables, ${totalRows} rows affected`,
@@ -385,6 +442,12 @@ export class GDPRDeletionService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: unknown) {
+      // Indisponibilidade da conexão privilegiada não é "falha de tabela": é
+      // uma condição de infraestrutura que o chamador precisa distinguir.
+      // Convertê-la em `status: 'failed'` genérico esconderia a causa real
+      // atrás de um erro de negócio.
+      if (error instanceof ServiceUnavailableException) throw error;
+
       const message = this.getErrorMessage(error);
       this.logger.error(
         `[GDPR] ENTERPRISE: Company ${companyId} soft-delete FAILED on table "${failedTable}" — transaction rolled back. ${message}`,
