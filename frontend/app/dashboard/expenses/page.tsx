@@ -3,6 +3,7 @@ import { logger } from '@/lib/logger';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { CalendarDays, Plus, Receipt, Search, WalletCards } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -48,6 +49,7 @@ function monthStartIso() {
 
 export default function ExpensesPage() {
   const { hasPermission } = useAuth();
+  const router = useRouter();
   const canViewExpenses = hasPermission(Permission.CAN_VIEW_EXPENSES);
   const canManageExpenses = hasPermission(Permission.CAN_MANAGE_EXPENSES);
   const [reports, setReports] = useState<ExpenseReport[]>([]);
@@ -225,7 +227,7 @@ export default function ExpensesPage() {
       toast.success('Prestação de despesas criada.');
       setShowCreate(false);
       await loadData();
-      window.location.href = `/dashboard/expenses/${report.id}`;
+      router.push(`/dashboard/expenses/${report.id}`);
     } catch (error) {
       logger.error('Erro ao criar prestação:', error);
       toast.error('Erro ao criar prestação de despesas.');
