@@ -171,7 +171,8 @@ describeE2E('E2E Critical - APR lifecycle', () => {
       const genBody = genRes.body as PdfAccessBody & { generated?: boolean };
       expect([200, 201]).toContain(genRes.status);
       expect(genBody.hasFinalPdf).toBe(true);
-      expect(genBody.fileKey).toMatch(/^documents\/.+\.pdf$/i);
+      expect(genBody.fileKey).toBeUndefined();
+      expect(typeof genBody.url).toBe('string');
 
       const res = await testApp
         .request()
@@ -259,7 +260,7 @@ describeE2E('E2E Critical - APR lifecycle', () => {
       expect(pdfAccessRes.status).toBe(200);
       expect(pdfAccessBody.hasFinalPdf).toBe(true);
       expect(pdfAccessBody.availability).toBe('ready');
-      expect(pdfAccessBody.fileKey).toMatch(/^documents\/.+\.pdf$/i);
+      expect(pdfAccessBody.fileKey).toBeUndefined();
       expect(typeof pdfAccessBody.url).toBe('string');
 
       const downloadUrl = String(pdfAccessBody.url || '');
