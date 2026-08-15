@@ -29,6 +29,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '../auth/enums/roles.enum';
 import { Authorize } from '../auth/authorize.decorator';
+import { PrivilegedDbService } from '../../shared/database/privileged-db.service';
 import {
   REDIS_CLIENT_AUTH,
   REDIS_CLIENT_CACHE,
@@ -62,6 +63,7 @@ export class HealthController {
     @Inject(REDIS_CLIENT_QUEUE) private readonly queueRedis: Redis,
     private readonly puppeteerPool: PuppeteerPoolService,
     private readonly healthService: HealthService,
+    private readonly privilegedDb: PrivilegedDbService,
     @Optional() @InjectQueue('mail') private readonly mailQueue?: Queue,
     @Optional()
     @InjectQueue('pdf-generation')
@@ -276,6 +278,7 @@ export class HealthController {
   async detailed() {
     const dbStatus = await this.healthService.checkDatabase();
     const memoryUsage = this.healthService.getMemoryUsage();
+    const privileged = this.privilegedDb.isEnabled();
 
     return {
       status: dbStatus.healthy ? 'healthy' : 'unhealthy',
@@ -285,6 +288,19 @@ export class HealthController {
       checks: {
         database: dbStatus,
         memory: memoryUsage,
+        // Deliberadamente FORA de /health/ready: a ausência da conexão
+        // privilegiada não deve tirar a API do balanceador. Login, leitura e
+        // escrita de tenant continuam funcionando normalmente; o que fica
+        // bloqueado (com 503 e evento `privileged_connection_required`) são as
+        // operações cross-tenant — exclusão de empresa, exclusão LGPD,
+        // retenção, provisionamento. Ver `admin_operations` abaixo.
+        admin_operations: {
+          available: privileged,
+          role: privileged ? 'sgs_admin' : null,
+          detail: privileged
+            ? 'Operações cross-tenant privilegiadas habilitadas.'
+            : 'DATABASE_ADMIN_URL ausente: operações cross-tenant respondem 503 (fail-closed).',
+        },
       },
       version: process.env.npm_package_version || '1.0.0',
     };

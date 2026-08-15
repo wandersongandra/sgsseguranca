@@ -1,12 +1,11 @@
 # Code owners (best-effort). GitHub so aplica em repos com o recurso habilitado.
 # Mantem revisao explicita em areas de risco alto.
 
-* @complianceX
+* @wandersongandra
 
-/.github/ @complianceX
-/docs/ @complianceX
+/.github/ @wandersongandra
+/docs/ @wandersongandra
 
-/backend/ @complianceX
-/frontend/ @complianceX
-/cloudflare/ @complianceX
-
+/backend/ @wandersongandra
+/frontend/ @wandersongandra
+/cloudflare/ @wandersongandra

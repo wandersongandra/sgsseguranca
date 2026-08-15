@@ -396,7 +396,7 @@ describe('PhotographicReportsService', () => {
       const withPrivate = service as unknown as {
         normalizeApplicableNrs: NrNormalizer;
       };
-      return withPrivate.normalizeApplicableNrs.bind(service);
+      return withPrivate.normalizeApplicableNrs.bind(service) as NrNormalizer;
     }
 
     it('descarta NR desconhecida em vez de rejeitar o relatório inteiro', () => {

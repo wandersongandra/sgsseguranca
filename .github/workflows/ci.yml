@@ -33,9 +33,23 @@ jobs:
           cache-dependency-path: backend/package-lock.json
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
+      # ------------------------------------------------------------------
+      # A PARTIR DAQUI, CADA CHECK E INDEPENDENTE.
+      #
+      # O default do GitHub Actions e `if: success()`, entao o primeiro step
+      # vermelho marcava TODOS os seguintes como `skipped`. Como o audit de
+      # dependencias vinha antes de lint/type-check/test/build, um CVE em
+      # dependencia transitiva apagava toda a evidencia do PR.
+      #
+      # `!cancelled()` faz cada check rodar mesmo com outro vermelho — e NAO e
+      # `continue-on-error`: a falha continua reprovando o job. A diferenca e
+      # entre separar execucao e esconder resultado.
+      # ------------------------------------------------------------------
       - name: Security baseline gate (refresh CSRF)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           NODE_ENV: staging
           REFRESH_CSRF_ENFORCED: "true"
@@ -43,6 +57,7 @@ jobs:
         run: npm run security:phase0:baseline
 
       - name: Security baseline negative test (must fail on insecure CSRF)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         env:
           NODE_ENV: staging
           REFRESH_CSRF_ENFORCED: "false"
@@ -58,33 +73,52 @@ jobs:
           echo "Negative test passed: insecure CSRF config was blocked as expected."
 
       - name: Audit backend dependencies (high+critical)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm audit --audit-level=high
 
       - name: Lint backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
       - name: Type-check backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run type-check
 
       - name: Test backend (shard 1/2)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:ci -- --shard=1/2
 
       - name: Test backend (shard 2/2)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:ci -- --shard=2/2
 
       - name: Smoke backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:smoke
 
       - name: Build backend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
 
       - name: Validate migrations
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run ci:migration:check
 
   backend-e2e:
     name: Backend E2E Critical Flows
     runs-on: ubuntu-latest
-    needs: backend
+    # Sem `needs: backend` — de proposito.
+    #
+    # Este job monta o proprio PostgreSQL, cria as roles de RLS, roda as
+    # migrations e instala as proprias dependencias: nao consome artefato
+    # nenhum do job `backend`. A dependencia era so ordenacao, e custava caro —
+    # qualquer step vermelho la (inclusive um CVE em dependencia transitiva,
+    # sem relacao com o codigo do PR) fazia o E2E de seguranca ser `skipped`,
+    # apagando a unica evidencia de que as guardas contra fail-open de RLS
+    # funcionam contra um banco real.
+    #
+    # Isto NAO esconde falha: o job `backend` continua reprovando por conta
+    # propria e o merge continua bloqueado.
     services:
       postgres:
         image: postgres:16-alpine
@@ -476,16 +510,23 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
+      # Mesma separacao do job de backend: o audit deixa de sequestrar a
+      # evidencia de lint/test/build. Falha continua reprovando o job.
       - name: Audit frontend dependencies (high+critical)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm audit --audit-level=high
 
       - name: Lint frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
       - name: Test frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run test:ci
 
       - name: Build frontend
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
