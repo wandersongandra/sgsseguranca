@@ -25,10 +25,7 @@ import { AprLog } from '../entities/apr-log.entity';
 import { AprRiskEvidence } from '../entities/apr-risk-evidence.entity';
 import { Apr, AprStatus } from '../entities/apr.entity';
 import { AprApprovalStepStatus } from '../entities/apr-approval-step.entity';
-import {
-  GovernedPdfAccessAvailability,
-  GovernedPdfAccessResponseDto,
-} from '../../../shared/dto/governed-pdf-access-response.dto';
+import { GovernedPdfAccessAvailability } from '../../../shared/dto/governed-pdf-access-response.dto';
 
 const APR_PDF_LOG_ACTIONS = {
   PDF_ATTACHED: 'APR_PDF_ANEXADO',
@@ -40,8 +37,18 @@ const APR_PUBLIC_VALIDATION_PORTAL = 'apr_public_validation';
 type AprPdfLogAction =
   (typeof APR_PDF_LOG_ACTIONS)[keyof typeof APR_PDF_LOG_ACTIONS];
 
+type AprPdfAccessResponse = {
+  entityId: string;
+  hasFinalPdf: boolean;
+  availability: AprPdfAccessAvailability;
+  message: string | null;
+  originalName: string | null;
+  contentType: 'application/pdf' | null;
+  expiresAt: string | null;
+  url: string | null;
+};
+
 export type AprPdfAccessAvailability = GovernedPdfAccessAvailability;
-type AprPdfAccessResponse = GovernedPdfAccessResponseDto;
 type AprPdfAuthenticityMetadata = {
   verificationCode?: string | null;
   generatedAt?: Date | null;
@@ -2129,9 +2136,9 @@ export class AprsPdfService {
         hasFinalPdf: false,
         availability: 'not_emitted',
         message: 'A APR ainda não possui PDF final emitido.',
-        fileKey: null,
-        folderPath: apr.pdf_folder_path ?? null,
         originalName: apr.pdf_original_name ?? null,
+        contentType: null,
+        expiresAt: null,
         url: null,
       };
     }
@@ -2156,9 +2163,9 @@ export class AprsPdfService {
       hasFinalPdf: true,
       availability,
       message,
-      fileKey: apr.pdf_file_key,
-      folderPath: apr.pdf_folder_path ?? null,
       originalName: apr.pdf_original_name ?? null,
+      contentType: 'application/pdf',
+      expiresAt: url ? new Date(Date.now() + 3600_000).toISOString() : null,
       url,
     };
   }
@@ -2250,8 +2257,8 @@ export class AprsPdfService {
       input.userId,
       input.logAction ?? APR_PDF_LOG_ACTIONS.PDF_ATTACHED,
       {
-        fileKey: key,
-        originalName: input.originalName,
+        artifactType: 'APR_FINAL_PDF',
+        generated: true,
       },
     );
 

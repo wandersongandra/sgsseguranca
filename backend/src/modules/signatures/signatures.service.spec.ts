@@ -70,8 +70,14 @@ describe('SignaturesService', () => {
       transaction: jest.fn((callback: (manager: unknown) => unknown) =>
         Promise.resolve(
           callback({
-            query: jest.fn(() => Promise.resolve()),
-            getRepository: jest.fn(() => transactionalRepository),
+            query: jest.fn((sql?: string) =>
+              Promise.resolve(
+                String(sql).includes('FROM "aprs"') ? [{ id: 'apr-1' }] : [],
+              ),
+            ),
+            getRepository: jest.fn((entity: unknown) =>
+              entity === Apr ? aprRepository : transactionalRepository,
+            ),
           }),
         ),
       ),
@@ -126,6 +132,16 @@ describe('SignaturesService', () => {
 
   const dataSource = {
     query: jest.fn(() => Promise.resolve([{ count: '0' }])),
+    transaction: jest.fn((callback: (manager: unknown) => unknown) =>
+      callback({
+        query: jest.fn((sql?: string) =>
+          String(sql).includes('FROM "aprs"') ? [{ id: 'apr-1' }] : [],
+        ),
+        getRepository: jest.fn((entity: unknown) =>
+          entity === Apr ? aprRepository : transactionalRepository,
+        ),
+      }),
+    ),
     getRepository: jest.fn((entity: unknown) => {
       if (entity === Apr) {
         return aprRepository;
@@ -190,7 +206,11 @@ describe('SignaturesService', () => {
     );
     trainingScopeQueryBuilder.getRawOne.mockResolvedValue(null);
     transactionalRepository.find.mockResolvedValue([]);
-    dataSource.query.mockResolvedValue([{ count: '0' }]);
+    (dataSource.query as jest.Mock).mockImplementation((sql?: string) =>
+      String(sql).includes('apr_participants')
+        ? Promise.resolve([{ allowed: true }])
+        : Promise.resolve([{ count: '0' }]),
+    );
     aprRepository.findOne.mockResolvedValue({
       id: 'apr-1',
       company_id: 'company-1',
@@ -199,6 +219,7 @@ describe('SignaturesService', () => {
       versao: 1,
       status: AprStatus.PENDENTE,
       pdf_file_key: null,
+      elaborador_id: 'user-1',
       updated_at: new Date('2026-03-16T11:55:00.000Z'),
     });
     catRepository.findOne.mockResolvedValue({
@@ -244,6 +265,27 @@ describe('SignaturesService', () => {
       forensicTrailService as unknown as ForensicTrailService,
       storageService as never,
     );
+  });
+
+  it('bloqueia assinatura APR de usuário que não é elaborador nem participante', async () => {
+    (dataSource.query as jest.Mock).mockImplementation((sql?: string) =>
+      String(sql).includes('apr_participants')
+        ? Promise.resolve([{ allowed: false }])
+        : Promise.resolve([{ count: '0' }]),
+    );
+
+    await expect(
+      service.create(
+        {
+          document_id: 'apr-1',
+          document_type: 'APR',
+          user_id: 'user-outsider',
+          signature_data: 'data:image/png;base64,ASSINATURA',
+          type: 'drawn',
+        },
+        'user-outsider',
+      ),
+    ).rejects.toThrow('elaborador ou um participante');
   });
 
   const useSiteScopedTenant = (siteIds = ['site-a']) => {
@@ -491,6 +533,51 @@ describe('SignaturesService', () => {
     );
     expect(canonicalDocument?.site_id).toBe('site-a');
     expect(documentBinding?.site_id).toBe('site-a');
+  });
+
+  it('persiste content hash V1 e detecta adulteração do estado atual', async () => {
+    await service.create(
+      {
+        document_id: 'apr-1',
+        document_type: 'APR',
+        user_id: 'user-1',
+        signature_data: 'data:image/png;base64,CONTENT_HASH',
+        type: 'drawn',
+      },
+      'user-1',
+    );
+
+    const created = savedEntities[savedEntities.length - 1];
+    expect(created?.content_hash).toMatch(/^[a-f0-9]{64}$/);
+    expect(created?.integrity_scheme).toBe('CONTENT_HASH_V1');
+    expect(created?.canonicalization_version).toBe(1);
+
+    repository.findOne.mockResolvedValue({
+      ...created,
+      id: 'sig-content',
+      signature_hash: 'hash-1',
+      timestamp_token: 'token-1',
+      company_id: 'company-1',
+      document_type: 'APR',
+    });
+    await expect(service.verifyById('sig-content')).resolves.toEqual(
+      expect.objectContaining({ content_integrity: 'VALID' }),
+    );
+
+    aprRepository.findOne.mockResolvedValue({
+      id: 'apr-1',
+      company_id: 'company-1',
+      numero: 'APR-001',
+      titulo: 'Título adulterado',
+      versao: 1,
+      status: AprStatus.PENDENTE,
+      pdf_file_key: null,
+      elaborador_id: 'user-1',
+      updated_at: new Date('2026-03-16T11:55:00.000Z'),
+    });
+    await expect(service.verifyById('sig-content')).resolves.toEqual(
+      expect.objectContaining({ content_integrity: 'CONTENT_MISMATCH' }),
+    );
   });
 
   it('filtra busca em lote pelo escopo de obras do usuario', async () => {
@@ -910,6 +997,7 @@ describe('SignaturesService', () => {
         proof_scope: SIGNATURE_PROOF_SCOPES.DOCUMENT_REVISION,
         document_binding_hash: 'binding-hash',
         signature_evidence_hash: 'evidence-hash',
+        content_integrity: 'LEGACY_SIGNATURE',
       }),
     );
   });

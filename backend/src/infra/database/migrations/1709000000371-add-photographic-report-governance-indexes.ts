@@ -27,9 +27,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   INVÁLIDO. `IF NOT EXISTS` enxerga o índice inválido como existente e NÃO o
  *   reconstrói — nesse caso é preciso derrubá-lo manualmente antes de reexecutar.
  */
-export class AddPhotographicReportGovernanceIndexes1709000000371
-  implements MigrationInterface
-{
+export class AddPhotographicReportGovernanceIndexes1709000000371 implements MigrationInterface {
   name = 'AddPhotographicReportGovernanceIndexes1709000000371';
   transaction = false;
 
