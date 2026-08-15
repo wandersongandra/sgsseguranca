@@ -7,6 +7,11 @@ import { PdfService } from './pdf.service';
 import { PuppeteerPoolService } from './puppeteer-pool.service';
 import { PdfValidatorService } from './pdf-validator.service';
 
+jest.mock('puppeteer', () => ({
+  executablePath: jest.fn(),
+  launch: jest.fn(),
+}));
+
 describe('PdfService', () => {
   let service: PdfService;
   let integrityRepository: {

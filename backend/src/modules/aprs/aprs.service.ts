@@ -33,6 +33,10 @@ import { TenantService } from '../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { CreateAprDto } from './dto/create-apr.dto';
 import { UpdateAprDto } from './dto/update-apr.dto';
+import {
+  AprLogResponseDto,
+  toAprLogResponseDto,
+} from './dto/apr-log-response.dto';
 import { Role } from '../auth/enums/roles.enum';
 import { normalizeRoleName } from '../auth/role-normalization.util';
 import { Activity } from '../activities/entities/activity.entity';
@@ -605,16 +609,24 @@ export class AprsService {
     userId: string | undefined,
     acao: AprLogAction,
     metadata?: Record<string, unknown>,
+    options?: { manager?: EntityManager; critical?: boolean },
   ): Promise<void> {
     try {
-      const log = this.aprLogsRepository.create({
+      const repository =
+        options?.manager?.getRepository(AprLog) ?? this.aprLogsRepository;
+      const log = repository.create({
         apr_id: aprId,
         usuario_id: userId ?? undefined,
         acao,
         metadata: metadata ?? undefined,
       });
-      await this.aprLogsRepository.save(log);
+      await repository.save(log);
     } catch {
+      if (options?.critical) {
+        throw new InternalServerErrorException(
+          `Não foi possível registrar a trilha forense da APR (${acao}).`,
+        );
+      }
       this.logger.warn(`Falha ao gravar log de APR (${aprId}): ${acao}`);
     }
   }
@@ -1204,6 +1216,23 @@ export class AprsService {
     );
   }
 
+  private assertSiteWithinCurrentActorScope(
+    siteId: string | null | undefined,
+  ): void {
+    const scope = resolveSiteAccessScopeFromTenantService(
+      this.tenantService,
+      'APR',
+    );
+    if (
+      !scope.hasCompanyWideAccess &&
+      (!siteId || !scope.siteIds.includes(siteId))
+    ) {
+      throw new ForbiddenException(
+        'O site informado não está no escopo operacional do usuário.',
+      );
+    }
+  }
+
   private buildAprTraceMetadata(apr: Apr): Record<string, unknown> {
     return {
       companyId: apr.company_id,
@@ -1270,6 +1299,7 @@ export class AprsService {
         'Tenant/empresa não identificado para criação da APR.',
       );
     }
+    this.assertSiteWithinCurrentActorScope(createAprDto.site_id);
     const normalizedRiskItems = this.buildAprRiskItemSnapshots({
       itens_risco: itens_risco,
       risk_items,
@@ -1367,6 +1397,37 @@ export class AprsService {
             );
           }
 
+          await this.addLog(
+            saved.id,
+            userId ?? saved.elaborador_id,
+            APR_LOG_ACTIONS.CREATED,
+            {
+              companyId: saved.company_id,
+              status: saved.status,
+              versao: saved.versao ?? 1,
+              siteId: saved.site_id,
+              participantCount: participants?.length ?? 0,
+              riskItemCount: normalizedRiskItems.length,
+            },
+            { manager, critical: true },
+          );
+          await this.forensicTrailService.append(
+            {
+              eventType: FORENSIC_EVENT_TYPES.APR_CREATED,
+              module: 'apr',
+              entityId: saved.id,
+              companyId: saved.company_id,
+              userId: userId ?? saved.elaborador_id,
+              metadata: {
+                status: saved.status,
+                version: saved.versao ?? 1,
+                siteId: saved.site_id,
+                riskItemCount: normalizedRiskItems.length,
+              },
+            },
+            { manager },
+          );
+
           return saved.id;
         },
       );
@@ -1393,20 +1454,6 @@ export class AprsService {
       companyId: result.company_id,
     });
     this.metricsService?.incrementAprCreated(result.company_id, result.status);
-    // Fire-and-forget: auditoria não bloqueia resposta ao cliente.
-    // Falhas são logadas internamente; o APR já foi persistido com sucesso.
-    void this.addLog(
-      result.id,
-      userId ?? result.elaborador_id,
-      APR_LOG_ACTIONS.CREATED,
-      this.buildAprTraceMetadata(result),
-    ).catch((err: unknown) => {
-      this.logger.error({
-        event: 'apr_create_log_failed',
-        aprId: result.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
     void this.invalidateAprOverviewCache(result.company_id);
     this.recordAprMetric({
       aprId: result.id,
@@ -1895,6 +1942,7 @@ export class AprsService {
     const persistedRiskItems = await this.loadRiskItemsForSync(id);
 
     const next = { ...rest };
+    this.assertSiteWithinCurrentActorScope(next.site_id ?? apr.site_id);
     if (next.is_modelo_padrao) next.is_modelo = true;
     if (next.is_modelo === false) next.is_modelo_padrao = false;
     const nextRiskItems = this.buildAprRiskItemSnapshots({
@@ -1934,6 +1982,26 @@ export class AprsService {
       null;
 
     await this.aprsRepository.manager.transaction(async (manager) => {
+      const managerWithQuery = manager as EntityManager & {
+        query?: <T>(sql: string, params?: unknown[]) => Promise<T>;
+      };
+      const signedRows = managerWithQuery.query
+        ? await managerWithQuery.query<Array<{ count: string }>>(
+            `SELECT COUNT(*)::text AS count
+               FROM "signatures"
+              WHERE "document_id" = $1
+                AND UPPER("document_type") = 'APR'
+                AND "company_id" = $2
+                AND "deleted_at" IS NULL`,
+            [apr.id, apr.company_id],
+          )
+        : [];
+      if (Number(signedRows[0]?.count ?? 0) > 0) {
+        throw new BadRequestException(
+          'APR com assinatura registrada é imutável. Gere uma nova versão para alterar o conteúdo.',
+        );
+      }
+
       await this.validateRelatedEntityScope({
         manager,
         companyId: apr.company_id,
@@ -1951,6 +2019,7 @@ export class AprsService {
         participants,
       });
 
+      const previousStatus = apr.status;
       Object.assign(apr, {
         ...next,
         initial_risk: initialRisk,
@@ -1994,6 +2063,21 @@ export class AprsService {
 
       const aprRepository = manager.getRepository(Apr);
       const saved = await aprRepository.save(apr);
+      await this.forensicTrailService.append(
+        {
+          eventType: FORENSIC_EVENT_TYPES.APR_UPDATED,
+          module: 'apr',
+          entityId: saved.id,
+          companyId: saved.company_id,
+          userId: userId ?? saved.elaborador_id,
+          metadata: {
+            previousStatus,
+            currentStatus: saved.status,
+            version: saved.versao ?? 1,
+          },
+        },
+        { manager },
+      );
       await this.assertRiskItemSyncAllowed(saved.id, nextRiskItems, manager);
       await this.syncRiskItems(manager, saved.id, nextRiskItems);
 
@@ -2200,9 +2284,19 @@ export class AprsService {
   }
 
   private async findOneWithRiskItems(id: string): Promise<Apr> {
-    const tenantId = this.tenantService.getTenantId();
+    const scope = resolveSiteAccessScopeFromTenantService(
+      this.tenantService,
+      'APR',
+    );
+    const where: FindOptionsWhere<Apr> = {
+      id,
+      company_id: scope.companyId,
+    };
+    if (!scope.hasCompanyWideAccess) {
+      where.site_id = In(scope.siteIds);
+    }
     return this.aprsRepository.findOneOrFail({
-      where: { id, company_id: tenantId },
+      where,
       relations: ['risk_items'],
     });
   }
@@ -2448,7 +2542,10 @@ export class AprsService {
     const maxVersionRow = await this.aprsRepository
       .createQueryBuilder('apr')
       .select('MAX(apr.versao)', 'max')
-      .where('(apr.id = :rootId OR apr.parent_apr_id = :rootId)', { rootId })
+      .where(
+        '(apr.id = :rootId OR apr.parent_apr_id = :rootId) AND apr.company_id = :companyId AND apr.deleted_at IS NULL',
+        { rootId, companyId: original.company_id },
+      )
       .getRawOne<{ max: string }>();
     const nextVersion = Number(maxVersionRow?.max ?? original.versao) + 1;
     const normalizedRiskItems = Array.isArray(original.risk_items)
@@ -2497,26 +2594,52 @@ export class AprsService {
       })),
     });
 
-    const saved = await this.aprsRepository.save(novo);
-    await this.syncRiskItems(
-      this.aprsRepository.manager,
-      saved.id,
-      normalizedRiskItems,
+    const saved = await this.aprsRepository.manager.transaction(
+      async (manager) => {
+        const aprRepository = manager.getRepository(Apr);
+        const created = await aprRepository.save(novo);
+        await this.syncRiskItems(manager, created.id, normalizedRiskItems);
+        await this.ensureDefaultApprovalSteps(manager, created.id);
+        await this.addLog(
+          id,
+          userId,
+          APR_LOG_ACTIONS.NEW_VERSION_GENERATED,
+          {
+            novaAprId: created.id,
+            versao: nextVersion,
+            sourceAprId: id,
+          },
+          { manager, critical: true },
+        );
+        await this.addLog(
+          created.id,
+          userId,
+          APR_LOG_ACTIONS.CREATED_FROM_VERSION,
+          {
+            ...this.buildAprTraceMetadata(created),
+            sourceAprId: id,
+            versao: nextVersion,
+          },
+          { manager, critical: true },
+        );
+        await this.forensicTrailService.append(
+          {
+            eventType: FORENSIC_EVENT_TYPES.APR_NEW_VERSION,
+            module: 'APR',
+            entityId: created.id,
+            userId,
+            companyId: created.company_id,
+            metadata: {
+              sourceAprId: id,
+              versao: nextVersion,
+              status: created.status,
+            },
+          },
+          { manager },
+        );
+        return created;
+      },
     );
-    await this.ensureDefaultApprovalSteps(
-      this.aprsRepository.manager,
-      saved.id,
-    );
-    await this.addLog(id, userId, APR_LOG_ACTIONS.NEW_VERSION_GENERATED, {
-      novaAprId: saved.id,
-      versao: nextVersion,
-      sourceAprId: id,
-    });
-    await this.addLog(saved.id, userId, APR_LOG_ACTIONS.CREATED_FROM_VERSION, {
-      ...this.buildAprTraceMetadata(saved),
-      sourceAprId: id,
-      versao: nextVersion,
-    });
     this.logger.log({
       event: 'apr_new_version',
       originalId: id,
@@ -2557,9 +2680,9 @@ export class AprsService {
     hasFinalPdf: boolean;
     availability: AprPdfAccessAvailability;
     message: string | null;
-    fileKey: string | null;
-    folderPath: string | null;
     originalName: string | null;
+    contentType: 'application/pdf' | null;
+    expiresAt: string | null;
     url: string | null;
   }> {
     const result = await this.aprsPdfService.generateFinalPdf(id, userId);
@@ -2569,7 +2692,7 @@ export class AprsService {
         aprId: id,
         tenantId: tenantId ?? null,
         eventType: AprMetricEventType.APR_PDF_GENERATED,
-        metadata: { userId: userId ?? null, fileKey: result.fileKey },
+        metadata: { userId: userId ?? null, generated: true },
       });
     }
     return result;
@@ -2591,7 +2714,6 @@ export class AprsService {
     ipAddress?: string,
   ): Promise<{
     id: string;
-    fileKey: string;
     originalName: string;
     hashSha256: string;
   }> {
@@ -2631,9 +2753,9 @@ export class AprsService {
     hasFinalPdf: boolean;
     availability: AprPdfAccessAvailability;
     message?: string;
-    fileKey: string | null;
-    folderPath: string | null;
     originalName: string | null;
+    contentType: 'application/pdf' | null;
+    expiresAt: string | null;
     url: string | null;
   }> {
     const apr = await this.findOneForWrite(id);
@@ -2643,9 +2765,9 @@ export class AprsService {
         hasFinalPdf: false,
         availability: 'not_emitted',
         message: 'A APR ainda não possui PDF final emitido.',
-        fileKey: null,
-        folderPath: apr.pdf_folder_path ?? null,
         originalName: apr.pdf_original_name ?? null,
+        contentType: null,
+        expiresAt: null,
         url: null,
       };
     }
@@ -2670,21 +2792,22 @@ export class AprsService {
       hasFinalPdf: true,
       availability,
       message,
-      fileKey: apr.pdf_file_key,
-      folderPath: apr.pdf_folder_path ?? null,
       originalName: apr.pdf_original_name ?? null,
+      contentType: 'application/pdf',
+      expiresAt: url ? new Date(Date.now() + 3600_000).toISOString() : null,
       url,
     };
   }
 
   // ─── Logs & History ──────────────────────────────────────────────────────────
 
-  async getLogs(id: string): Promise<AprLog[]> {
+  async getLogs(id: string): Promise<AprLogResponseDto[]> {
     await this.findOneForWrite(id);
-    return this.aprLogsRepository.find({
+    const logs = await this.aprLogsRepository.find({
       where: { apr_id: id },
       order: { data_hora: 'DESC' },
     });
+    return logs.map(toAprLogResponseDto);
   }
 
   async getVersionHistory(id: string): Promise<Apr[]> {
@@ -2864,10 +2987,20 @@ export class AprsService {
       );
     }
 
+    const scope = this.getTenantContextOrThrow();
+    const scopeSuffix =
+      scope.siteScope === 'all'
+        ? ''
+        : `:sites:${[...scope.siteIds].sort().join(',')}`;
+
     return this.cacheService.getOrSet(
-      this.buildAprOverviewCacheKey(tenantId),
+      `${this.buildAprOverviewCacheKey(tenantId)}${scopeSuffix}`,
       async () => {
-        const baseWhere: FindOptionsWhere<Apr> = { company_id: tenantId };
+        const baseWhere: FindOptionsWhere<Apr> = {
+          company_id: tenantId,
+          deleted_at: IsNull(),
+          ...(scope.siteScope === 'all' ? {} : { site_id: In(scope.siteIds) }),
+        };
         const approvedWhere: FindOptionsWhere<Apr> = {
           ...baseWhere,
           status: AprStatus.APROVADA,
@@ -2894,6 +3027,14 @@ export class AprsService {
           .where('apr.company_id = :tenantId', { tenantId })
           .andWhere('apr.deleted_at IS NULL')
           .andWhere('ri.deleted_at IS NULL')
+          .andWhere(
+            scope.siteScope === 'all'
+              ? '1 = 1'
+              : 'apr.site_id IN (:...analyticsSiteIds)',
+            scope.siteScope === 'all'
+              ? {}
+              : { analyticsSiteIds: scope.siteIds },
+          )
           .getRawOne<{ avg: string; criticos: string }>();
 
         return {
@@ -3062,7 +3203,8 @@ export class AprsService {
       .addSelect('ri.probabilidade', 'prob')
       .addSelect('ri.severidade', 'sev')
       .addSelect('COUNT(*)', 'count')
-      .where('ri.deleted_at IS NULL')
+      .where('apr.deleted_at IS NULL')
+      .andWhere('ri.deleted_at IS NULL')
       .andWhere('ri.probabilidade IS NOT NULL')
       .andWhere('ri.severidade IS NOT NULL')
       .groupBy('ri.categoria_risco')
