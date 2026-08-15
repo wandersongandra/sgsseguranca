@@ -1,8 +1,25 @@
 import { Exclude, Expose, Type, plainToInstance } from 'class-transformer';
-import { CompanyResponseDto } from '../../companies/dto/company-response.dto';
-import { SiteResponseDto } from '../../sites/dto/site-response.dto';
-import { UserResponseDto } from '../../users/dto/user-response.dto';
 import { Apr } from '../entities/apr.entity';
+
+/** Projeções APR deliberadamente mínimas; DTOs genéricos carregam PII e RBAC. */
+@Exclude()
+class AprUserSummaryResponseDto {
+  @Expose() id: string;
+  @Expose() nome: string;
+  @Expose() funcao?: string | null;
+}
+
+@Exclude()
+class AprCompanySummaryResponseDto {
+  @Expose() id: string;
+  @Expose() razao_social: string;
+}
+
+@Exclude()
+class AprSiteSummaryResponseDto {
+  @Expose() id: string;
+  @Expose() nome: string;
+}
 
 @Exclude()
 class AprActivityResponseDto {
@@ -395,9 +412,6 @@ export class AprResponseDto {
   has_final_pdf: boolean;
 
   @Expose()
-  pdf_folder_path?: string | null;
-
-  @Expose()
   pdf_original_name?: string | null;
 
   @Expose()
@@ -434,8 +448,8 @@ export class AprResponseDto {
   reprovado_motivo?: string | null;
 
   @Expose()
-  @Type(() => UserResponseDto)
-  reprovado_por?: UserResponseDto;
+  @Type(() => AprUserSummaryResponseDto)
+  reprovado_por?: AprUserSummaryResponseDto;
 
   @Expose()
   @Type(() => AprClassificationResumoResponseDto)
@@ -448,24 +462,24 @@ export class AprResponseDto {
   updated_at: Date;
 
   @Expose()
-  @Type(() => CompanyResponseDto)
-  company?: CompanyResponseDto;
+  @Type(() => AprCompanySummaryResponseDto)
+  company?: AprCompanySummaryResponseDto;
 
   @Expose()
-  @Type(() => SiteResponseDto)
-  site?: SiteResponseDto;
+  @Type(() => AprSiteSummaryResponseDto)
+  site?: AprSiteSummaryResponseDto;
 
   @Expose()
-  @Type(() => UserResponseDto)
-  elaborador?: UserResponseDto;
+  @Type(() => AprUserSummaryResponseDto)
+  elaborador?: AprUserSummaryResponseDto;
 
   @Expose()
-  @Type(() => UserResponseDto)
-  auditado_por?: UserResponseDto;
+  @Type(() => AprUserSummaryResponseDto)
+  auditado_por?: AprUserSummaryResponseDto;
 
   @Expose()
-  @Type(() => UserResponseDto)
-  participants: UserResponseDto[];
+  @Type(() => AprUserSummaryResponseDto)
+  participants: AprUserSummaryResponseDto[];
 
   @Expose()
   @Type(() => AprActivityResponseDto)

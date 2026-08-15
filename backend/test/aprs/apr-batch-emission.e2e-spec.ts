@@ -19,7 +19,6 @@ type PdfAccessBody = {
 type GeneratedApr = {
   id: string;
   number: string;
-  fileKey: string;
 };
 
 const SAMPLE_SIGNATURE_IMAGE =
@@ -172,12 +171,12 @@ describeE2E('E2E — APR batch final PDF emission', () => {
       const accessBody = accessRes.body as PdfAccessBody;
       expect(accessBody.hasFinalPdf).toBe(true);
       expect(accessBody.availability).toBe('ready');
-      expect(accessBody.fileKey).toMatch(/^documents\/.+\/aprs\/.+\.pdf$/i);
+      expect(accessBody.fileKey).toBeUndefined();
+      expect(typeof accessBody.url).toBe('string');
 
       generatedAprs.push({
         id: apr.id,
         number: aprNumber,
-        fileKey: String(accessBody.fileKey),
       });
 
       console.info(
