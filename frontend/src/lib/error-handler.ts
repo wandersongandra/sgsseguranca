@@ -240,7 +240,7 @@ export function handleApiError(error: unknown, context: string) {
       case 401:
         toast.error('Sessão expirada. Faça login novamente.');
         if (typeof window !== 'undefined') {
-          window.location.assign('/login');
+          window.location.replace('/login');
         }
         break;
       case 403:
