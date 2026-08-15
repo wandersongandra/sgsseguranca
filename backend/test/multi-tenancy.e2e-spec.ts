@@ -128,18 +128,25 @@ describeE2E('Multi-tenancy Isolation (APR CRUD + tenant switch)', () => {
 
     expect(response.status).toBe(200);
 
-    const auditRows = await testApp.dataSource.query<Array<{ ok: number }>>(
-      `
-        SELECT 1 AS ok
-        FROM forensic_trail_events
-        WHERE module = 'security'
-          AND event_type = 'ADMIN_ACTION'
-          AND company_id = $1
-          AND metadata ->> 'action' = $2
-        LIMIT 1
-      `,
-      [tenantB.companyId, `tenant_switch:${tenantB.companyId}`],
-    );
+    let auditRows: Array<{ ok: number }> = [];
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      auditRows = await testApp.dataSource.query<Array<{ ok: number }>>(
+        `
+          SELECT 1 AS ok
+          FROM forensic_trail_events
+          WHERE module = 'security'
+            AND event_type = 'ADMIN_ACTION'
+            AND company_id = $1
+            AND metadata ->> 'action' = $2
+          LIMIT 1
+        `,
+        [tenantB.companyId, `tenant_switch:${tenantB.companyId}`],
+      );
+      if (auditRows.length > 0) {
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
 
     expect(auditRows.length).toBeGreaterThan(0);
   });

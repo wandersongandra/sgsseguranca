@@ -1,0 +1,849 @@
+[
+  {
+    "alias": "loadtest-user-002",
+    "login": "93990916947",
+    "user_id": "bc1f068e-30da-4df1-8519-daf633e429c6",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-003",
+    "login": "09570154373",
+    "user_id": "37717f3c-05d8-4ffd-85ba-9d5ecb0ba2d8",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-004",
+    "login": "11838425110",
+    "user_id": "2b594bea-1313-4db5-8339-d8de591fe5a8",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-005",
+    "login": "33387262442",
+    "user_id": "bfdd484a-91e1-40ed-9620-c1abf385448b",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-006",
+    "login": "98543534607",
+    "user_id": "816ba441-c3f2-4947-871f-7f035e4aa1b4",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-007",
+    "login": "10000000604",
+    "user_id": "b5c8d4a3-16cf-447e-a8a4-3d4e8f33825d",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-008",
+    "login": "10000000795",
+    "user_id": "00c5f918-6438-4b8b-923e-ec4422ae4e31",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-009",
+    "login": "10000000876",
+    "user_id": "b315b3a9-a8cc-418a-ad45-3e77cafe7cfd",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-010",
+    "login": "10000000957",
+    "user_id": "2b87717e-f499-4884-91d9-4e7c062d1ef3",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-011",
+    "login": "10000001090",
+    "user_id": "559e1ed9-b992-4cca-9fb5-92ebca25f801",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-012",
+    "login": "10000001171",
+    "user_id": "9997b577-f986-45d9-a7b8-2a381fc3cb47",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-013",
+    "login": "10000001252",
+    "user_id": "dd546301-35b0-441d-95b3-37072a81b7ea",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-014",
+    "login": "10000001333",
+    "user_id": "5c79ef39-e496-4278-b782-f68cbafd7f6a",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-015",
+    "login": "10000001414",
+    "user_id": "972d8419-879c-43a8-890e-3e131184d878",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-016",
+    "login": "10000001503",
+    "user_id": "c8785f56-b5f3-400f-9b7f-35fa35642aed",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-017",
+    "login": "10000001686",
+    "user_id": "25b6c731-2808-4ab5-b52f-fba955d72afa",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-018",
+    "login": "10000001767",
+    "user_id": "9fb9c973-b3de-4245-b54f-ebab2b6a1aad",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-019",
+    "login": "10000001848",
+    "user_id": "e2808b0a-bee9-428a-8be8-3e0a9ba32adb",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-020",
+    "login": "10000001929",
+    "user_id": "a5453a02-a0b0-4913-bce0-b29e0e434c7c",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-021",
+    "login": "10000002062",
+    "user_id": "fc34e218-24f2-43ae-aaed-75edb1c14529",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-022",
+    "login": "10000002143",
+    "user_id": "71d7bca2-fd53-40ae-83c9-9d7b47469890",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-023",
+    "login": "10000002224",
+    "user_id": "11b9876a-be5f-403a-827e-f054d1b88469",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-024",
+    "login": "10000002305",
+    "user_id": "9a5567bf-bf20-41be-b225-7d74487c5962",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-025",
+    "login": "10000002496",
+    "user_id": "5021df92-e73b-4f33-be19-e39c8c4c76d4",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-026",
+    "login": "10000002577",
+    "user_id": "1412879c-26a8-4016-9ebe-41d2a8f2cbca",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-027",
+    "login": "10000002658",
+    "user_id": "5d54ba74-6c31-449e-9960-5cdff62f5280",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-028",
+    "login": "10000002739",
+    "user_id": "bc114add-787e-4da3-8efc-d3e24fbaf09f",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-029",
+    "login": "10000002810",
+    "user_id": "532f6e76-588a-4446-bd44-15cabfefee48",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-030",
+    "login": "10000002909",
+    "user_id": "3b929840-1e4e-48c2-b929-96a12dbb6551",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-031",
+    "login": "10000003034",
+    "user_id": "c34b4740-a325-4729-9455-e1a4a67a351c",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-032",
+    "login": "10000003115",
+    "user_id": "8f844aa3-50cc-4332-b820-ac25265fd69e",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-033",
+    "login": "10000003204",
+    "user_id": "5e17dd66-24c3-4d00-a340-07d2f3b48f12",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-034",
+    "login": "10000003387",
+    "user_id": "69e70747-cdd9-4350-943d-9e56dbfc71cc",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-035",
+    "login": "10000003468",
+    "user_id": "db7e2bc4-5abc-4bb4-9274-864cbec296c6",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-036",
+    "login": "10000003549",
+    "user_id": "09449e63-2ada-4557-a38f-37f2fc49e6c0",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-037",
+    "login": "10000003620",
+    "user_id": "782bad21-c142-4fd0-979e-2ac55e9c370f",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-038",
+    "login": "10000003700",
+    "user_id": "f14d2b88-6b42-4ba1-afc9-cd16da8232bf",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-039",
+    "login": "10000003891",
+    "user_id": "71f0558c-8826-4003-8eb3-8a7548b343e2",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-040",
+    "login": "10000003972",
+    "user_id": "e505e902-b4c6-4d31-808b-90d7e2741044",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-041",
+    "login": "10000004006",
+    "user_id": "d603de74-a91e-458f-9d6e-fd386885aa8d",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-042",
+    "login": "10000004197",
+    "user_id": "27dd0271-02dd-4127-974d-b6861649f86a",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-043",
+    "login": "10000004278",
+    "user_id": "f70da073-aa53-4f48-b99c-9685d7820dc7",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-044",
+    "login": "10000004359",
+    "user_id": "7b9acfc6-efb5-4104-9973-9899854c229a",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-045",
+    "login": "10000004430",
+    "user_id": "cadc7c04-5df0-45cc-9c62-d5571665e025",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-046",
+    "login": "10000004510",
+    "user_id": "1d2b6f91-84fb-4d55-a582-625f34d95686",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-047",
+    "login": "10000004600",
+    "user_id": "81ac45c3-d0ea-49ad-a6c2-e7ef9a8f4aba",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-048",
+    "login": "10000004782",
+    "user_id": "01981d60-67ac-411f-ae30-7f40b82ec686",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-049",
+    "login": "10000004863",
+    "user_id": "3537c796-fd62-4c6a-b5fa-f576cc3d8541",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-050",
+    "login": "10000004944",
+    "user_id": "74733f75-9d1a-475f-a238-403d67fb12f8",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-051",
+    "login": "10000005088",
+    "user_id": "cd5421c7-c7d4-45e6-9580-aa67fe9ac6bf",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-052",
+    "login": "10000005169",
+    "user_id": "082f536f-b73e-4715-9a05-b3e7a12566c6",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-053",
+    "login": "10000005240",
+    "user_id": "bcdf7c5e-df1a-4d19-a0fd-85af11fc9ad5",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-054",
+    "login": "10000005320",
+    "user_id": "7e651a7c-1b7c-49de-9f33-762392b55d61",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-055",
+    "login": "10000005401",
+    "user_id": "2e4336a8-fff7-4a78-a8ed-d5ed802853cc",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-056",
+    "login": "10000005592",
+    "user_id": "877f1a8d-dac3-46b4-82af-17a0bad18bfb",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-057",
+    "login": "10000005673",
+    "user_id": "c5bf3f71-10e8-482f-a118-b73e7740f9bf",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-058",
+    "login": "10000005754",
+    "user_id": "41f13542-521b-4c58-8284-f652360d938e",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-059",
+    "login": "10000005835",
+    "user_id": "218a03a2-b74f-41ec-b5e0-47856ef0e974",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-060",
+    "login": "10000005916",
+    "user_id": "3d9eb539-fb30-4898-abc8-ef8bf3d598db",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-061",
+    "login": "10000006050",
+    "user_id": "72b12b9c-0122-4e97-aa20-8abe578f0e9c",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-062",
+    "login": "10000006130",
+    "user_id": "370ec8e2-284b-4d61-ac8e-471a84d49768",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-063",
+    "login": "10000006211",
+    "user_id": "dd18d035-07f2-488f-b950-4b2ee1c596b1",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-064",
+    "login": "10000006300",
+    "user_id": "68b1281e-e99a-4626-aefa-293d1ee01053",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-065",
+    "login": "10000006483",
+    "user_id": "8ff989e6-4606-461e-bd86-3c4e55abbf3c",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-066",
+    "login": "10000006564",
+    "user_id": "93ed5e60-ffdb-4571-bcd0-68fd2f644599",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-067",
+    "login": "10000006645",
+    "user_id": "44a6b80c-3ef2-4ea8-92a7-4bda4ffc8920",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-068",
+    "login": "10000006726",
+    "user_id": "eba0ebe6-1123-4f7e-906d-6c32de18a970",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-069",
+    "login": "10000006807",
+    "user_id": "186e8905-e8c2-4a0f-a922-cba0430ebe42",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-070",
+    "login": "10000006998",
+    "user_id": "0a0201a1-c178-42db-9e5d-3d993cb1e20f",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-071",
+    "login": "10000007021",
+    "user_id": "7952193a-6a4f-4a18-ba04-ca247bf3f758",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-072",
+    "login": "10000007102",
+    "user_id": "91ac98a5-2e15-46b7-86d9-2ef03199538c",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-073",
+    "login": "10000007293",
+    "user_id": "957ba722-12dc-4208-9985-aa0cea7d1861",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-074",
+    "login": "10000007374",
+    "user_id": "bb54ea7d-8f8f-4ad5-a809-d572609c09f6",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-075",
+    "login": "10000007455",
+    "user_id": "8e6fb88f-e7b1-4d2b-bd3c-25c1ad36c36a",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-076",
+    "login": "10000007536",
+    "user_id": "58a5bfd2-c386-4d46-b8e2-06b936c8b5be",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-077",
+    "login": "10000007617",
+    "user_id": "7c2cdd0a-2d4b-49bd-8671-310ad19e28c5",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-078",
+    "login": "10000007706",
+    "user_id": "de857ab6-aa5a-4fdd-9897-51b5792fb0bc",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-079",
+    "login": "10000007889",
+    "user_id": "ba39445a-a50d-4203-a496-00017b178aef",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-080",
+    "login": "10000007960",
+    "user_id": "ca4fd7ff-fc66-4efa-8f8e-094c199a3c16",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-081",
+    "login": "10000008001",
+    "user_id": "ae3aaf27-8394-428d-89e7-f5ca43cf570b",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-082",
+    "login": "10000008184",
+    "user_id": "e494d7e4-b186-463e-b92d-490db55670e9",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-083",
+    "login": "10000008265",
+    "user_id": "8e9ea434-2db0-4bc9-b772-dd3a9b45794d",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-084",
+    "login": "10000008346",
+    "user_id": "f34b0860-1cb6-4942-9c6e-10645dfbaf2c",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-085",
+    "login": "10000008427",
+    "user_id": "2272baa0-587c-4bf3-bd12-0b14f3e6d3c7",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-086",
+    "login": "10000008508",
+    "user_id": "59754674-8f3c-4de8-ad2b-8a80897a71fa",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-087",
+    "login": "10000008699",
+    "user_id": "c56ee026-0d55-4756-9bba-29e494b83fbb",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-088",
+    "login": "10000008770",
+    "user_id": "b2248399-8bde-48b3-ae65-8c8403389c9f",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-089",
+    "login": "10000008850",
+    "user_id": "acfa6073-8d94-4804-ba90-a367653f970b",
+    "company_id": "57c178fd-a05d-406e-ae52-a5fcff5ba355",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-090",
+    "login": "10000008931",
+    "user_id": "e7cfe67c-fb00-4e79-b11e-8782e88ed741",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-091",
+    "login": "10000009075",
+    "user_id": "f66b1243-47cf-4151-ae4b-cafdf0ad33c4",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-092",
+    "login": "10000009156",
+    "user_id": "5405a02d-b01c-4597-81f3-d5affaba1269",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-093",
+    "login": "10000009237",
+    "user_id": "730c57ca-adc2-4d06-bd34-9baf9c3d00c9",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-094",
+    "login": "10000009318",
+    "user_id": "c8cab1ae-9188-4bbb-bab3-bbf3c561b005",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-095",
+    "login": "10000009407",
+    "user_id": "a2f170d7-bc8f-484f-ba85-ed55627c4967",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-096",
+    "login": "10000009580",
+    "user_id": "56443b38-6cdb-46d8-83ba-105ea9a2aae2",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-097",
+    "login": "10000009660",
+    "user_id": "d89921b5-5ff6-45c7-88aa-7cb09da744a9",
+    "company_id": "5da9043e-5f06-4dc9-b819-3940deb8dc71",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-098",
+    "login": "10000009741",
+    "user_id": "cea280fa-fe08-48d0-9de8-38b8beb67d2d",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-099",
+    "login": "10000009822",
+    "user_id": "c4b184db-f9af-4c6c-b6c2-256d23eb1cb5",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-100",
+    "login": "10000009903",
+    "user_id": "6e4e3234-ac50-4398-9f0a-ac3944f454aa",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-101",
+    "login": "10000010081",
+    "user_id": "b32a1f6f-b0e6-44f9-af06-70ffb39042a2",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-102",
+    "login": "10000010162",
+    "user_id": "586b8104-0ed5-4c60-87ec-ef7d12523a57",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-103",
+    "login": "10000010243",
+    "user_id": "2332eae0-6648-4ff0-8612-ed6f8e070e9f",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-104",
+    "login": "10000010324",
+    "user_id": "795cfc6a-7f66-4be3-9d59-ab06aff456c7",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-105",
+    "login": "10000010405",
+    "user_id": "a64f68a7-61f4-4bc9-9226-971be6a1b946",
+    "company_id": "46662526-2a0a-43e6-adfc-e687660c2ad2",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-106",
+    "login": "10000010596",
+    "user_id": "87593894-cb58-43cc-9e3e-0158e199bfa9",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-107",
+    "login": "10000010677",
+    "user_id": "1f93b29e-e858-4cc0-a80f-070c0a7189ba",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-108",
+    "login": "10000010758",
+    "user_id": "3654c8e4-786d-4b83-91e0-ff9c3c26fbfb",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-109",
+    "login": "10000010839",
+    "user_id": "3d538fbc-8a51-422b-9ebb-d5809514bd9d",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-110",
+    "login": "10000010910",
+    "user_id": "16e2fb11-e16b-4c76-ad67-7e1e8f7a8cd7",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-111",
+    "login": "10000011053",
+    "user_id": "1d06b2fb-b2a4-486b-b612-c99f2d56ab86",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-112",
+    "login": "10000011134",
+    "user_id": "5b022baa-da3d-4280-a80a-0d9241d7d9fb",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-113",
+    "login": "10000011215",
+    "user_id": "99db5987-4450-474f-9271-143974606472",
+    "company_id": "ae862f57-a0e9-4ccb-873a-65baeccc1ce3",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-114",
+    "login": "10000011304",
+    "user_id": "27f305d5-61dd-4d53-b602-c5c15c6f82dd",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-115",
+    "login": "10000011487",
+    "user_id": "9beca193-6485-4dd0-8edb-97251b6f3391",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-116",
+    "login": "10000011568",
+    "user_id": "6a610acd-dfbc-461d-a2a2-57bf96dca891",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-117",
+    "login": "10000011649",
+    "user_id": "b88f2cd3-50a8-4e0c-9908-be53ab513c35",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-118",
+    "login": "10000011720",
+    "user_id": "94d069d3-0d40-4df3-917f-e7df87922b1a",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Administrador da Empresa"
+  },
+  {
+    "alias": "loadtest-user-119",
+    "login": "10000011800",
+    "user_id": "d2995b7d-f5d6-4c5d-9a45-22698e94d010",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Técnico de Segurança do Trabalho (TST)"
+  },
+  {
+    "alias": "loadtest-user-120",
+    "login": "10000011991",
+    "user_id": "234a5724-3649-4bd2-a2f1-923af6495d3d",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Supervisor / Encarregado"
+  },
+  {
+    "alias": "loadtest-user-121",
+    "login": "10000012025",
+    "user_id": "29630780-8321-48ed-a7cb-410404c8b86c",
+    "company_id": "a1b5d329-0893-4044-8d9a-413b8a202272",
+    "role": "Operador / Colaborador"
+  },
+  {
+    "alias": "loadtest-user-001",
+    "login": "90000000094",
+    "user_id": "00000000-0000-4000-8000-000000000003",
+    "company_id": "00000000-0000-4000-8000-000000000001",
+    "role": "Administrador de teste"
+  }
+]
