@@ -274,3 +274,95 @@ Validado em 2026-07-27, após a migration 365 e o deploy do SHA
 As evidências detalhadas, os IDs anonimizados dos backups e a ressalva da
 constraint legado `NOT VALID` estão na seção 4.7 de
 `backend/docs/RUNBOOK_PRODUCTION.md`.
+
+---
+
+## Contrato de conexões após a migration 361 (atualizado 2026-08-11)
+
+### A regra
+
+```text
+sgs_app    = runtime. SEM bypass de RLS. Sempre com tenant no contexto.
+sgs_admin  = operações cross-tenant privilegiadas (DATABASE_ADMIN_URL).
+
+NUNCA usar a conexão de runtime como fallback para uma operação
+que dependa de enxergar linhas que a RLS pode ocultar.
+```
+
+### Por que o fallback deixou de ser equivalente
+
+`is_super_admin()` começa checando `pg_has_role(current_user,'sgs_rls_bypass','MEMBER')`.
+Depois da 361, `sgs_app` não é mais membro — então `SET LOCAL app.is_super_admin = 'true'`
+virou **no-op** nessa conexão.
+
+O ponto que passou despercebido por semanas: isso não gera erro. Sem tenant no
+contexto, `SELECT` devolve **0 linhas** e `UPDATE`/`DELETE` afetam **0 linhas**,
+silenciosamente. Três formas de falhar:
+
+| Forma | Sintoma |
+|---|---|
+| SELECT com 0 linhas | o código conclui "não existe" e segue por um ramo alternativo |
+| UPDATE com 0 linhas | o TypeORM não reclama; a operação reporta sucesso sem ter feito nada |
+| **Guarda fail-open** | `if (count > 0) throw` nunca dispara — o pior dos três |
+
+### Como escrever código novo
+
+Pergunta obrigatória em qualquer query que decida uma condição:
+
+> **Se esta query devolver zero linhas por causa da RLS, o código libera ou bloqueia?**
+
+Se libera, use a variante que **falha fechado**:
+
+```ts
+// SQL literal
+await privilegedDb.withRequiredPrivilegedClient('minha_operacao', async (client) => { ... });
+
+// entidades TypeORM
+await provisioningDataSource.requiredTransaction('minha_operacao', async (manager) => { ... });
+```
+
+Ambas respondem **503** e emitem `{ event: 'privileged_connection_required', severity: 'HIGH' }`
+quando `DATABASE_ADMIN_URL` está ausente. **Não** as envolva em `try/catch` que
+converta a exceção em caminho alternativo.
+
+`isEnabled()` / `isDedicated()` servem para health check e telemetria — **não**
+para escolher caminho de execução.
+
+### DATABASE_ADMIN_URL — decisão de arquitetura
+
+Continua **opcional no boot**, inclusive em produção. Torná-la obrigatória
+converteria um erro de configuração em queda total da API (login incluso). O
+contrato adotado é mais cirúrgico:
+
+1. `PrivilegedDbService.onModuleInit` loga `ERROR` em produção se faltar;
+2. cada operação cross-tenant falha fechado (503) em vez de degradar;
+3. `GET /health/detailed` → `checks.admin_operations` reporta o estado.
+
+Deliberadamente **fora** de `/health/ready`: sem a conexão privilegiada, login,
+leitura e escrita dentro de um tenant continuam corretos. Tirar a API do
+balanceador seria pior que bloquear só as operações administrativas.
+
+### Tabelas cuja ESCRITA é impossível para `sgs_app`
+
+Policies que exigem `is_super_admin()` **sem cláusula de tenant** — para estas,
+qualquer escrita pelo runtime é descartada em silêncio, com ou sem `x-company-id`:
+
+- `profiles` (INSERT/UPDATE/DELETE)
+- `gdpr_retention_cleanup_runs` (ALL)
+- `disaster_recovery_executions` (ALL)
+
+Exceções que ainda funcionam pelo runtime, porque leem
+`current_setting('app.is_super_admin')` direto: `companies` (migrations 364/372),
+`photographic_reports` e filhas (368), `epis` (315), `user_sites` (336).
+
+### Funções SQL e o papel que pode executá-las
+
+| Função | SECURITY DEFINER | Quem executa |
+|---|---|---|
+| `find_login_user`, `find_user_bridge`, `update_login_user_password_hash`, `reset_login_user_password` | sim | `sgs_app` |
+| `gdpr_delete_user_data`, `cleanup_expired_data` | **não** | **só `sgs_admin`** (migration 374) |
+
+As duas de GDPR não são SECURITY DEFINER de propósito: rodam com o privilégio de
+quem chama, e só `sgs_admin` reúne EXECUTE + membership em `sgs_rls_bypass`.
+Conceder EXECUTE a `sgs_app` daria a qualquer sessão da aplicação a capacidade de
+disparar anonimização em massa.

@@ -59,9 +59,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   alteração só de catálogo (sem reescrita da tabela) porque o default é
  *   constante. Em PG 10 seria reescrita completa sob ACCESS EXCLUSIVE.
  */
-export class AddPhotographicReportSstAndIntegrity1709000000370
-  implements MigrationInterface
-{
+export class AddPhotographicReportSstAndIntegrity1709000000370 implements MigrationInterface {
   name = 'AddPhotographicReportSstAndIntegrity1709000000370';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

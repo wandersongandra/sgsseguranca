@@ -1,8 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddPhotoConditionsToReportImages1709000000369
-  implements MigrationInterface
-{
+export class AddPhotoConditionsToReportImages1709000000369 implements MigrationInterface {
   name = 'AddPhotoConditionsToReportImages1709000000369';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
