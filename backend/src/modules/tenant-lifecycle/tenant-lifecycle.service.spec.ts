@@ -239,6 +239,8 @@ describe('TenantLifecycleService', () => {
         undefined,
         expect.objectContaining({
           filename: 'tenant-onboarding-invite',
+          // expect.stringContaining() é tipado como `any` no @types/jest atual.
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           html: expect.stringContaining('21 dias de teste'),
         }),
       );
@@ -326,6 +328,8 @@ describe('TenantLifecycleService', () => {
             funcao: 'Administrador da Empresa',
           }),
           expect.objectContaining({
+            // expect.any() é tipado como `any` no @types/jest atual.
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             user_id: expect.any(String),
             company_id: 'company-1',
             site_id: 'site-1',

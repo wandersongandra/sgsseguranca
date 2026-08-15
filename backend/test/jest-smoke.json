@@ -6,7 +6,8 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^uuid$": "<rootDir>/../test/uuid-cjs.js"
+    "^uuid$": "<rootDir>/../test/uuid-cjs.js",
+    "^puppeteer$": "<rootDir>/../test/puppeteer-cjs-shim.js"
   },
   "testEnvironment": "node"
 }

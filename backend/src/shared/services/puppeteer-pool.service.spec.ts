@@ -8,6 +8,17 @@ jest.mock('fs/promises', () => ({
   rm: jest.fn(),
 }));
 
+// O Puppeteer 25 é ESM puro — sem o transformIgnorePatterns em jest.config.js
+// liberando esse pacote (e puppeteer-core/@puppeteer/browsers/chromium-bidi)
+// para o ts-jest reescrever como CommonJS, este `jest.mock` nem chegaria a
+// carregar o módulo real: a suíte inteira quebraria com
+// "SyntaxError: Unexpected token 'export'" assim que qualquer arquivo
+// alcançasse (mesmo transitivamente) o pool de browsers do PDF.
+jest.mock('puppeteer', () => ({
+  launch: jest.fn(),
+  executablePath: jest.fn(),
+}));
+
 describe('PuppeteerPoolService', () => {
   const originalEnv = process.env;
 
@@ -86,9 +97,10 @@ describe('PuppeteerPoolService', () => {
       process: jest.fn(() => ({ pid: 5678 })),
     } as never;
 
+    // `executablePath()` passou a devolver Promise<string> no Puppeteer 25.
     jest
       .spyOn(puppeteer, 'executablePath')
-      .mockReturnValue(
+      .mockResolvedValue(
         '/workspace/backend/.cache/puppeteer/chrome/linux/chrome',
       );
     const launchSpy = jest

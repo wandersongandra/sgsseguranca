@@ -28,7 +28,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -134,6 +134,20 @@ jobs:
       JWT_SECRET: test-jwt-secret-for-e2e-testing-only-0123456789
       JWT_REFRESH_SECRET: test-refresh-secret-for-e2e-testing-only-0123456789
       BCRYPT_SALT_ROUNDS: 4
+      # Fallback padrao de concorrencia do pool de PDF fora de producao e' 3
+      # (getPdfGenerationConcurrency, pdf-runtime-config.ts) -- ate 3
+      # processos Chromium reais simultaneos. O runner ubuntu-latest nao tem
+      # RAM fisica de sobra para isso rodando ao lado de Postgres+Redis: as
+      # suites que geram PDF estouravam heap mesmo isoladas em processo
+      # proprio com --max-old-space-size=6144, porque o teto real e' RAM do
+      # SO, nao o limite configurado do V8. Forcar concorrencia 1 aqui nao
+      # muda o comportamento de producao (que ja usa NODE_ENV=production,
+      # fallback 2, em infra dedicada).
+      PDF_BROWSER_POOL_SIZE: '1'
+      PDF_GENERATION_CONCURRENCY: '1'
+      # TEMPORARIO: mede RAM real do runner antes de cada suite e2e, para
+      # confirmar a hipotese de teto fisico. Remover apos diagnosticar.
+      DIAG_MEMORY: 'true'
       THROTTLE_LIMIT: 10000
       THROTTLE_TTL: 60000
       LOGIN_THROTTLE_LIMIT: 100
@@ -148,7 +162,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -202,8 +216,43 @@ jobs:
             GRANT USAGE, SELECT ON SEQUENCES TO sgs_admin;
           SQL
 
-      - name: Run critical e2e flows
-        run: npm run test:e2e -- --forceExit
+      # Um processo Node por arquivo .e2e-spec.ts, nao um --runInBand unico
+      # para as 16 suites (nem particionado em 2 grupos, que ainda estourava
+      # com 14 arquivos). --runInBand roda tudo no MESMO processo -- memoria
+      # nunca e' genuinamente devolvida ao SO entre arquivos, mesmo com cada
+      # teste fechando seu app corretamente (afterAll -> testApp.close()),
+      # porque classes carregadas via require.cache e o overhead de 14+
+      # boots sequenciais de app NestJS completo (TypeORM + Redis + BullMQ +
+      # pool de Puppeteer) se acumulam no unico processo. Aumentar
+      # --max-old-space-size nao ajudou: o runner morria em ~4GB reais,
+      # bem abaixo de qualquer limite configurado (4096 ou 6144) -- teto
+      # fisico do runner, nao do V8. Cada iteracao abaixo e' um processo
+      # Node novo, que comeca com heap 100% livre.
+      - name: Diagnostico de memoria do runner (TEMPORARIO)
+        run: |
+          free -h
+          nproc
+          docker stats --no-stream || true
+
+      - name: Run critical e2e flows (um processo por arquivo)
+        run: |
+          set +e
+          failures=()
+          while IFS= read -r spec; do
+            echo "::group::$spec"
+            free -h
+            npm run test:e2e -- --forceExit --testPathPatterns="$spec"
+            status=$?
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              failures+=("$spec")
+            fi
+          done < <(npx jest --config ./test/jest-e2e.config.ts --listTests | sed 's#.*/test/##')
+          if [ "${#failures[@]}" -gt 0 ]; then
+            echo "::error::${#failures[@]} suite(s) falharam: ${failures[*]}"
+            exit 1
+          fi
+        working-directory: backend
 
   backend-dr-e2e:
     name: Backend E2E DR Restore (Dedicated Postgres)
@@ -272,7 +321,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -471,7 +520,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -489,3 +538,49 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+
+  container-pdf-smoke:
+    name: Container Chromium/PDF Smoke (Bookworm)
+    runs-on: ubuntu-latest
+    # Sem `needs:` — este job constrói a própria imagem e não consome artefato
+    # de nenhum outro. É a única prova de que o Chromium do sistema operacional
+    # funciona na imagem que vai para produção.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Build backend runtime image
+        run: docker build -f backend/Dockerfile -t sgs-backend:smoke backend
+
+      # Roda como o MESMO usuário não-root que o Dockerfile define (USER node).
+      # Validar Chromium só como root esconderia falha de permissão que aparece
+      # em produção.
+      - name: Chromium and PDF smoke inside the image (as node user)
+        run: |
+          docker run --rm --user node \
+            -e PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+            -e PUPPETEER_SKIP_DOWNLOAD=true \
+            -e TZ=America/Sao_Paulo \
+            sgs-backend:smoke \
+            node scripts/container-pdf-smoke.js
+
+      # Prova de que a estratégia "browser do sistema" continua suficiente:
+      # sem rede, o Puppeteer não pode baixar browser nenhum. Se o smoke ainda
+      # passar, é porque de fato usa /usr/bin/chromium.
+      - name: Prove no browser download is needed (network disabled)
+        run: |
+          docker run --rm --network none --user node \
+            -e PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+            -e PUPPETEER_SKIP_DOWNLOAD=true \
+            sgs-backend:smoke \
+            node scripts/container-pdf-smoke.js
+
+      - name: Report platform versions
+        if: ${{ !cancelled() }}
+        run: |
+          docker run --rm --user node sgs-backend:smoke sh -c '
+            echo "node:     $(node --version)"
+            echo "chromium: $(/usr/bin/chromium --version 2>/dev/null || echo indisponivel)"
+            echo "distro:   $(. /etc/os-release && echo "$PRETTY_NAME")"
+            echo "fontes:   $(fc-list 2>/dev/null | wc -l) instaladas"
+          '

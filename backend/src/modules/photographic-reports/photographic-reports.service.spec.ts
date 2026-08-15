@@ -396,7 +396,10 @@ describe('PhotographicReportsService', () => {
       const withPrivate = service as unknown as {
         normalizeApplicableNrs: NrNormalizer;
       };
-      return withPrivate.normalizeApplicableNrs.bind(service);
+      // `.bind` no protótipo de Function perde a assinatura de NrNormalizer e
+      // devolve `any` — o cast apenas restaura o tipo já declarado acima, sem
+      // mudar o valor em runtime.
+      return withPrivate.normalizeApplicableNrs.bind(service) as NrNormalizer;
     }
 
     it('descarta NR desconhecida em vez de rejeitar o relatório inteiro', () => {

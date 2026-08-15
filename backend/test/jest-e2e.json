@@ -8,7 +8,8 @@
     "^.+\\.(t|j)s$": "ts-jest"
   },
   "moduleNameMapper": {
-    "^uuid$": "<rootDir>/uuid-cjs.js"
+    "^uuid$": "<rootDir>/uuid-cjs.js",
+    "^puppeteer$": "<rootDir>/puppeteer-cjs-shim.js"
   },
   "globalSetup": "<rootDir>/setup/e2e-infra-check.ts",
   "openHandlesTimeout": 10000,

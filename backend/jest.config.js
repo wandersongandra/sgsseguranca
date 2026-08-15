@@ -9,8 +9,13 @@ module.exports = {
   // uuid >=14 is pure ESM and cannot be loaded by Jest's CJS transform.
   // This CJS shim mirrors the full uuid API using Node's built-in crypto.
   // Production runtime uses uuid@14 directly (override in package.json).
+  //
+  // puppeteer 25+ e' ESM puro tambem. Mesmo mecanismo: intercepta o
+  // require('puppeteer') antes que o Jest tente resolver o pacote real
+  // (ver test/puppeteer-cjs-shim.js para o porque).
   moduleNameMapper: {
     '^uuid$': '<rootDir>/test/uuid-cjs.js',
+    '^puppeteer$': '<rootDir>/test/puppeteer-cjs-shim.js',
   },
   collectCoverageFrom: ['src/**/*.(t|j)s'],
   coverageDirectory: 'coverage',
