@@ -485,7 +485,6 @@ describe('AprsController (http)', () => {
     const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
     aprsService.uploadRiskEvidence.mockResolvedValue({
       id: 'evidence-1',
-      fileKey: 'documents/company-1/apr-evidences/apr-1/evidence.jpg',
       originalName: 'evidence.jpg',
       hashSha256: 'hash-1',
     });
