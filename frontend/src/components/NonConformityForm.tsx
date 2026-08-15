@@ -248,6 +248,20 @@ function nullsToUndefined<T extends Record<string, unknown>>(obj: T): T {
   return result;
 }
 
+async function loadNonConformityFormData(companyId: string, id?: string) {
+  const sitesPromise = companyId
+    ? sitesService.findPaginated({ page: 1, limit: 100, companyId })
+    : Promise.resolve({ data: [], total: 0, page: 1, lastPage: 1 });
+  const nonConformityPromise = id
+    ? nonConformitiesService.findOne(id)
+    : Promise.resolve<NonConformity | null>(null);
+  const [sitesPage, nonConformity] = await Promise.all([
+    sitesPromise,
+    nonConformityPromise,
+  ]);
+  return { sitesPage, nonConformity };
+}
+
 // Refactor backlog: dividir em blocos menores (dados, evidências, fluxo) após fechamento do hardening emergencial.
 export function NonConformityForm({ id }: NonConformityFormProps) {
   const router = useRouter();
@@ -766,21 +780,10 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       const tenantAtRequest = activeCompanyId;
       setFetching(true);
       try {
-        const sitesPromise = activeCompanyId
-          ? sitesService.findPaginated({
-              page: 1,
-              limit: 100,
-              companyId: activeCompanyId,
-            })
-          : Promise.resolve({ data: [], total: 0, page: 1, lastPage: 1 });
-        const nonConformityPromise = id
-          ? nonConformitiesService.findOne(id)
-          : Promise.resolve<NonConformity | null>(null);
-
-        const [sitesPage, nonConformity] = await Promise.all([
-          sitesPromise,
-          nonConformityPromise,
-        ]);
+        const { sitesPage, nonConformity } = await loadNonConformityFormData(
+          activeCompanyId,
+          id,
+        );
 
         if (
           tenantGeneration !== tenantGenerationRef.current ||

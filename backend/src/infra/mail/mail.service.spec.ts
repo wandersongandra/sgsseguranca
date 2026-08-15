@@ -29,6 +29,7 @@ import { DistributedLockService } from '../../shared/redis/distributed-lock.serv
 import { Cat } from '../../modules/cats/entities/cat.entity';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
 import { PrivilegedDbService } from '../../shared/database/privileged-db.service';
+import { PhotographicReportsService } from '../../modules/photographic-reports/photographic-reports.service';
 
 // Mock do Resend
 const mockResendSend = jest.fn<Promise<unknown>, [unknown]>();
@@ -175,6 +176,7 @@ describe('MailService', () => {
         { provide: DidsService, useValue: mockDomainService },
         { provide: AuditsService, useValue: mockDomainService },
         { provide: RdosService, useValue: mockDomainService },
+        { provide: PhotographicReportsService, useValue: mockDomainService },
         { provide: CompaniesService, useValue: mockDomainService },
         { provide: TenantService, useValue: mockTenantService },
         { provide: ReportsService, useValue: mockDomainService },
@@ -262,6 +264,7 @@ describe('MailService', () => {
         { provide: DidsService, useValue: mockDomainService },
         { provide: AuditsService, useValue: mockDomainService },
         { provide: RdosService, useValue: mockDomainService },
+        { provide: PhotographicReportsService, useValue: mockDomainService },
         { provide: CompaniesService, useValue: mockDomainService },
         { provide: TenantService, useValue: mockTenantService },
         { provide: ReportsService, useValue: mockDomainService },
@@ -559,6 +562,7 @@ describe('MailService', () => {
           { provide: DidsService, useValue: mockDomainService },
           { provide: AuditsService, useValue: mockDomainService },
           { provide: RdosService, useValue: mockDomainService },
+          { provide: PhotographicReportsService, useValue: mockDomainService },
           { provide: CompaniesService, useValue: mockDomainService },
           { provide: TenantService, useValue: mockTenantService },
           { provide: ReportsService, useValue: mockDomainService },
@@ -964,6 +968,7 @@ describe('MailService', () => {
           { provide: DidsService, useValue: mockDomainService },
           { provide: AuditsService, useValue: mockDomainService },
           { provide: RdosService, useValue: mockDomainService },
+          { provide: PhotographicReportsService, useValue: mockDomainService },
           { provide: CompaniesService, useValue: mockDomainService },
           { provide: TenantService, useValue: mockTenantService },
           { provide: ReportsService, useValue: mockDomainService },
@@ -1048,6 +1053,7 @@ describe('MailService', () => {
           { provide: DidsService, useValue: mockDomainService },
           { provide: AuditsService, useValue: mockDomainService },
           { provide: RdosService, useValue: mockDomainService },
+          { provide: PhotographicReportsService, useValue: mockDomainService },
           { provide: CompaniesService, useValue: mockDomainService },
           { provide: TenantService, useValue: mockTenantService },
           { provide: ReportsService, useValue: mockDomainService },

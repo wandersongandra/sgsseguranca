@@ -327,9 +327,9 @@ export async function drawDossierBlueprint(
       context.kind === "employee"
         ? "Dossiê do colaborador"
         : "Dossiê da obra/setor",
-    criticality: "controlled",
+    criticality: "Controlado",
     validity: formatDateTime(context.generatedAt),
-    documentClass: "executive",
+    documentClass: "Executivo",
   });
 
   drawExecutiveSummaryStrip(ctx, buildExecutiveSummary(context));

@@ -353,9 +353,12 @@ async function bootstrap() {
           field: error.property,
           errors: Object.values(error.constraints || {}),
         }));
-
+        const summary = formattedErrors
+          .slice(0, 3)
+          .map((e) => `${e.field}: ${e.errors[0]}`)
+          .join('; ');
         return new BadRequestException({
-          message: 'Dados inválidos',
+          message: `Dados inválidos — ${summary}`,
           errors: formattedErrors,
         });
       },

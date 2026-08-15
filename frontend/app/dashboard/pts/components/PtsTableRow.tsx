@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Clock,
   Download,
+  FileText,
   Mail,
   Pencil,
   Printer,
@@ -55,6 +56,8 @@ interface PtsTableRowProps {
     key: keyof PtApprovalChecklistState,
     checked: boolean,
   ) => void;
+  onEmitGovernedPdf?: (id: string) => void;
+  emittingPdfId?: string | null;
 }
 
 const approvalRuleLabels: Array<{
@@ -134,6 +137,8 @@ export const PtsTableRow = React.memo(
     onDismissApprovalIssue,
     onDismissApprovalReview,
     onUpdateApprovalChecklist,
+    onEmitGovernedPdf,
+    emittingPdfId,
   }: PtsTableRowProps) => {
     const { hasPermission } = useAuth();
     const isApproved = pt.status === 'Aprovada';
@@ -218,6 +223,18 @@ export const PtsTableRow = React.memo(
               >
                 <Download className="h-4 w-4" />
               </Button>
+              {isApproved && !pt.pdf_file_key && onEmitGovernedPdf ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  loading={emittingPdfId === pt.id}
+                  onClick={() => onEmitGovernedPdf(pt.id)}
+                  title="Emitir PDF final governado"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+              ) : null}
               {isAwaitingApproval && canApprovePt ? (
                 <>
                   <Button

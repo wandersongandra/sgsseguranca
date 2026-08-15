@@ -1,10 +1,14 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
 import { Repository, IsNull } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { createHash } from 'node:crypto';
@@ -80,6 +84,9 @@ import {
 } from './entities/photographic-report.entity';
 import { Company } from '../companies/entities/company.entity';
 import { escapeLikePattern } from '../../shared/utils/sql.util';
+import { MailService } from '../../infra/mail/mail.service';
+import { DocumentMailDispatchResponseDto } from '../../infra/mail/dto/document-mail-dispatch-response.dto';
+import { defaultJobOptions } from '../../infra/queue/default-job-options';
 
 type PhotographicReportWithCounts = PhotographicReport & {
   dayCount?: number;
@@ -126,6 +133,10 @@ export class PhotographicReportsService {
     private readonly companyRepository: Repository<Company>,
     private readonly publicValidationGrantService: PublicValidationGrantService,
     private readonly signaturesService: SignaturesService,
+    @Inject(forwardRef(() => MailService))
+    private readonly mailService: MailService,
+    @InjectQueue('mail')
+    private readonly mailQueue: Queue,
   ) {}
 
   createUploadOptions(maxFileSize = DEFAULT_IMAGE_MAX_FILE_SIZE) {
@@ -434,15 +445,22 @@ export class PhotographicReportsService {
       ai_technical_assessment: image.ai_technical_assessment,
       ai_condition_classification: image.ai_condition_classification,
       ai_recommendations: image.ai_recommendations,
-      photo_conditions: image.photo_conditions,
+      ...this.mapImageGovernanceFields(image),
 
+      created_at: image.created_at.toISOString(),
+      updated_at: image.updated_at.toISOString(),
+      day: image.report_day_id ? dayMap.get(image.report_day_id) || null : null,
+    };
+  }
+
+  private mapImageGovernanceFields(image: PhotographicReportImage) {
+    return {
+      photo_conditions: image.photo_conditions,
       is_nonconformity: image.is_nonconformity ?? false,
       recommended_action: image.recommended_action ?? null,
       action_deadline: image.action_deadline ?? null,
       action_responsible: image.action_responsible ?? null,
-
-      // `device_id` e `ip_address` NÃO são expostos — ver comentário em
-      // PhotographicReportImageResponse. Só o manifesto do PDF os consome.
+      // `device_id` e `ip_address` não são expostos na resposta.
       original_name: image.original_name ?? null,
       mime_type: image.mime_type ?? null,
       file_size_bytes: image.file_size_bytes ?? null,
@@ -455,10 +473,6 @@ export class PhotographicReportsService {
         ? image.exif_datetime.toISOString()
         : null,
       integrity_flags: image.integrity_flags ?? null,
-
-      created_at: image.created_at.toISOString(),
-      updated_at: image.updated_at.toISOString(),
-      day: image.report_day_id ? dayMap.get(image.report_day_id) || null : null,
     };
   }
 
@@ -1436,15 +1450,11 @@ export class PhotographicReportsService {
     }
   }
 
-  async updateImage(
-    reportId: string,
-    imageId: string,
+  private async applyImagePlacementUpdate(
+    report: PhotographicReport,
+    image: PhotographicReportImage,
     dto: UpdatePhotographicReportImageDto,
-  ): Promise<PhotographicReportImageResponse> {
-    const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
-    const image = await this.ensureImageBelongsToReport(report, imageId);
-
+  ): Promise<void> {
     if (dto.report_day_id !== undefined) {
       image.report_day_id = dto.report_day_id
         ? (await this.ensureDayBelongsToReport(report, dto.report_day_id)).id
@@ -1453,15 +1463,17 @@ export class PhotographicReportsService {
     if (dto.manual_caption !== undefined) {
       image.manual_caption = this.normalizeText(dto.manual_caption);
     }
-    if (dto.image_order !== undefined) {
-      image.image_order = dto.image_order;
-    }
-    if (dto.ai_title !== undefined) {
+    if (dto.image_order !== undefined) image.image_order = dto.image_order;
+  }
+
+  private applyImageAnalysisUpdate(
+    image: PhotographicReportImage,
+    dto: UpdatePhotographicReportImageDto,
+  ): void {
+    if (dto.ai_title !== undefined)
       image.ai_title = this.normalizeText(dto.ai_title);
-    }
-    if (dto.ai_description !== undefined) {
+    if (dto.ai_description !== undefined)
       image.ai_description = this.normalizeText(dto.ai_description);
-    }
     if (dto.ai_positive_points !== undefined) {
       image.ai_positive_points = this.normalizeStringArray(
         dto.ai_positive_points,
@@ -1484,35 +1496,43 @@ export class PhotographicReportsService {
         5,
       );
     }
-
-    // BUG CORRIGIDO: `photo_conditions` era declarado no DTO, devolvido por
-    // mapImageEntity e enviado pelo PhotoCard, mas NÃO tinha branch de escrita
-    // aqui — todo checkbox marcado pelo usuário era descartado em silêncio
-    // desde que a feature foi entregue.
     if (dto.photo_conditions !== undefined) {
       image.photo_conditions = this.normalizeStringArray(
         dto.photo_conditions,
         MAX_PHOTO_CONDITIONS,
       );
     }
+  }
 
-    // Não conformidade. Os campos são independentes de propósito: desmarcar a
-    // NC não deve exigir reenviar a ação, e limpar a ação não deve exigir
-    // desmarcar a NC.
-    if (dto.is_nonconformity !== undefined) {
+  private applyImageGovernanceUpdate(
+    image: PhotographicReportImage,
+    dto: UpdatePhotographicReportImageDto,
+  ): void {
+    if (dto.is_nonconformity !== undefined)
       image.is_nonconformity = Boolean(dto.is_nonconformity);
-    }
-    if (dto.recommended_action !== undefined) {
+    if (dto.recommended_action !== undefined)
       image.recommended_action = this.normalizeText(dto.recommended_action);
-    }
     if (dto.action_deadline !== undefined) {
       image.action_deadline = dto.action_deadline
         ? this.normalizeDate(dto.action_deadline)
         : null;
     }
-    if (dto.action_responsible !== undefined) {
+    if (dto.action_responsible !== undefined)
       image.action_responsible = this.normalizeText(dto.action_responsible);
-    }
+  }
+
+  async updateImage(
+    reportId: string,
+    imageId: string,
+    dto: UpdatePhotographicReportImageDto,
+  ): Promise<PhotographicReportImageResponse> {
+    const companyId = this.getCompanyIdOrThrow();
+    const report = await this.findReportEntity(reportId, companyId);
+    const image = await this.ensureImageBelongsToReport(report, imageId);
+
+    await this.applyImagePlacementUpdate(report, image, dto);
+    this.applyImageAnalysisUpdate(image, dto);
+    this.applyImageGovernanceUpdate(image, dto);
 
     this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
     await this.imageRepository.save(image);
@@ -2314,6 +2334,95 @@ export class PhotographicReportsService {
         registryEntry.file_key.split('/').pop() ||
         null,
       url,
+    };
+  }
+
+  async sendEmail(
+    id: string,
+    to: string[],
+  ): Promise<DocumentMailDispatchResponseDto & { recipients: number }> {
+    const report = await this.findOne(id);
+    if (!to.length) {
+      return {
+        success: true,
+        message: 'Nenhum destinatário informado para envio do relatório.',
+        deliveryMode: 'sent',
+        artifactType: 'governed_final_pdf',
+        isOfficial: false,
+        fallbackUsed: false,
+        documentId: report.id,
+        documentType: 'PHOTOGRAPHIC_REPORT',
+        recipients: 0,
+      };
+    }
+
+    const pdfExports = (report.exports ?? []).filter(
+      (entry) => entry.export_type === PhotographicReportExportType.PDF,
+    );
+    if (!pdfExports.length) {
+      throw new BadRequestException(
+        'Exporte o relatório em PDF antes de enviar por e-mail.',
+      );
+    }
+
+    const context = this.tenantService.getContext();
+    const companyId = context?.companyId ?? report.company_id;
+    const workerTenantContext = {
+      companyId,
+      isSuperAdmin: context?.isSuperAdmin ?? false,
+      siteScope: context?.siteScope,
+      ...(context?.siteScope === 'single' ? { siteIds: context.siteIds } : {}),
+    };
+
+    let queuedCount = 0;
+    let syncFallbackUsed = false;
+
+    for (const email of to) {
+      try {
+        await this.mailQueue.add(
+          'send-document',
+          {
+            documentId: report.id,
+            documentType: 'PHOTOGRAPHIC_REPORT',
+            email,
+            companyId,
+            tenantContext: workerTenantContext,
+          },
+          defaultJobOptions,
+        );
+        queuedCount++;
+      } catch (error) {
+        this.logger.warn(
+          `Fila de e-mail indisponível para relatório fotográfico ${report.id}, aplicando fallback síncrono: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        await this.mailService.sendStoredDocument(
+          report.id,
+          'PHOTOGRAPHIC_REPORT',
+          email,
+          companyId,
+        );
+        syncFallbackUsed = true;
+      }
+    }
+
+    const deliveryMode: 'queued' | 'sent' =
+      queuedCount === to.length ? 'queued' : 'sent';
+
+    return {
+      success: true,
+      message:
+        deliveryMode === 'queued'
+          ? `Relatório fotográfico enfileirado para envio a ${to.length} destinatário(s).`
+          : `Relatório fotográfico enviado a ${to.length} destinatário(s) via fallback síncrono.`,
+      deliveryMode,
+      artifactType: 'governed_final_pdf',
+      isOfficial: false,
+      fallbackUsed: syncFallbackUsed,
+      documentId: report.id,
+      documentType: 'PHOTOGRAPHIC_REPORT',
+      recipients: to.length,
     };
   }
 }

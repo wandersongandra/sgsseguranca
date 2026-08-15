@@ -26,6 +26,18 @@ const ARR_RISCO_LABEL: Record<string, string> = {
   baixo: "Baixo",
 };
 
+const ARR_PROBABILITY_LABEL: Record<string, string> = {
+  baixa: "Baixa",
+  media: "Média",
+  alta: "Alta",
+};
+
+const ARR_SEVERITY_LABEL: Record<string, string> = {
+  leve: "Leve",
+  moderada: "Moderada",
+  grave: "Grave",
+  critica: "Crítica",
+};
 function buildStatusTone(status: string) {
   if (status === "tratada") return "success" as const;
   if (status === "analisada") return "info" as const;
@@ -36,6 +48,40 @@ function buildStatusTone(status: string) {
 function buildCriticality(arr: Arr) {
   if (arr.status === "arquivada") return "Arquivado";
   return ARR_RISCO_LABEL[arr.nivel_risco] ?? "Baixo";
+}
+
+function buildArrSummaryMetrics(arr: Arr, participantCount: number) {
+  return [
+    { label: "Atividade principal", value: sanitize(arr.atividade_principal), tone: "info" as const },
+    {
+      label: "Nível de risco",
+      value: ARR_RISCO_LABEL[arr.nivel_risco] ?? sanitize(arr.nivel_risco),
+      tone: arr.nivel_risco === "critico" || arr.nivel_risco === "alto" ? "warning" as const : "default" as const,
+    },
+    { label: "Probabilidade", value: ARR_PROBABILITY_LABEL[arr.probabilidade] ?? sanitize(arr.probabilidade), tone: "default" as const },
+    { label: "Severidade", value: ARR_SEVERITY_LABEL[arr.severidade] ?? sanitize(arr.severidade), tone: "default" as const },
+    { label: "Status", value: ARR_STATUS_LABEL[arr.status] ?? sanitize(arr.status), tone: buildStatusTone(arr.status) },
+    { label: "Participantes", value: participantCount, tone: participantCount > 0 ? "success" as const : "warning" as const },
+  ];
+}
+
+function drawArrTraceability(ctx: PdfContext, arr: Arr, code: string, hasFinalPdfMetadata: boolean) {
+  if (!hasFinalPdfMetadata) return;
+  drawMetadataGrid(ctx, {
+    title: "Rastreabilidade do PDF final",
+    columns: 2,
+    fields: [
+      { label: "Código documental", value: code },
+      {
+        label: "Hash SHA-256 do PDF",
+        value: arr.final_pdf_hash_sha256
+          ? `${arr.final_pdf_hash_sha256.slice(0, 32)}...`
+          : "Gerado no registro governado após emissão",
+      },
+      { label: "PDF gerado em", value: formatDateTime(arr.pdf_generated_at) },
+      { label: "Emitido por", value: arr.emitted_by?.nome },
+    ],
+  });
 }
 
 export async function drawArrBlueprint(
@@ -63,41 +109,7 @@ export async function drawArrBlueprint(
     title: "Síntese executiva",
     summary:
       "Registro enxuto para formalizar uma análise rápida de risco, a condição observada em campo e o tratamento imediato definido pela equipe.",
-    metrics: [
-      {
-        label: "Atividade principal",
-        value: sanitize(arr.atividade_principal),
-        tone: "info",
-      },
-      {
-        label: "Nível de risco",
-        value: ARR_RISCO_LABEL[arr.nivel_risco] ?? sanitize(arr.nivel_risco),
-        tone:
-          arr.nivel_risco === "critico" || arr.nivel_risco === "alto"
-            ? "warning"
-            : "default",
-      },
-      {
-        label: "Probabilidade",
-        value: sanitize(arr.probabilidade),
-        tone: "default",
-      },
-      {
-        label: "Severidade",
-        value: sanitize(arr.severidade),
-        tone: "default",
-      },
-      {
-        label: "Status",
-        value: ARR_STATUS_LABEL[arr.status] ?? sanitize(arr.status),
-        tone: buildStatusTone(arr.status),
-      },
-      {
-        label: "Participantes",
-        value: participantCount,
-        tone: participantCount > 0 ? "success" : "warning",
-      },
-    ],
+    metrics: buildArrSummaryMetrics(arr, participantCount),
   });
 
   drawMetadataGrid(ctx, {
@@ -118,23 +130,7 @@ export async function drawArrBlueprint(
     ],
   });
 
-  if (hasFinalPdfMetadata) {
-    drawMetadataGrid(ctx, {
-      title: "Rastreabilidade do PDF final",
-      columns: 2,
-      fields: [
-        { label: "Código documental", value: code },
-        {
-          label: "Hash SHA-256 do PDF",
-          value: arr.final_pdf_hash_sha256
-            ? `${arr.final_pdf_hash_sha256.slice(0, 32)}...`
-            : "Gerado no registro governado após emissão",
-        },
-        { label: "PDF gerado em", value: formatDateTime(arr.pdf_generated_at) },
-        { label: "Emitido por", value: arr.emitted_by?.nome },
-      ],
-    });
-  }
+  drawArrTraceability(ctx, arr, code, hasFinalPdfMetadata);
 
   drawNarrativeSection(ctx, {
     title: "Descrição / contexto",

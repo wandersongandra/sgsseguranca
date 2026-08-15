@@ -34,6 +34,8 @@ interface PtsTableProps {
     key: keyof PtApprovalChecklistState,
     checked: boolean,
   ) => void;
+  onEmitGovernedPdf?: (id: string) => void;
+  emittingPdfId?: string | null;
 }
 
 const EMPTY_APPROVAL_CHECKLIST: PtApprovalChecklistState = {
@@ -64,6 +66,8 @@ export const PtsTable = React.memo(
     onDismissApprovalIssue,
     onDismissApprovalReview,
     onUpdateApprovalChecklist,
+    onEmitGovernedPdf,
+    emittingPdfId,
   }: PtsTableProps) => {
     const row = (pt: Pt) => (
       <PtsTableRow
@@ -87,6 +91,8 @@ export const PtsTable = React.memo(
         onDismissApprovalIssue={onDismissApprovalIssue}
         onDismissApprovalReview={onDismissApprovalReview}
         onUpdateApprovalChecklist={onUpdateApprovalChecklist}
+        onEmitGovernedPdf={onEmitGovernedPdf}
+        emittingPdfId={emittingPdfId}
       />
     );
 
@@ -151,6 +157,8 @@ export const PtsTable = React.memo(
             onDismissApprovalIssue={onDismissApprovalIssue}
             onDismissApprovalReview={onDismissApprovalReview}
             onUpdateApprovalChecklist={onUpdateApprovalChecklist}
+            onEmitGovernedPdf={onEmitGovernedPdf}
+            emittingPdfId={emittingPdfId}
           />
         )}
       />

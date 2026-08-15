@@ -434,6 +434,72 @@ describe('NonConformitiesService', () => {
     });
   });
 
+  it('update() rejeita transição de status fora do fluxo permitido (pula etapas)', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.ABERTA,
+      anexos: [],
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+
+    await expect(
+      service.update('nc-1', { status: NcStatus.ENCERRADA }),
+    ).rejects.toThrow('Transição de "ABERTA" para "ENCERRADA" não permitida');
+
+    expect(repository.save).not.toHaveBeenCalled();
+  });
+
+  it('update() carimba closed_at/resolved_by ao encerrar por uma transição válida', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.AGUARDANDO_VALIDACAO,
+      anexos: [],
+      closed_at: null,
+      resolved_by: null,
+      acao_definitiva_descricao: 'Instalar a proteção coletiva especificada.',
+      acao_definitiva_responsavel: 'Responsável da manutenção',
+      acao_definitiva_prazo: new Date('2026-03-20T00:00:00.000Z'),
+      verificacao_resultado: 'Sim',
+      verificacao_evidencias: 'Proteção instalada e testada em campo.',
+      verificacao_data: new Date('2026-03-21T00:00:00.000Z'),
+      verificacao_responsavel: 'Técnico SST',
+      assinatura_responsavel_area: 'Responsável da área',
+      assinatura_tecnico_auditor: 'Técnico SST',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
+
+    const result = await service.update('nc-1', {
+      status: NcStatus.ENCERRADA,
+    });
+
+    expect(result.status).toBe(NcStatus.ENCERRADA);
+    expect(result.closed_at).toBeInstanceOf(Date);
+  });
+
+  it('update() não reprocessa transição quando o status enviado é igual ao atual', async () => {
+    const entity = {
+      id: 'nc-1',
+      company_id: 'company-1',
+      status: NcStatus.EM_ANDAMENTO,
+      anexos: [],
+      descricao: 'Texto antigo',
+    } as unknown as NonConformity;
+    jest.spyOn(service, 'findOneEntity').mockResolvedValue(entity);
+    _lockedNcRow = entity as unknown as Record<string, unknown>;
+
+    await expect(
+      service.update('nc-1', {
+        status: NcStatus.EM_ANDAMENTO,
+        descricao: 'Texto novo',
+      }),
+    ).resolves.toBeDefined();
+
+    expect(entity.descricao).toBe('Texto novo');
+  });
+
   it('filtra arquivos semanais pela data documental da NC', async () => {
     (
       documentGovernanceService.listFinalDocuments as jest.Mock
