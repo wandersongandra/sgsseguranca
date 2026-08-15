@@ -27,6 +27,83 @@ function ncStatusTone(status: string): "danger" | "warning" | "info" | "success"
   return "default";
 }
 
+function buildNcActionRows(nc: NonConformity, statusLabel: string): ActionPlanRow[] {
+  const rows: ActionPlanRow[] = [];
+  if (nc.acao_imediata_descricao) {
+    rows.push({
+      action: `Imediata: ${sanitize(nc.acao_imediata_descricao)}`,
+      owner: sanitize(nc.acao_imediata_responsavel),
+      dueDate: formatDate(nc.acao_imediata_data),
+      status: sanitize(nc.acao_imediata_status || "Pendente"),
+    });
+  }
+  if (nc.acao_definitiva_descricao) {
+    const definitiveLines = [
+      `Definitiva: ${sanitize(nc.acao_definitiva_descricao)}`,
+      nc.acao_definitiva_recursos ? `Recursos: ${sanitize(nc.acao_definitiva_recursos)}` : "",
+      nc.acao_definitiva_prazo && nc.acao_definitiva_data_prevista
+        ? `Previsão: ${formatDate(nc.acao_definitiva_data_prevista)}`
+        : "",
+    ].filter(Boolean);
+    rows.push({
+      action: definitiveLines.join("\n"),
+      owner: sanitize(nc.acao_definitiva_responsavel),
+      dueDate: formatDate(nc.acao_definitiva_prazo || nc.acao_definitiva_data_prevista),
+      status: statusLabel,
+    });
+  }
+  const preventiveLines = [
+    nc.acao_preventiva_medidas ? `Medidas: ${sanitize(nc.acao_preventiva_medidas)}` : "",
+    nc.acao_preventiva_treinamento ? `Treinamento: ${sanitize(nc.acao_preventiva_treinamento)}` : "",
+    nc.acao_preventiva_revisao_procedimento ? `Revisão procedimento: ${sanitize(nc.acao_preventiva_revisao_procedimento)}` : "",
+    nc.acao_preventiva_melhoria_processo ? `Melhoria processo: ${sanitize(nc.acao_preventiva_melhoria_processo)}` : "",
+    nc.acao_preventiva_epc_epi ? `EPC/EPI: ${sanitize(nc.acao_preventiva_epc_epi)}` : "",
+  ].filter(Boolean);
+  if (preventiveLines.length > 0) {
+    rows.push({ action: preventiveLines.join("\n"), owner: "-", dueDate: "-", status: "Preventiva" });
+  }
+  return rows;
+}
+
+function buildNcMetrics(nc: NonConformity, statusLabel: string, riscoLabel: string) {
+  return [
+    { label: "Código", value: sanitize(nc.codigo_nc), tone: "info" as const },
+    { label: "Status", value: sanitize(nc.status), tone: "warning" as const },
+    { label: "Risco", value: sanitize(nc.risco_nivel), tone: "danger" as const },
+    { label: "Setor", value: sanitize(nc.local_setor_area), tone: "info" as const },
+    { label: "Status oficial", value: statusLabel, tone: ncStatusTone(nc.status) },
+    { label: "Risco normalizado", value: riscoLabel, tone: "default" as const },
+  ];
+}
+
+function buildNcMetadataFields(nc: NonConformity, statusLabel: string) {
+  return [
+    { label: "Código", value: nc.codigo_nc },
+    { label: "Tipo", value: nc.tipo },
+    { label: "Categoria", value: nc.tipo_categoria || nc.tipo_subcategoria || "-" },
+    { label: "Data identificação", value: formatDate(nc.data_identificacao) },
+    { label: "Local/Setor", value: nc.local_setor_area },
+    { label: "Atividade", value: nc.atividade_envolvida },
+    { label: "Responsável área", value: nc.responsavel_area },
+    { label: "Auditor", value: nc.auditor_responsavel },
+    { label: "Status", value: statusLabel },
+    { label: "Risco", value: nc.risco_categoria || nc.risco_nivel },
+    { label: "NR", value: nc.requisito_nr_categoria || nc.requisito_nr },
+    { label: "Causa", value: nc.causa_categoria || (nc.causa || []).join(", ") || "-" },
+  ];
+}
+
+function drawNcSupportingNarratives(ctx: PdfContext, nc: NonConformity) {
+  drawNarrativeSection(ctx, { title: "Descrição do desvio", content: nc.descricao });
+  drawNarrativeSection(ctx, { title: "Evidência observada", content: nc.evidencia_observada });
+  drawNarrativeSection(ctx, { title: "Descrição das evidências fotográficas", content: nc.evidencia_descricao_foto });
+  drawNarrativeSection(ctx, { title: "Risco/Perigo", content: `${sanitize(nc.risco_perigo)} | ${sanitize(nc.risco_associado)}` });
+  drawNarrativeSection(ctx, { title: "Descrição da verificação", content: nc.verificacao_descricao_foto || nc.verificacao_evidencias });
+  if ((nc.anexos || []).length > 0) {
+    drawNarrativeSection(ctx, { title: "Anexos/evidências", content: `${(nc.anexos || []).length} anexo(s) vinculado(s) à NC.` });
+  }
+}
+
 export async function drawNcBlueprint(
   ctx: PdfContext,
   autoTable: AutoTableFn,
@@ -47,34 +124,16 @@ export async function drawNcBlueprint(
   drawExecutiveSummaryStrip(ctx, {
     title: "Resumo executivo da NC",
     summary: "Documento de compliance com foco em desvio identificado, requisito violado, plano corretivo e evidências de verificação.",
-    metrics: [
-      { label: "Código", value: sanitize(nc.codigo_nc), tone: "info" },
-      { label: "Status", value: statusLabel, tone: ncStatusTone(nc.status) },
-      { label: "Risco", value: riscoLabel, tone: "danger" },
-      { label: "Responsável área", value: sanitize(nc.responsavel_area), tone: "default" },
-      { label: "Auditor", value: sanitize(nc.auditor_responsavel), tone: "default" },
-      { label: "Setor", value: sanitize(nc.local_setor_area), tone: "info" },
-    ],
+    metrics: buildNcMetrics(nc, statusLabel, riscoLabel),
   });
 
   drawMetadataGrid(ctx, {
     title: "Identificação da não conformidade",
     columns: 2,
-    fields: [
-      { label: "Código", value: nc.codigo_nc },
-      { label: "Tipo", value: nc.tipo },
-      { label: "Data identificação", value: formatDate(nc.data_identificacao) },
-      { label: "Local/Setor", value: nc.local_setor_area },
-      { label: "Atividade", value: nc.atividade_envolvida },
-      { label: "Responsável área", value: nc.responsavel_area },
-      { label: "Auditor", value: nc.auditor_responsavel },
-      { label: "Status", value: statusLabel },
-    ],
+    fields: buildNcMetadataFields(nc, statusLabel),
   });
 
-  drawNarrativeSection(ctx, { title: "Descrição do desvio", content: nc.descricao });
-  drawNarrativeSection(ctx, { title: "Evidência observada", content: nc.evidencia_observada });
-  drawNarrativeSection(ctx, { title: "Risco/Perigo", content: `${sanitize(nc.risco_perigo)} | ${sanitize(nc.risco_associado)}` });
+  drawNcSupportingNarratives(ctx, nc);
 
   drawComplianceTable(ctx, autoTable, "Requisito violado e classificação", [
     {
@@ -85,61 +144,18 @@ export async function drawNcBlueprint(
     },
   ], { semanticRules: { profile: "nc", columns: [3] } });
 
-  const actionRows: ActionPlanRow[] = [];
-  if (nc.acao_imediata_descricao) {
-    actionRows.push({
-      action: `Imediata: ${sanitize(nc.acao_imediata_descricao)}`,
-      owner: sanitize(nc.acao_imediata_responsavel),
-      dueDate: formatDate(nc.acao_imediata_data),
-      status: sanitize(nc.acao_imediata_status || "Pendente"),
-    });
-  }
-  if (nc.acao_definitiva_descricao) {
-    const definitiveLines = [
-      `Definitiva: ${sanitize(nc.acao_definitiva_descricao)}`,
-      nc.acao_definitiva_recursos ? `Recursos: ${sanitize(nc.acao_definitiva_recursos)}` : "",
-      nc.acao_definitiva_prazo && nc.acao_definitiva_data_prevista
-        ? `Previsão: ${formatDate(nc.acao_definitiva_data_prevista)}`
-        : "",
-    ].filter(Boolean);
-    actionRows.push({
-      action: definitiveLines.join("\n"),
-      owner: sanitize(nc.acao_definitiva_responsavel),
-      dueDate: formatDate(nc.acao_definitiva_prazo || nc.acao_definitiva_data_prevista),
-      status: statusLabel,
-    });
-  }
-  if (
-    nc.acao_preventiva_medidas ||
-    nc.acao_preventiva_treinamento ||
-    nc.acao_preventiva_revisao_procedimento ||
-    nc.acao_preventiva_melhoria_processo ||
-    nc.acao_preventiva_epc_epi
-  ) {
-    const preventivaLines = [
-      nc.acao_preventiva_medidas ? `Medidas: ${sanitize(nc.acao_preventiva_medidas)}` : "",
-      nc.acao_preventiva_treinamento ? `Treinamento: ${sanitize(nc.acao_preventiva_treinamento)}` : "",
-      nc.acao_preventiva_revisao_procedimento ? `Revisão procedimento: ${sanitize(nc.acao_preventiva_revisao_procedimento)}` : "",
-      nc.acao_preventiva_melhoria_processo ? `Melhoria processo: ${sanitize(nc.acao_preventiva_melhoria_processo)}` : "",
-      nc.acao_preventiva_epc_epi ? `EPC/EPI: ${sanitize(nc.acao_preventiva_epc_epi)}` : "",
-    ].filter(Boolean);
-    actionRows.push({
-      action: preventivaLines.join("\n"),
-      owner: "-",
-      dueDate: "-",
-      status: "Preventiva",
-    });
-  }
+  const actionRows = buildNcActionRows(nc, statusLabel);
   drawActionPlanTable(ctx, autoTable, actionRows, { semanticRules: { profile: "nc" } });
 
   drawNarrativeSection(ctx, { title: "Verificação e resultado", content: nc.verificacao_resultado });
+  drawNarrativeSection(ctx, { title: "Evidência de verificação", content: nc.verificacao_descricao_foto || nc.verificacao_evidencias });
   drawNarrativeSection(ctx, { title: "Observações finais", content: nc.observacoes_gerais });
 
   await drawGovernanceClosingBlock(ctx, {
     signatures: [
       { label: "Responsável da área", name: sanitize(nc.responsavel_area), role: "Responsável", image: nc.assinatura_responsavel_area || null },
       { label: "Técnico/Auditor", name: sanitize(nc.auditor_responsavel), role: "TST/Auditor", image: nc.assinatura_tecnico_auditor || null },
-      { label: "Gestão", name: "Gestão", role: "Gestão", image: nc.assinatura_gestao || null },
+      { label: "Gestão", name: sanitize(nc.assinatura_gestao || "Gestão"), role: "Gestão", image: nc.assinatura_gestao || null },
     ],
     code,
     url: validationUrl,

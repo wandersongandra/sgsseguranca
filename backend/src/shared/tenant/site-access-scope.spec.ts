@@ -21,14 +21,7 @@ function isSiteVisibleToScope(
 describe('site-access-scope.util', () => {
   describe('resolveSiteAccessScope', () => {
     const makeTenantContext = (
-      overrides: {
-        companyId?: string;
-        isSuperAdmin?: boolean;
-        userId?: string;
-        siteId?: string;
-        siteIds?: string[];
-        siteScope?: 'single' | 'all';
-      } = {},
+      overrides: Partial<TenantContext> = {},
     ): TenantContext => ({
       companyId: 'company-1',
       isSuperAdmin: false,
@@ -127,8 +120,8 @@ describe('site-access-scope.util', () => {
     });
 
     it('isCompanyWideProfile retorna false para outros perfis', () => {
-      expect(isCompanyWideProfile(Role.SUPERVISOR)).toBe(false);
-      expect(isCompanyWideProfile(Role.TST)).toBe(false);
+      expect(isCompanyWideProfile('TÉCNICO DE SEGURANÇA')).toBe(false);
+      expect(isCompanyWideProfile('TST')).toBe(false);
       expect(isCompanyWideProfile(undefined)).toBe(false);
       expect(isCompanyWideProfile(null)).toBe(false);
     });

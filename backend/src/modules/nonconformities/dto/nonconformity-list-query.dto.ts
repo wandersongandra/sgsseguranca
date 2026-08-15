@@ -56,4 +56,34 @@ export class NonConformityListQueryDto {
   @IsString()
   @IsIn(['ABERTA', 'EM_ANDAMENTO', 'AGUARDANDO_VALIDACAO', 'ENCERRADA'])
   status?: string;
+
+  @IsOptional()
+  @Transform(toOptionalTrimmedString)
+  @IsString()
+  @MaxLength(50)
+  tipo_categoria?: string;
+
+  @IsOptional()
+  @Transform(toOptionalTrimmedString)
+  @IsString()
+  @MaxLength(50)
+  causa_categoria?: string;
+
+  @IsOptional()
+  @Transform(toOptionalTrimmedString)
+  @IsString()
+  @MaxLength(50)
+  requisito_nr_categoria?: string;
+
+  @IsOptional()
+  @Transform(toOptionalTrimmedString)
+  @IsString()
+  @MaxLength(50)
+  risco_categoria?: string;
+
+  @IsOptional()
+  @Transform(toOptionalTrimmedString)
+  @IsString()
+  @MaxLength(100)
+  site_id?: string;
 }

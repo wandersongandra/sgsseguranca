@@ -49,7 +49,6 @@ export async function generateNonConformityPdf(
     code,
     date: nc.data_identificacao,
     status: sanitize(nc.status),
-    version: "1",
     company: sanitize(
       (nc as NonConformity & { company?: { razao_social?: string } }).company
         ?.razao_social || nc.company_id,

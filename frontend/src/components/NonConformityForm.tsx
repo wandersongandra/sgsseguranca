@@ -54,6 +54,14 @@ import {
 const nonConformitySchema = z.object({
   codigo_nc: z.string().min(1, "O código é obrigatório"),
   tipo: z.string().min(1, "O tipo é obrigatório"),
+  tipo_categoria: z.string().optional(),
+  tipo_subcategoria: z.string().optional(),
+  causa_categoria: z.string().optional(),
+  requisito_nr_categoria: z.string().optional(),
+  risco_categoria: z.string().optional(),
+  risco_fonte: z.string().optional(),
+  evidencia_descricao_foto: z.string().optional(),
+  verificacao_descricao_foto: z.string().optional(),
   data_identificacao: z.string(),
   site_id: z.string().optional(),
   local_setor_area: z.string().min(1, "O local/setor/área é obrigatório"),
@@ -112,6 +120,17 @@ const nonConformitySchema = z.object({
 });
 
 type NonConformityFormData = z.infer<typeof nonConformitySchema>;
+
+const NC_TYPE_CATEGORIES = ["NC_MAIOR", "NC_MENOR", "OBSERVACAO", "MELHORIA"];
+const NC_TYPE_SUBCATEGORIES = [
+  "Segurança operacional",
+  "Condição insegura",
+  "Ato inseguro",
+  "Procedimento",
+  "Equipamento",
+  "Treinamento",
+  "Outro",
+];
 
 const MAX_CAPTURE_DIMENSION = 1600;
 
@@ -248,6 +267,45 @@ function nullsToUndefined<T extends Record<string, unknown>>(obj: T): T {
   return result;
 }
 
+function buildLoadedNonConformityFormValues(
+  nonConformity: NonConformity,
+  currentStatus: NcStatus,
+) {
+  return {
+    ...nullsToUndefined(nonConformity as unknown as Record<string, unknown>),
+    checklist_id: nonConformity.checklist_id ?? undefined,
+    tipo_categoria: nonConformity.tipo_categoria ?? undefined,
+    tipo_subcategoria: nonConformity.tipo_subcategoria ?? undefined,
+    causa_categoria: nonConformity.causa_categoria ?? undefined,
+    requisito_nr_categoria: nonConformity.requisito_nr_categoria ?? undefined,
+    risco_categoria: nonConformity.risco_categoria ?? undefined,
+    risco_fonte: nonConformity.risco_fonte ?? undefined,
+    evidencia_descricao_foto: nonConformity.evidencia_descricao_foto ?? undefined,
+    verificacao_descricao_foto: nonConformity.verificacao_descricao_foto ?? undefined,
+    status: currentStatus,
+    data_identificacao: toInputDateValue(nonConformity.data_identificacao),
+    acao_imediata_data: toInputDateValue(nonConformity.acao_imediata_data) || undefined,
+    acao_definitiva_prazo: toInputDateValue(nonConformity.acao_definitiva_prazo) || undefined,
+    acao_definitiva_data_prevista: toInputDateValue(nonConformity.acao_definitiva_data_prevista) || undefined,
+    verificacao_data: toInputDateValue(nonConformity.verificacao_data) || undefined,
+    anexos: toNcAttachmentFormValues(nonConformity.anexos),
+  };
+}
+
+async function loadNonConformityFormData(companyId: string, id?: string) {
+  const sitesPromise = companyId
+    ? sitesService.findPaginated({ page: 1, limit: 100, companyId })
+    : Promise.resolve({ data: [], total: 0, page: 1, lastPage: 1 });
+  const nonConformityPromise = id
+    ? nonConformitiesService.findOne(id)
+    : Promise.resolve<NonConformity | null>(null);
+  const [sitesPage, nonConformity] = await Promise.all([
+    sitesPromise,
+    nonConformityPromise,
+  ]);
+  return { sitesPage, nonConformity };
+}
+
 // Refactor backlog: dividir em blocos menores (dados, evidências, fluxo) após fechamento do hardening emergencial.
 export function NonConformityForm({ id }: NonConformityFormProps) {
   const router = useRouter();
@@ -299,7 +357,19 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     resolver: zodResolver(nonConformitySchema),
     mode: "onBlur",
     reValidateMode: "onBlur",
-    defaultValues: createDefaultNonConformityFormValues(prefilledChecklistId),
+    defaultValues: {
+      data_identificacao: new Date().toISOString().split("T")[0],
+      tipo: "NC_MENOR",
+      risco_nivel: "Baixo",
+      status: NcStatus.ABERTA,
+      acao_imediata_status: "Não implementada",
+      verificacao_resultado: "Não",
+      classificacao: [],
+      risco_consequencias: [],
+      causa: [],
+      anexos: [],
+      checklist_id: prefilledChecklistId || undefined,
+    },
   });
 
   const watchedAnexos = watch("anexos") || [];
@@ -766,21 +836,10 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       const tenantAtRequest = activeCompanyId;
       setFetching(true);
       try {
-        const sitesPromise = activeCompanyId
-          ? sitesService.findPaginated({
-              page: 1,
-              limit: 100,
-              companyId: activeCompanyId,
-            })
-          : Promise.resolve({ data: [], total: 0, page: 1, lastPage: 1 });
-        const nonConformityPromise = id
-          ? nonConformitiesService.findOne(id)
-          : Promise.resolve<NonConformity | null>(null);
-
-        const [sitesPage, nonConformity] = await Promise.all([
-          sitesPromise,
-          nonConformityPromise,
-        ]);
+        const { sitesPage, nonConformity } = await loadNonConformityFormData(
+          activeCompanyId,
+          id,
+        );
 
         if (
           tenantGeneration !== tenantGenerationRef.current ||
@@ -803,18 +862,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           legacyAttachmentReferencesRef.current = new Set(
             getLegacyAttachmentReferences(nonConformity.anexos),
           );
-          reset({
-            ...nullsToUndefined(nonConformity as unknown as Record<string, unknown>),
-            checklist_id: nonConformity.checklist_id ?? undefined,
-            status: currentStatus,
-            data_identificacao: toInputDateValue(nonConformity.data_identificacao),
-            acao_imediata_data: toInputDateValue(nonConformity.acao_imediata_data) || undefined,
-            acao_definitiva_prazo: toInputDateValue(nonConformity.acao_definitiva_prazo) || undefined,
-            acao_definitiva_data_prevista:
-              toInputDateValue(nonConformity.acao_definitiva_data_prevista) || undefined,
-            verificacao_data: toInputDateValue(nonConformity.verificacao_data) || undefined,
-            anexos: toNcAttachmentFormValues(nonConformity.anexos),
-          });
+          reset(buildLoadedNonConformityFormValues(nonConformity, currentStatus));
           // react-hook-form com resolver (zod) não computa formState.isValid
           // automaticamente após reset() — só roda validação em resposta a
           // interação do usuário (mode: "onBlur"). Sem isso, o botão Salvar
@@ -978,7 +1026,6 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     "Outro",
   ];
 
-  const tiposNc = ["Crítica", "Maior", "Menor"];
   const niveisRisco = ["Baixo", "Médio", "Alto", "Crítico"];
   const statusAcao = ["Implementada", "Em andamento", "Não implementada"];
   const resultadoEficacia = ["Sim", "Parcialmente", "Não"];
@@ -1265,7 +1312,12 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               {...register("codigo_nc")}
               hasError={!!errors.codigo_nc}
               placeholder="Ex: NC-2024-001"
+              readOnly
             />
+
+            <p className="mt-1 text-xs text-[var(--ds-color-text-muted)]">
+              Código gerado pelo sistema para manter rastreabilidade e unicidade.
+            </p>
             {errors.codigo_nc && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.codigo_nc.message}
@@ -1285,12 +1337,42 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               aria-label="Tipo da não conformidade"
               hasError={!!errors.tipo}
             >
-              {tiposNc.map((tipo) => (
+              <option value="">Selecione o tipo</option>
+              {NC_TYPE_CATEGORIES.map((tipo) => (
                 <option key={tipo} value={tipo}>
-                  {tipo}
+                  {tipo.replaceAll("_", " ")}
                 </option>
               ))}
             </Select>
+
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label className="mb-2 block text-xs font-bold text-[var(--ds-color-text-secondary)]">
+                  Categoria complementar
+                </label>
+                <Select {...register("tipo_subcategoria")}>
+                  <option value="">Selecione</option>
+                  {NC_TYPE_SUBCATEGORIES.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-2 block text-xs font-bold text-[var(--ds-color-text-secondary)]">
+                  Classe visual
+                </label>
+                <Select {...register("tipo_categoria")}>
+                  <option value="">Selecione</option>
+                  {NC_TYPE_CATEGORIES.map((item) => (
+                    <option key={item} value={item}>
+                      {item.replaceAll("_", " ")}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
             {errors.tipo && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">{errors.tipo.message}</p>
             )}
@@ -1341,12 +1423,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               id="nc-local-setor-area"
               {...register("local_setor_area")}
               hasError={!!errors.local_setor_area}
+              placeholder="Ex: Produção, Manutenção, Obra X"
             />
             {errors.local_setor_area && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.local_setor_area.message}
               </p>
             )}
+            <p className="mt-1 text-xs text-[var(--ds-color-text-muted)]">
+              O campo permanece livre para suportar diferentes obras/empresas sem travar o fluxo.
+            </p>
           </div>
           <div className="md:col-span-2">
             <label
@@ -1355,11 +1441,20 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             >
               Atividade envolvida
             </label>
-            <Input
+            <Select
               id="nc-atividade-envolvida"
               {...register("atividade_envolvida")}
               hasError={!!errors.atividade_envolvida}
-            />
+            >
+              <option value="">Selecione a atividade</option>
+              <option value="Trabalho em altura">Trabalho em altura</option>
+              <option value="Movimentação de cargas">Movimentação de cargas</option>
+              <option value="Intervenção elétrica">Intervenção elétrica</option>
+              <option value="Solda / corte">Solda / corte</option>
+              <option value="Uso de máquinas">Uso de máquinas</option>
+              <option value="Limpeza / organização">Limpeza / organização</option>
+              <option value="Outro">Outro</option>
+            </Select>
             {errors.atividade_envolvida && (
               <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
                 {errors.atividade_envolvida.message}
