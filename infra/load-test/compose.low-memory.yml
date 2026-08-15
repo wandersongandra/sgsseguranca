@@ -1,0 +1,24 @@
+services:
+  postgres-loadtest:
+    mem_limit: 256m
+    cpus: '0.40'
+  redis-loadtest:
+    mem_limit: 64m
+    cpus: '0.15'
+  api-loadtest:
+    mem_limit: 512m
+    cpus: '0.75'
+    environment:
+      NODE_OPTIONS: --max-old-space-size=384
+      UV_THREADPOOL_SIZE: '4'
+      DB_POOL_MAX: '4'
+      DB_POOL_MIN: '1'
+  migrations-loadtest:
+    mem_limit: 384m
+    cpus: '0.50'
+  seed-loadtest:
+    mem_limit: 384m
+    cpus: '0.50'
+  proxy-loadtest:
+    mem_limit: 48m
+    cpus: '0.10'

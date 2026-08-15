@@ -11,6 +11,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { TenantService } from '../../shared/tenant/tenant.service';
+import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import {
@@ -37,6 +38,11 @@ const APR_LOG_ACTIONS = {
 } as const;
 const POSTGRES_LOCK_NOT_AVAILABLE_CODE = '55P03';
 const APR_ROW_LOCK_RETRY_DELAYS_MS = [50, 100, 200] as const;
+
+type PostgresErrorLike = {
+  code?: unknown;
+  driverError?: unknown;
+};
 
 type AprLogAction = (typeof APR_LOG_ACTIONS)[keyof typeof APR_LOG_ACTIONS];
 type AprWorkflowActor = {
@@ -74,12 +80,16 @@ export class AprWorkflowService {
     id: string,
     fn: (apr: Apr, manager: EntityManager) => Promise<Apr>,
   ): Promise<Apr> {
-    const tenantId = this.tenantService.getTenantId();
-    if (!tenantId) {
+    if (!this.tenantService.getTenantId()) {
       throw new InternalServerErrorException(
         'Tenant context ausente em transição de APR',
       );
     }
+    const scope = resolveSiteAccessScopeFromTenantService(
+      this.tenantService,
+      'APR',
+    );
+    const tenantId = scope.companyId;
 
     for (
       let attempt = 0;
@@ -89,9 +99,16 @@ export class AprWorkflowService {
       try {
         return await this.aprsRepository.manager.transaction(
           async (manager) => {
+            const queryParams: unknown[] = [id, tenantId];
+            const siteClause = scope.hasCompanyWideAccess
+              ? ''
+              : ' AND "site_id" = ANY($3::uuid[])';
+            if (!scope.hasCompanyWideAccess) {
+              queryParams.push(scope.siteIds);
+            }
             const rows = await manager.query<Apr[]>(
-              `SELECT * FROM "aprs" WHERE "id" = $1 AND "company_id" = $2 FOR UPDATE NOWAIT`,
-              [id, tenantId],
+              `SELECT * FROM "aprs" WHERE "id" = $1 AND "company_id" = $2 AND "deleted_at" IS NULL${siteClause} FOR UPDATE NOWAIT`,
+              queryParams,
             );
 
             if (!rows || rows.length === 0) {
@@ -103,10 +120,16 @@ export class AprWorkflowService {
           },
         );
       } catch (error: unknown) {
-        const retryDelayMs = APR_ROW_LOCK_RETRY_DELAYS_MS[attempt];
         if (!this.isPostgresLockNotAvailableError(error)) {
           throw error;
         }
+        const retryDelayMs = APR_ROW_LOCK_RETRY_DELAYS_MS[attempt];
+        this.logger.warn({
+          event: 'apr_workflow_lock_conflict',
+          aprId: id,
+          retryCount: attempt,
+          durationMs: retryDelayMs ?? 0,
+        });
         if (retryDelayMs === undefined) {
           throw new ConflictException(
             'Outra operação está em andamento para esta APR. Tente novamente em instantes.',
@@ -123,11 +146,19 @@ export class AprWorkflowService {
   }
 
   private isPostgresLockNotAvailableError(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+    const candidate = error as PostgresErrorLike;
+    if (candidate.code === POSTGRES_LOCK_NOT_AVAILABLE_CODE) {
+      return true;
+    }
     return (
-      typeof error === 'object' &&
-      error !== null &&
-      'code' in error &&
-      error.code === POSTGRES_LOCK_NOT_AVAILABLE_CODE
+      typeof candidate.driverError === 'object' &&
+      candidate.driverError !== null &&
+      'code' in candidate.driverError &&
+      (candidate.driverError as { code?: unknown }).code ===
+        POSTGRES_LOCK_NOT_AVAILABLE_CODE
     );
   }
 
@@ -214,14 +245,34 @@ export class AprWorkflowService {
           }
         }
 
-        return manager.getRepository(Apr).save(apr);
+        const persisted = await manager.getRepository(Apr).save(apr);
+        await this.forensicTrailService.append(
+          {
+            eventType: FORENSIC_EVENT_TYPES.APR_APPROVED,
+            module: 'apr',
+            entityId: persisted.id,
+            companyId: persisted.company_id,
+            userId,
+            metadata: {
+              previousStatus: currentStatus,
+              currentStatus: persisted.status,
+              version: persisted.versao ?? 1,
+              reason: reason ?? null,
+            },
+          },
+          { manager },
+        );
+        return persisted;
       },
     );
 
-    await this.addLog(id, userId, APR_LOG_ACTIONS.APPROVED, {
-      ...this.buildAprTraceMetadata(saved),
-      motivo: reason,
-    });
+    await this.addLog(
+      id,
+      userId,
+      APR_LOG_ACTIONS.APPROVED,
+      { ...this.buildAprTraceMetadata(saved), motivo: reason },
+      { critical: true },
+    );
     this.logger.log({ event: 'apr_approved', aprId: id, userId });
     // Notifica proximo aprovador (fire-and-forget — nao bloqueia resposta)
     void this.tryNotifyNextApprover(id, saved);
@@ -323,10 +374,13 @@ export class AprWorkflowService {
       },
     );
 
-    await this.addLog(id, userId, APR_LOG_ACTIONS.REJECTED, {
-      ...this.buildAprTraceMetadata(saved),
-      motivo: reason,
-    });
+    await this.addLog(
+      id,
+      userId,
+      APR_LOG_ACTIONS.REJECTED,
+      { ...this.buildAprTraceMetadata(saved), motivo: reason },
+      { critical: true },
+    );
     this.logger.log({ event: 'apr_rejected', aprId: id, userId });
     return saved;
   }
@@ -349,7 +403,23 @@ export class AprWorkflowService {
         }
 
         apr.status = AprStatus.ENCERRADA;
-        return manager.getRepository(Apr).save(apr);
+        const persisted = await manager.getRepository(Apr).save(apr);
+        await this.forensicTrailService.append(
+          {
+            eventType: FORENSIC_EVENT_TYPES.APR_FINALIZED,
+            module: 'apr',
+            entityId: persisted.id,
+            companyId: persisted.company_id,
+            userId,
+            metadata: {
+              previousStatus: currentStatus,
+              currentStatus: persisted.status,
+              version: persisted.versao ?? 1,
+            },
+          },
+          { manager },
+        );
+        return persisted;
       },
     );
 
@@ -358,6 +428,7 @@ export class AprWorkflowService {
       userId,
       APR_LOG_ACTIONS.FINALIZED,
       this.buildAprTraceMetadata(saved),
+      { critical: true },
     );
     this.logger.log({ event: 'apr_finalized', aprId: id, userId });
     return saved;
@@ -368,16 +439,24 @@ export class AprWorkflowService {
     userId: string | undefined,
     acao: AprLogAction,
     metadata?: Record<string, unknown>,
+    options?: { manager?: EntityManager; critical?: boolean },
   ): Promise<void> {
     try {
-      const log = this.aprLogsRepository.create({
+      const repository =
+        options?.manager?.getRepository(AprLog) ?? this.aprLogsRepository;
+      const log = repository.create({
         apr_id: aprId,
         usuario_id: userId ?? undefined,
         acao,
         metadata: metadata ?? undefined,
       });
-      await this.aprLogsRepository.save(log);
+      await repository.save(log);
     } catch {
+      if (options?.critical) {
+        throw new InternalServerErrorException(
+          `Não foi possível registrar a trilha forense da APR (${acao}).`,
+        );
+      }
       this.logger.warn(`Falha ao gravar log de APR (${aprId}): ${acao}`);
     }
   }
@@ -834,6 +913,23 @@ export class AprWorkflowService {
     // Conjunto canônico de papéis do ator (inclui o fallback RBAC `roles`).
     const actorRoles = this.normalizeActorRoles({ roleNames: approverRoles });
     const primaryRole = actorRoles[0] ?? 'unknown';
+
+    if (action === ApprovalRecordAction.REABERTO) {
+      const currentStatus = this.ensureAprStatus(apr.status);
+      if (
+        currentStatus === AprStatus.CANCELADA ||
+        currentStatus === AprStatus.ENCERRADA
+      ) {
+        throw new BadRequestException(
+          `Não é possível reabrir uma APR ${currentStatus}. Gere uma nova versão para continuar.`,
+        );
+      }
+      if (apr.pdf_file_key) {
+        throw new BadRequestException(
+          'APR com PDF final emitido está bloqueada para reabertura. Gere uma nova versão para alterar o documento.',
+        );
+      }
+    }
 
     if (!apr.workflowConfigId || !this.workflowResolver) {
       throw new BadRequestException(
