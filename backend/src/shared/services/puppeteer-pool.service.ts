@@ -8,14 +8,14 @@ import { existsSync } from 'fs';
 import { mkdtemp, rm } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import * as puppeteer from 'puppeteer';
-import { Browser, Page } from 'puppeteer';
+import type { Browser, LaunchOptions, Page } from 'puppeteer';
 import {
   getPdfBrowserAcquireTimeoutMs,
   getPdfBrowserMaxUses,
   getPdfBrowserPoolSize,
   getPdfPageTimeoutMs,
 } from './pdf-runtime-config';
+import { loadPuppeteer } from './puppeteer-runtime';
 
 interface PooledBrowser {
   id: number;
@@ -35,8 +35,11 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
   private readonly acquireTimeoutMs = getPdfBrowserAcquireTimeoutMs();
   private readonly maxUsesPerBrowser = getPdfBrowserMaxUses();
   private cleanupInterval?: NodeJS.Timeout;
+  private readonly startupPromises = new Map<number, Promise<void>>();
+  private isClosing = false;
 
   onModuleInit() {
+    this.isClosing = false;
     this.logger.log(
       `Inicializando pool de Puppeteer em modo lazy (poolSize=${this.poolSize}, pageTimeoutMs=${this.maxPageTimeout}, acquireTimeoutMs=${this.acquireTimeoutMs}, maxUsesPerBrowser=${this.maxUsesPerBrowser})`,
     );
@@ -50,19 +53,27 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     this.logger.log('Fechando pool de Puppeteer');
+    this.isClosing = true;
 
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
 
+    // A startup já iniciado pode ainda estar resolvendo o adapter ESM. Aguarde
+    // esse trabalho antes de fechar o módulo; o destroy não cria recursos novos.
+    await Promise.allSettled(this.startupPromises.values());
     await Promise.all(
       this.browserPool.map((b) => this.closeBrowserInstance(b)),
     );
 
     this.browserPool = [];
+    this.startupPromises.clear();
   }
 
   async getPage(): Promise<Page> {
+    if (this.isClosing) {
+      throw new Error('Pool de Puppeteer está em encerramento.');
+    }
     const requestStartedAt = Date.now();
 
     // Tentar obter um browser disponível
@@ -95,7 +106,7 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Verificar saúde do browser
-    if (!pooledBrowser.browser.isConnected()) {
+    if (!pooledBrowser.browser.connected) {
       this.logger.warn(
         `Browser ${pooledBrowser.id} desconectado. Reiniciando...`,
       );
@@ -140,7 +151,7 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
         `Erro ao criar página no browser ${pooledBrowser.id}:`,
         error,
       );
-      if (!pooledBrowser.browser.isConnected()) {
+      if (!pooledBrowser.browser.connected) {
         await this.recycleBrowser(pooledBrowser);
       }
       throw error;
@@ -171,7 +182,8 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
     browser: Browser;
     userDataDir: string;
   }> {
-    const resolvedBrowser = this.resolveExecutablePath();
+    const puppeteer = await loadPuppeteer();
+    const resolvedBrowser = await this.resolveExecutablePath();
     const userDataDir = await mkdtemp(join(tmpdir(), 'sgs-pdf-chromium-'));
     const runtimeEnv = {
       ...process.env,
@@ -180,41 +192,40 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
         process.env.XDG_CONFIG_HOME || join(userDataDir, '.config'),
       XDG_CACHE_HOME: process.env.XDG_CACHE_HOME || join(userDataDir, '.cache'),
     };
-    const launchOptions: puppeteer.LaunchOptions & { executablePath?: string } =
-      {
-        args: [
-          // --no-sandbox é necessário em containers Docker sem user namespace isolation.
-          // Mitigações compensatórias: (1) HTML gerado via setContent, nunca page.goto com URL externa;
-          // (2) todos os dados interpolados no HTML são HTML-escaped; (3) request interception ativa
-          // em pdf.service.ts bloqueando recursos de rede; (4) container executa como usuário não-root
-          // (USER node no Dockerfile.worker); (5) PDF validado contra magic bytes + anti-JS patterns.
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-gpu',
-          '--no-first-run',
-          '--no-zygote',
-          '--disable-extensions',
-          '--mute-audio',
-          '--disable-background-networking',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-breakpad',
-          '--disable-component-extensions-with-background-pages',
-          '--disable-features=TranslateUI,BlinkGenPropertyTrees',
-          '--disable-ipc-flooding-protection',
-          '--disable-renderer-backgrounding',
-          '--enable-features=NetworkService,NetworkServiceInProcess',
-          '--disable-crash-reporter',
-          '--disable-features=Crashpad,TranslateUI,BlinkGenPropertyTrees',
-          `--user-data-dir=${userDataDir}`,
-          `--data-path=${userDataDir}`,
-          `--disk-cache-dir=${userDataDir}`,
-          `--crash-dumps-dir=${userDataDir}`,
-        ],
-        headless: true,
-        env: runtimeEnv,
-      };
+    const launchOptions: LaunchOptions & { executablePath?: string } = {
+      args: [
+        // --no-sandbox é necessário em containers Docker sem user namespace isolation.
+        // Mitigações compensatórias: (1) HTML gerado via setContent, nunca page.goto com URL externa;
+        // (2) todos os dados interpolados no HTML são HTML-escaped; (3) request interception ativa
+        // em pdf.service.ts bloqueando recursos de rede; (4) container executa como usuário não-root
+        // (USER node no Dockerfile.worker); (5) PDF validado contra magic bytes + anti-JS patterns.
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--no-first-run',
+        '--no-zygote',
+        '--disable-extensions',
+        '--mute-audio',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-breakpad',
+        '--disable-component-extensions-with-background-pages',
+        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+        '--disable-ipc-flooding-protection',
+        '--disable-renderer-backgrounding',
+        '--enable-features=NetworkService,NetworkServiceInProcess',
+        '--disable-crash-reporter',
+        '--disable-features=Crashpad,TranslateUI,BlinkGenPropertyTrees',
+        `--user-data-dir=${userDataDir}`,
+        `--data-path=${userDataDir}`,
+        `--disk-cache-dir=${userDataDir}`,
+        `--crash-dumps-dir=${userDataDir}`,
+      ],
+      headless: true,
+      env: runtimeEnv,
+    };
 
     try {
       if (resolvedBrowser.executablePath) {
@@ -243,36 +254,71 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async addBrowserToPool(id: number): Promise<void> {
-    try {
-      const { browser, userDataDir } = await this.launchBrowser();
-      this.browserPool.push({
-        id,
-        browser,
-        userDataDir,
-        inUse: false,
-        lastUsed: new Date(),
-        useCount: 0,
-      });
-      this.logger.log(
-        `Browser ${id} iniciado (PID: ${browser.process()?.pid})`,
-      );
-    } catch (error) {
-      if (error instanceof Error) {
-        this.logger.error(
-          `Erro ao inicializar browser ${id}: ${error.message}`,
-          error.stack,
+    if (this.isClosing) {
+      return;
+    }
+
+    const existingStartup = this.startupPromises.get(id);
+    if (existingStartup) {
+      await existingStartup;
+      return;
+    }
+
+    const startup = (async () => {
+      try {
+        const { browser, userDataDir } = await this.launchBrowser();
+        if (this.isClosing) {
+          await this.closeBrowserInstance({
+            id,
+            browser,
+            userDataDir,
+            inUse: false,
+            lastUsed: new Date(),
+            useCount: 0,
+          });
+          return;
+        }
+        this.browserPool.push({
+          id,
+          browser,
+          userDataDir,
+          inUse: false,
+          lastUsed: new Date(),
+          useCount: 0,
+        });
+        this.logger.log(
+          `Browser ${id} iniciado (PID: ${browser.process()?.pid})`,
         );
-        return;
+      } catch (error) {
+        if (error instanceof Error) {
+          this.logger.error(
+            `Erro ao inicializar browser ${id}: ${error.message}`,
+            error.stack,
+          );
+          return;
+        }
+        this.logger.error(
+          `Erro ao inicializar browser ${id}: ${String(error)}`,
+        );
+      } finally {
+        this.startupPromises.delete(id);
       }
-      this.logger.error(`Erro ao inicializar browser ${id}: ${String(error)}`);
+    })();
+
+    this.startupPromises.set(id, startup);
+    try {
+      await startup;
+    } catch {
+      // O startup já registra a causa técnica; callers continuam usando o
+      // timeout seguro de aquisição sem expor detalhes do runtime.
     }
   }
 
-  private resolveExecutablePath(): {
+  private async resolveExecutablePath(): Promise<{
     executablePath?: string;
     source: 'env' | 'puppeteer' | 'default';
     exists: boolean;
-  } {
+  }> {
     const envPath = process.env.PUPPETEER_EXECUTABLE_PATH?.trim();
     if (envPath) {
       return {
@@ -283,7 +329,8 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const executablePath = puppeteer.executablePath();
+      const puppeteer = await loadPuppeteer();
+      const executablePath = await puppeteer.executablePath();
       return {
         executablePath,
         source: 'puppeteer',
@@ -348,7 +395,7 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
     const maxInactiveTime = 5 * 60 * 1000; // 5 minutos
 
     for (const pooledBrowser of this.browserPool) {
-      if (!pooledBrowser.browser.isConnected()) {
+      if (!pooledBrowser.browser.connected) {
         await this.recycleBrowser(pooledBrowser);
         continue;
       }

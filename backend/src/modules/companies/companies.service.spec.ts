@@ -11,6 +11,7 @@ import { StorageService } from '../../shared/services/storage.service';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { GDPRDeletionService } from '../admin/services/gdpr-deletion.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
+import { ProvisioningDataSourceService } from '../../shared/database/provisioning-datasource.service';
 import { Site } from '../sites/entities/site.entity';
 import { User } from '../users/entities/user.entity';
 import { Profile } from '../profiles/entities/profile.entity';
@@ -21,6 +22,16 @@ describe('CompaniesService', () => {
   let service: CompaniesService;
   let repo: jest.Mocked<Repository<Company>>;
   let cacheManager: jest.Mocked<Cache>;
+  /**
+   * A conexão de provisionamento é uma dependência do serviço, mas quem cobre
+   * o comportamento dela é `companies.service.lifecycle.spec.ts` (bloco
+   * `remove`). Aqui basta um duplo inerte para o módulo compilar.
+   */
+  const provisioningManager = {
+    getRepository: jest.fn(() => ({
+      count: jest.fn(() => Promise.resolve(0)),
+    })),
+  };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -82,6 +93,15 @@ describe('CompaniesService', () => {
           provide: TenantService,
           useValue: {
             run: jest.fn((_ctx: unknown, cb: () => unknown) => cb()),
+          },
+        },
+        {
+          provide: ProvisioningDataSourceService,
+          useValue: {
+            isDedicated: jest.fn(() => true),
+            transaction: jest.fn((cb: (m: unknown) => unknown) =>
+              Promise.resolve(cb(provisioningManager)),
+            ),
           },
         },
       ],

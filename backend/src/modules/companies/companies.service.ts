@@ -36,6 +36,7 @@ import { detectMimeFromMagicBytes } from '../../shared/utils/detect-mime.util';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { GDPRDeletionService } from '../admin/services/gdpr-deletion.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
+import { ProvisioningDataSourceService } from '../../shared/database/provisioning-datasource.service';
 
 type ParsedDataUrl = {
   contentType: string;
@@ -75,6 +76,7 @@ export class CompaniesService {
     private readonly gdprDeletionService: GDPRDeletionService,
     private readonly fileInspectionService: FileInspectionService,
     private readonly tenantService: TenantService,
+    private readonly provisioningDataSource: ProvisioningDataSourceService,
   ) {}
 
   /**
@@ -649,9 +651,31 @@ export class CompaniesService {
 
   async remove(id: string): Promise<void> {
     await this.findOneEntity(id); // lança NotFoundException se empresa não existir
-    const linkedUsers = await this.companiesRepository.manager
-      .getRepository(User)
-      .count({ where: { company_id: id } });
+
+    // A contagem PRECISA correr na conexão de provisionamento.
+    //
+    // Esta é uma guarda que **falha aberta**: zero usuários significa "pode
+    // excluir". Na conexão de runtime ela contava 0 sempre que o chamador não
+    // tinha tenant no contexto — e é assim que a rota é normalmente usada, já
+    // que `/companies` está em GLOBAL_TENANT_OPTIONAL_PATHS e o ADMIN_GERAL
+    // chama sem `x-company-id`. Sem `current_company()`, e com
+    // `is_super_admin()` inerte desde a migration 361, a RLS de `users` nega
+    // tudo, o count devolve 0 e a trava nunca dispara: qualquer empresa com
+    // usuários ativos era excluída sem a confirmação que este código pretendia
+    // exigir, e a cascata de GDPR levava os usuários junto.
+    //
+    // Foi encontrado na prática, ao limpar tenants de teste: o
+    // `DELETE /users/:id` foi barrado pelo MFA de step-up e o
+    // `DELETE /companies/:id` passou por baixo, apagando os mesmos usuários.
+    //
+    // `requiredTransaction` e não `transaction`: sem conexão privilegiada não
+    // há como PROVAR que a empresa está vazia, e "não consegui provar" não
+    // pode virar "pode excluir". Falha fechado (503) em qualquer ambiente.
+    const linkedUsers = await this.provisioningDataSource.requiredTransaction(
+      'company_delete_guard',
+      (manager) =>
+        manager.getRepository(User).count({ where: { company_id: id } }),
+    );
 
     if (linkedUsers > 0) {
       throw new BadRequestException(

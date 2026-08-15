@@ -475,6 +475,26 @@ describe('AprsService', () => {
     );
   });
 
+  it('não silencia falha de trilha crítica da APR', async () => {
+    aprLogsRepository.save.mockRejectedValueOnce(
+      new Error('audit unavailable'),
+    );
+
+    const serviceInternals = service as unknown as {
+      addLog: (...args: unknown[]) => Promise<void>;
+    };
+
+    await expect(
+      serviceInternals.addLog(
+        'apr-1',
+        'user-1',
+        'APR_APROVADA',
+        { status: AprStatus.APROVADA },
+        { critical: true },
+      ),
+    ).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+
   describe('is_modelo_padrao (modelo-padrão da empresa) — restrição de papel', () => {
     const callGuard = (roleNames?: Array<string | null | undefined>): void =>
       (
@@ -1399,9 +1419,9 @@ describe('AprsService', () => {
       hasFinalPdf: false,
       availability: 'not_emitted',
       message: 'A APR ainda não possui PDF final emitido.',
-      fileKey: null,
-      folderPath: null,
       originalName: null,
+      contentType: null,
+      expiresAt: null,
       url: null,
     });
   });
@@ -1447,9 +1467,6 @@ describe('AprsService', () => {
       id: string;
       uploaded_by_name?: string;
       risk_item_ordem?: number;
-      latitude?: number;
-      longitude?: number;
-      accuracy_m?: number;
       url?: string;
       watermarked_url?: string;
     }>;
@@ -1464,10 +1481,9 @@ describe('AprsService', () => {
       id: 'evidence-1',
       uploaded_by_name: 'Carlos',
       risk_item_ordem: 3,
-      latitude: -23.5505,
-      longitude: -46.6333,
-      accuracy_m: 5.4,
     });
+    expect(result[0]).not.toHaveProperty('file_key');
+    expect(result[0]).not.toHaveProperty('latitude');
     expect(result[0]?.url).toContain('documents%2Fcompany-1%2Faprs');
     expect(result[0]?.watermarked_url).toContain('watermarked');
   });
@@ -1529,9 +1545,9 @@ describe('AprsService', () => {
 
     expect(result).toMatchObject({
       id: 'evidence-1',
-      fileKey: 'documents/company-1/aprs/apr-1/apr-final.pdf',
       originalName: 'evidence.jpg',
     });
+    expect(result).not.toHaveProperty('fileKey');
     expect(typeof result.hashSha256).toBe('string');
     expect(result.hashSha256).toBeTruthy();
 
