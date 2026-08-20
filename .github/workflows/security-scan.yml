@@ -1,4 +1,4 @@
-﻿name: Security Scan
+name: Security Scan
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
 
       - name: TruffleHog Secret Scan
         if: ${{ !(github.event_name == 'push' && (github.event.before == github.sha || github.event.before == '0000000000000000000000000000000000000000')) }}
-        uses: trufflesecurity/trufflehog@6f3c981e7b77f235fd2702dd74af25fc4b72bf11
+        uses: trufflesecurity/trufflehog@bcfcf73aaf4759d4dadc2783177c245a02792318
         with:
           path: ./
           base: ${{ github.event.pull_request.base.sha || github.event.before }}
