@@ -10,6 +10,8 @@ import {
   UseGuards,
   UseInterceptors,
   ParseUUIDPipe,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -27,6 +29,7 @@ import { UpdateEpiAssignmentDto } from './dto/update-epi-assignment.dto';
 import { EpiAssignmentsService } from './epi-assignments.service';
 import { Authorize } from '../auth/authorize.decorator';
 import { CatalogQueryDto } from '../../shared/dto/catalog-query.dto';
+import { FindEpiAssignmentsQueryDto } from './dto/find-epi-assignments-query.dto';
 import { UsersService } from '../users/users.service';
 import { EpisService } from '../epis/epis.service';
 import { resolveLookupRole } from '../../shared/utils/lookup-role.util';
@@ -59,19 +62,14 @@ export class EpiAssignmentsController {
 
   @Get()
   @Authorize('can_view_epi_assignments')
-  findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('status') status?: 'entregue' | 'devolvido' | 'substituido',
-    @Query('user_id') userId?: string,
-    @Query('epi_id') epiId?: string,
-  ) {
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
+  findAll(@Query() query: FindEpiAssignmentsQueryDto) {
     return this.assignmentsService.findPaginated({
-      page: page ? Number(page) : 1,
-      limit: limit ? Number(limit) : 20,
-      status,
-      user_id: userId,
-      epi_id: epiId,
+      page: query.page ?? 1,
+      limit: query.limit ?? 20,
+      status: query.status,
+      user_id: query.user_id,
+      epi_id: query.epi_id,
     });
   }
 

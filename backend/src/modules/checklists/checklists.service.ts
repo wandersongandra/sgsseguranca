@@ -2488,8 +2488,15 @@ export class ChecklistsService {
         },
       );
     }
-    if (updateChecklistDto.is_modelo !== undefined) {
-      checklist.is_modelo = updateChecklistDto.is_modelo;
+    if (
+      updateChecklistDto.is_modelo !== undefined &&
+      updateChecklistDto.is_modelo !== checklist.is_modelo
+    ) {
+      // SGS-CHK-STM-002: changing is_modelo bypasses assertChecklistDocumentMutable
+      // (templates are always mutable) and signature-reset — block the transition.
+      throw new BadRequestException(
+        'Não é permitido alterar o tipo do checklist (modelo/operacional) após a criação.',
+      );
     }
     if (updateChecklistDto.ativo !== undefined) {
       checklist.ativo = updateChecklistDto.ativo;
@@ -3341,14 +3348,22 @@ export class ChecklistsService {
         createdBy: userId || RequestContext.getUserId() || undefined,
         fileBuffer: file.buffer,
         persistEntityMetadata: async (manager) => {
-          await manager.getRepository(Checklist).update(
-            { id: checklist.id },
+          // SGS-CHK-CON-007: conditional update prevents double-emission race —
+          // two concurrent attachPdf requests both pass assertChecklistReadyForFinalPdf
+          // but only the first one's UPDATE matches (pdf_file_key IS NULL).
+          const result = await manager.getRepository(Checklist).update(
+            { id: checklist.id, pdf_file_key: IsNull() },
             {
               pdf_file_key: fileKey,
               pdf_folder_path: folderPath,
               pdf_original_name: file.originalname,
             },
           );
+          if (result.affected !== 1) {
+            throw new ConflictException(
+              'O checklist já possui PDF final anexado.',
+            );
+          }
         },
       });
 

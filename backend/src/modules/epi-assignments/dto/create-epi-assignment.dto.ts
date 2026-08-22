@@ -8,7 +8,9 @@
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class EpiSignatureInputDto {
   @IsString()
@@ -52,5 +54,7 @@ export class CreateEpiAssignmentDto {
   observacoes?: string;
 
   @IsObject()
+  @ValidateNested()
+  @Type(() => EpiSignatureInputDto)
   assinatura_entrega: EpiSignatureInputDto;
 }

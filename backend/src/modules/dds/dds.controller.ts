@@ -618,6 +618,7 @@ export class DdsController {
     requestsPerMinute: DDS_SIGNATURES_TENANT_THROTTLE_LIMIT,
     requestsPerHour: DDS_SIGNATURES_TENANT_THROTTLE_HOUR_LIMIT,
   })
+  @ForensicAuditAction('update', 'dds_signatures')
   replaceSignatures(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: ReplaceDdsSignaturesDto,
@@ -693,6 +694,7 @@ export class DdsController {
     requestsPerHour: DDS_UPLOAD_TENANT_THROTTLE_HOUR_LIMIT,
   })
   @UseInterceptors(FileInterceptor('file', createGovernedPdfUploadOptions()))
+  @ForensicAuditAction('create', 'dds_final_document')
   async attachFile(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req()
@@ -819,6 +821,7 @@ export class DdsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_dds')
+  @ForensicAuditAction('update', 'dds')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updateDdsDto: UpdateDdsDto,
@@ -840,6 +843,7 @@ export class DdsController {
     requestsPerMinute: DDS_CREATE_TENANT_THROTTLE_LIMIT,
     requestsPerHour: DDS_CREATE_TENANT_THROTTLE_HOUR_LIMIT,
   })
+  @ForensicAuditAction('create', 'dds')
   operationalizeTemplate(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() dto: OperationalizeDdsDto,

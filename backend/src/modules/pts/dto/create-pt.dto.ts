@@ -224,42 +224,49 @@ export class CreatePtDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => HeightChecklistItemDto)
   trabalho_altura_checklist?: HeightChecklistItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => HeightChecklistItemDto)
   trabalho_eletrico_checklist?: HeightChecklistItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => HeightChecklistItemDto)
   trabalho_quente_checklist?: HeightChecklistItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => HeightChecklistItemDto)
   trabalho_espaco_confinado_checklist?: HeightChecklistItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => HeightChecklistItemDto)
   trabalho_escavacao_checklist?: HeightChecklistItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => RecommendationChecklistItemDto)
   recomendacoes_gerais_checklist?: RecommendationChecklistItemDto[];
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => RapidRiskChecklistItemDto)
   analise_risco_rapida_checklist?: RapidRiskChecklistItemDto[];

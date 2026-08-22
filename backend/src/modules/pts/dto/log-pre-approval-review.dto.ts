@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -6,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -30,9 +32,11 @@ class PtPreApprovalWorkerStatusDto {
   userId: string;
 
   @IsString()
+  @MaxLength(200)
   nome: string;
 
   @IsString()
+  @MaxLength(100)
   roleLabel: string;
 
   @IsBoolean()
@@ -43,7 +47,9 @@ class PtPreApprovalWorkerStatusDto {
   unavailable?: boolean;
 
   @IsArray()
+  @ArrayMaxSize(20)
   @IsString({ each: true })
+  @MaxLength(500, { each: true })
   reasons: string[];
 }
 
@@ -66,7 +72,9 @@ export class LogPreApprovalReviewDto {
   readyForRelease: boolean;
 
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
+  @MaxLength(500, { each: true })
   blockers: string[];
 
   @IsInt()
@@ -85,12 +93,15 @@ export class LogPreApprovalReviewDto {
   hasRapidRiskBlocker: boolean;
 
   @IsArray()
+  @ArrayMaxSize(200)
   @ValidateNested({ each: true })
   @Type(() => PtPreApprovalWorkerStatusDto)
   workerStatuses: PtPreApprovalWorkerStatusDto[];
 
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
+  @MaxLength(500, { each: true })
   warnings: string[];
 
   @ValidateNested()

@@ -99,6 +99,7 @@ export class PtsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_pt')
+  @ForensicAuditAction('create', 'pt')
   create(@Body() createPtDto: CreatePtDto): Promise<PtResponseDto> {
     return this.ptsService.create(createPtDto).then(toPtResponseDto);
   }
@@ -106,6 +107,7 @@ export class PtsController {
   @Post(':id/approve')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_approve_pt')
+  @ForensicAuditAction('approve', 'pt')
   approve(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: ApprovePtDto,
@@ -144,6 +146,7 @@ export class PtsController {
   @Post(':id/reject')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_approve_pt')
+  @ForensicAuditAction('reject', 'pt')
   reject(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: RejectPtDto,
@@ -283,6 +286,7 @@ export class PtsController {
   @Post(':id/finalize')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_approve_pt')
+  @ForensicAuditAction('finalize', 'pt')
   finalize(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() body: FinalizePtDto,
@@ -512,6 +516,7 @@ export class PtsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_pt')
+  @ForensicAuditAction('update', 'pt')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updatePtDto: UpdatePtDto,

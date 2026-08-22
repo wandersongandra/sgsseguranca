@@ -579,6 +579,7 @@ export class PtsService {
     responsavelId?: string | null;
     auditadoPorId?: string | null;
     executantes?: string[];
+    vigiaUserId?: string | null;
   }): Promise<void> {
     await Promise.all([
       this.assertCompanyScopedEntityId(
@@ -611,6 +612,13 @@ export class PtsService {
         input.executantes,
         'Executantes',
       ),
+      // Valida vigia designado contra o tenant — impede cross-tenant (SGS-PT-SEC-007).
+      this.assertCompanyScopedEntityId(
+        User,
+        input.companyId,
+        input.vigiaUserId,
+        'Vigia designado',
+      ),
     ]);
 
     await this.assertUsersScopedToSite(
@@ -623,7 +631,12 @@ export class PtsService {
 
   private async refreshExpiredStatuses(companyId?: string): Promise<void> {
     const { siteIds, siteScope, isSuperAdmin } = this.getTenantContextOrThrow();
-    const throttleKey = companyId ?? '*';
+    // Throttle key inclui escopo de obra para evitar que uma requisição de obra A
+    // impeça a expiração de obra B dentro da mesma empresa (SGS-PT-CON-009).
+    const throttleKey = [
+      companyId ?? '*',
+      ...(!isSuperAdmin && siteScope !== 'all' ? siteIds : []),
+    ].join(':');
     const lastRun = this.expireRefreshThrottle.get(throttleKey) ?? 0;
 
     if (Date.now() - lastRun < EXPIRE_REFRESH_THROTTLE_MS) {
@@ -733,6 +746,7 @@ export class PtsService {
       responsavelId: createPtDto.responsavel_id,
       auditadoPorId: createPtDto.auditado_por_id ?? null,
       executantes,
+      vigiaUserId: createPtDto.vigia_user_id ?? null,
     });
 
     const initialRisk = this.riskCalculationService.calculateScore(
@@ -798,7 +812,12 @@ export class PtsService {
   }): Promise<OffsetPage<Pt>> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     // maxLimit: 1000 — limite de segurança para evitar OOM (5 JOINs em findOne)
     const { page, limit, skip } = normalizeOffsetPagination(opts, {
       defaultLimit: 20,
@@ -844,7 +863,12 @@ export class PtsService {
   async findAllForExport(): Promise<Pt[]> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     const qb = this.ptsRepository
       .createQueryBuilder('pt')
       .select([
@@ -879,7 +903,12 @@ export class PtsService {
   }): Promise<OffsetPage<Pt>> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     const { page, limit, skip } = normalizeOffsetPagination(opts, {
       defaultLimit: 20,
       maxLimit: 100,
@@ -936,7 +965,12 @@ export class PtsService {
   }): Promise<CursorPaginatedResponse<Pt>> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
 
     const { limit } = normalizeOffsetPagination(
       { page: 1, limit: opts?.limit },
@@ -1011,7 +1045,12 @@ export class PtsService {
   async findOne(id: string): Promise<Pt> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     const pt = await this.ptsRepository.findOne({
       where: { id, company_id: companyId },
       relations: [
@@ -1039,6 +1078,19 @@ export class PtsService {
     this.assertPtDocumentMutable(pt);
     const { executantes, status, ...rest } = updatePtDto;
     this.preservePersistedChecklistAnexoRefs(pt, rest);
+
+    // SGS-PT-SEC-004: mirror the site-scope guard from create() — the RLS
+    // WITH CHECK would also reject the write, but as a 500 (Postgres error)
+    // instead of the expected 400 with an actionable message.
+    if (rest.site_id !== undefined && rest.site_id !== pt.site_id) {
+      const { siteIds, siteScope, isSuperAdmin } = this.getTenantContextOrThrow();
+      if (!isSuperAdmin && siteScope !== 'all' && !siteIds.includes(rest.site_id)) {
+        throw new BadRequestException(
+          'PT deve permanecer na obra atual do tenant. A obra só pode ser alterada por um administrador com acesso global.',
+        );
+      }
+    }
+
     const effectiveInicio = rest.data_hora_inicio ?? pt.data_hora_inicio;
     const effectiveFim = rest.data_hora_fim ?? pt.data_hora_fim;
     if (
@@ -1066,6 +1118,8 @@ export class PtsService {
         (Array.isArray(pt.executantes)
           ? pt.executantes.map((executante) => executante.id)
           : []),
+      vigiaUserId:
+        rest.vigia_user_id !== undefined ? rest.vigia_user_id : pt.vigia_user_id,
     });
 
     const initialRisk = this.riskCalculationService.calculateScore(
@@ -1300,7 +1354,7 @@ export class PtsService {
       try {
         return await this.ptsRepository.manager.transaction(async (manager) => {
           const rows = await manager.query<Pt[]>(
-            `SELECT * FROM "pts" WHERE "id" = $1 AND "company_id" = $2${siteClause} FOR UPDATE NOWAIT`,
+            `SELECT * FROM "pts" WHERE "id" = $1 AND "company_id" = $2 AND "deleted_at" IS NULL${siteClause} FOR UPDATE NOWAIT`,
             params,
           );
 
@@ -1359,6 +1413,15 @@ export class PtsService {
         if (!allowed?.includes(PtStatus.APROVADA)) {
           throw new BadRequestException(
             `Transição inválida: ${pt.status} → Aprovada. Permitidas: ${allowed?.join(', ') || 'nenhuma'}`,
+          );
+        }
+        // SGS-PT-SM-006: reject approval of a PT whose validity window has
+        // already closed — refreshExpiredStatuses only acts on already-APROVADA
+        // PTs, so PENDENTE PTs with past data_hora_fim remain approval-eligible
+        // indefinitely without this guard.
+        if (pt.data_hora_fim && new Date(pt.data_hora_fim) <= new Date()) {
+          throw new BadRequestException(
+            'PT com janela de validade encerrada não pode ser aprovada. Emita uma nova PT.',
           );
         }
         await this.assertCanApprove(pt, pt.company_id);
@@ -1459,6 +1522,8 @@ export class PtsService {
             `Transição inválida: ${pt.status} → Encerrada. Permitidas: ${allowed?.join(', ') || 'nenhuma'}`,
           );
         }
+        // PDF final congelado não refletirá dados de encerramento — impedir (SGS-PT-INT-014).
+        this.assertPtDocumentMutable(pt);
 
         const realFim = closure.data_hora_real_fim
           ? new Date(closure.data_hora_real_fim)
@@ -1987,6 +2052,20 @@ export class PtsService {
         'Somente PTs sem PDF final podem ser removidas. Use os fluxos formais de cancelamento/encerramento para registros já emitidos.',
       );
     }
+    // SGS-PT-SM-008: PTs in terminal/active states must not be silently removed
+    // even when they lack a PDF — Aprovada/Encerrada represent safety authorizations
+    // and Cancelada/Expirada carry audit value.
+    const nonRemovableStatuses: string[] = [
+      PtStatus.APROVADA,
+      PtStatus.ENCERRADA,
+      PtStatus.CANCELADA,
+      PtStatus.EXPIRADA,
+    ];
+    if (nonRemovableStatuses.includes(pt.status)) {
+      throw new BadRequestException(
+        `PT com status '${pt.status}' não pode ser removida. Somente PTs em rascunho ou pendentes sem PDF final podem ser excluídas.`,
+      );
+    }
     await this.documentGovernanceService.removeFinalDocumentReference({
       companyId: pt.company_id,
       module: 'pt',
@@ -2005,7 +2084,20 @@ export class PtsService {
   }
 
   async count(options?: FindManyOptions<Pt>): Promise<number> {
-    return this.ptsRepository.count(options);
+    // Sempre aplica filtro de tenant e soft-delete — impede cross-tenant leak (SGS-PT-SEC-013).
+    const { companyId } = this.getTenantContextOrThrow();
+    const raw = options?.where;
+    const whereArr: FindOptionsWhere<Pt>[] = Array.isArray(raw)
+      ? raw
+      : [((raw as FindOptionsWhere<Pt>) ?? {})];
+    return this.ptsRepository.count({
+      ...options,
+      where: whereArr.map((w) => ({
+        ...w,
+        company_id: companyId,
+        deleted_at: IsNull(),
+      })),
+    });
   }
 
   async listStoredFiles(filters: WeeklyBundleFilters) {
@@ -2038,7 +2130,12 @@ export class PtsService {
   async exportExcel(): Promise<Buffer> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
     const qb = this.ptsRepository
       .createQueryBuilder('pt')
       .select([
@@ -2083,7 +2180,12 @@ export class PtsService {
   }> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    void this.refreshExpiredStatuses(companyId);
+    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+      this.logger.warn({
+        event: 'pt_expire_refresh_error',
+        error: err instanceof Error ? err.message : String(err),
+      }),
+    );
 
     const baseWhere: FindOptionsWhere<Pt> = {
       company_id: companyId,

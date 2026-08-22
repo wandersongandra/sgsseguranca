@@ -135,6 +135,7 @@ export class ChecklistsController {
   @Post()
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_checklists')
+  @ForensicAuditAction('create', 'checklist')
   @UserThrottle({ requestsPerMinute: 10 })
   @TenantThrottle({ requestsPerMinute: 30, requestsPerHour: 120 })
   create(@Body() createChecklistDto: CreateChecklistDto) {
@@ -224,6 +225,7 @@ export class ChecklistsController {
   @Patch(':id')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_checklists')
+  @ForensicAuditAction('update', 'checklist')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Body() updateChecklistDto: UpdateChecklistDto,
@@ -277,6 +279,7 @@ export class ChecklistsController {
   @Post(':id/file')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_checklists')
+  @ForensicAuditAction('finalize', 'checklist')
   @UserThrottle({ requestsPerMinute: 5 })
   @TenantThrottle({ requestsPerMinute: 20, requestsPerHour: 100 })
   @UseInterceptors(FileInterceptor('file', createGovernedPdfUploadOptions()))
@@ -307,6 +310,7 @@ export class ChecklistsController {
   @Post(':id/equipment-photo')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_checklists')
+  @ForensicAuditAction('update', 'checklist')
   @UserThrottle({ requestsPerMinute: 5 })
   @TenantThrottle({ requestsPerMinute: 20, requestsPerHour: 100 })
   @UseInterceptors(
@@ -343,6 +347,7 @@ export class ChecklistsController {
   @Post(':id/items/:itemIndex/photos')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_checklists')
+  @ForensicAuditAction('update', 'checklist')
   @UserThrottle({ requestsPerMinute: 5 })
   @TenantThrottle({ requestsPerMinute: 20, requestsPerHour: 100 })
   @UseInterceptors(

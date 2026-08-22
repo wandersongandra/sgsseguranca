@@ -120,11 +120,13 @@ export class EpisService extends BaseService<Epi> {
   }
 
   async count(options?: FindManyOptions<Epi>): Promise<number> {
-    const tenantId = this.tenantService.getTenantId();
+    // SGS-EPI-SEC-012: fail-closed — throw when no tenant context rather than
+    // returning aggregate across all companies.
+    const tenantId = this.getTenantId();
     const where = options?.where ?? {};
     return this.episRepository.count({
       ...(options ?? {}),
-      where: tenantId ? { ...where, company_id: tenantId } : where,
+      where: { ...where, company_id: tenantId },
     });
   }
 
@@ -135,17 +137,16 @@ export class EpisService extends BaseService<Epi> {
     withoutValidity: number;
     windowDays: number;
   }> {
-    const tenantId = this.tenantService.getTenantId();
+    // SGS-EPI-SEC-012: fail-closed — throw when no tenant context.
+    const tenantId = this.getTenantId();
     const now = new Date();
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() + days);
 
     const query = this.episRepository
       .createQueryBuilder('epi')
-      .where('epi.deleted_at IS NULL');
-    if (tenantId) {
-      query.andWhere('epi.company_id = :tenantId', { tenantId });
-    }
+      .where('epi.deleted_at IS NULL')
+      .andWhere('epi.company_id = :tenantId', { tenantId });
 
     const epis = await query.getMany();
 
@@ -187,7 +188,8 @@ export class EpisService extends BaseService<Epi> {
   async dispatchExpiryNotifications(
     days: number,
   ): Promise<{ dispatched: number; timestamp: Date }> {
-    const tenantId = this.tenantService.getTenantId();
+    // SGS-EPI-SEC-012: fail-closed — throw when no tenant context.
+    const tenantId = this.getTenantId();
     const now = new Date();
     const future = new Date();
     future.setDate(future.getDate() + days);
@@ -195,11 +197,8 @@ export class EpisService extends BaseService<Epi> {
     const qb = this.episRepository
       .createQueryBuilder('epi')
       .where('epi.validade_ca BETWEEN :now AND :future', { now, future })
-      .andWhere('epi.deleted_at IS NULL');
-
-    if (tenantId) {
-      qb.andWhere('epi.company_id = :tenantId', { tenantId });
-    }
+      .andWhere('epi.deleted_at IS NULL')
+      .andWhere('epi.company_id = :tenantId', { tenantId });
 
     const expiring = await qb.getMany();
     return {

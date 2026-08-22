@@ -30,6 +30,7 @@ import {
 } from '../../shared/interceptors/file-upload.interceptor';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { TenantInterceptor } from '../../shared/tenant/tenant.interceptor';
+import { AuditAction as ForensicAuditAction } from '../../shared/decorators/audit-action.decorator';
 import { ArrsService } from './arrs.service';
 import { CreateArrDto } from './dto/create-arr.dto';
 import { FindArrsQueryDto } from './dto/find-arrs-query.dto';
@@ -121,6 +122,7 @@ export class ArrsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_arrs')
+  @ForensicAuditAction('create', 'arr')
   @TenantThrottle({
     requestsPerMinute: ARR_CREATE_TENANT_THROTTLE_LIMIT,
     requestsPerHour: ARR_CREATE_TENANT_THROTTLE_HOUR_LIMIT,
@@ -150,6 +152,7 @@ export class ArrsController {
   @Post(':id/generate-final-pdf')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_arrs')
+  @ForensicAuditAction('finalize', 'arr')
   async generateFinalPdf(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req()
@@ -175,6 +178,7 @@ export class ArrsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_arrs')
+  @ForensicAuditAction('finalize', 'arr')
   @TenantThrottle({
     requestsPerMinute: ARR_UPLOAD_TENANT_THROTTLE_LIMIT,
     requestsPerHour: ARR_UPLOAD_TENANT_THROTTLE_HOUR_LIMIT,
@@ -211,6 +215,7 @@ export class ArrsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_arrs')
+  @ForensicAuditAction('update', 'arr')
   @TenantThrottle({
     requestsPerMinute: ARR_STATUS_TENANT_THROTTLE_LIMIT,
     requestsPerHour: ARR_STATUS_TENANT_THROTTLE_HOUR_LIMIT,
@@ -235,6 +240,7 @@ export class ArrsController {
     Role.COLABORADOR,
   )
   @Authorize('can_manage_arrs')
+  @ForensicAuditAction('update', 'arr')
   @TenantThrottle({
     requestsPerMinute: ARR_UPDATE_TENANT_THROTTLE_LIMIT,
     requestsPerHour: ARR_UPDATE_TENANT_THROTTLE_HOUR_LIMIT,
@@ -249,6 +255,7 @@ export class ArrsController {
   @Delete(':id')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_manage_arrs')
+  @ForensicAuditAction('delete', 'arr')
   remove(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.arrsService.remove(id);
   }

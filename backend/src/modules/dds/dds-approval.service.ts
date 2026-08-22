@@ -5,6 +5,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -409,6 +410,10 @@ export class DdsApprovalService {
     }) => Promise<T>,
   ): Promise<T> {
     const companyId = this.tenantService.getTenantId();
+    // SGS-DDS-SEC-011: falha fechada — contexto de empresa é obrigatório.
+    if (!companyId) {
+      throw new UnauthorizedException('Contexto de empresa não identificado para DDS.');
+    }
     return this.ddsRepository.manager.transaction(async (manager) => {
       const ddsRepository = manager.getRepository(Dds);
       const approvals = manager.getRepository(DdsApprovalRecord);
@@ -417,11 +422,8 @@ export class DdsApprovalService {
         .createQueryBuilder('dds')
         .setLock('pessimistic_write')
         .where('dds.id = :ddsId', { ddsId })
-        .andWhere('dds.deleted_at IS NULL');
-
-      if (companyId) {
-        qb.andWhere('dds.company_id = :companyId', { companyId });
-      }
+        .andWhere('dds.deleted_at IS NULL')
+        .andWhere('dds.company_id = :companyId', { companyId });
 
       const dds = await qb.getOne();
 

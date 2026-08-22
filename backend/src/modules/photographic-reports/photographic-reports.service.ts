@@ -1006,6 +1006,16 @@ export class PhotographicReportsService {
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(id, companyId);
+
+    if (
+      report.status === PhotographicReportStatus.FINALIZADO ||
+      report.status === PhotographicReportStatus.EXPORTADO
+    ) {
+      throw new BadRequestException(
+        'Relatórios finalizados ou exportados não podem ser revertidos para rascunho via edição direta. Use os fluxos formais de revisão.',
+      );
+    }
+
     Object.assign(report, {
       ...report,
       ...dto,
@@ -1254,6 +1264,16 @@ export class PhotographicReportsService {
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
+
+    if (
+      report.status === PhotographicReportStatus.FINALIZADO ||
+      report.status === PhotographicReportStatus.EXPORTADO
+    ) {
+      throw new BadRequestException(
+        'Não é possível remover dias de relatórios finalizados ou exportados.',
+      );
+    }
+
     await this.ensureDayBelongsToReport(report, dayId);
     await this.dayRepository.delete({
       id: dayId,
@@ -1546,6 +1566,16 @@ export class PhotographicReportsService {
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
+
+    if (
+      report.status === PhotographicReportStatus.FINALIZADO ||
+      report.status === PhotographicReportStatus.EXPORTADO
+    ) {
+      throw new BadRequestException(
+        'Não é possível remover fotos de relatórios finalizados ou exportados.',
+      );
+    }
+
     const image = await this.ensureImageBelongsToReport(report, imageId);
 
     try {
@@ -1589,6 +1619,19 @@ export class PhotographicReportsService {
     });
 
     this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+    // Two-pass save: first shift all orders to a high temporary range so the
+    // unique partial index (report_id, image_order) is not violated mid-batch
+    // when two images swap positions and TypeORM issues individual UPDATEs.
+    const finalOrders = new Map([...imageMap.values()].map((img) => [img.id, img.image_order]));
+    let tempIdx = 0;
+    for (const img of imageMap.values()) {
+      img.image_order = images.length * 2 + tempIdx + 1;
+      tempIdx++;
+    }
+    await this.imageRepository.save([...imageMap.values()]);
+    for (const img of imageMap.values()) {
+      img.image_order = finalOrders.get(img.id)!;
+    }
     await this.imageRepository.save([...imageMap.values()]);
     await this.reportRepository.save(report);
     return this.findOne(report.id);
@@ -2220,6 +2263,11 @@ export class PhotographicReportsService {
     if (report.images.length === 0) {
       throw new BadRequestException('Relatório sem fotos.');
     }
+    if (report.status === PhotographicReportStatus.RASCUNHO) {
+      throw new BadRequestException(
+        'O relatório deve ser finalizado antes de ser exportado como documento governado.',
+      );
+    }
     const result = await this.buildExportBufferAndPersist({
       report,
       exportType: PhotographicReportExportType.PDF,
@@ -2233,6 +2281,11 @@ export class PhotographicReportsService {
     const report = await this.findOne(reportId);
     if (report.images.length === 0) {
       throw new BadRequestException('Relatório sem fotos.');
+    }
+    if (report.status === PhotographicReportStatus.RASCUNHO) {
+      throw new BadRequestException(
+        'O relatório deve ser finalizado antes de ser exportado como documento governado.',
+      );
     }
     const result = await this.buildExportBufferAndPersist({
       report,

@@ -73,6 +73,7 @@ describe('EpiAssignmentsService governed PDF', () => {
     const service = new EpiAssignmentsService(
       {} as Repository<EpiAssignment>,
       {} as Repository<Epi>,
+      {} as never, // sitesRepository — not needed for PDF tests
       {} as Repository<User>,
       {} as TenantService,
       {} as SignatureTimestampService,

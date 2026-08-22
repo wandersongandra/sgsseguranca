@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -145,6 +146,7 @@ export class ArrsService {
     const arr = this.arrRepository.create({
       ...rest,
       company_id: tenantId,
+      nivel_risco: this.resolveNivelRisco(rest.probabilidade, rest.severidade),
       participants: participantIds.map((id) => ({ id }) as User),
     });
 
@@ -260,58 +262,120 @@ export class ArrsService {
   }
 
   async update(id: string, updateArrDto: UpdateArrDto): Promise<Arr> {
-    const arr = await this.findOne(id);
-    this.assertFinalDocumentMutable(arr);
-
-    const { participants, ...rest } = updateArrDto;
-    if (rest.site_id) {
-      this.assertSiteAllowed(rest.site_id);
+    // SGS-ARR-BE-009: company_id must not be accepted in update payloads
+    const { participants, company_id, ...rest } = updateArrDto as UpdateArrDto & {
+      company_id?: unknown;
+    };
+    if (company_id !== undefined) {
+      throw new BadRequestException(
+        'company_id não é permitido no payload. O tenant autenticado define a empresa.',
+      );
     }
-    const participantIds =
-      participants !== undefined
-        ? this.normalizeUniqueIds(participants)
-        : this.getParticipantIds(arr);
 
-    await this.assertRelationsBelongToCompany({
-      companyId: arr.company_id,
-      siteId: rest.site_id ?? arr.site_id,
-      responsavelId: rest.responsavel_id ?? arr.responsavel_id,
-      participantIds,
+    // SGS-ARR-CONC-008: acquire row-level lock to prevent lost-update races
+    const arr = await this.arrRepository.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(Arr);
+      const locked = await repo
+        .createQueryBuilder('arr')
+        .setLock('pessimistic_write', undefined, ['arr'])
+        .where('arr.id = :id', { id })
+        .andWhere('arr.deleted_at IS NULL')
+        .getOne()
+        .catch((err: { code?: string }) => {
+          if (err?.code === '55P03') {
+            throw new ConflictException('ARR sendo editada simultaneamente. Tente novamente.');
+          }
+          throw err;
+        });
+
+      if (!locked) {
+        throw new NotFoundException(`Análise de Risco Rápida com ID ${id} não encontrada.`);
+      }
+
+      this.assertFinalDocumentMutable(locked);
+
+      if (rest.site_id) {
+        this.assertSiteAllowed(rest.site_id);
+      }
+      const participantIds =
+        participants !== undefined
+          ? this.normalizeUniqueIds(participants)
+          : this.getParticipantIds(locked);
+
+      await this.assertRelationsBelongToCompany({
+        companyId: locked.company_id,
+        siteId: rest.site_id ?? locked.site_id,
+        responsavelId: rest.responsavel_id ?? locked.responsavel_id,
+        participantIds,
+      });
+
+      Object.assign(locked, rest);
+
+      // SGS-ARR-BR-002: always derive nivel_risco from the matrix
+      locked.nivel_risco = this.resolveNivelRisco(
+        locked.probabilidade,
+        locked.severidade,
+      );
+
+      locked.participants = participantIds.map((participantId) => ({
+        id: participantId,
+      })) as User[];
+
+      return repo.save(locked);
     });
 
-    Object.assign(arr, rest);
-    arr.participants = participantIds.map((participantId) => ({
-      id: participantId,
-    })) as User[];
-
-    const saved = await this.arrRepository.save(arr);
     this.logger.log({
       event: 'arr_updated',
-      arrId: saved.id,
-      companyId: saved.company_id,
+      arrId: arr.id,
+      companyId: arr.company_id,
     });
-    return saved;
+    return arr;
   }
 
   async updateStatus(id: string, status: ArrStatus): Promise<Arr> {
-    const arr = await this.findOne(id);
-    this.assertFinalDocumentMutable(arr);
+    // SGS-ARR-CONC-008: acquire lock before evaluating transitions
+    const saved = await this.arrRepository.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(Arr);
+      const arr = await repo
+        .createQueryBuilder('arr')
+        .setLock('pessimistic_write', undefined, ['arr'])
+        .where('arr.id = :id', { id })
+        .andWhere('arr.deleted_at IS NULL')
+        .getOne()
+        .catch((err: { code?: string }) => {
+          if (err?.code === '55P03') {
+            throw new ConflictException('ARR sendo editada simultaneamente. Tente novamente.');
+          }
+          throw err;
+        });
 
-    if (arr.status === ArrStatus.ARQUIVADA) {
-      throw new BadRequestException(
-        'Documento arquivado não pode ter o status alterado.',
-      );
-    }
+      if (!arr) {
+        throw new NotFoundException(`Análise de Risco Rápida com ID ${id} não encontrada.`);
+      }
 
-    const allowed = ARR_ALLOWED_TRANSITIONS[arr.status] || [];
-    if (!allowed.includes(status)) {
-      throw new BadRequestException(
-        `Transição inválida: ${arr.status} → ${status}. Permitidas: ${allowed.join(', ') || 'nenhuma'}`,
-      );
-    }
+      if (arr.status === ArrStatus.ARQUIVADA) {
+        throw new BadRequestException(
+          'Documento arquivado não pode ter o status alterado.',
+        );
+      }
 
-    arr.status = status;
-    const saved = await this.arrRepository.save(arr);
+      // SGS-ARR-STATE-006: allow ARQUIVADA even after PDF emission — only
+      // content transitions need assertFinalDocumentMutable
+      if (status !== ArrStatus.ARQUIVADA) {
+        this.assertFinalDocumentMutable(arr);
+      }
+
+      const allowed = ARR_ALLOWED_TRANSITIONS[arr.status] || [];
+      if (!allowed.includes(status)) {
+        throw new BadRequestException(
+          `Transição inválida: ${arr.status} → ${status}. Permitidas: ${allowed.join(', ') || 'nenhuma'}`,
+        );
+      }
+
+      arr.status = status;
+      return repo.save(arr);
+    });
+
     this.logger.log({
       event: 'arr_status_updated',
       arrId: saved.id,
@@ -679,6 +743,19 @@ export class ArrsService {
         'Documento arquivado. Gere um novo registro para retomar o fluxo.',
       );
     }
+  }
+
+  private resolveNivelRisco(
+    probabilidade: string,
+    severidade: string,
+  ): string {
+    // Matriz de risco 3x4: probabilidade × severidade → nível
+    const matrix: Record<string, Record<string, string>> = {
+      baixa: { leve: 'baixo', moderada: 'baixo', grave: 'medio', critica: 'alto' },
+      media: { leve: 'baixo', moderada: 'medio', grave: 'alto', critica: 'critico' },
+      alta: { leve: 'medio', moderada: 'alto', grave: 'critico', critica: 'critico' },
+    };
+    return matrix[probabilidade]?.[severidade] ?? 'alto';
   }
 
   private getParticipantIds(arr: Arr): string[] {

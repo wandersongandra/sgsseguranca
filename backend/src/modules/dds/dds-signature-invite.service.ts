@@ -537,9 +537,11 @@ export class DdsSignatureInviteService implements OnModuleInit {
         'DDS com PDF final emitido está bloqueado para novas assinaturas.',
       );
     }
-    if (dds.status === DdsStatus.ARQUIVADO) {
+    // SGS-DDS-INT-008: AUDITADO também deve bloquear novos convites — alinha com
+    // assertWorkflowMutable no caminho autenticado.
+    if (dds.status === DdsStatus.AUDITADO || dds.status === DdsStatus.ARQUIVADO) {
       throw new BadRequestException(
-        'DDS arquivado não recebe link público de assinatura.',
+        'DDS auditado ou arquivado não recebe link público de assinatura.',
       );
     }
   }
@@ -692,7 +694,10 @@ export class DdsSignatureInviteService implements OnModuleInit {
       .andWhere('dds.deleted_at IS NULL');
 
     if (input.lock) {
-      query.setLock('pessimistic_write');
+      // Lock only the invite row. Without specifying tables TypeORM emits
+      // "FOR UPDATE" without "OF", which PostgreSQL rejects when any
+      // nullable side of a LEFT JOIN is present in the query.
+      query.setLock('pessimistic_write', undefined, ['invite']);
     }
 
     const invite = await query.getOne();
@@ -721,8 +726,12 @@ export class DdsSignatureInviteService implements OnModuleInit {
         'DDS indisponível para assinatura por este link.',
       );
     }
-    if (invite.dds.status === DdsStatus.ARQUIVADO) {
-      throw new GoneException('DDS arquivado.');
+    // SGS-DDS-INT-008: bloquear uso do convite em DDS auditado ou arquivado.
+    if (
+      invite.dds.status === DdsStatus.AUDITADO ||
+      invite.dds.status === DdsStatus.ARQUIVADO
+    ) {
+      throw new GoneException('DDS auditado ou arquivado não aceita novas assinaturas por link público.');
     }
     if (invite.dds.version !== invite.dds_version) {
       throw new GoneException(

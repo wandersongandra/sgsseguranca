@@ -186,14 +186,13 @@ describe('Compliance flows smoke', () => {
       episService as never,
     );
 
-    // findAll(page?, limit?, status?, userId?, epiId?)
-    const result = await controller.findAll(
-      '1',
-      '20',
-      undefined,
-      'user-1',
-      undefined,
-    );
+    const result = await controller.findAll({
+      page: 1,
+      limit: 20,
+      user_id: 'user-1',
+      epi_id: undefined,
+      status: undefined,
+    });
 
     expect(result.data).toHaveLength(1);
     expect(result.data[0].status).toBe('entregue');

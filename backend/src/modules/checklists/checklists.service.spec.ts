@@ -282,7 +282,7 @@ describe('ChecklistsService', () => {
       pdf_file_key: null,
       created_at: new Date('2026-03-14T12:00:00.000Z'),
     } as unknown as Checklist;
-    const update = jest.fn();
+    const update = jest.fn().mockResolvedValue({ affected: 1 });
     const manager = {
       getRepository: jest.fn(() => ({ update })),
     };
@@ -331,7 +331,7 @@ describe('ChecklistsService', () => {
       }),
     );
     expect(update).toHaveBeenCalledWith(
-      { id: 'checklist-1' },
+      expect.objectContaining({ id: 'checklist-1' }),
       expect.objectContaining({
         pdf_original_name: 'checklist-oficial.pdf',
       }),

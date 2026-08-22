@@ -4,11 +4,15 @@
   IsOptional,
   IsString,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { EpiSignatureInputDto } from './create-epi-assignment.dto';
 
 export class ReturnEpiAssignmentDto {
   @IsObject()
+  @ValidateNested()
+  @Type(() => EpiSignatureInputDto)
   assinatura_devolucao: EpiSignatureInputDto;
 
   @IsOptional()

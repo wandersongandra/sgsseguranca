@@ -85,6 +85,7 @@ function makeService(overrides: {
   return new EpiAssignmentsService(
     assignmentsRepository,
     episRepository,
+    {} as never, // sitesRepository — not needed for these unit tests
     usersRepository,
     tenantService,
     signatureTimestampService,

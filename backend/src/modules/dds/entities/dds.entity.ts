@@ -29,7 +29,9 @@ export enum AuditResult {
 
 export const DDS_ALLOWED_TRANSITIONS: Record<DdsStatus, DdsStatus[]> = {
   [DdsStatus.RASCUNHO]: [DdsStatus.PUBLICADO, DdsStatus.ARQUIVADO],
-  [DdsStatus.PUBLICADO]: [DdsStatus.ARQUIVADO],
+  // AUDITADO é gravado pelo fluxo de aprovação (DdsApprovalService.approveStep) — declara aqui
+  // para que updateStatus() também aceite a transição via API direta (SGS-DDS-SM-007).
+  [DdsStatus.PUBLICADO]: [DdsStatus.AUDITADO, DdsStatus.ARQUIVADO],
   [DdsStatus.AUDITADO]: [DdsStatus.ARQUIVADO],
   [DdsStatus.ARQUIVADO]: [],
 };

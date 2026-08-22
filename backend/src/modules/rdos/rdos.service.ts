@@ -384,14 +384,20 @@ export class RdosService {
     const now = new Date();
     const yyyymm = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`;
     const prefix = `RDO-${yyyymm}-`;
-    const last = await this.rdosRepository
+    // Fetch all numero values for this month and extract the max sequence in JS.
+    // MAX() over a string column fails when the counter crosses a digit boundary
+    // (e.g. '999' > '1000' in string ordering), so we do numeric extraction here.
+    const rows = await this.rdosRepository
       .createQueryBuilder('rdo')
-      .select('MAX(rdo.numero)', 'max')
+      .select('rdo.numero', 'numero')
       .where('rdo.company_id = :companyId', { companyId })
       .andWhere('rdo.numero LIKE :prefix', { prefix: `${prefix}%` })
-      .getRawOne<{ max: string | null }>();
-    const lastSeq = last?.max ? Number(last.max.slice(prefix.length)) || 0 : 0;
-    return `${prefix}${String(lastSeq + 1).padStart(3, '0')}`;
+      .getRawMany<{ numero: string }>();
+    const lastSeq = rows.reduce((max, row) => {
+      const seq = Number(row.numero.slice(prefix.length)) || 0;
+      return seq > max ? seq : max;
+    }, 0);
+    return `${prefix}${String(lastSeq + 1).padStart(4, '0')}`;
   }
 
   private buildSignatureTrackedSnapshot(
@@ -2351,7 +2357,9 @@ export class RdosService {
       cleanupStoredFile: (fileKey) =>
         this.documentStorageService.deleteFile(fileKey),
     });
-    await this.rdosRepository.remove(rdo);
+    // Soft delete preserves rdo_audit_events (would be CASCADE-deleted by the
+    // FK if we used rdosRepository.remove(), which issues a hard DELETE).
+    await this.rdosRepository.softDelete(rdo.id);
     await Promise.all(
       activityPhotoPayloads.map((payload) =>
         this.documentStorageService

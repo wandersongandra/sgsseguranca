@@ -70,6 +70,7 @@ function makeService(overrides: {
   return new EpiAssignmentsService(
     assignmentsRepository,
     episRepository,
+    {} as never, // sitesRepository — not needed for these unit tests
     usersRepository,
     tenantService,
     signatureTimestampService,
@@ -156,8 +157,8 @@ describe('EpiAssignmentsService', () => {
     });
 
     it('copies ca and validade_ca from the EPI to the assignment', async () => {
-      const validadeDate = new Date('2026-01-01');
-      const mockEpi = { id: 'epi-1', ca: 'CA-999', validade_ca: validadeDate };
+      const validadeDate = new Date('2099-12-31');
+      const mockEpi = { id: 'epi-1', ca: 'CA-999', validade_ca: validadeDate, status: true };
       const mockUser = { id: 'u1', company_id: 'company-1' };
       const created: Partial<EpiAssignment> = {};
 

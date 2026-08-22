@@ -79,6 +79,7 @@ describe('RdosService', () => {
     count: jest.Mock;
     create: jest.Mock;
     remove: jest.Mock;
+    softDelete: jest.Mock;
     createQueryBuilder: jest.Mock;
     manager: {
       getRepository: jest.Mock;
@@ -158,6 +159,7 @@ describe('RdosService', () => {
       count: jest.fn().mockResolvedValue(0),
       create: jest.fn((input) => ({ ...input }) as Rdo),
       remove: jest.fn().mockResolvedValue(undefined),
+      softDelete: jest.fn().mockResolvedValue(undefined),
       createQueryBuilder: jest.fn().mockReturnValue(defaultQb),
       manager: {
         getRepository: jest.fn((entity) => {
@@ -323,14 +325,16 @@ describe('RdosService', () => {
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      getRawOne: jest.fn().mockResolvedValue({ max: 'RDO-202603-002' }),
+      getRawMany: jest
+        .fn()
+        .mockResolvedValue([{ numero: 'RDO-202603-002' }]),
     });
     const dto: CreateRdoDto = {
       data: '2026-03-16',
       status: 'rascunho',
     };
     const result = await service.create(dto);
-    expect(result.numero).toMatch(/^RDO-\d{6}-003$/);
+    expect(result.numero).toMatch(/^RDO-\d{6}-0003$/);
     expect(repository.save).toHaveBeenCalled();
   });
 
@@ -1176,7 +1180,7 @@ describe('RdosService', () => {
         },
       }),
     );
-    expect(repository.remove).toHaveBeenCalledWith(rdo);
+    expect(repository.softDelete).toHaveBeenCalledWith(rdo.id);
     expect(forensicTrailService.append).toHaveBeenCalledWith(
       expect.objectContaining<AppendForensicTrailEventInput>({
         eventType: FORENSIC_EVENT_TYPES.DOCUMENT_HARD_REMOVED,
@@ -1231,22 +1235,24 @@ describe('RdosService', () => {
       select: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
-      getRawOne: jest.fn().mockResolvedValue({ max: 'RDO-202603-005' }),
+      getRawMany: jest
+        .fn()
+        .mockResolvedValue([{ numero: 'RDO-202603-005' }]),
     });
     const dto: CreateRdoDto = {
       data: '2026-03-16',
     };
     const result = await service.create(dto);
-    expect(result.numero).toMatch(/^RDO-\d{6}-006$/);
+    expect(result.numero).toMatch(/^RDO-\d{6}-0006$/);
   });
 
   it('inicia sequencia em 001 quando nao ha RDOs no mes', async () => {
-    // default mock already returns { max: null } — no override needed
+    // default mock already returns getRawMany: [] — no override needed
     const dto: CreateRdoDto = {
       data: '2026-04-01',
     };
     const result = await service.create(dto);
-    expect(result.numero).toMatch(/^RDO-\d{6}-001$/);
+    expect(result.numero).toMatch(/^RDO-\d{6}-0001$/);
   });
 
   // ─── update (status bypass protection) ───────────────────────────────────────
