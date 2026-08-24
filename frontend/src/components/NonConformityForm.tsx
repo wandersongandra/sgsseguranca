@@ -15,6 +15,7 @@ import {
   nonConformitiesService,
   normalizeNcStatus,
   parseGovernedNcAttachmentReference,
+  parseGovernedNcPhotoReference,
 } from "@/services/nonConformitiesService";
 import { sitesService, Site } from "@/services/sitesService";
 import { getFormErrorMessage } from "@/lib/error-handler";
@@ -279,11 +280,17 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
   const [removingAttachmentIndex, setRemovingAttachmentIndex] = useState<
     number | null
   >(null);
+  const [uploadingFotoEvidencia, setUploadingFotoEvidencia] = useState(false);
+  const [uploadingFotoVerificacao, setUploadingFotoVerificacao] = useState(false);
+  const [removingFotoEvidenciaIndex, setRemovingFotoEvidenciaIndex] = useState<number | null>(null);
+  const [removingFotoVerificacaoIndex, setRemovingFotoVerificacaoIndex] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cameraCancelButtonRef = useRef<HTMLButtonElement | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const governedAttachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const fotoEvidenciaInputRef = useRef<HTMLInputElement | null>(null);
+  const fotoVerificacaoInputRef = useRef<HTMLInputElement | null>(null);
   const activeCompanyIdRef = useRef(activeCompanyId);
   const tenantGenerationRef = useRef(0);
   const attachmentMutationRequestIdRef = useRef(0);
@@ -309,6 +316,8 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
   });
 
   const watchedAnexos = watch("anexos") || [];
+  const watchedFotosEvidencia = watch("fotos_evidencia") || [];
+  const watchedFotosVerificacao = watch("fotos_verificacao") || [];
   const isClosedNc = loadedStatus === NcStatus.ENCERRADA;
   const isMutatingAttachments =
     uploadingGovernedAttachment || removingAttachmentIndex !== null;
@@ -664,6 +673,132 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
     }
   };
 
+  const uploadFotoEvidencia = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!id) {
+      toast.info("Salve a não conformidade primeiro para enviar fotos de evidência.");
+      event.target.value = "";
+      return;
+    }
+    if (!canManageNc || isClosedNc) {
+      toast.error("Não é possível adicionar fotos a uma não conformidade em modo somente leitura.");
+      event.target.value = "";
+      return;
+    }
+    if (requireNcAction("upload")) { event.target.value = ""; return; }
+    try {
+      setUploadingFotoEvidencia(true);
+      const result = await nonConformitiesService.attachFotoEvidencia(id, file);
+      setValue("fotos_evidencia", result.fotos, { shouldDirty: false });
+      toast.success("Foto de evidência salva.");
+    } catch (error) {
+      logger.error("Erro ao enviar foto de evidência:", error);
+      toast.error("Não foi possível salvar a foto de evidência.");
+    } finally {
+      setUploadingFotoEvidencia(false);
+      event.target.value = "";
+    }
+  };
+
+  const removeFotoEvidencia = async (index: number) => {
+    if (!id) return;
+    if (!canManageNc || isClosedNc) {
+      toast.error("Não é possível remover fotos de uma não conformidade em modo somente leitura.");
+      return;
+    }
+    if (requireNcAction("remove")) return;
+    try {
+      setRemovingFotoEvidenciaIndex(index);
+      const result = await nonConformitiesService.removeFotoEvidencia(id, index);
+      setValue("fotos_evidencia", result.fotos, { shouldDirty: false });
+      toast.success("Foto de evidência removida.");
+    } catch (error) {
+      logger.error("Erro ao remover foto de evidência:", error);
+      toast.error("Não foi possível remover a foto de evidência.");
+    } finally {
+      setRemovingFotoEvidenciaIndex(null);
+    }
+  };
+
+  const openFotoEvidencia = async (index: number) => {
+    if (!id) return;
+    try {
+      const access = await nonConformitiesService.getFotoEvidenciaAccess(id, index);
+      if (access.url) {
+        openSafeExternalUrlInNewTab(access.url);
+      } else {
+        toast.warning(access.message || "Foto de evidência indisponível no momento.");
+      }
+    } catch (error) {
+      logger.error("Erro ao abrir foto de evidência:", error);
+      toast.error("Não foi possível abrir a foto de evidência.");
+    }
+  };
+
+  const uploadFotoVerificacao = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!id) {
+      toast.info("Salve a não conformidade primeiro para enviar fotos de verificação.");
+      event.target.value = "";
+      return;
+    }
+    if (!canManageNc || isClosedNc) {
+      toast.error("Não é possível adicionar fotos a uma não conformidade em modo somente leitura.");
+      event.target.value = "";
+      return;
+    }
+    if (requireNcAction("upload")) { event.target.value = ""; return; }
+    try {
+      setUploadingFotoVerificacao(true);
+      const result = await nonConformitiesService.attachFotoVerificacao(id, file);
+      setValue("fotos_verificacao", result.fotos, { shouldDirty: false });
+      toast.success("Foto de verificação salva.");
+    } catch (error) {
+      logger.error("Erro ao enviar foto de verificação:", error);
+      toast.error("Não foi possível salvar a foto de verificação.");
+    } finally {
+      setUploadingFotoVerificacao(false);
+      event.target.value = "";
+    }
+  };
+
+  const removeFotoVerificacao = async (index: number) => {
+    if (!id) return;
+    if (!canManageNc || isClosedNc) {
+      toast.error("Não é possível remover fotos de uma não conformidade em modo somente leitura.");
+      return;
+    }
+    if (requireNcAction("remove")) return;
+    try {
+      setRemovingFotoVerificacaoIndex(index);
+      const result = await nonConformitiesService.removeFotoVerificacao(id, index);
+      setValue("fotos_verificacao", result.fotos, { shouldDirty: false });
+      toast.success("Foto de verificação removida.");
+    } catch (error) {
+      logger.error("Erro ao remover foto de verificação:", error);
+      toast.error("Não foi possível remover a foto de verificação.");
+    } finally {
+      setRemovingFotoVerificacaoIndex(null);
+    }
+  };
+
+  const openFotoVerificacao = async (index: number) => {
+    if (!id) return;
+    try {
+      const access = await nonConformitiesService.getFotoVerificacaoAccess(id, index);
+      if (access.url) {
+        openSafeExternalUrlInNewTab(access.url);
+      } else {
+        toast.warning(access.message || "Foto de verificação indisponível no momento.");
+      }
+    } catch (error) {
+      logger.error("Erro ao abrir foto de verificação:", error);
+      toast.error("Não foi possível abrir a foto de verificação.");
+    }
+  };
+
   const handleGenerateFinalPdf = async () => {
     if (!id) {
       toast.info("Salve a não conformidade primeiro para gerar o PDF oficial.");
@@ -989,6 +1124,57 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
   const statusAcao = ["Implementada", "Em andamento", "Não implementada"];
   const resultadoEficacia = ["Sim", "Parcialmente", "Não"];
 
+  const tiposCategoriaOptions = [
+    "NR (Norma Regulamentadora)",
+    "ISO 45001",
+    "OHSAS 18001",
+    "Procedimental",
+    "Operacional",
+    "Documental",
+    "Comportamental",
+    "Estrutural",
+    "EPI / EPC",
+    "Equipamento / Máquina",
+    "Treinamento",
+    "Ambiental",
+  ];
+  const tiposSubcategoriaOptions = [
+    "Trabalho em altura",
+    "Espaço confinado",
+    "Eletricidade",
+    "Máquinas e equipamentos",
+    "Produtos químicos",
+    "Ergonomia",
+    "Incêndio",
+    "Movimentação de cargas",
+    "Proteção respiratória",
+    "EPIs obrigatórios",
+    "Documentação faltante",
+    "Treinamento vencido",
+    "Procedimento não seguido",
+    "Sinalização",
+    "Outro",
+  ];
+  const riscoCategoriaOptions = [
+    "Físico",
+    "Químico",
+    "Biológico",
+    "Ergonômico",
+    "Mecânico / Acidente",
+    "Psicossocial",
+    "Ambiental",
+  ];
+  const riscoFonteOptions = [
+    "Processo",
+    "Equipamento",
+    "Ambiente de trabalho",
+    "Comportamento humano",
+    "Material / Substância",
+    "Método de trabalho",
+    "Organização",
+    "Fator externo",
+  ];
+
   return (
     <form
       onSubmit={handleSubmit(onSubmit, onInvalid)}
@@ -1308,13 +1494,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             >
               Categoria do tipo <span className="font-normal text-[var(--ds-color-text-secondary)]">(opcional)</span>
             </label>
-            <input
+            <Select
               id="nc-tipo-categoria"
               {...register("tipo_categoria")}
-              maxLength={120}
-              placeholder="Ex.: SGS, NR-35, ISO 45001"
-              className="w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-3 py-2.5 text-[13px] font-semibold text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] transition-colors duration-[120ms] focus:border-[var(--component-field-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-1"
-            />
+              disabled={formIsReadOnly}
+            >
+              <option value="">— Selecione —</option>
+              {tiposCategoriaOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </Select>
           </div>
           <div>
             <label
@@ -1323,13 +1512,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             >
               Subcategoria do tipo <span className="font-normal text-[var(--ds-color-text-secondary)]">(opcional)</span>
             </label>
-            <input
+            <Select
               id="nc-tipo-subcategoria"
               {...register("tipo_subcategoria")}
-              maxLength={120}
-              placeholder="Ex.: Trabalho em altura, Espaço confinado"
-              className="w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-3 py-2.5 text-[13px] font-semibold text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] transition-colors duration-[120ms] focus:border-[var(--component-field-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-1"
-            />
+              disabled={formIsReadOnly}
+            >
+              <option value="">— Selecione —</option>
+              {tiposSubcategoriaOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </Select>
           </div>
           <div>
             <label
@@ -1539,6 +1731,81 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               rows={2}
             />
           </div>
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-bold text-[var(--ds-color-text-secondary)]">
+                Fotos de evidência
+              </span>
+              {!formIsReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!id) {
+                      toast.info("Salve a NC primeiro para enviar fotos.");
+                      return;
+                    }
+                    fotoEvidenciaInputRef.current?.click();
+                  }}
+                  disabled={uploadingFotoEvidencia || removingFotoEvidenciaIndex !== null}
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--ds-color-border)] bg-[var(--ds-color-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[var(--ds-color-surface-raised)] disabled:opacity-50"
+                >
+                  {uploadingFotoEvidencia ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  {uploadingFotoEvidencia ? "Enviando…" : "Adicionar foto"}
+                </button>
+              )}
+            </div>
+            <input
+              ref={fotoEvidenciaInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={uploadFotoEvidencia}
+            />
+            {!id && (
+              <p className="text-xs text-[var(--ds-color-text-tertiary)]">
+                Salve a NC primeiro para enviar fotos de evidência.
+              </p>
+            )}
+            {watchedFotosEvidencia.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {watchedFotosEvidencia.map((ref, idx) => {
+                  const meta = parseGovernedNcPhotoReference(ref);
+                  const isRemoving = removingFotoEvidenciaIndex === idx;
+                  return (
+                    <div
+                      key={ref}
+                      className="flex items-center gap-2 rounded-md border border-[var(--ds-color-border)] bg-[var(--ds-color-surface)] px-3 py-2 text-xs"
+                    >
+                      <span className="max-w-[140px] truncate font-medium text-[var(--ds-color-text-primary)]">
+                        {meta?.originalName ?? `Foto ${idx + 1}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void openFotoEvidencia(idx)}
+                        className="text-[var(--ds-color-info)] hover:underline"
+                      >
+                        Ver
+                      </button>
+                      {!formIsReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => void removeFotoEvidencia(idx)}
+                          disabled={isRemoving || uploadingFotoEvidencia}
+                          className="text-[var(--ds-color-danger)] hover:underline disabled:opacity-50"
+                        >
+                          {isRemoving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remover"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1624,13 +1891,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             >
               Categoria do risco <span className="font-normal text-[var(--ds-color-text-secondary)]">(opcional)</span>
             </label>
-            <input
+            <Select
               id="nc-risco-categoria"
               {...register("risco_categoria")}
-              maxLength={120}
-              placeholder="Ex.: Físico, Químico, Ergonômico"
-              className="w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-3 py-2.5 text-[13px] font-semibold text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] transition-colors duration-[120ms] focus:border-[var(--component-field-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-1"
-            />
+              disabled={formIsReadOnly}
+            >
+              <option value="">— Selecione —</option>
+              {riscoCategoriaOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </Select>
           </div>
           <div>
             <label
@@ -1639,13 +1909,16 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             >
               Fonte do risco <span className="font-normal text-[var(--ds-color-text-secondary)]">(opcional)</span>
             </label>
-            <input
+            <Select
               id="nc-risco-fonte"
               {...register("risco_fonte")}
-              maxLength={200}
-              placeholder="Ex.: Máquina, Processo, Comportamento"
-              className="w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-3 py-2.5 text-[13px] font-semibold text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] transition-colors duration-[120ms] focus:border-[var(--component-field-border-focus)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-1"
-            />
+              disabled={formIsReadOnly}
+            >
+              <option value="">— Selecione —</option>
+              {riscoFonteOptions.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </Select>
           </div>
           <div>
             <label
@@ -1974,6 +2247,81 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
               {...register("verificacao_evidencias")}
               rows={2}
             />
+          </div>
+          <div className="md:col-span-2">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-bold text-[var(--ds-color-text-secondary)]">
+                Fotos de verificação
+              </span>
+              {!formIsReadOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!id) {
+                      toast.info("Salve a NC primeiro para enviar fotos.");
+                      return;
+                    }
+                    fotoVerificacaoInputRef.current?.click();
+                  }}
+                  disabled={uploadingFotoVerificacao || removingFotoVerificacaoIndex !== null}
+                  className="flex items-center gap-1.5 rounded-md border border-[var(--ds-color-border)] bg-[var(--ds-color-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[var(--ds-color-surface-raised)] disabled:opacity-50"
+                >
+                  {uploadingFotoVerificacao ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Camera className="h-3.5 w-3.5" />
+                  )}
+                  {uploadingFotoVerificacao ? "Enviando…" : "Adicionar foto"}
+                </button>
+              )}
+            </div>
+            <input
+              ref={fotoVerificacaoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={uploadFotoVerificacao}
+            />
+            {!id && (
+              <p className="text-xs text-[var(--ds-color-text-tertiary)]">
+                Salve a NC primeiro para enviar fotos de verificação.
+              </p>
+            )}
+            {watchedFotosVerificacao.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {watchedFotosVerificacao.map((ref, idx) => {
+                  const meta = parseGovernedNcPhotoReference(ref);
+                  const isRemoving = removingFotoVerificacaoIndex === idx;
+                  return (
+                    <div
+                      key={ref}
+                      className="flex items-center gap-2 rounded-md border border-[var(--ds-color-border)] bg-[var(--ds-color-surface)] px-3 py-2 text-xs"
+                    >
+                      <span className="max-w-[140px] truncate font-medium text-[var(--ds-color-text-primary)]">
+                        {meta?.originalName ?? `Foto ${idx + 1}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void openFotoVerificacao(idx)}
+                        className="text-[var(--ds-color-info)] hover:underline"
+                      >
+                        Ver
+                      </button>
+                      {!formIsReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => void removeFotoVerificacao(idx)}
+                          disabled={isRemoving || uploadingFotoVerificacao}
+                          className="text-[var(--ds-color-danger)] hover:underline disabled:opacity-50"
+                        >
+                          {isRemoving ? <Loader2 className="h-3 w-3 animate-spin" /> : "Remover"}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <div>
             <label className="mb-2 block text-sm font-bold text-[var(--ds-color-text-secondary)]">

@@ -123,6 +123,29 @@ export interface NonConformityAttachmentAttachResponse {
   };
 }
 
+export interface NonConformityPhotoAttachResponse {
+  entityId: string;
+  field: "fotos_evidencia" | "fotos_verificacao";
+  fotos: string[];
+  fotosCount: number;
+  fotoReference: string;
+  foto: {
+    index: number;
+    originalName: string;
+    mimeType: string;
+  };
+}
+
+export interface NonConformityPhotoRemoveResponse {
+  entityId: string;
+  field: "fotos_evidencia" | "fotos_verificacao";
+  fotos: string[];
+  fotosCount: number;
+  removedFotoReference: string;
+  storageCleanup: "removed" | "pending";
+  message: string;
+}
+
 export interface NonConformityAttachmentRemoveResponse {
   entityId: string;
   attachments: string[];
@@ -213,6 +236,45 @@ export function isGovernedNcAttachmentReference(
   value?: string | null,
 ): boolean {
   return Boolean(parseGovernedNcAttachmentReference(value));
+}
+
+const NC_PHOTO_REF_PREFIXES = [
+  "gst:nc-foto-evidencia:",
+  "gst:nc-foto-verificacao:",
+] as const;
+
+export function parseGovernedNcPhotoReference(
+  value?: string | null,
+): GovernedNonConformityAttachmentReference | null {
+  const normalized = String(value || "").trim();
+  const prefix = NC_PHOTO_REF_PREFIXES.find((p) => normalized.startsWith(p));
+  if (!prefix) {
+    return null;
+  }
+
+  const encodedPayload = normalized.slice(prefix.length);
+  if (!encodedPayload) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      decodeBase64Url(encodedPayload),
+    ) as Partial<GovernedNonConformityAttachmentReference>;
+    if (
+      parsed?.v !== 1 ||
+      parsed.kind !== "governed-storage" ||
+      typeof parsed.fileKey !== "string" ||
+      typeof parsed.originalName !== "string" ||
+      typeof parsed.mimeType !== "string" ||
+      typeof parsed.uploadedAt !== "string"
+    ) {
+      return null;
+    }
+    return parsed as GovernedNonConformityAttachmentReference;
+  } catch {
+    return null;
+  }
 }
 
 export function normalizeNcStatus(value?: string | null): NcStatus {
@@ -357,6 +419,78 @@ export const nonConformitiesService = {
   ): Promise<NonConformityAttachmentAccessResponse> => {
     const response = await api.get<NonConformityAttachmentAccessResponse>(
       `/nonconformities/${id}/attachments/${index}/access`,
+    );
+    return response.data;
+  },
+
+  attachFotoEvidencia: async (
+    id: string,
+    file: File,
+  ): Promise<NonConformityPhotoAttachResponse> => {
+    assertNonConformityActionAvailable("upload");
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post<NonConformityPhotoAttachResponse>(
+      `/nonconformities/${id}/fotos-evidencia`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response.data;
+  },
+
+  removeFotoEvidencia: async (
+    id: string,
+    index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> => {
+    assertNonConformityActionAvailable("remove");
+    const response = await api.delete<NonConformityPhotoRemoveResponse>(
+      `/nonconformities/${id}/fotos-evidencia/${index}`,
+    );
+    return response.data;
+  },
+
+  getFotoEvidenciaAccess: async (
+    id: string,
+    index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> => {
+    const response = await api.get<NonConformityAttachmentAccessResponse>(
+      `/nonconformities/${id}/fotos-evidencia/${index}/access`,
+    );
+    return response.data;
+  },
+
+  attachFotoVerificacao: async (
+    id: string,
+    file: File,
+  ): Promise<NonConformityPhotoAttachResponse> => {
+    assertNonConformityActionAvailable("upload");
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await api.post<NonConformityPhotoAttachResponse>(
+      `/nonconformities/${id}/fotos-verificacao`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return response.data;
+  },
+
+  removeFotoVerificacao: async (
+    id: string,
+    index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> => {
+    assertNonConformityActionAvailable("remove");
+    const response = await api.delete<NonConformityPhotoRemoveResponse>(
+      `/nonconformities/${id}/fotos-verificacao/${index}`,
+    );
+    return response.data;
+  },
+
+  getFotoVerificacaoAccess: async (
+    id: string,
+    index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> => {
+    const response = await api.get<NonConformityAttachmentAccessResponse>(
+      `/nonconformities/${id}/fotos-verificacao/${index}/access`,
     );
     return response.data;
   },

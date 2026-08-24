@@ -30,6 +30,9 @@ import { NonConformityResponseDto } from './dto/nonconformity-response.dto';
 import type {
   NonConformityAttachmentAttachResponse,
   NonConformityAttachmentRemoveResponse,
+  NonConformityAttachmentAccessResponse,
+  NonConformityPhotoAttachResponse,
+  NonConformityPhotoRemoveResponse,
 } from './nonconformities.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -228,6 +231,104 @@ export class NonConformitiesController {
       await inspectUploadedFileBuffer(buffer, file, this.fileInspectionService);
 
       return await this.nonConformitiesService.attachAttachment(
+        id,
+        buffer,
+        file.originalname,
+      );
+    } finally {
+      await cleanupUploadedTempFile(file);
+    }
+  }
+
+  @Get(':id/fotos-evidencia/:index/access')
+  @Authorize('can_view_nc')
+  getFotoEvidenciaAccess(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('index', ParseIntPipe) index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> {
+    return this.nonConformitiesService.getFotoEvidenciaAccess(id, index);
+  }
+
+  @Delete(':id/fotos-evidencia/:index')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @Authorize('can_manage_nc')
+  removeFotoEvidencia(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('index', ParseIntPipe) index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> {
+    return this.nonConformitiesService.removeFotoEvidencia(id, index);
+  }
+
+  @Post(':id/fotos-evidencia')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @UseInterceptors(
+    FileInterceptor(
+      'file',
+      createTemporaryUploadOptions({ maxFileSize: 10 * 1024 * 1024 }),
+    ),
+  )
+  @Authorize('can_manage_nc')
+  async attachFotoEvidencia(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<NonConformityPhotoAttachResponse> {
+    if (!file) {
+      throw new BadRequestException('Foto de evidência não enviada.');
+    }
+    const buffer = await readUploadedFileBuffer(file);
+    try {
+      validateFileMagicBytes(buffer, ['image/jpeg', 'image/png', 'image/webp']);
+      await inspectUploadedFileBuffer(buffer, file, this.fileInspectionService);
+      return await this.nonConformitiesService.attachFotoEvidencia(
+        id,
+        buffer,
+        file.originalname,
+      );
+    } finally {
+      await cleanupUploadedTempFile(file);
+    }
+  }
+
+  @Get(':id/fotos-verificacao/:index/access')
+  @Authorize('can_view_nc')
+  getFotoVerificacaoAccess(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('index', ParseIntPipe) index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> {
+    return this.nonConformitiesService.getFotoVerificacaoAccess(id, index);
+  }
+
+  @Delete(':id/fotos-verificacao/:index')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @Authorize('can_manage_nc')
+  removeFotoVerificacao(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Param('index', ParseIntPipe) index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> {
+    return this.nonConformitiesService.removeFotoVerificacao(id, index);
+  }
+
+  @Post(':id/fotos-verificacao')
+  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @UseInterceptors(
+    FileInterceptor(
+      'file',
+      createTemporaryUploadOptions({ maxFileSize: 10 * 1024 * 1024 }),
+    ),
+  )
+  @Authorize('can_manage_nc')
+  async attachFotoVerificacao(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ): Promise<NonConformityPhotoAttachResponse> {
+    if (!file) {
+      throw new BadRequestException('Foto de verificação não enviada.');
+    }
+    const buffer = await readUploadedFileBuffer(file);
+    try {
+      validateFileMagicBytes(buffer, ['image/jpeg', 'image/png', 'image/webp']);
+      await inspectUploadedFileBuffer(buffer, file, this.fileInspectionService);
+      return await this.nonConformitiesService.attachFotoVerificacao(
         id,
         buffer,
         file.originalname,

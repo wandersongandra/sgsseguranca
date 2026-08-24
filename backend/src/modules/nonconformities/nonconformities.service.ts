@@ -127,6 +127,29 @@ export type NonConformityAttachmentRemoveResponse = {
   message: string;
 };
 
+export type NonConformityPhotoAttachResponse = {
+  entityId: string;
+  field: NcPhotoField;
+  fotos: string[];
+  fotosCount: number;
+  fotoReference: string;
+  foto: {
+    index: number;
+    originalName: string;
+    mimeType: string;
+  };
+};
+
+export type NonConformityPhotoRemoveResponse = {
+  entityId: string;
+  field: NcPhotoField;
+  fotos: string[];
+  fotosCount: number;
+  removedFotoReference: string;
+  storageCleanup: 'removed' | 'pending';
+  message: string;
+};
+
 const MAX_NC_ATTACHMENTS = 24;
 const GOVERNED_ATTACHMENT_REF_PREFIX = 'gst:nc-attachment:';
 const SUPPORTED_NC_ATTACHMENT_MIME_TYPES = [
@@ -138,6 +161,19 @@ const SUPPORTED_NC_ATTACHMENT_MIME_TYPES = [
 
 type SupportedNcAttachmentMimeType =
   (typeof SUPPORTED_NC_ATTACHMENT_MIME_TYPES)[number];
+
+const MAX_NC_PHOTOS = 20;
+const GOVERNED_FOTO_EVIDENCIA_REF_PREFIX = 'gst:nc-foto-evidencia:';
+const GOVERNED_FOTO_VERIFICACAO_REF_PREFIX = 'gst:nc-foto-verificacao:';
+const SUPPORTED_NC_PHOTO_MIME_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
+
+type SupportedNcPhotoMimeType = (typeof SUPPORTED_NC_PHOTO_MIME_TYPES)[number];
+
+type NcPhotoField = 'fotos_evidencia' | 'fotos_verificacao';
 
 // Coordenação de concorrência para append de anexos (espelha APR/PT/Checklist).
 // FOR UPDATE NOWAIT falha com 55P03 quando a linha já está travada; reprocessamos
@@ -903,6 +939,10 @@ export class NonConformitiesService {
       verificacao_responsavel: this.normalizeOptionalText(
         dto.verificacao_responsavel,
       ),
+      tipo_categoria: this.normalizeOptionalText(dto.tipo_categoria),
+      tipo_subcategoria: this.normalizeOptionalText(dto.tipo_subcategoria),
+      risco_categoria: this.normalizeOptionalText(dto.risco_categoria),
+      risco_fonte: this.normalizeOptionalText(dto.risco_fonte),
       status: this.normalizeStatus(dto.status),
       observacoes_gerais: this.normalizeOptionalText(dto.observacoes_gerais),
       anexos: this.normalizeAttachments(dto.anexos, {
@@ -1094,6 +1134,20 @@ export class NonConformitiesService {
       payload.verificacao_responsavel = this.normalizeOptionalText(
         dto.verificacao_responsavel,
       );
+    }
+    if (dto.tipo_categoria !== undefined) {
+      payload.tipo_categoria = this.normalizeOptionalText(dto.tipo_categoria);
+    }
+    if (dto.tipo_subcategoria !== undefined) {
+      payload.tipo_subcategoria = this.normalizeOptionalText(
+        dto.tipo_subcategoria,
+      );
+    }
+    if (dto.risco_categoria !== undefined) {
+      payload.risco_categoria = this.normalizeOptionalText(dto.risco_categoria);
+    }
+    if (dto.risco_fonte !== undefined) {
+      payload.risco_fonte = this.normalizeOptionalText(dto.risco_fonte);
     }
     if (dto.status !== undefined)
       payload.status = this.normalizeStatus(dto.status);
@@ -2036,6 +2090,323 @@ export class NonConformitiesService {
         errorMessage: error instanceof Error ? error.message : 'unknown',
       });
       return response;
+    }
+  }
+
+  // ─── Fotos de Evidência e Verificação ───────────────────────────────────────
+
+  async attachFotoEvidencia(
+    id: string,
+    buffer: Buffer,
+    originalName: string,
+  ): Promise<NonConformityPhotoAttachResponse> {
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.attachPhotoLocked(
+        id,
+        'fotos_evidencia',
+        buffer,
+        originalName,
+        assertLeaseHealthy,
+      ),
+    );
+  }
+
+  async attachFotoVerificacao(
+    id: string,
+    buffer: Buffer,
+    originalName: string,
+  ): Promise<NonConformityPhotoAttachResponse> {
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.attachPhotoLocked(
+        id,
+        'fotos_verificacao',
+        buffer,
+        originalName,
+        assertLeaseHealthy,
+      ),
+    );
+  }
+
+  private async attachPhotoLocked(
+    id: string,
+    field: NcPhotoField,
+    buffer: Buffer,
+    originalName: string,
+    assertLeaseHealthy: () => void,
+  ): Promise<NonConformityPhotoAttachResponse> {
+    const nc = await this.findOneEntity(id);
+    this.assertNcDocumentMutable(nc);
+
+    const detectedMimeType = detectMimeFromMagicBytes(buffer);
+    const supportedMimeTypes = SUPPORTED_NC_PHOTO_MIME_TYPES as readonly string[];
+    if (!detectedMimeType || !supportedMimeTypes.includes(detectedMimeType)) {
+      throw new BadRequestException(
+        'Formato de foto não suportado. Use JPEG, PNG ou WebP.',
+      );
+    }
+    const mimeType = detectedMimeType as SupportedNcPhotoMimeType;
+
+    const subfolder =
+      field === 'fotos_evidencia'
+        ? 'nonconformity-photos-evidencia'
+        : 'nonconformity-photos-verificacao';
+    const refPrefix =
+      field === 'fotos_evidencia'
+        ? GOVERNED_FOTO_EVIDENCIA_REF_PREFIX
+        : GOVERNED_FOTO_VERIFICACAO_REF_PREFIX;
+
+    const fileKey = this.documentStorageService.generateDocumentKey(
+      nc.company_id,
+      subfolder,
+      id,
+      originalName,
+      { folderSegments: nc.site_id ? ['sites', nc.site_id] : [] },
+    );
+
+    try {
+      assertLeaseHealthy();
+      await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    } catch (error) {
+      this.logNcEvent('warn', 'nc_photo_upload_failed', {
+        entityId: nc.id,
+        field,
+        mimeType,
+        errorMessage: error instanceof Error ? error.message : 'unknown',
+      });
+      throw error;
+    }
+
+    const reference = `${refPrefix}${this.encodeBase64Url(
+      JSON.stringify({
+        v: 1,
+        kind: 'governed-storage',
+        fileKey,
+        originalName,
+        mimeType,
+        uploadedAt: new Date().toISOString(),
+        sizeBytes: buffer.byteLength,
+      } satisfies GovernedAttachmentReferencePayload),
+    )}`;
+
+    let saved: NonConformity;
+    let beforeSnapshot: NonConformity;
+    try {
+      const { saved: lockedSaved, result: snapshot } =
+        await this.mutateNcLocked(
+          id,
+          nc.company_id,
+          (locked) => {
+            this.assertNcDocumentMutable(locked);
+            const snap = { ...locked };
+            const current: string[] = locked[field] ?? [];
+            if (
+              !current.includes(reference) &&
+              current.length >= MAX_NC_PHOTOS
+            ) {
+              throw new BadRequestException(
+                `Máximo de ${MAX_NC_PHOTOS} fotos por campo. Remova uma foto antes de enviar outra.`,
+              );
+            }
+            (locked as unknown as Record<string, unknown>)[field] = Array.from(
+              new Set([...current, reference]),
+            );
+            return snap;
+          },
+          { assertLeaseHealthy },
+        );
+      saved = lockedSaved;
+      beforeSnapshot = snapshot;
+    } catch (error) {
+      await cleanupUploadedFile(
+        this.logger,
+        `nonconformity-photo:${nc.id}:${field}`,
+        fileKey,
+        (key) => this.documentStorageService.deleteFile(key),
+      );
+      throw error;
+    }
+
+    await this.logAudit(AuditAction.UPDATE, saved.id, beforeSnapshot, saved);
+    const savedFotos: string[] = (saved as unknown as Record<string, unknown>)[field] as string[] ?? [];
+
+    return {
+      entityId: saved.id,
+      field,
+      fotos: savedFotos,
+      fotosCount: savedFotos.length,
+      fotoReference: reference,
+      foto: {
+        index: savedFotos.findIndex((item) => item === reference),
+        originalName,
+        mimeType,
+      },
+    };
+  }
+
+  async removeFotoEvidencia(
+    id: string,
+    index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> {
+    return this.removePhotoAtIndex(id, 'fotos_evidencia', index);
+  }
+
+  async removeFotoVerificacao(
+    id: string,
+    index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> {
+    return this.removePhotoAtIndex(id, 'fotos_verificacao', index);
+  }
+
+  private async removePhotoAtIndex(
+    id: string,
+    field: NcPhotoField,
+    index: number,
+  ): Promise<NonConformityPhotoRemoveResponse> {
+    if (!Number.isSafeInteger(index) || index < 0) {
+      throw new BadRequestException('Índice de foto inválido.');
+    }
+    return this.workflowLock.runExclusive(id, (assertLeaseHealthy) =>
+      this.removePhotoLocked(id, field, index, assertLeaseHealthy),
+    );
+  }
+
+  private async removePhotoLocked(
+    id: string,
+    field: NcPhotoField,
+    index: number,
+    assertLeaseHealthy: () => void,
+  ): Promise<NonConformityPhotoRemoveResponse> {
+    const nc = await this.findOneEntity(id);
+    this.assertNcDocumentMutable(nc);
+
+    const fotos: string[] = (nc as unknown as Record<string, unknown>)[field] as string[] ?? [];
+    const fotoReference = fotos[index];
+    const parsed = this.parseGovernedAttachmentReference(fotoReference);
+    if (!parsed || !fotoReference) {
+      throw new BadRequestException(
+        'Somente fotos governadas podem ser removidas.',
+      );
+    }
+    if (!this.isExpectedAttachmentStorageKey(nc, parsed.fileKey)) {
+      throw new BadRequestException(
+        'A referência de foto não corresponde à não conformidade solicitada.',
+      );
+    }
+
+    const { saved, result: before } = await this.mutateNcLocked(
+      id,
+      nc.company_id,
+      (locked) => {
+        this.assertNcDocumentMutable(locked);
+        const lockedFotos: string[] =
+          (locked as unknown as Record<string, unknown>)[field] as string[] ?? [];
+        if (lockedFotos[index] !== fotoReference) {
+          throw new ConflictException(
+            'A lista de fotos foi alterada por outra operação. Recarregue antes de tentar remover novamente.',
+          );
+        }
+        const beforeSnapshot = { ...locked };
+        (locked as unknown as Record<string, unknown>)[field] = lockedFotos.filter(
+          (_, i) => i !== index,
+        );
+        return beforeSnapshot;
+      },
+      { expectedUpdatedAt: nc.updated_at, assertLeaseHealthy },
+    );
+
+    await this.logAudit(AuditAction.UPDATE, saved.id, before, saved);
+
+    const savedFotos: string[] =
+      (saved as unknown as Record<string, unknown>)[field] as string[] ?? [];
+    try {
+      await this.documentStorageService.deleteFile(parsed.fileKey);
+      return {
+        entityId: saved.id,
+        field,
+        fotos: savedFotos,
+        fotosCount: savedFotos.length,
+        removedFotoReference: fotoReference,
+        storageCleanup: 'removed',
+        message: 'Foto removida da não conformidade e do storage oficial.',
+      };
+    } catch {
+      return {
+        entityId: saved.id,
+        field,
+        fotos: savedFotos,
+        fotosCount: savedFotos.length,
+        removedFotoReference: fotoReference,
+        storageCleanup: 'pending',
+        message:
+          'Foto removida da não conformidade; a limpeza do storage será conciliada.',
+      };
+    }
+  }
+
+  async getFotoEvidenciaAccess(
+    id: string,
+    index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> {
+    return this.getPhotoAccess(id, 'fotos_evidencia', index);
+  }
+
+  async getFotoVerificacaoAccess(
+    id: string,
+    index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> {
+    return this.getPhotoAccess(id, 'fotos_verificacao', index);
+  }
+
+  private async getPhotoAccess(
+    id: string,
+    field: NcPhotoField,
+    index: number,
+  ): Promise<NonConformityAttachmentAccessResponse> {
+    const nc = await this.findOneEntity(id);
+    const fotos: string[] =
+      (nc as unknown as Record<string, unknown>)[field] as string[] ?? [];
+    const fotoValue = fotos[index];
+    const parsed = this.parseGovernedAttachmentReference(fotoValue);
+
+    if (!parsed) {
+      throw new BadRequestException(
+        'A foto solicitada não está disponível no storage governado.',
+      );
+    }
+    if (!this.isExpectedAttachmentStorageKey(nc, parsed.fileKey)) {
+      throw new BadRequestException(
+        'A referência de foto não corresponde à não conformidade solicitada.',
+      );
+    }
+
+    try {
+      const url = await this.documentStorageService.getSignedUrl(parsed.fileKey);
+      return {
+        entityId: nc.id,
+        index,
+        hasGovernedAttachment: true,
+        availability: 'ready',
+        fileKey: parsed.fileKey,
+        originalName: parsed.originalName,
+        mimeType: parsed.mimeType,
+        url,
+        degraded: false,
+        message: null,
+      };
+    } catch {
+      return {
+        entityId: nc.id,
+        index,
+        hasGovernedAttachment: true,
+        availability: 'registered_without_signed_url',
+        fileKey: parsed.fileKey,
+        originalName: parsed.originalName,
+        mimeType: parsed.mimeType,
+        url: null,
+        degraded: true,
+        message:
+          'Foto registrada, mas a URL segura do storage não está disponível no momento.',
+      };
     }
   }
 
