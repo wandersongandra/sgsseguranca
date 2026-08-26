@@ -1,5 +1,9 @@
 import appDataSource from '../../data-source';
 import { DataSource } from 'typeorm';
+import migrationCompatibility from '../../../migration-history-compatibility.json';
+
+const LEGACY_MIGRATION_ALIASES: Record<string, string> =
+  migrationCompatibility.aliases;
 
 const DEFERRED_PRODUCTION_MIGRATION_IDS = [
   '1709000000086',
@@ -104,6 +108,20 @@ function getMigrationTimestamp(migration: MigrationMetadata): string {
   return matchedTimestamp?.[1] || '';
 }
 
+function isEffectivelyExecuted(
+  migrationName: string,
+  executedMigrationNames: Set<string>,
+): boolean {
+  if (executedMigrationNames.has(migrationName)) {
+    return true;
+  }
+
+  return Object.entries(LEGACY_MIGRATION_ALIASES).some(
+    ([legacyName, canonicalName]) =>
+      canonicalName === migrationName && executedMigrationNames.has(legacyName),
+  );
+}
+
 export async function assertNoPendingMigrationsInProd(): Promise<void> {
   const requireNoPendingMigrations = shouldRequireNoPendingMigrations(
     process.env,
@@ -141,7 +159,10 @@ export async function assertNoPendingMigrationsInProd(): Promise<void> {
 
     const pendingMigrations = dataSource.migrations.filter(
       (migration) =>
-        !executedMigrationNames.has(getMigrationName(migration)) &&
+        !isEffectivelyExecuted(
+          getMigrationName(migration),
+          executedMigrationNames,
+        ) &&
         getMigrationName(migration).length > 0 &&
         !isDeferredMigration(migration, deferredMigrationIds),
     );

@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class CanonicalizeAiInteractionsUuids1709000000182 implements MigrationInterface {
-  name = 'CanonicalizeAiInteractionsUuids1709000000182';
+export class CanonicalizeAiInteractionsUuids1709000000385 implements MigrationInterface {
+  name = 'CanonicalizeAiInteractionsUuids1709000000385';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

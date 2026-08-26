@@ -7,6 +7,15 @@ const {
   resolveDatabaseConfig,
   resolveSslConfig,
 } = require('./database-runtime.config');
+const { assertMigrationManifest } = require('./migration-manifest');
+const {
+  compareMigrations,
+  getLegacyNamesForCanonicalName,
+  isMigrationEffectivelyExecuted,
+} = require('./migration-history-compatibility');
+const {
+  assertScriptEnvironment,
+} = require('./assert-environment-contract.cjs');
 
 function parseCliArgs(argv) {
   const options = {};
@@ -54,6 +63,8 @@ function buildDataSource(migrations) {
 }
 
 function resolveTargetedMigrations(tokens) {
+  assertMigrationManifest();
+
   const distDir = path.resolve(
     __dirname,
     '..',
@@ -81,9 +92,17 @@ function resolveTargetedMigrations(tokens) {
     );
   }
 
-  const selected = files.filter((file) =>
-    normalizedTokens.some((token) => file.includes(token)),
-  );
+  const selected = files.filter((file) => {
+    const metadata = resolveMigrationMetadata(path.join(distDir, file));
+    return normalizedTokens.some(
+      (token) =>
+        file.includes(token) ||
+        metadata.name.includes(token) ||
+        getLegacyNamesForCanonicalName(metadata.name).some((legacyName) =>
+          legacyName.includes(token),
+        ),
+    );
+  });
 
   if (!selected.length) {
     throw new Error(
@@ -91,13 +110,20 @@ function resolveTargetedMigrations(tokens) {
     );
   }
 
-  return selected.map((file) => {
-    const safeFile = path.basename(file);
-    if (safeFile !== file) {
-      throw new Error(`Nome de migração inválido: ${file}`);
-    }
-    return `${distDir}${path.sep}${safeFile}`;
-  });
+  return selected
+    .map((file) => {
+      const safeFile = path.basename(file);
+      if (safeFile !== file) {
+        throw new Error(`Nome de migração inválido: ${file}`);
+      }
+      return `${distDir}${path.sep}${safeFile}`;
+    })
+    .sort((left, right) =>
+      compareMigrations(
+        resolveMigrationMetadata(left),
+        resolveMigrationMetadata(right),
+      ),
+    );
 }
 
 function loadMigrationClass(filePath) {
@@ -149,7 +175,7 @@ async function runTargetedMigrations(dataSource, migrationFiles) {
   let appliedCount = 0;
 
   for (const migration of migrations) {
-    if (executedByName.has(migration.name)) {
+    if (isMigrationEffectivelyExecuted(migration.name, executedByName)) {
       console.log(
         `[MIGRATIONS:TARGETED] Skipping already applied migration ${migration.name}.`,
       );
@@ -197,6 +223,10 @@ async function runTargetedMigrations(dataSource, migrationFiles) {
 async function main() {
   dotenv.config({ path: path.resolve(__dirname, '../.env') });
   dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+  assertScriptEnvironment({
+    component: 'migration',
+    validateFeatureIntegrations: false,
+  });
 
   const args = parseCliArgs(process.argv.slice(2));
   const includeRaw = typeof args.include === 'string' ? args.include : '';

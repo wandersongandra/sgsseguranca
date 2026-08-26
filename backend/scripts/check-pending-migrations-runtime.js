@@ -2,22 +2,26 @@ require('reflect-metadata');
 const path = require('path');
 const dotenv = require('dotenv');
 const { DataSource } = require('typeorm');
-const { MigrationExecutor } = require('typeorm/migration/MigrationExecutor');
 const {
   resolveDatabaseConfig,
   resolveSslConfig,
 } = require('./database-runtime.config');
+const { readMigrationManifest } = require('./migration-manifest');
+const {
+  ensureMigrationsTable,
+  filterPendingMigrations,
+  loadExecutedMigrationRows,
+  readCompatibilityManifest,
+} = require('./migration-history-compatibility');
+const {
+  assertScriptEnvironment,
+} = require('./assert-environment-contract.cjs');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const distRoot = path.resolve(__dirname, '../dist');
-const migrationsDir = path.join(
-  distRoot,
-  'infra',
-  'database',
-  'migrations',
-);
+const migrationsDir = path.join(distRoot, 'infra', 'database', 'migrations');
 
 function buildDataSource() {
   const databaseConfig = resolveDatabaseConfig();
@@ -41,24 +45,56 @@ function buildDataSource() {
 }
 
 async function main() {
+  assertScriptEnvironment({
+    component: 'migration',
+    validateFeatureIntegrations: false,
+  });
   const dataSource = buildDataSource();
   try {
     await dataSource.initialize();
-    const executor = new MigrationExecutor(dataSource);
-    const pending = await executor.getPendingMigrations();
+    await ensureMigrationsTable(dataSource);
+    const manifest = readMigrationManifest();
+    const executedRows = await loadExecutedMigrationRows(dataSource);
+    const executedNames = new Set(
+      executedRows.map((row) => String(row.name || '').trim()).filter(Boolean),
+    );
+    const pending = filterPendingMigrations(
+      dataSource.migrations,
+      executedNames,
+    );
+    const sourceNames = new Set(
+      manifest.entries.map((migration) => migration.name),
+    );
+    const legacyNames = new Set(
+      Object.keys(readCompatibilityManifest().aliases),
+    );
+    const executedNotInSource = executedRows
+      .map((migration) => String(migration.name || '').trim())
+      .filter(
+        (name) =>
+          name.length > 0 && !sourceNames.has(name) && !legacyNames.has(name),
+      );
 
     console.log(
       JSON.stringify(
         {
+          manifestIssueCount: manifest.issues.length,
+          manifestIssues: manifest.issues,
           pendingCount: pending.length,
           pending: pending.map((migration) => migration.name),
+          executedNotInSourceCount: executedNotInSource.length,
+          executedNotInSource,
         },
         null,
         2,
       ),
     );
 
-    if (pending.length > 0) {
+    if (
+      manifest.issues.length > 0 ||
+      pending.length > 0 ||
+      executedNotInSource.length > 0
+    ) {
       process.exitCode = 1;
     }
   } catch (error) {

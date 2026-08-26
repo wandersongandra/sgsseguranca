@@ -1,10 +1,18 @@
 require('reflect-metadata');
 const path = require('path');
-const { DataSource, MigrationExecutor } = require('typeorm');
+const { DataSource } = require('typeorm');
 const {
   resolveDatabaseConfig,
   resolveSslConfig,
 } = require('./database-runtime.config');
+const {
+  ensureMigrationsTable,
+  filterPendingMigrations,
+  loadExecutedMigrationRows,
+} = require('./migration-history-compatibility');
+const {
+  assertScriptEnvironment,
+} = require('./assert-environment-contract.cjs');
 
 function buildDataSource() {
   const databaseConfig = resolveDatabaseConfig();
@@ -19,6 +27,7 @@ function buildDataSource() {
     __dirname,
     '..',
     'dist',
+    'infra',
     'database',
     'migrations',
     '*.js',
@@ -40,16 +49,27 @@ function buildDataSource() {
 }
 
 async function main() {
+  assertScriptEnvironment({
+    component: 'migration',
+    validateFeatureIntegrations: false,
+  });
   const dataSource = buildDataSource();
 
   try {
     await dataSource.initialize();
-    const hasPending = await dataSource.showMigrations();
+    await ensureMigrationsTable(dataSource);
+    const executedRows = await loadExecutedMigrationRows(dataSource);
+    const executedNames = new Set(
+      executedRows.map((row) => String(row.name || '')).filter(Boolean),
+    );
+    const pendingMigrations = filterPendingMigrations(
+      dataSource.migrations,
+      executedNames,
+    );
+    const hasPending = pendingMigrations.length > 0;
 
     if (hasPending) {
       console.error('[MIGRATIONS] Pending migrations detected.');
-      const executor = new MigrationExecutor(dataSource);
-      const pendingMigrations = await executor.getPendingMigrations();
       for (const migration of pendingMigrations) {
         console.error(`[MIGRATIONS] Pending: ${migration.name}`);
       }

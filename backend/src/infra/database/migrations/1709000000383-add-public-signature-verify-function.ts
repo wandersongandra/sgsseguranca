@@ -48,7 +48,10 @@ export class AddPublicSignatureVerifyFunction1709000000383 implements MigrationI
         RETURN QUERY
         SELECT
           s.signature_hash::TEXT,
-          s.signed_at,
+          -- signatures.signed_at é timestamp sem timezone; o contrato público
+          -- da função é timestamptz. A conversão explícita mantém o contrato
+          -- estável em PostgreSQL e evita erro de tipo no RETURN QUERY.
+          s.signed_at AT TIME ZONE 'UTC',
           s.timestamp_authority::TEXT,
           s.type::TEXT,
           s.timestamp_token::TEXT,

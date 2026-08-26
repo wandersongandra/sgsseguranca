@@ -9,6 +9,17 @@ const {
   resolveDatabaseConfig,
   resolveSslConfig,
 } = require('./database-runtime.config');
+const { assertMigrationManifest } = require('./migration-manifest');
+const {
+  ensureMigrationsTable,
+  filterPendingMigrations,
+  getMigrationName,
+  getMigrationTimestamp,
+  loadExecutedMigrationRows,
+} = require('./migration-history-compatibility');
+const {
+  assertScriptEnvironment,
+} = require('./assert-environment-contract.cjs');
 
 const DEFERRED_PRODUCTION_MIGRATION_IDS = [
   '1709000000086',
@@ -223,6 +234,9 @@ function resolveDeferredMigrationIds() {
 }
 
 function resolveMigrationsForExecution() {
+  const deferredIds = resolveDeferredMigrationIds();
+  assertMigrationManifest(undefined, { deferredIds });
+
   const distDir = path.resolve(
     __dirname,
     '..',
@@ -231,7 +245,7 @@ function resolveMigrationsForExecution() {
     'database',
     'migrations',
   );
-  const deferredIds = new Set(resolveDeferredMigrationIds());
+  const deferredIdSet = new Set(deferredIds);
 
   if (!fs.existsSync(distDir)) {
     return ['dist/infra/database/migrations/*.js'];
@@ -247,7 +261,7 @@ function resolveMigrationsForExecution() {
 
   for (const file of files) {
     const migrationId = file.slice(0, 13);
-    if (deferredIds.has(migrationId)) {
+    if (deferredIdSet.has(migrationId)) {
       deferred.push(file);
       continue;
     }
@@ -323,8 +337,7 @@ function isDuplicateMigrationsPrimaryKeyError(err) {
 
 async function runMigrationsWithRaceTolerance(dataSource) {
   try {
-    const applied = await dataSource.runMigrations({ transaction: 'each' });
-    return applied;
+    return await runMigrationsInDeterministicOrder(dataSource);
   } catch (err) {
     if (!isDuplicateMigrationsPrimaryKeyError(err)) {
       throw err;
@@ -333,8 +346,8 @@ async function runMigrationsWithRaceTolerance(dataSource) {
     console.warn(
       '[MIGRATIONS] Duplicate insert detected in migrations table. Verifying pending migrations state...',
     );
-    const stillPending = await dataSource.showMigrations();
-    if (stillPending) {
+    const stillPending = await getPendingMigrations(dataSource);
+    if (stillPending.length > 0) {
       throw err;
     }
 
@@ -345,7 +358,71 @@ async function runMigrationsWithRaceTolerance(dataSource) {
   }
 }
 
+async function getPendingMigrations(dataSource) {
+  await ensureMigrationsTable(dataSource);
+  const executedRows = await loadExecutedMigrationRows(dataSource);
+  const executedNames = new Set(
+    executedRows.map((row) => String(row.name || '').trim()).filter(Boolean),
+  );
+  return filterPendingMigrations(dataSource.migrations, executedNames);
+}
+
+async function executeMigration(dataSource, migration) {
+  const queryRunner = dataSource.createQueryRunner();
+  await queryRunner.connect();
+  const useTransaction = migration.transaction !== false;
+  const migrationName = getMigrationName(migration);
+  const migrationTimestamp = Number(getMigrationTimestamp(migration));
+
+  if (!migrationName || !Number.isSafeInteger(migrationTimestamp)) {
+    throw new Error(`Invalid migration identity: ${migrationName}`);
+  }
+
+  try {
+    if (useTransaction) {
+      await queryRunner.beforeMigration();
+      await queryRunner.startTransaction();
+    }
+
+    await migration.up(queryRunner);
+    await queryRunner.query(
+      'INSERT INTO "migrations"("timestamp", "name") VALUES ($1, $2)',
+      [migrationTimestamp, migrationName],
+    );
+
+    if (useTransaction) {
+      await queryRunner.commitTransaction();
+      await queryRunner.afterMigration();
+    }
+
+    console.log(`[MIGRATIONS] Applied ${migrationName} successfully.`);
+    return migration;
+  } catch (error) {
+    if (useTransaction && queryRunner.isTransactionActive) {
+      await queryRunner.rollbackTransaction();
+    }
+    throw error;
+  } finally {
+    await queryRunner.release();
+  }
+}
+
+async function runMigrationsInDeterministicOrder(dataSource) {
+  const pending = await getPendingMigrations(dataSource);
+  const applied = [];
+
+  for (const migration of pending) {
+    applied.push(await executeMigration(dataSource, migration));
+  }
+
+  return applied;
+}
+
 async function main() {
+  assertScriptEnvironment({
+    component: 'migration',
+    validateFeatureIntegrations: false,
+  });
   const { dataSource, databaseConfig } = await initializeMigrationDataSource();
   const lockInput =
     process.env.MIGRATION_ADVISORY_LOCK_INPUT ||
@@ -363,8 +440,8 @@ async function main() {
     lockRunner = dataSource.createQueryRunner();
     await lockRunner.connect();
     await acquireAdvisoryLock(lockRunner, lockId, lockTimeoutMs);
-    const hasPending = await dataSource.showMigrations();
-    if (!hasPending) {
+    const pending = await getPendingMigrations(dataSource);
+    if (pending.length === 0) {
       console.log('[MIGRATIONS] No pending migrations.');
       return;
     }
@@ -386,7 +463,18 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error('[MIGRATIONS] Failed:', err.message || err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[MIGRATIONS] Failed:', err.message || err);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  acquireAdvisoryLock,
+  clampPositiveInt,
+  computeAdvisoryLockId,
+  initializeMigrationDataSource,
+  releaseAdvisoryLock,
+  resolveDeferredMigrationIds,
+};

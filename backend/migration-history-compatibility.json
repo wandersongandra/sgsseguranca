@@ -1,0 +1,51 @@
+{
+  "aliases": {
+    "CanonicalizeAiInteractionsUuids1709000000182": "CanonicalizeAiInteractionsUuids1709000000385",
+    "AddAuditChecklistResponses1709000000342": "AddAuditChecklistResponses1709000000386",
+    "CreateInspectionsTable1709000000378": "CreateInspectionsTable1709000000387",
+    "GrantForensicTrailToSgsAdmin1709000000379": "GrantForensicTrailToSgsAdmin1709000000388",
+    "GrantTenantValidationToSgsAdmin1709000000380": "GrantTenantValidationToSgsAdmin1709000000389"
+  },
+  "order": {
+    "AddMustChangePasswordToUsers1709000000182": {
+      "legacyTimestamp": "1709000000182",
+      "ordinal": 1
+    },
+    "CanonicalizeAiInteractionsUuids1709000000385": {
+      "legacyTimestamp": "1709000000182",
+      "ordinal": 2
+    },
+    "AddAuditChecklistResponses1709000000386": {
+      "legacyTimestamp": "1709000000342",
+      "ordinal": 1
+    },
+    "AprIndexesConstraintsGdprEvidence1709000000342": {
+      "legacyTimestamp": "1709000000342",
+      "ordinal": 2
+    },
+    "CreateInspectionsTable1709000000387": {
+      "legacyTimestamp": "1709000000378",
+      "ordinal": 1
+    },
+    "RestoreGdprEpiPtsErasure1709000000378": {
+      "legacyTimestamp": "1709000000378",
+      "ordinal": 2
+    },
+    "GrantForensicTrailToSgsAdmin1709000000388": {
+      "legacyTimestamp": "1709000000379",
+      "ordinal": 1
+    },
+    "RdoAuditEventsAppendOnly1709000000379": {
+      "legacyTimestamp": "1709000000379",
+      "ordinal": 2
+    },
+    "ArrRiskIntegrity1709000000380": {
+      "legacyTimestamp": "1709000000380",
+      "ordinal": 1
+    },
+    "GrantTenantValidationToSgsAdmin1709000000389": {
+      "legacyTimestamp": "1709000000380",
+      "ordinal": 2
+    }
+  }
+}

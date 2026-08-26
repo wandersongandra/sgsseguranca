@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * migration chain. The conditional creation preserves those installations
  * while making a new database complete and tenant/site isolated.
  */
-export class CreateInspectionsTable1709000000378 implements MigrationInterface {
-  name = 'CreateInspectionsTable1709000000378';
+export class CreateInspectionsTable1709000000387 implements MigrationInterface {
+  name = 'CreateInspectionsTable1709000000387';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);

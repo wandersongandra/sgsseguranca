@@ -4,8 +4,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Permite que a conexão privilegiada persista a trilha forense sem reabrir o
  * bypass de RLS para a conexão comum da aplicação.
  */
-export class GrantForensicTrailToSgsAdmin1709000000379 implements MigrationInterface {
-  name = 'GrantForensicTrailToSgsAdmin1709000000379';
+export class GrantForensicTrailToSgsAdmin1709000000388 implements MigrationInterface {
+  name = 'GrantForensicTrailToSgsAdmin1709000000388';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

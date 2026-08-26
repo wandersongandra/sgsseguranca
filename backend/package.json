@@ -50,7 +50,7 @@
     "storage:bucket-cutover:dry-run": "node -r ts-node/register/transpile-only scripts/storage-bucket-cutover.ts --dry-run",
     "pdf:homologation": "node ./node_modules/ts-node/dist/bin.js -r tsconfig-paths/register --project tsconfig.pdf-homologation.json scripts/generate-pdf-homologation.ts",
     "pdf:epi-golden": "node ./node_modules/ts-node/dist/bin.js -T scripts/generate-epi-golden-pdf.ts",
-    "migration:revert": "typeorm migration:revert -d dist/data-source.js",
+    "migration:revert": "node scripts/run-migration-revert.js",
     "mail:runtime:audit": "node scripts/audit-mail-runtime.js",
     "mail:runtime:audit:json": "node scripts/audit-mail-runtime.js --json",
     "mail:runtime:prune-failed": "node scripts/audit-mail-runtime.js --prune-failed --min-age-minutes=1440",
