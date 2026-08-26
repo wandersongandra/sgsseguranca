@@ -102,6 +102,7 @@ COPY --from=builder /app/node_modules ./node_modules
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/migration-history-compatibility.json ./migration-history-compatibility.json
 COPY --from=builder /app/newrelic.js ./newrelic.js
 
 # Entrypoint genérico para repassar o comando final do serviço

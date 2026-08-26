@@ -21,6 +21,7 @@ import {
   type TelemetryRuntime,
 } from './shared/observability/opentelemetry.config';
 import { initSentry, type SentryInitStatus } from './shared/monitoring/sentry';
+import { validateCommonEnvironment } from './shared/config/environment-contract';
 
 const WORKER_SERVICE_NAME = 'wanderson-gandra-worker';
 const WORKER_TELEMETRY_PORT = 9465;
@@ -111,6 +112,10 @@ function logObservabilityStatus(
 }
 
 async function bootstrap() {
+  validateCommonEnvironment(process.env, {
+    component: 'worker',
+    requireQueueRedis: true,
+  });
   const bootstrapLogger = createStructuredWinstonLogger(WORKER_SERVICE_NAME);
   const workerPort = getWorkerHealthPort();
   const requestedPrometheusPort = process.env.PROMETHEUS_PORT

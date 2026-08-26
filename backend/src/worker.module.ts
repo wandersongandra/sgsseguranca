@@ -42,6 +42,10 @@ import {
   createRedisKeyvCache,
   DEFAULT_CACHE_TTL_MS,
 } from './shared/cache/redis-keyv-cache.util';
+import {
+  KNOWN_SGS_ENV_KEYS,
+  validateCommonEnvironment,
+} from './shared/config/environment-contract';
 
 function firstNonEmpty(
   values: Array<string | undefined | null>,
@@ -319,7 +323,25 @@ const validationSchema = Joi.object({
   WORKER_HEARTBEAT_ENABLED: Joi.boolean().default(true),
   WORKER_HEARTBEAT_REQUIRED: Joi.boolean().default(true),
   WORKER_HEARTBEAT_KEY: Joi.string().default('worker:heartbeat:queue-runtime'),
-  WORKER_HEARTBEAT_TTL_SECONDS: Joi.number().default(90),
+  WORKER_HEARTBEAT_TTL_SECONDS: Joi.number()
+    .integer()
+    .min(30)
+    .max(3600)
+    .default(90),
+}).custom((value: Record<string, unknown>, helpers) => {
+  try {
+    validateCommonEnvironment(value, {
+      component: 'worker',
+      knownKeys: KNOWN_SGS_ENV_KEYS,
+      requireQueueRedis: true,
+    });
+  } catch (error) {
+    return helpers.error('any.invalid', {
+      message: error instanceof Error ? error.message : 'ENVIRONMENT_INVALID',
+    });
+  }
+
+  return value;
 });
 
 @Module({

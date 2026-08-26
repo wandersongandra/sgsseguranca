@@ -36,6 +36,7 @@ import {
   type TelemetryRuntime,
 } from './shared/observability/opentelemetry.config';
 import { initSentry, type SentryInitStatus } from './shared/monitoring/sentry';
+import { validateCommonEnvironment } from './shared/config/environment-contract';
 import {
   isCorsOriginAllowed,
   resolveAllowedCorsOrigins,
@@ -86,6 +87,7 @@ function logObservabilityStatus(
 }
 
 async function bootstrap() {
+  validateCommonEnvironment(process.env, { component: 'api' });
   const bootstrapLogger = createStructuredWinstonLogger(WEB_SERVICE_NAME);
   const webPort = Number(process.env.PORT || 8080);
   const requestedPrometheusPort = process.env.PROMETHEUS_PORT

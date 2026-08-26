@@ -16,16 +16,29 @@ O acesso operacional usa o usuário `sgsops` e a chave local dedicada
 - `migrations-loadtest`: job de execução única com a credencial de DDL.
 - `seed-loadtest`: job de execução única com dados sintéticos e determinísticos.
 - `api-loadtest`: backend NestJS com o papel `sgs_app`, sem credencial de DDL.
+- `worker-loadtest`: processo NestJS separado, construído com `Dockerfile.worker`,
+  heartbeat obrigatório no Redis e sem porta publicada.
 - `proxy-loadtest`: Nginx leve, somente na rede Docker; aplica limites de
   requisição/conexão e encaminha para a API.
 - `edge-loadtest`: Caddy separado para o hostname exclusivo
   `api-loadtest.sgsseguranca.com.br`, TLS automático e chave
   `X-Loadtest-Key`. O segredo fica apenas no `.env.loadtest` da VPS.
 
-Frontend, Grafana, Prometheus, Loki, Kubernetes, MinIO e worker não fazem parte
-do primeiro boot. O worker só deve ser habilitado depois da medição de RAM com
-API, banco e Redis estáveis. O storage documental inicial é local, em volume
+Frontend, Grafana, Prometheus, Loki, Kubernetes e MinIO não fazem parte do
+runtime P0. O worker só deve ser habilitado depois da medição de RAM com API,
+banco e Redis estáveis; nesta validação ele foi habilitado com limite próprio e
+healthcheck por heartbeat. O storage documental inicial é local, em volume
 exclusivo do ambiente.
+
+O Redis deste perfil é compartilhado por autenticação, cache, rate limit,
+idempotência e BullMQ. Por isso o `maxmemory-policy` deve permanecer em
+`noeviction`: políticas de eviction podem remover chaves de filas e produzir
+perda silenciosa de jobs. Se a carga exigir eviction, separar o Redis de filas
+antes de alterar a política.
+
+`FRONTEND_URL` permanece opcional enquanto não existir frontend de loadtest.
+Com `MAIL_ENABLED=false`, a ausência gera apenas o warning de links DDS e não
+habilita envio; nunca apontar esse ambiente para `app.sgsseguranca.com.br`.
 
 `VALIDATION_TOKEN_SECRET` também é obrigatório no load-test. Gere na VPS um
 segredo sintético com pelo menos 32 caracteres e nunca reutilize segredo de
@@ -136,10 +149,17 @@ cliente.
 Depois do boot, execute o script dentro da rede Docker isolada:
 
 ```bash
-docker compose --env-file .env.loadtest -f compose.yml run --rm \
-  --entrypoint node api-loadtest \
-  /opt/load-test/scripts/forensic-rls-proof.cjs
+docker compose --env-file .env.loadtest -f compose.yml run --rm --no-deps \
+  --user root \
+  -v "$PWD/.env.loadtest:/run/secrets/loadtest.env:ro" \
+  --entrypoint sh api-loadtest \
+  -lc 'set -a; . /run/secrets/loadtest.env; set +a; exec node /opt/load-test/scripts/forensic-rls-proof.cjs'
 ```
+
+O `.env.loadtest` é montado somente no container descartável porque as variáveis
+de login sintético são necessárias pela prova, mas não devem ser injetadas no
+processo permanente da API. `--no-deps` evita repetir os jobs de migration e
+seed; não use `--remove-orphans` neste diagnóstico.
 
 Ele valida o role `sgs_app`, `rolbypassrls = false`, persistência do
 `LOGIN_SUCCESS`, insert/select do tenant correto, bloqueio de leitura por
