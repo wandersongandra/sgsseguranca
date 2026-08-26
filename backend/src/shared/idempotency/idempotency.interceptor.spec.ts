@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { lastValueFrom, of, throwError } from 'rxjs';
 import { IdempotencyInterceptor } from './idempotency.interceptor';
+import { DurableIdempotencyPersistenceException } from './idempotency.service';
 import { TenantService } from '../tenant/tenant.service';
 
 describe('IdempotencyInterceptor', () => {
@@ -13,6 +14,7 @@ describe('IdempotencyInterceptor', () => {
   });
 
   function createContext(input: {
+    method?: string;
     headers?: Record<string, string>;
     user?: { userId?: string; id?: string };
     body?: unknown;
@@ -21,7 +23,7 @@ describe('IdempotencyInterceptor', () => {
     path?: string;
   }): ExecutionContext {
     const request = {
-      method: 'POST',
+      method: input.method ?? 'POST',
       path: input.path ?? '/auth/login',
       headers: input.headers ?? {},
       user: input.user,
@@ -82,7 +84,7 @@ describe('IdempotencyInterceptor', () => {
     await lastValueFrom(
       interceptor.intercept(
         createContext({
-          headers: { 'x-idempotency-key': 'request-123' },
+          headers: { 'X-Idempotency-Key': 'request-123' },
           user: { userId: '22222222-2222-4222-8222-222222222222' },
         }),
         { handle: () => of({ ok: true }) },
@@ -105,6 +107,197 @@ describe('IdempotencyInterceptor', () => {
       { ok: true },
     );
   });
+
+  it('reutiliza o replay quando a ordem das propriedades JSON muda', async () => {
+    jest
+      .spyOn(TenantService, 'currentTenantId')
+      .mockReturnValue('11111111-1111-4111-8111-111111111111');
+    let record: {
+      status: 'processing' | 'completed';
+      requestHash: string;
+      statusCode?: number;
+      body?: unknown;
+      responseStored?: boolean;
+      createdAt: number;
+    } | null = null;
+    let sideEffects = 0;
+    const idempotencyService = {
+      getRecord: jest.fn().mockImplementation(() => Promise.resolve(record)),
+      markProcessing: jest
+        .fn()
+        .mockImplementation(
+          (
+            _scopeId: string,
+            _method: string,
+            _path: string,
+            _idempotencyKey: string,
+            requestHash: string,
+          ) => {
+            if (record) return Promise.resolve('exists');
+            record = {
+              status: 'processing',
+              requestHash,
+              createdAt: Date.now(),
+            };
+            return Promise.resolve('acquired');
+          },
+        ),
+      saveResponse: jest
+        .fn()
+        .mockImplementation(
+          (
+            _scopeId: string,
+            _method: string,
+            _path: string,
+            _idempotencyKey: string,
+            requestHash: string,
+            statusCode: number,
+            body: unknown,
+          ) => {
+            record = {
+              status: 'completed',
+              requestHash,
+              statusCode,
+              body,
+              responseStored: true,
+              createdAt: Date.now(),
+            };
+            return Promise.resolve();
+          },
+        ),
+      deleteRecord: jest.fn().mockResolvedValue(undefined),
+    };
+    const interceptor = new IdempotencyInterceptor(idempotencyService as never);
+    const first = {
+      headers: { 'x-idempotency-key': 'canonical-order' },
+      user: { userId: '22222222-2222-4222-8222-222222222222' },
+      body: { alpha: 1, nested: { first: true, second: 'value' } },
+    };
+    const second = {
+      ...first,
+      body: { nested: { second: 'value', first: true }, alpha: 1 },
+    };
+
+    const handler = {
+      handle: () => {
+        sideEffects += 1;
+        return of({ created: true });
+      },
+    };
+    await expect(
+      lastValueFrom(interceptor.intercept(createContext(first), handler)),
+    ).resolves.toEqual({ created: true });
+    await expect(
+      lastValueFrom(interceptor.intercept(createContext(second), handler)),
+    ).resolves.toEqual({ created: true });
+
+    expect(sideEffects).toBe(1);
+    expect(idempotencyService.saveResponse).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([2, 5, 10, 20])(
+    'executa o efeito uma vez sob concorrência de %i chamadas',
+    async (concurrency) => {
+      jest
+        .spyOn(TenantService, 'currentTenantId')
+        .mockReturnValue('11111111-1111-4111-8111-111111111111');
+      let record: {
+        status: 'processing' | 'completed';
+        requestHash: string;
+        statusCode?: number;
+        body?: unknown;
+        responseStored?: boolean;
+        createdAt: number;
+      } | null = null;
+      let sideEffects = 0;
+      const idempotencyService = {
+        getRecord: jest.fn().mockImplementation(() => Promise.resolve(record)),
+        markProcessing: jest
+          .fn()
+          .mockImplementation(
+            (
+              _scopeId: string,
+              _method: string,
+              _path: string,
+              _idempotencyKey: string,
+              requestHash: string,
+            ) => {
+              if (record) return Promise.resolve('exists');
+              record = {
+                status: 'processing',
+                requestHash,
+                createdAt: Date.now(),
+              };
+              return Promise.resolve('acquired');
+            },
+          ),
+        saveResponse: jest
+          .fn()
+          .mockImplementation(
+            (
+              _scopeId: string,
+              _method: string,
+              _path: string,
+              _idempotencyKey: string,
+              requestHash: string,
+              statusCode: number,
+              body: unknown,
+            ) => {
+              record = {
+                status: 'completed',
+                requestHash,
+                statusCode,
+                body,
+                responseStored: true,
+                createdAt: Date.now(),
+              };
+              return Promise.resolve();
+            },
+          ),
+        deleteRecord: jest.fn().mockResolvedValue(undefined),
+      };
+      const first = new IdempotencyInterceptor(idempotencyService as never);
+      const second = new IdempotencyInterceptor(idempotencyService as never);
+      const handler = {
+        handle: () => {
+          sideEffects += 1;
+          return of({ created: true });
+        },
+      };
+      const outcomes = await Promise.allSettled(
+        Array.from({ length: concurrency }, (_, index) =>
+          lastValueFrom(
+            (index % 2 === 0 ? first : second).intercept(
+              createContext({
+                headers: { 'x-idempotency-key': 'concurrent-key' },
+                user: { userId: '22222222-2222-4222-8222-222222222222' },
+                body: { amount: 100 },
+              }),
+              handler,
+            ),
+          ),
+        ),
+      );
+
+      const fulfilled = outcomes.filter(
+        (outcome): outcome is PromiseFulfilledResult<unknown> =>
+          outcome.status === 'fulfilled',
+      );
+      const rejected = outcomes.filter(
+        (outcome): outcome is PromiseRejectedResult =>
+          outcome.status === 'rejected',
+      );
+      expect(fulfilled).toHaveLength(1);
+      expect(rejected).toHaveLength(concurrency - 1);
+      expect(
+        rejected.every(
+          (outcome) => outcome.reason instanceof ConflictException,
+        ),
+      ).toBe(true);
+      expect(sideEffects).toBe(1);
+      expect(idempotencyService.saveResponse).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('não cria cache apenas com contexto tenant quando não há usuário autenticado', async () => {
     jest
@@ -216,6 +409,159 @@ describe('IdempotencyInterceptor', () => {
       'persistence-degraded',
     );
     expect(idempotencyService.deleteRecord).not.toHaveBeenCalled();
+  });
+
+  it('não mascara falha ao persistir a conclusão durável no PostgreSQL', async () => {
+    jest
+      .spyOn(TenantService, 'currentTenantId')
+      .mockReturnValue('11111111-1111-4111-8111-111111111111');
+    let sideEffects = 0;
+    const idempotencyService = {
+      getRecord: jest.fn().mockResolvedValue(null),
+      markProcessing: jest.fn().mockResolvedValue('acquired'),
+      saveResponse: jest
+        .fn()
+        .mockRejectedValue(new DurableIdempotencyPersistenceException()),
+      deleteRecord: jest.fn().mockResolvedValue(undefined),
+    };
+    const interceptor = new IdempotencyInterceptor(idempotencyService as never);
+    const context = createContext({
+      headers: { 'x-idempotency-key': 'durable-write-failure' },
+      user: { userId: '22222222-2222-4222-8222-222222222222' },
+      body: { amount: 100 },
+    });
+
+    await expect(
+      lastValueFrom(
+        interceptor.intercept(context, {
+          handle: () => {
+            sideEffects += 1;
+            return of({ created: true });
+          },
+        }),
+      ),
+    ).rejects.toBeInstanceOf(DurableIdempotencyPersistenceException);
+
+    expect(sideEffects).toBe(1);
+    const response = context
+      .switchToHttp()
+      .getResponse<{ setHeader: jest.Mock }>();
+    expect(response.setHeader).not.toHaveBeenCalled();
+  });
+
+  it('não repete o efeito quando o Redis falha após o commit durável', async () => {
+    jest
+      .spyOn(TenantService, 'currentTenantId')
+      .mockReturnValue('11111111-1111-4111-8111-111111111111');
+
+    let durableRecord: unknown = null;
+    let sideEffects = 0;
+    const idempotencyService = {
+      getRecord: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(durableRecord)),
+      markProcessing: jest.fn().mockResolvedValue('acquired'),
+      saveResponse: jest
+        .fn()
+        .mockImplementationOnce(
+          (
+            _scopeId: string,
+            _method: string,
+            _path: string,
+            _idempotencyKey: string,
+            requestHash: string,
+            statusCode: number,
+            body: unknown,
+          ) => {
+            durableRecord = {
+              status: 'completed',
+              requestHash,
+              statusCode,
+              body,
+              responseStored: true,
+              createdAt: Date.now(),
+            };
+            return Promise.reject(new Error('redis indisponível'));
+          },
+        )
+        .mockResolvedValue(undefined),
+      deleteRecord: jest.fn().mockResolvedValue(undefined),
+    };
+    const interceptor = new IdempotencyInterceptor(idempotencyService as never);
+    const request = createContext({
+      headers: { 'x-idempotency-key': 'be-006-retry' },
+      user: { userId: '22222222-2222-4222-8222-222222222222' },
+      body: { amount: 100 },
+    });
+    const handler = {
+      handle: () => {
+        sideEffects += 1;
+        return of({ created: true, sideEffects });
+      },
+    };
+
+    await expect(
+      lastValueFrom(interceptor.intercept(request, handler)),
+    ).resolves.toEqual({
+      created: true,
+      sideEffects: 1,
+    });
+
+    await expect(
+      lastValueFrom(interceptor.intercept(request, handler)),
+    ).resolves.toEqual({
+      created: true,
+      sideEffects: 1,
+    });
+
+    expect(durableRecord).toEqual(
+      expect.objectContaining({ status: 'completed', responseStored: true }),
+    );
+    expect(sideEffects).toBe(1);
+  });
+
+  it('bloqueia retry quando a finalização durável falha e deixa a reserva em processing', async () => {
+    jest
+      .spyOn(TenantService, 'currentTenantId')
+      .mockReturnValue('11111111-1111-4111-8111-111111111111');
+
+    let record: unknown = null;
+    let sideEffects = 0;
+    const idempotencyService = {
+      getRecord: jest.fn().mockImplementation(() => Promise.resolve(record)),
+      markProcessing: jest.fn().mockImplementation(() => {
+        record = {
+          status: 'processing',
+          requestHash: 'a'.repeat(64),
+          createdAt: Date.now(),
+        };
+        return Promise.resolve('acquired');
+      }),
+      saveResponse: jest
+        .fn()
+        .mockRejectedValue(new DurableIdempotencyPersistenceException()),
+      deleteRecord: jest.fn().mockResolvedValue(undefined),
+    };
+    const interceptor = new IdempotencyInterceptor(idempotencyService as never);
+    const request = createContext({
+      headers: { 'x-idempotency-key': 'durable-finalization-failure' },
+      user: { userId: '22222222-2222-4222-8222-222222222222' },
+      body: { amount: 101 },
+    });
+    const handler = {
+      handle: () => {
+        sideEffects += 1;
+        return of({ created: true });
+      },
+    };
+
+    await expect(
+      lastValueFrom(interceptor.intercept(request, handler)),
+    ).rejects.toBeInstanceOf(DurableIdempotencyPersistenceException);
+    await expect(
+      lastValueFrom(interceptor.intercept(request, handler)),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(sideEffects).toBe(1);
   });
 
   it('libera a chave quando a própria operação falha', async () => {

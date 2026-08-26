@@ -12,7 +12,10 @@ import { Observable, from, of, throwError } from 'rxjs';
 import { switchMap, mergeMap, catchError, map } from 'rxjs/operators';
 import type { Request, Response } from 'express';
 import { createHash } from 'node:crypto';
-import { IdempotencyService } from './idempotency.service';
+import {
+  DurableIdempotencyPersistenceException,
+  IdempotencyService,
+} from './idempotency.service';
 import { TenantService } from '../tenant/tenant.service';
 
 type IdempotencyRequest = Request<
@@ -42,7 +45,10 @@ function readHeader(
   if (!headers || typeof headers !== 'object') {
     return undefined;
   }
-  const value: unknown = (headers as Record<string, unknown>)[headerName];
+  const headerEntry = Object.entries(headers as Record<string, unknown>).find(
+    ([name]) => name.toLowerCase() === headerName.toLowerCase(),
+  );
+  const value: unknown = headerEntry?.[1];
   if (typeof value === 'string') {
     return value;
   }
@@ -154,7 +160,8 @@ export class IdempotencyInterceptor implements NestInterceptor {
     const idempotencyKeyValue = readHeader(request, 'x-idempotency-key');
 
     // Só aplica em métodos não-seguros com a header presente
-    if (!idempotencyKeyValue || !this.IDEMPOTENT_METHODS.has(request.method)) {
+    const method = request.method.toUpperCase();
+    if (!idempotencyKeyValue || !this.IDEMPOTENT_METHODS.has(method)) {
       return next.handle();
     }
 
@@ -194,7 +201,7 @@ export class IdempotencyInterceptor implements NestInterceptor {
       );
     }
 
-    const { method, path } = request;
+    const { path } = request;
     const requestHash = buildRequestHash(request);
 
     // Usar from() para converter a Promise em Observable e encadear
@@ -290,6 +297,12 @@ export class IdempotencyInterceptor implements NestInterceptor {
                 ).pipe(
                   map((): unknown => body),
                   catchError((persistenceError: unknown) => {
+                    if (
+                      persistenceError instanceof
+                      DurableIdempotencyPersistenceException
+                    ) {
+                      return throwError(() => persistenceError);
+                    }
                     this.logger.error(
                       `Operação concluída, mas resposta idempotente não foi persistida: ${method} ${path}`,
                       persistenceError instanceof Error
