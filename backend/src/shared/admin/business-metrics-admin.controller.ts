@@ -41,7 +41,7 @@ const getErrorMessage = (error: unknown): string =>
 @Controller('admin/metrics')
 @TenantOptional()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN_GERAL)
+@Roles(Role.SUPER_ADMIN)
 export class BusinessMetricsAdminController {
   constructor(
     private readonly businessMetricsSummaryService: BusinessMetricsSummaryService,

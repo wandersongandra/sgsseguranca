@@ -103,7 +103,7 @@ export class MfaService {
     if (!this.isEnabled()) {
       return false;
     }
-    if (normalized === 'ADMIN_GERAL') {
+    if (normalized === 'SUPER_ADMIN' || normalized === 'ADMIN_GERAL') {
       return isAdminGeralMfaEnforced(this.configService);
     }
     if (normalized === 'ADMIN_EMPRESA') {
@@ -414,7 +414,7 @@ export class MfaService {
   async verifyLoginChallenge(params: {
     challengeToken: string;
     code: string;
-  }): Promise<{ userId: string }> {
+  }): Promise<{ userId: string; companyId: string }> {
     const state = await this.consumeChallengeAttempt(params.challengeToken);
     if (state.purpose !== 'login') {
       throw new ForbiddenException('Challenge MFA inválido para login');
@@ -448,13 +448,13 @@ export class MfaService {
       'login',
       state.companyId,
     );
-    return { userId: state.userId };
+    return { userId: state.userId, companyId: credential.company_id };
   }
 
   async activateBootstrapChallenge(params: {
     challengeToken: string;
     code: string;
-  }): Promise<{ userId: string }> {
+  }): Promise<{ userId: string; companyId: string }> {
     const state = await this.consumeChallengeAttempt(params.challengeToken);
     if (state.purpose !== 'bootstrap') {
       throw new ForbiddenException('Challenge MFA inválido para bootstrap');
@@ -494,7 +494,7 @@ export class MfaService {
       verification.method,
       credential.company_id,
     );
-    return { userId: state.userId };
+    return { userId: state.userId, companyId: credential.company_id };
   }
 
   async verifyStepUp(params: {
@@ -888,7 +888,7 @@ export class MfaService {
 
   private canUsePasswordFallback(profileName?: string | null): boolean {
     const normalized = normalizePrivilegedRole(profileName);
-    if (normalized === 'ADMIN_GERAL') {
+    if (normalized === 'SUPER_ADMIN' || normalized === 'ADMIN_GERAL') {
       return !isAdminGeralMfaEnforced(this.configService);
     }
     if (normalized === 'ADMIN_EMPRESA') {

@@ -13,8 +13,11 @@ import { Observable } from 'rxjs';
  * A injeção de app.current_company_id/app.is_super_admin no PostgreSQL é feita
  * pelo TenantDbContextService (pool hook), que cobre TODAS as conexões TypeORM.
  *
- * Este interceptor não precisa mais fazer chamadas ao banco — fazê-lo criaria
- * race conditions e envenenamento do pool de conexões.
+ * Este interceptor não é uma barreira de segurança e não deve ser tratado como
+ * enforcement. Ele não precisa fazer chamadas ao banco — fazê-lo criaria race
+ * conditions e envenenamento do pool de conexões. O enforcement da camada de
+ * aplicação é feito pelo TenantGuard e pelos serviços tenant-scoped; o
+ * PostgreSQL permanece como segunda barreira via RLS.
  */
 @Injectable()
 export class TenantInterceptor implements NestInterceptor {

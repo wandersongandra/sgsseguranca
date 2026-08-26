@@ -14,6 +14,18 @@ type TokenExpiresIn = NonNullable<SignOptions['expiresIn']>;
 type RefreshCookieSameSite = 'strict' | 'lax' | 'none';
 const DURATION_WITH_UNIT_REGEX = /^\d+(s|m|h|d)$/i;
 
+export const JWT_ALGORITHM = 'HS256' as const;
+export const JWT_ACCESS_TOKEN_TYPE = 'access' as const;
+export const JWT_REFRESH_TOKEN_TYPE = 'refresh' as const;
+export type JwtTokenType =
+  typeof JWT_ACCESS_TOKEN_TYPE | typeof JWT_REFRESH_TOKEN_TYPE;
+
+export type JwtContract = {
+  issuer: string;
+  audience: string;
+  algorithms: [typeof JWT_ALGORITHM];
+};
+
 export function isInfiniteTtl(ttl: TokenExpiresIn): boolean {
   const normalized = String(ttl).toLowerCase();
   return (
@@ -87,6 +99,68 @@ function readConfigValue(
   key: string,
 ): string | undefined {
   return configService?.get<string>(key)?.trim() || process.env[key]?.trim();
+}
+
+export function getJwtContract(
+  configService?: Pick<ConfigService, 'get'>,
+): JwtContract {
+  const issuer = readConfigValue(configService, 'JWT_ISSUER');
+  const audience = readConfigValue(configService, 'JWT_AUDIENCE');
+
+  if (!issuer || !audience) {
+    throw new Error('JWT_ISSUER and JWT_AUDIENCE are required');
+  }
+
+  return {
+    issuer,
+    audience,
+    algorithms: [JWT_ALGORITHM],
+  };
+}
+
+export function getJwtSignOptions(
+  configService?: Pick<ConfigService, 'get'>,
+): Pick<JwtContract, 'issuer' | 'audience'> {
+  const { issuer, audience } = getJwtContract(configService);
+  return { issuer, audience };
+}
+
+export function getJwtVerifyOptions(
+  configService?: Pick<ConfigService, 'get'>,
+): Pick<JwtContract, 'issuer' | 'audience' | 'algorithms'> {
+  return getJwtContract(configService);
+}
+
+export function isUnsafeJwtSecret(secret: string | undefined): boolean {
+  const normalized = secret?.trim() || '';
+  if (normalized.length < 64) {
+    return true;
+  }
+
+  if (/^(.)\1+$/.test(normalized)) {
+    return true;
+  }
+
+  return /^(change|replace|placeholder|your|default|test|example)[_-]?.*secret/i.test(
+    normalized,
+  );
+}
+
+export function isFiniteJwtTtl(value: unknown): boolean {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0;
+  }
+
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (isInfiniteTtl(normalized as TokenExpiresIn)) {
+    return false;
+  }
+
+  return durationToMs(normalized) !== null && durationToMs(normalized)! > 0;
 }
 
 export function getAccessTokenSecret(

@@ -81,6 +81,8 @@ export function bootstrapBackendTestEnvironment() {
     'JWT_REFRESH_SECRET',
     'test-refresh-secret-for-e2e-testing-only-0123456789-padded-64chars',
   );
+  applyForced('JWT_ISSUER', 'https://jwt.test.sgs.local');
+  applyForced('JWT_AUDIENCE', 'sgs-test');
 
   // bcrypt: 4 rounds = rápido em testes
   applyDefault('BCRYPT_SALT_ROUNDS', '4');

@@ -5,8 +5,6 @@ import { TestApp, type LoginSession } from '../helpers/test-app';
 const describeE2E =
   process.env.E2E_INFRA_AVAILABLE === 'false' ? describe.skip : describe;
 
-type UserResponse = { id?: string; profile_id?: string };
-
 function buildValidCpf(seed: number): string {
   const base = String(seed).padStart(9, '0').slice(-9);
   const digits = base.split('').map(Number);
@@ -229,7 +227,7 @@ describeE2E(
         expect(response.status).toBe(403);
       });
 
-      it('ADMIN_GERAL criando usuário ADMIN_GERAL -> 201', async () => {
+      it('ADMIN_GERAL não pode promover usuário para ADMIN_GERAL -> 403', async () => {
         const response = await testApp
           .request()
           .post('/users')
@@ -243,15 +241,12 @@ describeE2E(
             profile_id: adminGeralProfileId,
           });
 
-        const body = response.body as UserResponse;
-        expect(response.status).toBe(201);
-        expect(body.id).toBeTruthy();
-        expect(body.profile_id).toBe(adminGeralProfileId);
+        expect(response.status).toBe(403);
       });
     });
 
     describe('Cross-tenant', () => {
-      it('SUPER_ADMIN consegue navegar tenant B com auditoria de troca de tenant', async () => {
+      it('ADMIN_GERAL não consegue navegar tenant B nem gerar troca de tenant', async () => {
         const tenantB = testApp.getTenant('tenantB');
         const tecnicoTenantB = testApp.getUser('tenantB', Role.TST);
         const aprTenantB = await createApr(
@@ -275,7 +270,7 @@ describeE2E(
             }),
           );
 
-        expect(response.status).toBe(200);
+        expect(response.status).toBe(403);
 
         const auditRows = await testApp.setupQuery<Array<{ ok: number }>>(
           `
@@ -290,7 +285,7 @@ describeE2E(
           [tenantB.companyId, `tenant_switch:${tenantB.companyId}`],
         );
 
-        expect(auditRows.length).toBeGreaterThan(0);
+        expect(auditRows).toHaveLength(0);
       });
 
       it('Usuário do tenant A acessando recurso do tenant B -> 404 (não 403)', async () => {

@@ -42,6 +42,7 @@ import {
 import { Profile } from '../profiles/entities/profile.entity';
 import { Site } from '../sites/entities/site.entity';
 import { Role } from '../auth/enums/roles.enum';
+import { normalizeRoleName } from '../auth/role-normalization.util';
 import { RbacService, type RoleScope } from '../rbac/rbac.service';
 import { AuthRedisService } from '../../shared/redis/redis.service';
 import { AuthPrincipalService } from '../auth/auth-principal.service';
@@ -563,7 +564,11 @@ export class UsersService {
         select: { id: true, nome: true },
       });
       requestedProfileName = profile?.nome;
-      if (profile?.nome === Role.ADMIN_GERAL && !isSuperAdmin) {
+      if (
+        profile &&
+        normalizeRoleName(profile.nome) === Role.ADMIN_GERAL &&
+        !isSuperAdmin
+      ) {
         this.logger.warn({
           event: 'role_change_denied',
           action: 'users.create',
@@ -1205,7 +1210,11 @@ export class UsersService {
         select: { id: true, nome: true },
       });
       nextProfileName = profile?.nome;
-      if (profile?.nome === Role.ADMIN_GERAL && !isSuperAdmin) {
+      if (
+        profile &&
+        normalizeRoleName(profile.nome) === Role.ADMIN_GERAL &&
+        !isSuperAdmin
+      ) {
         this.logger.warn({
           event: 'role_change_denied',
           action: 'users.update',
@@ -1805,7 +1814,9 @@ export class UsersService {
    * Aplica a política de atribuição de perfis/roles.
    *
    * Hierarquia de poder:
-   * - ADMIN_GERAL: atribui qualquer perfil (tratado pelo chamador via isSuperAdmin)
+   * - SUPER_ADMIN: atribui qualquer perfil, inclusive perfis de plataforma
+   * - ADMIN_GERAL: administra o próprio tenant, mas não promove para o papel
+   *   de administrador do tenant
    * - ADMIN_EMPRESA: não pode criar outro ADMIN_EMPRESA (apenas ADMIN_GERAL pode)
    * - TST: não pode atribuir ADMIN_EMPRESA ou TST
    * - SUPERVISOR: não pode atribuir ADMIN_EMPRESA, TST ou SUPERVISOR

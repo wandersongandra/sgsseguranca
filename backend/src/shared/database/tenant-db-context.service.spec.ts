@@ -42,6 +42,7 @@ describe('TenantDbContextService', () => {
   const buildService = (driver: unknown, tenantContext?: unknown) => {
     const dataSource = {
       isInitialized: true,
+      options: { type: 'postgres' },
       driver,
     } as DataSource;
     const tenantService = {
@@ -72,7 +73,7 @@ describe('TenantDbContextService', () => {
       },
     );
 
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await new Promise<void>((resolve, reject) => {
       master.connect((err, client, release) => {
@@ -122,7 +123,7 @@ describe('TenantDbContextService', () => {
       },
     );
 
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await new Promise<void>((resolve, reject) => {
       pool.connect((err, pgClient, release) => {
@@ -159,7 +160,7 @@ describe('TenantDbContextService', () => {
       },
     );
 
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await new Promise<void>((resolve, reject) => {
       pool.connect((err, pgClient, release) => {
@@ -193,7 +194,7 @@ describe('TenantDbContextService', () => {
       },
     );
 
-    service.onApplicationBootstrap();
+    await service.onApplicationBootstrap();
 
     await new Promise<void>((resolve, reject) => {
       pool.connect((err, pgClient, release) => {
@@ -210,5 +211,62 @@ describe('TenantDbContextService', () => {
       expect.stringContaining("set_config('app.is_super_admin'"),
       expect.arrayContaining(['', 'true']),
     );
+  });
+
+  it('falha fechado quando PostgreSQL não expõe nenhum pool para patch', async () => {
+    const service = buildService({});
+
+    await expect(service.onApplicationBootstrap()).rejects.toThrow(
+      'O contexto RLS não pôde ser instalado',
+    );
+  });
+
+  it('não aceita requests durante a janela entre initialize e o patch RLS', async () => {
+    const client = createClient();
+    const pool = createPool(client);
+    const dataSourceState = {
+      isInitialized: false,
+      options: { type: 'postgres' },
+      driver: {} as unknown,
+    };
+    const dataSource = dataSourceState as unknown as DataSource;
+    const tenantService = {
+      getContext: jest.fn(() => ({
+        companyId: '11111111-1111-4111-8111-111111111111',
+        isSuperAdmin: false,
+      })),
+    } as unknown as TenantService;
+    const dbTimings = {
+      recordBorrowWait: jest.fn(),
+      recordRlsContextSet: jest.fn(),
+      isEnabled: jest.fn(() => false),
+    } as unknown as DbTimingsService;
+    const service = new TenantDbContextService(
+      dataSource,
+      tenantService,
+      dbTimings,
+    );
+
+    const bootstrap = service.onApplicationBootstrap();
+    dataSourceState.driver = { master: pool };
+    dataSourceState.isInitialized = true;
+    await bootstrap;
+
+    await new Promise<void>((resolve, reject) => {
+      pool.connect((err, pgClient, release) => {
+        if (err || !pgClient || !release) {
+          reject(err ?? new Error('client ausente'));
+          return;
+        }
+        release();
+        resolve();
+      });
+    });
+
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("set_config('app.current_company_id'"),
+      expect.any(Array),
+    );
+    service.onModuleDestroy();
   });
 });

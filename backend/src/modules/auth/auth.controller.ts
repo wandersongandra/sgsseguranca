@@ -73,6 +73,7 @@ import { AuthzOptional } from './authz-optional.decorator';
 import { MfaService } from './services/mfa.service';
 import { normalizePrivilegedRole } from './mfa.config';
 import { Role } from './enums/roles.enum';
+import { TenantService } from '../../shared/tenant/tenant.service';
 import {
   ActivateBootstrapMfaDto,
   ActivateMfaEnrollmentDto,
@@ -139,6 +140,7 @@ export class AuthController {
     private turnstileService: TurnstileService,
     private readonly mfaService: MfaService,
     private readonly configService: ConfigService,
+    private readonly tenantService: TenantService,
   ) {
     if (isProd && isRefreshCsrfReportOnly()) {
       throw new Error(
@@ -298,10 +300,7 @@ export class AuthController {
         challengeToken: body.challengeToken,
         code: body.code,
       });
-      const user = (await this.usersService.findAuthSessionUser(
-        result.userId,
-      )) as unknown as User;
-      return this.issueAuthenticatedSession(user, req, response);
+      return this.issueMfaAuthenticatedSession(result, req, response);
     } catch (err) {
       void this.bruteForceService.registerFailure(tracker);
       throw err;
@@ -324,10 +323,7 @@ export class AuthController {
         challengeToken: body.challengeToken,
         code: body.code,
       });
-      const user = (await this.usersService.findAuthSessionUser(
-        result.userId,
-      )) as unknown as User;
-      return this.issueAuthenticatedSession(user, req, response);
+      return this.issueMfaAuthenticatedSession(result, req, response);
     } catch (err) {
       void this.bruteForceService.registerFailure(tracker);
       throw err;
@@ -945,13 +941,48 @@ export class AuthController {
     };
   }
 
+  /**
+   * MFA público ainda não possui JWT/tenant middleware para carregar o ALS.
+   * O company_id devolvido pelo challenge assinado é a ponte pré-auth; a
+   * leitura do usuário e a emissão da sessão reentram nesse tenant explícito.
+   */
+  private issueMfaAuthenticatedSession(
+    result: { userId: string; companyId: string },
+    req: ExpressRequest,
+    response: Response,
+  ): Promise<AuthSessionResponseDto> {
+    if (!result.companyId) {
+      throw new UnauthorizedException('Contexto de empresa ausente no MFA');
+    }
+
+    return this.tenantService.run(
+      {
+        companyId: result.companyId,
+        isSuperAdmin: false,
+        userId: result.userId,
+        siteScope: 'all',
+      },
+      async () => {
+        const user = (await this.usersService.findAuthSessionUser(
+          result.userId,
+        )) as unknown as User;
+        if (user.company_id !== result.companyId) {
+          throw new UnauthorizedException('Principal MFA fora do tenant');
+        }
+        return this.issueAuthenticatedSession(user, req, response);
+      },
+    );
+  }
+
   private hasAdminGeralRole(
     roles: string[],
     profileName?: string | null,
   ): boolean {
     return (
       normalizePrivilegedRole(profileName) === 'ADMIN_GERAL' ||
+      normalizePrivilegedRole(profileName) === 'SUPER_ADMIN' ||
       roles.includes(Role.ADMIN_GERAL) ||
+      roles.includes(Role.SUPER_ADMIN) ||
       roles.includes('ADMIN_GERAL')
     );
   }

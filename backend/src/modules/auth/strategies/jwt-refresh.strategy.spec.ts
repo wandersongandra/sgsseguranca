@@ -4,6 +4,9 @@ import * as crypto from 'crypto';
 import { JwtRefreshStrategy } from './jwt-refresh.strategy';
 
 describe('JwtRefreshStrategy', () => {
+  const issuer = 'https://jwt.test.sgs.local';
+  const audience = 'sgs-test';
+
   const buildStrategy = () => {
     process.env.JWT_REFRESH_SECRET = 'refresh-secret-for-tests';
     const redisClient = {
@@ -16,8 +19,13 @@ describe('JwtRefreshStrategy', () => {
       }),
     };
     const configService = {
-      get: jest.fn((key: string) =>
-        key === 'JWT_REFRESH_SECRET' ? 'refresh-secret-for-tests' : undefined,
+      get: jest.fn(
+        (key: string) =>
+          ({
+            JWT_REFRESH_SECRET: 'refresh-secret-for-tests',
+            JWT_ISSUER: issuer,
+            JWT_AUDIENCE: audience,
+          })[key],
       ),
     } as unknown as ConfigService;
 
@@ -41,7 +49,16 @@ describe('JwtRefreshStrategy', () => {
     const { strategy, redisClient } = buildStrategy();
 
     await expect(
-      strategy.validate({}, { sub: 'user-1' }),
+      strategy.validate(
+        {},
+        {
+          sub: 'user-1',
+          iss: issuer,
+          aud: audience,
+          exp: 4_102_444_800,
+          token_type: 'refresh',
+        },
+      ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
     expect(redisClient.get).not.toHaveBeenCalled();
   });
@@ -56,7 +73,15 @@ describe('JwtRefreshStrategy', () => {
 
     const result = await strategy.validate(
       { cookies: { refresh_token: refreshToken } },
-      { sub: 'user-1', company_id: 'company-1', profile: 'TST' },
+      {
+        sub: 'user-1',
+        company_id: 'company-1',
+        profile: 'TST',
+        iss: issuer,
+        aud: audience,
+        exp: 4_102_444_800,
+        token_type: 'refresh',
+      },
     );
 
     expect(redisService.getRefreshTokenKey).toHaveBeenCalledWith(
@@ -70,5 +95,72 @@ describe('JwtRefreshStrategy', () => {
         company_id: 'company-1',
       }),
     );
+  });
+
+  it('bloqueia issuer/audience ausentes ou incorretos', async () => {
+    const { strategy } = buildStrategy();
+    const base = {
+      sub: 'user-1',
+      company_id: 'company-1',
+      iss: issuer,
+      aud: audience,
+      exp: 4_102_444_800,
+      token_type: 'refresh',
+    };
+
+    for (const payload of [
+      { ...base, iss: undefined },
+      { ...base, iss: 'https://evil.example' },
+      { ...base, aud: undefined },
+      { ...base, aud: 'other-api' },
+    ]) {
+      await expect(
+        strategy.validate(
+          { cookies: { refresh_token: 'refresh-token-value' } },
+          payload,
+        ),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+  });
+
+  it('bloqueia access token e token legado sem token_type no caminho de refresh', async () => {
+    const { strategy } = buildStrategy();
+    const base = {
+      sub: 'user-1',
+      company_id: 'company-1',
+      iss: issuer,
+      aud: audience,
+    };
+
+    await expect(
+      strategy.validate(
+        { cookies: { refresh_token: 'refresh-token-value' } },
+        { ...base, token_type: 'access' },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(
+      strategy.validate(
+        { cookies: { refresh_token: 'refresh-token-value' } },
+        { ...base },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('bloqueia refresh token sem expiração', async () => {
+    const { strategy } = buildStrategy();
+
+    await expect(
+      strategy.validate(
+        { cookies: { refresh_token: 'refresh-token-value' } },
+        {
+          sub: 'user-1',
+          company_id: 'company-1',
+          iss: issuer,
+          aud: audience,
+          token_type: 'refresh',
+          exp: undefined,
+        },
+      ),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

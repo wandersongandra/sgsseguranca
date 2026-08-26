@@ -128,10 +128,10 @@ describeE2E('Multi-Tenant Isolation (APR) (e2e)', () => {
     const userAId = readFirstId(userA, 'user A');
     const userBId = readFirstId(userB, 'user B');
 
-    // Criar perfil de Super Admin
+    // Criar perfil de plataforma explícito
     const superAdminProfile = await dataSource.query<IdRow[]>(
       `INSERT INTO profiles (id, nome, permissoes, status)
-       VALUES (uuid_generate_v4(), 'ADMIN_GERAL', '{}'::jsonb, true)
+       VALUES (uuid_generate_v4(), 'SUPER_ADMIN', '{}'::jsonb, true)
        RETURNING id`,
     );
     const superAdminProfileId = readFirstId(

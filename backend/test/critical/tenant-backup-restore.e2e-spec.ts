@@ -75,7 +75,7 @@ describeE2E('E2E Critical - Tenant backup/restore DR', () => {
   it('deve exportar tenant, permitir perda lógica e restaurar dados no mesmo tenant', async () => {
     const adminSession = await testApp.loginAs(Role.ADMIN_EMPRESA, 'tenantA');
     const superAdminSession = await testApp.loginAs(
-      Role.ADMIN_GERAL,
+      Role.SUPER_ADMIN,
       'tenantA',
     );
     const tenantA = testApp.getTenant('tenantA');

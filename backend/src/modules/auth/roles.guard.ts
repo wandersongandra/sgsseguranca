@@ -173,14 +173,9 @@ export class RolesGuard implements CanActivate {
   }
 
   private hasRequiredRole(userRole: Role, requiredRoles: Role[]): boolean {
-    if (requiredRoles.includes(userRole)) {
-      return true;
-    }
-
-    if (userRole === Role.ADMIN_GERAL) {
-      return true;
-    }
-
-    return false;
+    // Não existe hierarquia implícita: ADMIN_GERAL só satisfaz um contrato
+    // que o declara explicitamente. O mesmo vale para SUPER_ADMIN; operações
+    // de plataforma precisam declarar esse papel no endpoint.
+    return requiredRoles.includes(userRole);
   }
 }

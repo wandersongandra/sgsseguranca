@@ -2,7 +2,7 @@
 import { Role } from './enums/roles.enum';
 
 export type MfaPrivilegedRole =
-  'ADMIN_GERAL' | 'ADMIN_EMPRESA' | 'NON_PRIVILEGED';
+  'SUPER_ADMIN' | 'ADMIN_GERAL' | 'ADMIN_EMPRESA' | 'NON_PRIVILEGED';
 
 function readConfigValue(
   configService: Pick<ConfigService, 'get'> | undefined,
@@ -133,6 +133,10 @@ export function normalizePrivilegedRole(
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ');
+
+  if (normalized === 'super_admin' || normalized === 'super admin') {
+    return 'SUPER_ADMIN';
+  }
 
   if (
     normalized ===

@@ -89,7 +89,7 @@ export class EpisService extends BaseService<Epi> {
     limit?: number;
     search?: string;
   }): Promise<OffsetPage<Epi>> {
-    const tenantId = this.getTenantId();
+    const tenantId = this.getTenantId('findPaginated');
     const { page, limit, skip } = normalizeOffsetPagination(opts, {
       defaultLimit: 20,
       maxLimit: 100,
@@ -122,7 +122,7 @@ export class EpisService extends BaseService<Epi> {
   async count(options?: FindManyOptions<Epi>): Promise<number> {
     // SGS-EPI-SEC-012: fail-closed — throw when no tenant context rather than
     // returning aggregate across all companies.
-    const tenantId = this.getTenantId();
+    const tenantId = this.getTenantId('count');
     const where = options?.where ?? {};
     return this.episRepository.count({
       ...(options ?? {}),
@@ -138,7 +138,7 @@ export class EpisService extends BaseService<Epi> {
     windowDays: number;
   }> {
     // SGS-EPI-SEC-012: fail-closed — throw when no tenant context.
-    const tenantId = this.getTenantId();
+    const tenantId = this.getTenantId('findCaExpirySummary');
     const now = new Date();
     const limitDate = new Date();
     limitDate.setDate(limitDate.getDate() + days);
@@ -189,7 +189,7 @@ export class EpisService extends BaseService<Epi> {
     days: number,
   ): Promise<{ dispatched: number; timestamp: Date }> {
     // SGS-EPI-SEC-012: fail-closed — throw when no tenant context.
-    const tenantId = this.getTenantId();
+    const tenantId = this.getTenantId('dispatchExpiryNotifications');
     const now = new Date();
     const future = new Date();
     future.setDate(future.getDate() + days);

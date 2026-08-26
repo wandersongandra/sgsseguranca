@@ -5,13 +5,12 @@
  *   1. Sem token                → 401
  *   2. Token ADMIN_EMPRESA       → 403  (role insuficiente)
  *   3. Token TRABALHADOR         → 403  (role insuficiente)
- *   4. Token ADMIN_GERAL         → passa a camada de autenticação (não 401/403)
+ *   4. Token ADMIN_GERAL         → 403; ADMIN_GERAL não é papel de plataforma
  *   5. UUID inválido em rota     → 400  (ParseUUIDPipe antes da autenticação de negócio)
  *   6. SQL injection na rota     → 400
  *
  * Pré-condição: docker compose -f ../ops/test/compose/docker-compose.e2e.yml up -d
  */
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Role } from '../../src/modules/auth/enums/roles.enum';
 import { TestApp, type LoginSession } from '../helpers/test-app';
 
@@ -133,70 +132,72 @@ describeE2E('E2E P0 — Segurança das rotas /admin/* (Fase 1)', () => {
   });
 
   // ────────────────────────────────────────────────────────────────────────────
-  // 4. ADMIN_GERAL → passa a camada de auth (não 401, não 403)
+  // 4. ADMIN_GERAL → não acessa operações de plataforma
   // ────────────────────────────────────────────────────────────────────────────
 
-  describe('ADMIN_GERAL → passa autenticação (não 401/403)', () => {
-    it('GET /admin/health/quick-status com ADMIN_GERAL → não 401/403', async () => {
+  describe('ADMIN_GERAL → 403 em operações de plataforma', () => {
+    it('GET /admin/health/quick-status com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/health/quick-status')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(403);
     });
 
-    it('GET /admin/cache/status com ADMIN_GERAL → não 401/403', async () => {
+    it('GET /admin/cache/status com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/cache/status')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(403);
     });
 
-    it('GET /admin/security/validate-rls com ADMIN_GERAL → não 401/403', async () => {
+    it('GET /admin/security/validate-rls com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/security/validate-rls')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(403);
     });
 
-    it('GET /admin/security/score com ADMIN_GERAL → não 401/403', async () => {
+    it('GET /admin/security/score com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/security/score')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(403);
     });
 
-    it('GET /admin/gdpr/pending-requests com ADMIN_GERAL → não 401/403', async () => {
+    it('GET /admin/gdpr/pending-requests com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/gdpr/pending-requests')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(403);
     });
 
-    it('GET /admin/summary/deployment-readiness com ADMIN_GERAL → não 401/403', async () => {
+    it('GET /admin/summary/deployment-readiness com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/summary/deployment-readiness')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(403);
     });
   });
 
   // ────────────────────────────────────────────────────────────────────────────
-  // 5. UUID inválido em parâmetros de rota → 400 (ADMIN_GERAL)
+  // 5. ADMIN_GERAL não alcança operações de plataforma, inclusive rotas com
+  // parâmetros inválidos. A validação detalhada de UUID fica coberta no teste
+  // unitário do controller com SUPER_ADMIN explícito.
   // ────────────────────────────────────────────────────────────────────────────
 
-  describe('UUID inválido em params de rota → 400', () => {
+  describe('ADMIN_GERAL bloqueado antes de parâmetros de rota privilegiados', () => {
     const invalidIds = [
       { label: 'string simples', value: 'nao-e-uuid' },
       { label: 'SQL injection básico', value: "'; DROP TABLE users; --" },
@@ -205,7 +206,7 @@ describeE2E('E2E P0 — Segurança das rotas /admin/* (Fase 1)', () => {
     ];
 
     for (const { label, value } of invalidIds) {
-      it(`POST /admin/gdpr/delete-user/${label} sem step-up → 403`, async () => {
+      it(`POST /admin/gdpr/delete-user/${label} com ADMIN_GERAL → 403`, async () => {
         const response = await testApp
           .request()
           .post(`/admin/gdpr/delete-user/${encodeURIComponent(value)}`)
@@ -213,27 +214,26 @@ describeE2E('E2E P0 — Segurança das rotas /admin/* (Fase 1)', () => {
           .set(csrfHeaders);
 
         expect(response.status).toBe(403);
-        expect(response.body?.error?.code).toBe('STEP_UP_REQUIRED');
       });
     }
 
-    it('GET /admin/gdpr/request-status/invalid-id → 400', async () => {
+    it('GET /admin/gdpr/request-status/invalid-id com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .get('/admin/gdpr/request-status/invalid-id')
         .set(testApp.authHeaders(adminGeralSession));
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(403);
     });
 
-    it('POST /admin/security/test-isolation/bad-uuid/bad-uuid → 400', async () => {
+    it('POST /admin/security/test-isolation/bad-uuid/bad-uuid com ADMIN_GERAL → 403', async () => {
       const response = await testApp
         .request()
         .post('/admin/security/test-isolation/nao-uuid/nao-uuid')
         .set(testApp.authHeaders(adminGeralSession))
         .set(csrfHeaders);
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(403);
     });
   });
 

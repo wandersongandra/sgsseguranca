@@ -330,6 +330,39 @@ describe('RolesGuard', () => {
       expect(loggerWarnSpy).not.toHaveBeenCalled();
     });
 
+    it.each([Role.TST, Role.SUPERVISOR, Role.ADMIN_EMPRESA])(
+      'does not treat ADMIN_GERAL as a universal bypass for %s',
+      async (requiredRole) => {
+        (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
+          requiredRole,
+        ]);
+        (rbacService.getUserAccess as jest.Mock).mockResolvedValue({
+          roles: [Role.ADMIN_GERAL],
+          permissions: [],
+        });
+
+        await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
+          new ForbiddenException('Função insuficiente para esta operação'),
+        );
+      },
+    );
+
+    it('allows the explicit SUPER_ADMIN role only when the route declares it', async () => {
+      (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
+        Role.SUPER_ADMIN,
+      ]);
+      (
+        mockExecutionContext.switchToHttp().getRequest as jest.Mock
+      ).mockReturnValue({
+        user: {
+          userId: 'platform-admin',
+          profile: { nome: Role.SUPER_ADMIN },
+        },
+      });
+
+      await expect(guard.canActivate(mockExecutionContext)).resolves.toBe(true);
+    });
+
     it('normaliza alias GERENTE como supervisor operacional', async () => {
       (reflector.getAllAndOverride as jest.Mock).mockReturnValue([
         Role.SUPERVISOR,

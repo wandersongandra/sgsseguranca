@@ -8,6 +8,11 @@ import {
   getRefreshTokenTtl,
   getRefreshTokenTtlDays,
   getRefreshTokenCookieOptions,
+  getJwtContract,
+  getJwtSignOptions,
+  getJwtVerifyOptions,
+  isFiniteJwtTtl,
+  isUnsafeJwtSecret,
 } from './auth-security.config';
 
 describe('auth-security.config', () => {
@@ -134,5 +139,53 @@ describe('auth-security.config', () => {
         domain: '.sgsseguranca.com.br',
       }),
     );
+  });
+
+  it('exige issuer e audience para o contrato JWT', () => {
+    const config = {
+      get: jest.fn(
+        (key: string) =>
+          ({
+            JWT_ISSUER: 'https://jwt.test.sgs.local',
+            JWT_AUDIENCE: 'sgs-test',
+          })[key],
+      ),
+    };
+
+    expect(getJwtContract(config)).toEqual({
+      issuer: 'https://jwt.test.sgs.local',
+      audience: 'sgs-test',
+      algorithms: ['HS256'],
+    });
+    expect(getJwtSignOptions(config)).toEqual({
+      issuer: 'https://jwt.test.sgs.local',
+      audience: 'sgs-test',
+    });
+    expect(getJwtVerifyOptions(config)).toEqual({
+      issuer: 'https://jwt.test.sgs.local',
+      audience: 'sgs-test',
+      algorithms: ['HS256'],
+    });
+  });
+
+  it('rejeita contrato JWT sem issuer/audience e TTL infinito fora do ambiente local', () => {
+    const originalIssuer = process.env.JWT_ISSUER;
+    const originalAudience = process.env.JWT_AUDIENCE;
+    delete process.env.JWT_ISSUER;
+    delete process.env.JWT_AUDIENCE;
+    try {
+      expect(() =>
+        getJwtContract({ get: jest.fn().mockReturnValue(undefined) }),
+      ).toThrow('JWT_ISSUER and JWT_AUDIENCE are required');
+      expect(isFiniteJwtTtl('15m')).toBe(true);
+      expect(isFiniteJwtTtl('infinite')).toBe(false);
+      expect(isUnsafeJwtSecret('a'.repeat(64))).toBe(true);
+      expect(isUnsafeJwtSecret('sgs-prod-access-key-A9'.repeat(4))).toBe(false);
+    } finally {
+      if (originalIssuer === undefined) delete process.env.JWT_ISSUER;
+      else process.env.JWT_ISSUER = originalIssuer;
+      if (originalAudience === undefined) delete process.env.JWT_AUDIENCE;
+      else process.env.JWT_AUDIENCE = originalAudience;
+    }
   });
 });

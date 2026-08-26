@@ -95,8 +95,14 @@ import { shouldUseRedisQueueInfra } from './infra/queue/redis-queue-infra.util';
 import {
   getAccessTokenTtl,
   getAccessTokenTtlMs,
+  isFiniteJwtTtl,
   isInfiniteTtl,
+  isUnsafeJwtSecret,
 } from './modules/auth/auth-security.config';
+import {
+  KNOWN_SGS_ENV_KEYS,
+  validateCommonEnvironment,
+} from './shared/config/environment-contract';
 
 const shouldUseQueueRedisInfra = shouldUseRedisQueueInfra();
 
@@ -238,12 +244,15 @@ export const validationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test', 'staging')
     .default('development'),
-  PORT: Joi.number().default(3000),
+  PORT: Joi.number().integer().min(1).max(65535).default(3000),
   DATABASE_TYPE: Joi.string()
     .valid('postgres', 'sqlite', 'better-sqlite3')
     .default('postgres'),
   SQLITE_DB_PATH: Joi.string().default('dev.sqlite'),
-  DATABASE_URL: Joi.string().optional().allow(''),
+  DATABASE_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .optional()
+    .allow(''),
   // Opcional POR DECISÃO, inclusive em produção — mas a ausência não é
   // silenciosa nem permissiva.
   //
@@ -256,16 +265,42 @@ export const validationSchema = Joi.object({
   //      runtime, que desde a migration 361 enxerga 0 linhas por RLS;
   //   3. `GET /health/detailed` expõe `checks.admin_operations`.
   // Ver `docs/RUNBOOK_RLS_BYPASS_HARDENING.md`.
-  DATABASE_ADMIN_URL: Joi.string().optional().allow(''),
-  DATABASE_PRIVATE_URL: Joi.string().optional().allow(''),
-  DATABASE_REPLICA_URL: Joi.string().optional().allow(''),
-  DATABASE_PUBLIC_URL: Joi.string().optional().allow(''),
-  API_PUBLIC_URL: Joi.string().optional().allow(''),
+  DATABASE_ADMIN_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .optional()
+    .allow(''),
+  DATABASE_PRIVATE_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .optional()
+    .allow(''),
+  DATABASE_REPLICA_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .optional()
+    .allow(''),
+  DATABASE_PUBLIC_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .optional()
+    .allow(''),
+  API_PUBLIC_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .optional()
+    .allow(''),
+  FRONTEND_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .optional()
+    .allow(''),
+  APP_ENV: Joi.string().optional().allow(''),
+  APP_LOADTEST_MARKER: Joi.string().optional().allow(''),
+  REQUIRE_NO_PENDING_MIGRATIONS: Joi.boolean().optional(),
+  DATABASE_MIGRATION_URL: Joi.string()
+    .uri({ scheme: ['postgres', 'postgresql'] })
+    .optional()
+    .allow(''),
   URL_DO_BANCO_DE_DADOS: Joi.string().optional().allow(''),
   POSTGRES_URL: Joi.string().optional().allow(''),
   POSTGRESQL_URL: Joi.string().optional().allow(''),
   DATABASE_HOST: Joi.string().optional().allow(''),
-  DATABASE_PORT: Joi.number().default(5432),
+  DATABASE_PORT: Joi.number().integer().min(1).max(65535).default(5432),
   DATABASE_USER: Joi.string().optional().allow(''),
   DATABASE_PASSWORD: Joi.string().optional().allow(''),
   DATABASE_NAME: Joi.string().optional().allow(''),
@@ -286,33 +321,48 @@ export const validationSchema = Joi.object({
   DATABASE_SSL_ALLOW_INSECURE_FORCE: Joi.boolean().valid(false).default(false),
   DATABASE_SSL_CA: Joi.string().optional(),
   LEGACY_CPF_PLAINTEXT_LOOKUP_ENABLED: Joi.boolean().default(false),
-  REDIS_URL: Joi.string().optional(),
-  REDIS_AUTH_URL: Joi.string().optional().allow(''),
+  REDIS_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional()
+    .allow(''),
+  REDIS_AUTH_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional()
+    .allow(''),
   REDIS_AUTH_HOST: Joi.string().optional().allow(''),
-  REDIS_AUTH_PORT: Joi.number().optional(),
+  REDIS_AUTH_PORT: Joi.number().integer().min(1).max(65535).optional(),
   REDIS_AUTH_PASSWORD: Joi.string().optional().allow(''),
   REDIS_AUTH_USERNAME: Joi.string().optional().allow(''),
   REDIS_AUTH_TLS: Joi.boolean().default(false),
   REDIS_AUTH_TLS_ALLOW_INSECURE: Joi.boolean().valid(false).default(false),
-  REDIS_CACHE_URL: Joi.string().optional().allow(''),
+  REDIS_CACHE_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional()
+    .allow(''),
   REDIS_CACHE_HOST: Joi.string().optional().allow(''),
-  REDIS_CACHE_PORT: Joi.number().optional(),
+  REDIS_CACHE_PORT: Joi.number().integer().min(1).max(65535).optional(),
   REDIS_CACHE_PASSWORD: Joi.string().optional().allow(''),
   REDIS_CACHE_USERNAME: Joi.string().optional().allow(''),
   REDIS_CACHE_TLS: Joi.boolean().default(false),
   REDIS_CACHE_TLS_ALLOW_INSECURE: Joi.boolean().valid(false).default(false),
-  REDIS_RATE_LIMIT_URL: Joi.string().optional().allow(''),
+  REDIS_RATE_LIMIT_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional()
+    .allow(''),
   REDIS_RATE_LIMIT_HOST: Joi.string().optional().allow(''),
-  REDIS_RATE_LIMIT_PORT: Joi.number().optional(),
+  REDIS_RATE_LIMIT_PORT: Joi.number().integer().min(1).max(65535).optional(),
   REDIS_RATE_LIMIT_PASSWORD: Joi.string().optional().allow(''),
   REDIS_RATE_LIMIT_USERNAME: Joi.string().optional().allow(''),
   REDIS_RATE_LIMIT_TLS: Joi.boolean().default(false),
   REDIS_RATE_LIMIT_TLS_ALLOW_INSECURE: Joi.boolean()
     .valid(false)
     .default(false),
-  REDIS_QUEUE_URL: Joi.string().optional().allow(''),
+  REDIS_QUEUE_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional()
+    .allow(''),
   REDIS_QUEUE_HOST: Joi.string().optional().allow(''),
-  REDIS_QUEUE_PORT: Joi.number().optional(),
+  REDIS_QUEUE_PORT: Joi.number().integer().min(1).max(65535).optional(),
   REDIS_QUEUE_PASSWORD: Joi.string().optional().allow(''),
   REDIS_QUEUE_USERNAME: Joi.string().optional().allow(''),
   REDIS_QUEUE_TLS: Joi.boolean().default(false),
@@ -331,7 +381,7 @@ export const validationSchema = Joi.object({
       }),
     }),
   }),
-  REDIS_PORT: Joi.number().default(6379),
+  REDIS_PORT: Joi.number().integer().min(1).max(65535).default(6379),
   REDIS_PASSWORD: Joi.string().optional().allow(''),
   REDIS_TLS: Joi.boolean().default(false),
   // Dispensa a exigência de TLS quando o Redis está na mesma rede interna do
@@ -347,6 +397,11 @@ export const validationSchema = Joi.object({
     .min(60)
     .max(86_400)
     .default(3_600),
+  IDEMPOTENCY_DURABLE_RETENTION_SECONDS: Joi.number()
+    .integer()
+    .min(86_400)
+    .max(7_776_000)
+    .default(2_592_000),
   IDEMPOTENCY_MAX_RESPONSE_BYTES: Joi.number()
     .integer()
     .min(1_024)
@@ -365,6 +420,8 @@ export const validationSchema = Joi.object({
       .default('development-security-audit-hmac-key'),
   }),
   JWT_SECRET: Joi.string().min(64).required(),
+  JWT_ISSUER: Joi.string().trim().optional().allow(''),
+  JWT_AUDIENCE: Joi.string().trim().optional().allow(''),
   MFA_ENABLED: Joi.boolean().default(true),
   MFA_ISSUER: Joi.string().optional().allow(''),
   MFA_JWT_SECRET: Joi.string().min(32).optional().allow(''),
@@ -407,6 +464,7 @@ export const validationSchema = Joi.object({
   FIELD_ENCRYPTION_KEY: Joi.string().optional().allow(''),
   FIELD_ENCRYPTION_HASH_KEY: Joi.string().optional().allow(''),
   VALIDATION_TOKEN_SECRET: Joi.string().min(32).optional().allow(''),
+  DOCUMENT_DOWNLOAD_TOKEN_SECRET: Joi.string().optional().allow(''),
   ACCESS_TOKEN_TTL: Joi.string().optional().allow(''),
   JWT_EXPIRES_IN: Joi.string().default('15m'),
   REFRESH_TOKEN_TTL: Joi.string()
@@ -841,6 +899,17 @@ export const validationSchema = Joi.object({
   HIBP_CHECK_ENABLED: Joi.string().valid('true', 'false').optional().allow(''),
   HIBP_TIMEOUT_MS: Joi.number().integer().min(500).max(10000).optional(),
 }).custom((value: Record<string, unknown>, helpers) => {
+  try {
+    validateCommonEnvironment(value, {
+      component: 'api',
+      knownKeys: KNOWN_SGS_ENV_KEYS,
+    });
+  } catch (error) {
+    return helpers.error('any.invalid', {
+      message: error instanceof Error ? error.message : 'ENVIRONMENT_INVALID',
+    });
+  }
+
   const env = value as {
     DEV_LOGIN_BYPASS?: boolean;
     ALLOW_DEV_LOGIN_BYPASS?: boolean;
@@ -877,6 +946,12 @@ export const validationSchema = Joi.object({
     DR_STORAGE_REPLICA_FORCE_PATH_STYLE?: boolean;
     REFRESH_CSRF_ENFORCED?: boolean;
     REFRESH_CSRF_REPORT_ONLY?: boolean;
+    JWT_SECRET?: string;
+    JWT_REFRESH_SECRET?: string;
+    JWT_ISSUER?: string;
+    JWT_AUDIENCE?: string;
+    ACCESS_TOKEN_TTL?: string;
+    JWT_EXPIRES_IN?: string;
   };
 
   const bypassEnabled = env.DEV_LOGIN_BYPASS === true;
@@ -928,6 +1003,48 @@ export const validationSchema = Joi.object({
     return helpers.error('any.invalid', {
       message:
         'REFRESH_CSRF_REPORT_ONLY=true só é permitido em ambiente local (development/test).',
+    });
+  }
+
+  if (
+    isNonLocalRuntime &&
+    (!firstNonEmpty([env.JWT_ISSUER]) || !firstNonEmpty([env.JWT_AUDIENCE]))
+  ) {
+    return helpers.error('any.invalid', {
+      message:
+        'JWT_ISSUER e JWT_AUDIENCE são obrigatórios fora de development/test; o runtime não pode emitir ou aceitar JWT sem esse vínculo.',
+    });
+  }
+
+  if (
+    isNonLocalRuntime &&
+    (isUnsafeJwtSecret(env.JWT_SECRET) ||
+      isUnsafeJwtSecret(env.JWT_REFRESH_SECRET))
+  ) {
+    return helpers.error('any.invalid', {
+      message:
+        'JWT_SECRET e JWT_REFRESH_SECRET devem ter no mínimo 64 caracteres e não podem usar placeholders, defaults ou valores previsíveis.',
+    });
+  }
+
+  if (
+    isNonLocalRuntime &&
+    env.JWT_SECRET &&
+    env.JWT_REFRESH_SECRET &&
+    env.JWT_SECRET === env.JWT_REFRESH_SECRET
+  ) {
+    return helpers.error('any.invalid', {
+      message:
+        'JWT_REFRESH_SECRET deve ser diferente de JWT_SECRET para manter a separação criptográfica entre access e refresh.',
+    });
+  }
+
+  const configuredAccessTokenTtl =
+    firstNonEmpty([env.ACCESS_TOKEN_TTL, env.JWT_EXPIRES_IN]) || '15m';
+  if (isNonLocalRuntime && !isFiniteJwtTtl(configuredAccessTokenTtl)) {
+    return helpers.error('any.invalid', {
+      message:
+        'ACCESS_TOKEN_TTL/JWT_EXPIRES_IN deve ser finito e positivo fora de development/test; tokens de sessão não podem ser emitidos sem exp.',
     });
   }
 
@@ -1429,13 +1546,6 @@ export class AppModule implements OnModuleInit {
       this.validateProductionSecurity();
     } else {
       this.logger.warn('⚠️  Ambiente de DESENVOLVIMENTO detectado');
-      const devJwtIssuer = this.configService.get<string>('JWT_ISSUER');
-      const devJwtAudience = this.configService.get<string>('JWT_AUDIENCE');
-      if (!devJwtIssuer || !devJwtAudience) {
-        this.logger.warn(
-          'JWT_ISSUER / JWT_AUDIENCE não configurados. Aceitável em desenvolvimento, obrigatório em produção.',
-        );
-      }
     }
 
     if (/^true$/i.test(process.env.REDIS_DISABLED || '')) {

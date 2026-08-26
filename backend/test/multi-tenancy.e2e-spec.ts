@@ -9,7 +9,7 @@ describeE2E('Multi-tenancy Isolation (APR CRUD + tenant switch)', () => {
   let testApp: TestApp;
   let adminEmpresaTenantASession: LoginSession;
   let adminEmpresaTenantBSession: LoginSession;
-  let superAdminSession: LoginSession;
+  let adminGeralSession: LoginSession;
   let csrfHeaders: Record<string, string>;
   let aprTenantBId: string;
 
@@ -25,7 +25,7 @@ describeE2E('Multi-tenancy Isolation (APR CRUD + tenant switch)', () => {
       Role.ADMIN_EMPRESA,
       'tenantB',
     );
-    superAdminSession = await testApp.loginAs(Role.ADMIN_GERAL, 'tenantA');
+    adminGeralSession = await testApp.loginAs(Role.ADMIN_GERAL, 'tenantA');
     csrfHeaders = await testApp.csrfHeaders();
 
     const tenantB = testApp.getTenant('tenantB');
@@ -114,19 +114,19 @@ describeE2E('Multi-tenancy Isolation (APR CRUD + tenant switch)', () => {
     expect(response.status).toBe(404);
   });
 
-  it('permite SUPER_ADMIN navegar tenant B com trilha de auditoria', async () => {
+  it('bloqueia ADMIN_GERAL ao navegar tenant B e não cria trilha de troca', async () => {
     const tenantB = testApp.getTenant('tenantB');
 
     const response = await testApp
       .request()
       .get(`/aprs/${aprTenantBId}`)
       .set(
-        testApp.authHeaders(superAdminSession, {
+        testApp.authHeaders(adminGeralSession, {
           companyIdOverride: tenantB.companyId,
         }),
       );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
 
     const auditRows = await testApp.setupQuery<Array<{ ok: number }>>(
       `
@@ -141,6 +141,6 @@ describeE2E('Multi-tenancy Isolation (APR CRUD + tenant switch)', () => {
       [tenantB.companyId, `tenant_switch:${tenantB.companyId}`],
     );
 
-    expect(auditRows.length).toBeGreaterThan(0);
+    expect(auditRows).toHaveLength(0);
   });
 });

@@ -44,7 +44,7 @@ describe('access-token-claims.util', () => {
       is_super_admin: true,
     });
 
-    expect(normalized.profile).toEqual({ nome: Role.ADMIN_GERAL });
+    expect(normalized.profile).toEqual({ nome: Role.SUPER_ADMIN });
     expect(normalized.isSuperAdmin).toBe(true);
     expect(normalized.token_claim_cache.is_super_admin).toBe(true);
   });

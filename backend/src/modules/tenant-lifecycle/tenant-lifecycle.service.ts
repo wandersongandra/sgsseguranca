@@ -334,7 +334,6 @@ export class TenantLifecycleService {
     this.logger.log({
       event: 'tenant_onboarding_invite_revoked',
       inviteId: saved.id,
-      email: saved.email,
     });
 
     return { id: saved.id, revoked_at: saved.revoked_at! };

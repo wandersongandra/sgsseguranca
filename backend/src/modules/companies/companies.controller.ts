@@ -56,7 +56,7 @@ export class CompaniesController {
   ) {}
 
   @Post()
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @ForensicAuditAction('create', 'company')
   create(@Body() createCompanyDto: CreateCompanyDto) {
@@ -64,7 +64,13 @@ export class CompaniesController {
   }
 
   @Get()
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
+  @Roles(
+    Role.SUPER_ADMIN,
+    Role.ADMIN_GERAL,
+    Role.ADMIN_EMPRESA,
+    Role.TST,
+    Role.SUPERVISOR,
+  )
   @Authorize('can_view_companies')
   @ApiQuery({
     name: 'page',
@@ -174,7 +180,7 @@ export class CompaniesController {
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @ForensicAuditAction('update', 'company')
   update(
@@ -185,7 +191,7 @@ export class CompaniesController {
   }
 
   @Post(':id/activate')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @HttpCode(HttpStatus.OK)
   @ForensicAuditAction('activate', 'company')
@@ -194,7 +200,7 @@ export class CompaniesController {
   }
 
   @Post(':id/extend-trial')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @HttpCode(HttpStatus.OK)
   @ForensicAuditAction('extend_trial', 'company')
@@ -206,7 +212,7 @@ export class CompaniesController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @ForensicAuditAction('delete', 'company')
   remove(@Param('id', new ParseUUIDPipe()) id: string) {

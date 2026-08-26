@@ -28,28 +28,28 @@ export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
   @Post()
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_profiles')
   create(@Body() createProfileDto: CreateProfileDto) {
     return this.profilesService.create(createProfileDto);
   }
 
   @Get()
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST)
   @Authorize('can_view_profiles')
   findAll() {
     return this.profilesService.findAll();
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST)
+  @Roles(Role.SUPER_ADMIN, Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST)
   @Authorize('can_view_profiles')
   findOne(@Param('id', new ParseUUIDPipe()) id: string) {
     return this.profilesService.findOne(id);
   }
 
   @Patch(':id')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_profiles')
   update(
     @Param('id', new ParseUUIDPipe()) id: string,
@@ -59,7 +59,7 @@ export class ProfilesController {
   }
 
   @Delete(':id')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_profiles')
   @ForensicAuditAction('delete', 'profile')
   remove(@Param('id', new ParseUUIDPipe()) id: string) {

@@ -34,7 +34,7 @@ export class TenantLifecycleController {
   constructor(private readonly service: TenantLifecycleService) {}
 
   @Post('invites')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @UseGuards(RolesGuard)
   createInvite(
@@ -67,7 +67,7 @@ export class TenantLifecycleController {
   }
 
   @Delete('invites/:id/revoke')
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Authorize('can_manage_companies')
   @UseGuards(RolesGuard)
   @HttpCode(HttpStatus.OK)

@@ -120,10 +120,9 @@ const ADMIN_GERAL_ONLY_PERMISSIONS = [
 ] as const;
 
 export const PROFILE_PERMISSION_FALLBACK: Record<string, string[]> = {
-  'Administrador Geral': [
-    ...ADMIN_EMPRESA_FALLBACK_PERMISSIONS,
-    ...ADMIN_GERAL_ONLY_PERMISSIONS,
-  ],
+  // ADMIN_GERAL administra todos os módulos/obras do próprio tenant, mas não
+  // recebe permissões de plataforma. O escopo global é SUPER_ADMIN explícito.
+  'Administrador Geral': [...ADMIN_EMPRESA_FALLBACK_PERMISSIONS],
   SUPER_ADMIN: [
     ...ADMIN_EMPRESA_FALLBACK_PERMISSIONS,
     ...ADMIN_GERAL_ONLY_PERMISSIONS,
@@ -605,8 +604,8 @@ export class RbacService {
 
     const aliases: Record<string, RoleScope> = {
       SUPER_ADMIN: 'SUPER_ADMIN',
-      ADMIN_GERAL: 'SUPER_ADMIN',
-      'ADMINISTRADOR GERAL': 'SUPER_ADMIN',
+      'ADMINISTRADOR GERAL': 'ADMIN_EMPRESA',
+      ADMIN_GERAL: 'ADMIN_EMPRESA',
       ADMIN_EMPRESA: 'ADMIN_EMPRESA',
       'ADMIN EMPRESA': 'ADMIN_EMPRESA',
       'ADMINISTRADOR DA EMPRESA': 'ADMIN_EMPRESA',

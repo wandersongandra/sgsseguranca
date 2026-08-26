@@ -54,6 +54,7 @@ export type LoginSession = {
 const DEFAULT_PASSWORD = 'Password@123';
 
 const PROFILE_NAMES: Role[] = [
+  Role.SUPER_ADMIN,
   Role.ADMIN_GERAL,
   Role.ADMIN_EMPRESA,
   Role.TST,
@@ -501,6 +502,25 @@ export class TestApp {
         worker: '11144477735',
       },
     });
+
+    const platformAdmin = await this.upsertUser({
+      nome: 'Super Admin Plataforma',
+      funcao: 'SUPER_ADMIN',
+      cpf: '15082302698',
+      email: 'super-admin-platform@e2e.test',
+      passwordHash,
+      companyId: companyA.id,
+      siteId: siteA.id,
+      profileId: profileMap[Role.SUPER_ADMIN].id,
+      aiProcessingConsent: true,
+    });
+    usersTenantA.platformAdmin = {
+      id: platformAdmin.id,
+      cpf: '15082302698',
+      email: platformAdmin.email,
+      role: Role.SUPER_ADMIN,
+      companyId: companyA.id,
+    };
 
     const usersTenantB = await this.seedTenantUsers({
       companyId: companyB.id,

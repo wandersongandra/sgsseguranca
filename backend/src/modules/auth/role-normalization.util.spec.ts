@@ -13,7 +13,7 @@ describe('normalizeRoleName', () => {
   });
 
   it('resolve aliases conhecidos (case/acentos-insensível)', () => {
-    expect(normalizeRoleName('SUPER_ADMIN')).toBe(Role.ADMIN_GERAL);
+    expect(normalizeRoleName('SUPER_ADMIN')).toBe(Role.SUPER_ADMIN);
     expect(normalizeRoleName('ADMIN_EMPRESA')).toBe(Role.ADMIN_EMPRESA);
     expect(normalizeRoleName('administrador da empresa')).toBe(
       Role.ADMIN_EMPRESA,

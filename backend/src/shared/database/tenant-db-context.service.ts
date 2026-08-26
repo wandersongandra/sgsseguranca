@@ -69,20 +69,21 @@ export class TenantDbContextService
     private readonly dbTimings: DbTimingsService,
   ) {}
 
-  onApplicationBootstrap(): void {
+  async onApplicationBootstrap(): Promise<void> {
     if (this.dataSource.isInitialized) {
       this.patchPool();
       return;
     }
-    // DataSource ainda não inicializado (boot lazy). Aguarda em background.
-    this.clearBootstrapWaitInterval();
-    this.bootstrapWaitInterval = setInterval(() => {
-      if (this.dataSource.isInitialized) {
-        this.clearBootstrapWaitInterval();
-        this.patchPool();
-      }
-    }, 500);
-    this.bootstrapWaitInterval.unref();
+
+    // SQLite e outros drivers não possuem RLS PostgreSQL. Para PostgreSQL,
+    // aguardar em background criaria uma janela entre initialize() e o patch
+    // em que o servidor poderia aceitar uma query sem contexto.
+    if (String(this.dataSource.options.type) !== 'postgres') {
+      return;
+    }
+
+    await this.waitForPostgresInitialization();
+    this.patchPool();
   }
 
   onModuleDestroy(): void {
@@ -95,6 +96,40 @@ export class TenantDbContextService
     }
     clearInterval(this.bootstrapWaitInterval);
     this.bootstrapWaitInterval = undefined;
+  }
+
+  private async waitForPostgresInitialization(): Promise<void> {
+    const timeoutMs = clampTimeoutMs(
+      process.env.DB_RLS_CONTEXT_BOOTSTRAP_TIMEOUT_MS,
+      30_000,
+      5 * 60_000,
+    );
+    const startedAt = Date.now();
+
+    await new Promise<void>((resolve, reject) => {
+      const check = () => {
+        if (this.dataSource.isInitialized) {
+          this.clearBootstrapWaitInterval();
+          resolve();
+          return;
+        }
+
+        if (Date.now() - startedAt >= timeoutMs) {
+          this.clearBootstrapWaitInterval();
+          reject(
+            new Error(
+              'TenantDbContextService: PostgreSQL não inicializou dentro do prazo; ' +
+                'startup abortado antes de aceitar requests sem contexto RLS.',
+            ),
+          );
+        }
+      };
+
+      this.clearBootstrapWaitInterval();
+      this.bootstrapWaitInterval = setInterval(check, 25);
+      this.bootstrapWaitInterval.unref();
+      check();
+    });
   }
 
   private patchPool(): void {
@@ -118,10 +153,22 @@ export class TenantDbContextService
     );
 
     if (pools.length === 0) {
-      this.logger.warn(
+      const message =
         'TenantDbContextService: pg Pools não encontrados no driver TypeORM. ' +
-          'Certifique-se de usar o driver postgres. ' +
-          'RLS context injection será desabilitado.',
+        'O contexto RLS não pôde ser instalado.';
+
+      this.logger.error(message);
+
+      // SQLite e outros drivers não possuem o pool PostgreSQL nem RLS. Em
+      // produção/teste PostgreSQL, porém, continuar o bootstrap sem o patch
+      // transformaria uma falha de segurança em um estado fail-open.
+      if (String(this.dataSource.options.type) === 'postgres') {
+        throw new Error(message);
+      }
+
+      this.logger.warn(
+        'TenantDbContextService: driver não-PostgreSQL detectado; ' +
+          'injeção de contexto RLS não se aplica.',
       );
       return;
     }

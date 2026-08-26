@@ -7,6 +7,9 @@ import {
   MinLength,
 } from 'class-validator';
 
+const MFA_CODE_MIN_LENGTH = 6;
+const MFA_CODE_MAX_LENGTH = 64;
+
 export class VerifyLoginMfaDto {
   @IsString()
   @IsNotEmpty()
@@ -15,7 +18,8 @@ export class VerifyLoginMfaDto {
 
   @IsString()
   @IsNotEmpty()
-  @Length(6, 6)
+  @MinLength(MFA_CODE_MIN_LENGTH)
+  @MaxLength(MFA_CODE_MAX_LENGTH)
   code: string;
 }
 
@@ -27,21 +31,24 @@ export class ActivateBootstrapMfaDto {
 
   @IsString()
   @IsNotEmpty()
-  @Length(6, 6)
+  @MinLength(MFA_CODE_MIN_LENGTH)
+  @MaxLength(MFA_CODE_MAX_LENGTH)
   code: string;
 }
 
 export class ActivateMfaEnrollmentDto {
   @IsString()
   @IsNotEmpty()
-  @Length(6, 6)
+  @MinLength(MFA_CODE_MIN_LENGTH)
+  @MaxLength(MFA_CODE_MAX_LENGTH)
   code: string;
 }
 
 export class DisableMfaDto {
   @IsString()
   @IsNotEmpty()
-  @Length(6, 6)
+  @MinLength(MFA_CODE_MIN_LENGTH)
+  @MaxLength(MFA_CODE_MAX_LENGTH)
   code: string;
 }
 
@@ -52,7 +59,8 @@ export class VerifyStepUpDto {
 
   @IsOptional()
   @IsString()
-  @Length(6, 6)
+  @MinLength(MFA_CODE_MIN_LENGTH)
+  @MaxLength(MFA_CODE_MAX_LENGTH)
   code?: string;
 
   @IsOptional()

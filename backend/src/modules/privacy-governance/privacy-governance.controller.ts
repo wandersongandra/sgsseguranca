@@ -45,9 +45,9 @@ export class PrivacyGovernanceController {
     return this.privacyGovernanceService.getRetentionMatrix();
   }
 
-  // Operacional interno: requer ADMIN_GERAL (dados de offboarding de tenant)
+  // Operacional de plataforma: requer SUPER_ADMIN explícito (offboarding de tenant).
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN_GERAL)
+  @Roles(Role.SUPER_ADMIN)
   @Get('tenant-offboarding-checklist')
   @ApiOperation({
     summary: 'Tenant offboarding privacy checklist',

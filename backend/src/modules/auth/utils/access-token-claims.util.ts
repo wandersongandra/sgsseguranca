@@ -2,6 +2,11 @@ import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '../enums/roles.enum';
+import {
+  getJwtVerifyOptions,
+  JWT_ACCESS_TOKEN_TYPE,
+  type JwtTokenType,
+} from '../auth-security.config';
 
 type JsonObject = Record<string, unknown>;
 
@@ -128,7 +133,7 @@ export function normalizeAccessTokenClaims(
 
   const profileName = tokenClaimCache.profile_name;
   const effectiveProfileName =
-    profileName || (explicitSuperAdmin ? Role.ADMIN_GERAL : undefined);
+    profileName || (explicitSuperAdmin ? Role.SUPER_ADMIN : undefined);
 
   const companyId = tokenClaimCache.company_id;
   const siteId = tokenClaimCache.site_id;
@@ -153,9 +158,26 @@ export function normalizeAccessTokenClaims(
     profile: effectiveProfileName ? { nome: effectiveProfileName } : undefined,
     plan,
     isSuperAdmin:
-      explicitSuperAdmin || effectiveProfileName === Role.ADMIN_GERAL,
+      explicitSuperAdmin || effectiveProfileName === Role.SUPER_ADMIN,
     token_claim_cache: tokenClaimCache,
   };
+}
+
+export function assertJwtTokenType(
+  payload: unknown,
+  expected: JwtTokenType,
+): void {
+  const claims = asObject(payload);
+  if (claims?.token_type !== expected) {
+    throw new UnauthorizedException('Tipo de token inválido');
+  }
+}
+
+export function assertJwtHasExpiration(payload: unknown): void {
+  const claims = asObject(payload);
+  if (typeof claims?.exp !== 'number' || !Number.isFinite(claims.exp)) {
+    throw new UnauthorizedException('Token sem expiração');
+  }
 }
 
 export function extractAccessTokenClaimCache(
@@ -216,7 +238,11 @@ export function verifyAccessTokenClaims(
 ): NormalizedAccessTokenClaims {
   const payload = jwtService.verify(token, {
     secret: resolveAccessTokenSecret(configService),
+    ...getJwtVerifyOptions(configService),
   }) as unknown;
+
+  assertJwtTokenType(payload, JWT_ACCESS_TOKEN_TYPE);
+  assertJwtHasExpiration(payload);
 
   return normalizeAccessTokenClaims(payload);
 }

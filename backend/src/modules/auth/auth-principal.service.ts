@@ -10,11 +10,16 @@ import {
 } from '../../shared/security/security-audit.service';
 import {
   NormalizedAccessTokenClaims,
+  assertJwtHasExpiration,
+  assertJwtTokenType,
   normalizeAccessTokenClaims,
   resolveAccessTokenSecret,
 } from './utils/access-token-claims.util';
+import {
+  getJwtVerifyOptions,
+  JWT_ACCESS_TOKEN_TYPE,
+} from './auth-security.config';
 import { decryptSensitiveValue } from '../../shared/security/field-encryption.util';
-import { normalizePrivilegedRole } from './mfa.config';
 
 export type AuthenticatedPrincipal = {
   id: string;
@@ -152,6 +157,8 @@ export class AuthPrincipalService {
   private verifyAccessToken(token: string): Record<string, unknown> {
     const secret = resolveAccessTokenSecret(this.configService);
     const verified = this.verifyJwt(token, secret);
+    assertJwtTokenType(verified, JWT_ACCESS_TOKEN_TYPE);
+    assertJwtHasExpiration(verified);
     if (verified && typeof verified === 'object' && !Array.isArray(verified)) {
       return verified;
     }
@@ -160,7 +167,7 @@ export class AuthPrincipalService {
 
   private verifyJwt(token: string, secret: string): JwtVerifyResult | null {
     try {
-      return jwt.verify(token, secret);
+      return jwt.verify(token, secret, getJwtVerifyOptions(this.configService));
     } catch {
       return null;
     }
@@ -464,5 +471,12 @@ export class AuthPrincipalService {
 }
 
 export function isSuperAdminProfileName(profileName?: string): boolean {
-  return normalizePrivilegedRole(profileName) === 'ADMIN_GERAL';
+  const normalized = String(profileName || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+
+  // ADMIN_GERAL é administrador do próprio tenant, não plataforma.
+  // Somente o papel explícito SUPER_ADMIN pode abrir contexto global.
+  return normalized === 'SUPER_ADMIN';
 }

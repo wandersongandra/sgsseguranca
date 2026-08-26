@@ -12,13 +12,13 @@ import { TenantOptional } from '../decorators/tenant-optional.decorator';
 /**
  * Endpoint administrativo de monitoramento de rate limits.
  *
- * Acesso restrito a ADMIN_GERAL.
+ * Acesso restrito a SUPER_ADMIN de plataforma.
  * Retorna snapshot atual dos contadores no Redis.
  */
 @Controller('admin/rate-limits')
 @TenantOptional()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN_GERAL)
+@Roles(Role.SUPER_ADMIN)
 export class RateLimitsAdminController {
   private static readonly MAX_SCAN_ITERATIONS = 20;
   private static readonly MAX_SCANNED_KEYS = 2000;

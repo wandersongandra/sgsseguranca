@@ -89,7 +89,7 @@ export class MachinesService extends BaseService<Machine> {
     limit?: number;
     search?: string;
   }): Promise<OffsetPage<Machine>> {
-    const tenantId = this.getTenantId();
+    const tenantId = this.getTenantId('findPaginated');
     const { page, limit, skip } = normalizeOffsetPagination(opts, {
       defaultLimit: 20,
       maxLimit: 100,

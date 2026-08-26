@@ -89,7 +89,7 @@ export class ToolsService extends BaseService<Tool> {
     limit?: number;
     search?: string;
   }): Promise<OffsetPage<Tool>> {
-    const tenantId = this.getTenantId();
+    const tenantId = this.getTenantId('findPaginated');
     const { page, limit, skip } = normalizeOffsetPagination(opts, {
       defaultLimit: 20,
       maxLimit: 100,

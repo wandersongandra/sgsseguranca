@@ -16,6 +16,7 @@ import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
 import { Role } from './enums/roles.enum';
+import { normalizeRoleName } from './role-normalization.util';
 import { CpfUtil } from '../../shared/utils/cpf.util';
 import { PasswordService } from '../../shared/services/password.service';
 import { AuthRedisService } from '../../shared/redis/redis.service';
@@ -33,15 +34,25 @@ import {
   getRefreshTokenTtl,
   getRefreshTokenTtlDays,
   getMaxActiveSessionsPerUser,
+  getJwtSignOptions,
+  getJwtVerifyOptions,
+  JWT_ACCESS_TOKEN_TYPE,
+  JWT_REFRESH_TOKEN_TYPE,
 } from './auth-security.config';
-import { resolveAccessTokenSecret } from './utils/access-token-claims.util';
+import {
+  assertJwtHasExpiration,
+  resolveAccessTokenSecret,
+} from './utils/access-token-claims.util';
 import { resolvePasswordResetBaseUrl } from '../../shared/utils/password-reset-url.util';
 import {
   decryptSensitiveValue,
   hashSensitiveValue,
 } from '../../shared/security/field-encryption.util';
 import { TenantService } from '../../shared/tenant/tenant.service';
-import { AuthPrincipalService } from './auth-principal.service';
+import {
+  AuthPrincipalService,
+  isSuperAdminProfileName,
+} from './auth-principal.service';
 import { isLegacyCpfPlaintextLookupEnabled } from '../privacy/cpf-plaintext-migration.util';
 
 const RESET_TOKEN_TTL_SECONDS = 3600; // 1 hora
@@ -68,6 +79,7 @@ interface JwtPayload {
   app_user_id?: string;
   jti?: string;
   exp?: number;
+  token_type?: typeof JWT_ACCESS_TOKEN_TYPE | typeof JWT_REFRESH_TOKEN_TYPE;
 }
 
 type AuthLoginUserRow = {
@@ -940,22 +952,12 @@ export class AuthService {
     return mode === 'ua' ? 'ua' : 'none';
   }
 
-  /**
-   * Retorna opções de signing com `issuer` e `audience` quando configurados.
-   *
-   * JWT_ISSUER e JWT_AUDIENCE são opcionais — se não configurados, os tokens
-   * continuam sendo emitidos sem esses claims (retrocompatibilidade).
-   * Em produção nova, configurar ambos para binding forte do token ao emissor.
-   *
-   * A validação correspondente está em JwtStrategy.validate().
-   */
-  private getLocalJwtSignOptions(): Record<string, unknown> {
-    const issuer = this.configService.get<string>('JWT_ISSUER')?.trim();
-    const audience = this.configService.get<string>('JWT_AUDIENCE')?.trim();
-    const opts: Record<string, unknown> = {};
-    if (issuer) opts.issuer = issuer;
-    if (audience) opts.audience = audience;
-    return opts;
+  private getLocalJwtSignOptions(): ReturnType<typeof getJwtSignOptions> {
+    return getJwtSignOptions(this.configService);
+  }
+
+  private getLocalJwtVerifyOptions(): ReturnType<typeof getJwtVerifyOptions> {
+    return getJwtVerifyOptions(this.configService);
   }
 
   private buildGraphiteEmailHtml(options: {
@@ -1058,6 +1060,14 @@ export class AuthService {
       isAdminGeral,
       jti,
     };
+    const accessPayload = {
+      ...payload,
+      token_type: JWT_ACCESS_TOKEN_TYPE,
+    };
+    const refreshPayload = {
+      ...payload,
+      token_type: JWT_REFRESH_TOKEN_TYPE,
+    };
     const accessTtl = getAccessTokenTtl();
     const localOpts = this.getLocalJwtSignOptions();
 
@@ -1068,7 +1078,7 @@ export class AuthService {
       const forcedTtlSeconds =
         Number(process.env.FORCE_PASSWORD_CHANGE_TOKEN_TTL_SECONDS) || 600; // 10 minutes
       const limitedPayload = {
-        ...payload,
+        ...accessPayload,
         force_password_change: true,
         scope: 'force_change',
       };
@@ -1095,9 +1105,12 @@ export class AuthService {
 
     const refreshSecret = getRefreshTokenSecret(this.configService);
     const accessToken = isInfiniteTtl(accessTtl)
-      ? this.jwtService.sign(payload, { ...localOpts })
-      : this.jwtService.sign(payload, { expiresIn: accessTtl, ...localOpts });
-    const refreshToken = this.jwtService.sign(payload, {
+      ? this.jwtService.sign(accessPayload, { ...localOpts })
+      : this.jwtService.sign(accessPayload, {
+          expiresIn: accessTtl,
+          ...localOpts,
+        });
+    const refreshToken = this.jwtService.sign(refreshPayload, {
       expiresIn: getRefreshTokenTtl(),
       secret: refreshSecret,
       ...localOpts,
@@ -1181,21 +1194,67 @@ export class AuthService {
     try {
       payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: refreshSecret,
+        ...this.getLocalJwtVerifyOptions(),
       });
+      if (payload.token_type !== JWT_REFRESH_TOKEN_TYPE) {
+        throw new UnauthorizedException(
+          'Token de access não pode ser usado como refresh',
+        );
+      }
+      assertJwtHasExpiration(payload);
     } catch {
       throw new UnauthorizedException('Refresh token inválido');
     }
 
-    const companyId = this.normalizeSessionCompanyId(payload.company_id);
+    const payloadCompanyId = this.normalizeSessionCompanyId(payload.company_id);
+    const currentContext =
+      await this.authPrincipalService.resolveCurrentUserContext({
+        appUserId: payload.app_user_id ?? payload.sub,
+        authUserId: payload.auth_uid,
+      });
+    if (!currentContext?.companyId) {
+      throw new UnauthorizedException(
+        'Usuário inativo ou sem empresa vinculada',
+      );
+    }
+
+    if (currentContext.companyId !== payloadCompanyId) {
+      this.logger.warn({
+        event: 'refresh_tenant_context_changed',
+        userId: payload.sub,
+        action: 'refresh_blocked',
+      });
+      throw new UnauthorizedException(
+        'Sessão inválida após alteração de empresa',
+      );
+    }
+
+    const isCurrentSuperAdmin = isSuperAdminProfileName(
+      currentContext.profileName,
+    );
+    const normalizedCurrentProfile = normalizeRoleName(
+      currentContext.profileName,
+    );
+    const isCompanyWideTenantProfile =
+      normalizedCurrentProfile === Role.ADMIN_GERAL ||
+      normalizedCurrentProfile === Role.ADMIN_EMPRESA;
+    const companyId = this.normalizeSessionCompanyId(currentContext.companyId);
     return this.tenantService.run(
       {
         companyId,
-        isSuperAdmin: payload.isAdminGeral === true,
+        isSuperAdmin: isCurrentSuperAdmin,
         userId: payload.sub,
-        siteId: payload.site_id ?? undefined,
-        siteScope: payload.isAdminGeral === true ? 'all' : 'single',
+        siteId: currentContext.siteId,
+        siteScope:
+          isCurrentSuperAdmin || isCompanyWideTenantProfile ? 'all' : 'single',
       },
-      () => this.refreshInTenantContext(refreshToken, payload, ctx),
+      () =>
+        this.refreshInTenantContext(refreshToken, payload, ctx, {
+          companyId,
+          siteId: currentContext.siteId,
+          profileName: currentContext.profileName,
+          isSuperAdmin: isCurrentSuperAdmin,
+        }),
     );
   }
 
@@ -1203,6 +1262,12 @@ export class AuthService {
     refreshToken: string,
     payload: JwtPayload,
     ctx?: { userAgent?: string; ip?: string },
+    currentContext?: {
+      companyId: string;
+      siteId?: string;
+      profileName?: string;
+      isSuperAdmin: boolean;
+    },
   ) {
     const refreshSecret = getRefreshTokenSecret(this.configService);
     const oldHash = this.hashToken(refreshToken);
@@ -1301,40 +1366,40 @@ export class AuthService {
     // (ex.: obra X -> Y), o refresh re-emite o token com a obra NOVA — sem isso,
     // o site_id antigo do payload seria perpetuado por até 30 dias, mantendo o
     // usuário "preso" na obra antiga e gerando 401 por divergência de contexto.
-    let freshSiteId: string | null | undefined;
-    try {
-      const freshContext =
-        await this.authPrincipalService.resolveCurrentUserContext({
-          appUserId: payload.app_user_id ?? payload.sub,
-          authUserId: payload.auth_uid,
-        });
-      freshSiteId = freshContext?.siteId;
-    } catch {
-      this.logger.warn({
-        event: 'refresh_site_context_lookup_failed',
-        userId: payload.sub,
-        action: 'falling_back_to_payload_site',
-      });
+    if (!currentContext) {
+      throw new UnauthorizedException(
+        'Contexto atual do usuário não resolvido',
+      );
     }
     const newPayload = {
       sub: payload.sub,
       app_user_id: payload.app_user_id ?? payload.sub,
       auth_uid: payload.auth_uid,
-      company_id: companyId,
-      site_id: freshSiteId ?? payload.site_id ?? undefined,
-      profile: payload.profile,
-      isAdminGeral: payload.isAdminGeral === true,
+      company_id: currentContext.companyId,
+      site_id: currentContext.siteId ?? undefined,
+      profile: currentContext.profileName
+        ? { nome: currentContext.profileName }
+        : undefined,
+      isAdminGeral: currentContext.isSuperAdmin,
       jti: crypto.randomUUID(),
+    };
+    const newAccessPayload = {
+      ...newPayload,
+      token_type: JWT_ACCESS_TOKEN_TYPE,
+    };
+    const newRefreshPayload = {
+      ...newPayload,
+      token_type: JWT_REFRESH_TOKEN_TYPE,
     };
     const accessTtl = getAccessTokenTtl();
     const localOpts = this.getLocalJwtSignOptions();
     const accessToken = isInfiniteTtl(accessTtl)
-      ? this.jwtService.sign(newPayload, { ...localOpts })
-      : this.jwtService.sign(newPayload, {
+      ? this.jwtService.sign(newAccessPayload, { ...localOpts })
+      : this.jwtService.sign(newAccessPayload, {
           expiresIn: accessTtl,
           ...localOpts,
         });
-    const newRefreshToken = this.jwtService.sign(newPayload, {
+    const newRefreshToken = this.jwtService.sign(newRefreshPayload, {
       expiresIn: getRefreshTokenTtl(),
       secret: refreshSecret,
       ...localOpts,
@@ -1428,8 +1493,15 @@ export class AuthService {
         refreshToken,
         {
           secret: refreshSecret,
+          ...this.getLocalJwtVerifyOptions(),
         },
       );
+      if (payload.token_type !== JWT_REFRESH_TOKEN_TYPE) {
+        throw new UnauthorizedException(
+          'Token de access não pode ser revogado como refresh',
+        );
+      }
+      assertJwtHasExpiration(payload);
       const tokenHash = this.hashToken(refreshToken);
       await this.redisService.revokeRefreshToken(payload.sub, tokenHash);
       await this.revokePersistedSession(
@@ -1449,8 +1521,15 @@ export class AuthService {
           accessToken,
           {
             secret: resolveAccessTokenSecret(this.configService),
+            ...this.getLocalJwtVerifyOptions(),
           },
         );
+        if (decoded?.token_type !== JWT_ACCESS_TOKEN_TYPE) {
+          throw new UnauthorizedException(
+            'Token de refresh não pode ser usado como access',
+          );
+        }
+        assertJwtHasExpiration(decoded);
         if (decoded?.jti) {
           const remainingTtl = decoded.exp
             ? Math.max(0, decoded.exp - Math.floor(Date.now() / 1000))

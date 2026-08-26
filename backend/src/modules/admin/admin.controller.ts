@@ -30,7 +30,7 @@ import {
  * Admin Operations Controller
  * Endpoints para manutenção, compliance e monitoring
  *
- * SEGURANÇA: Todas as rotas exigem JWT válido + Role.ADMIN_GERAL.
+ * SEGURANÇA: Todas as rotas exigem JWT válido + Role.SUPER_ADMIN.
  * TenantOptional é aplicado pois admin global opera cross-tenant.
  *
  * Rotas:
@@ -44,7 +44,7 @@ import {
 @ApiTags('Admin - Operations & Compliance')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN_GERAL)
+@Roles(Role.SUPER_ADMIN)
 @TenantOptional()
 export class AdminController {
   private readonly logger = new Logger('AdminController');

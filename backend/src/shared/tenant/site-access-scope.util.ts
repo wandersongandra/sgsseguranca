@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { Role } from '../../modules/auth/enums/roles.enum';
+import { normalizeRoleName } from '../../modules/auth/role-normalization.util';
 import { RequestContext } from '../middleware/request-context.middleware';
 import { TenantContext } from './tenant.service';
 
@@ -19,7 +20,8 @@ type ResolveSiteAccessScopeOptions = {
 };
 
 export function isCompanyWideProfile(profileName?: string | null): boolean {
-  return profileName === Role.ADMIN_GERAL || profileName === Role.ADMIN_EMPRESA;
+  const normalized = normalizeRoleName(profileName);
+  return normalized === Role.ADMIN_GERAL || normalized === Role.ADMIN_EMPRESA;
 }
 
 export function resolveSiteAccessScope(

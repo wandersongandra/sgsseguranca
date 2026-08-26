@@ -987,9 +987,9 @@ describe('UsersService.create role assignment hardening', () => {
       .toUpperCase();
 
     const aliases: Record<string, string> = {
-      'ADMINISTRADOR GERAL': 'SUPER_ADMIN',
+      'ADMINISTRADOR GERAL': 'ADMIN_EMPRESA',
       SUPER_ADMIN: 'SUPER_ADMIN',
-      ADMIN_GERAL: 'SUPER_ADMIN',
+      ADMIN_GERAL: 'ADMIN_EMPRESA',
       'ADMINISTRADOR DA EMPRESA': 'ADMIN_EMPRESA',
       ADMIN_EMPRESA: 'ADMIN_EMPRESA',
       GERENTE: 'GERENTE',
@@ -1158,6 +1158,46 @@ describe('UsersService.create role assignment hardening', () => {
         profile_id: 'profile-local',
       }),
     ).rejects.toThrow('escopo RBAC não foi resolvido');
+
+    expect(repoSaveMock).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia ADMIN_GERAL de atribuir ADMIN_GERAL ao usar nome canônico', async () => {
+    profilesRepo.findOne.mockResolvedValue({
+      id: 'profile-admin-geral',
+      nome: 'Administrador Geral',
+    } as Profile);
+
+    await expect(
+      service.create({
+        nome: 'Novo Admin Geral',
+        cpf: '15082302698',
+        funcao: 'Administrador',
+        profile_id: 'profile-admin-geral',
+      }),
+    ).rejects.toThrow(
+      'Atribuição de perfil Administrador Geral não é permitida.',
+    );
+
+    expect(repoSaveMock).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia ADMIN_GERAL de atribuir ADMIN_GERAL por alias', async () => {
+    profilesRepo.findOne.mockResolvedValue({
+      id: 'profile-admin-geral-alias',
+      nome: 'ADMIN_GERAL',
+    } as Profile);
+
+    await expect(
+      service.create({
+        nome: 'Novo Admin Geral Alias',
+        cpf: '15082302698',
+        funcao: 'Administrador',
+        profile_id: 'profile-admin-geral-alias',
+      }),
+    ).rejects.toThrow(
+      'Atribuição de perfil Administrador Geral não é permitida.',
+    );
 
     expect(repoSaveMock).not.toHaveBeenCalled();
   });

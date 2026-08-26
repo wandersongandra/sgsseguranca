@@ -136,12 +136,9 @@ describe('RbacService cache curto', () => {
 
     expect(result.roles).toEqual(['Administrador Geral']);
     expect(result.permissions).toEqual(
-      expect.arrayContaining([
-        'can_view_dashboard',
-        'can_manage_users',
-        'can_view_system_health',
-      ]),
+      expect.arrayContaining(['can_view_dashboard', 'can_manage_users']),
     );
+    expect(result.permissions).not.toContain('can_view_system_health');
     expect(userRolesQueryMock).toHaveBeenCalledTimes(1);
     expect(usersQueryMock).toHaveBeenCalledTimes(2);
     expect(redisSetexMock).toHaveBeenCalledWith(
@@ -391,6 +388,8 @@ describe('RbacService cache curto', () => {
   });
 
   it('expõe o escopo efetivo coerente para aliases do produto', () => {
+    expect(service.getRoleScope('ADMIN_GERAL')).toBe('ADMIN_EMPRESA');
+    expect(service.getRoleScope('SUPER_ADMIN')).toBe('SUPER_ADMIN');
     expect(service.getRoleScope('GERENTE')).toBe('GERENTE');
     expect(service.getRoleScope('Técnico')).toBe('TECNICO');
     expect(service.getRoleScope('VISUALIZADOR')).toBe('VISUALIZADOR');

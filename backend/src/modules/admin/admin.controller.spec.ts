@@ -3,13 +3,13 @@
  *
  * Verifica que todas as rotas /admin/* exigem:
  *   - Autenticação JWT (401 se ausente)
- *   - Role.ADMIN_GERAL    (403 se role insuficiente)
+ *   - Role.SUPER_ADMIN    (403 se role insuficiente)
  *
  * Fase 2 adiciona:
  *   - Verificação de metadados NestJS (guards declarados em nível de classe)
  *   - Cobertura de TODAS as rotas do controller (não apenas sample)
  *   - Guards separados: JWT vs Roles (comportamento mais realista)
- *   - Resposta estruturada verificada para ADMIN_GERAL
+ *   - Resposta estruturada verificada para SUPER_ADMIN
  */
 import {
   INestApplication,
@@ -53,7 +53,7 @@ const makeRoleGuard = (userRole: Role) => ({
       .switchToHttp()
       .getRequest<{ user: { profile: { nome: string } } }>();
     req.user = { profile: { nome: userRole } };
-    if (userRole !== Role.ADMIN_GERAL) {
+    if (userRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Função insuficiente para esta operação');
     }
     return true;
@@ -71,10 +71,10 @@ const makeAuthenticatedWithRoleGuard = (userRole: Role) => ({
   },
 });
 
-// Guard para RolesGuard: bloqueia se não é ADMIN_GERAL
+// Guard para RolesGuard: bloqueia se não é SUPER_ADMIN
 const rolesGuardFor = (userRole: Role) => ({
   canActivate: () => {
-    if (userRole !== Role.ADMIN_GERAL) {
+    if (userRole !== Role.SUPER_ADMIN) {
       throw new ForbiddenException('Função insuficiente');
     }
     return true;
@@ -257,7 +257,7 @@ const ALL_ADMIN_ROUTES: Array<{
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('AdminController — Metadados NestJS: guards aplicados em nível de classe (Fase 2)', () => {
-  it('AdminController tem @Roles(Role.ADMIN_GERAL) declarado a nível de classe', async () => {
+  it('AdminController tem @Roles(Role.SUPER_ADMIN) declarado a nível de classe', async () => {
     const moduleRef = await buildModuleRef();
     const reflector = moduleRef.get(Reflector);
 
@@ -265,7 +265,7 @@ describe('AdminController — Metadados NestJS: guards aplicados em nível de cl
     const roles = reflector.get<Role[]>(ROLES_KEY, AdminController);
 
     expect(Array.isArray(roles)).toBe(true);
-    expect(roles).toContain(Role.ADMIN_GERAL);
+    expect(roles).toContain(Role.SUPER_ADMIN);
 
     // Garante que nenhum role de menor privilégio está incluído na declaração de classe
     const unprivilegedRoles = [
@@ -402,13 +402,13 @@ describe('AdminController — Autenticação e Autorização (P0)', () => {
     });
   });
 
-  describe('ADMIN_GERAL → acesso permitido (2xx)', () => {
+  describe('SUPER_ADMIN → acesso permitido (2xx)', () => {
     let adminApp: INestApplication;
 
     beforeAll(async () => {
       adminApp = await buildApp(
-        makeAuthenticatedWithRoleGuard(Role.ADMIN_GERAL),
-        rolesGuardFor(Role.ADMIN_GERAL),
+        makeAuthenticatedWithRoleGuard(Role.SUPER_ADMIN),
+        rolesGuardFor(Role.SUPER_ADMIN),
       );
     });
 
@@ -416,7 +416,7 @@ describe('AdminController — Autenticação e Autorização (P0)', () => {
       await adminApp.close();
     });
 
-    it('GET /admin/cache/status retorna 200 para ADMIN_GERAL', async () => {
+    it('GET /admin/cache/status retorna 200 para SUPER_ADMIN', async () => {
       const response = await httpRequest(adminApp).get('/admin/cache/status');
       expect(response.status).toBe(200);
     });
@@ -472,7 +472,7 @@ describe('AdminController — Validação de UUID nos parâmetros de rota (P0)',
   let adminApp: INestApplication;
 
   beforeAll(async () => {
-    adminApp = await buildApp(makeRoleGuard(Role.ADMIN_GERAL));
+    adminApp = await buildApp(makeRoleGuard(Role.SUPER_ADMIN));
   });
 
   afterAll(async () => {

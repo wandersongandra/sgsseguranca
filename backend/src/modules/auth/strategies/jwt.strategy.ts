@@ -5,8 +5,13 @@ import { ConfigService } from '@nestjs/config';
 import type { Request } from 'express';
 import { TokenRevocationService } from '../token-revocation.service';
 import { AuthPrincipalService } from '../auth-principal.service';
-import { resolveAccessTokenSecret } from '../utils/access-token-claims.util';
+import {
+  assertJwtHasExpiration,
+  assertJwtTokenType,
+  resolveAccessTokenSecret,
+} from '../utils/access-token-claims.util';
 import type { AuthenticatedPrincipal } from '../auth-principal.service';
+import { getJwtContract, JWT_ACCESS_TOKEN_TYPE } from '../auth-security.config';
 
 type AuthenticatedHttpRequest = Request & {
   authPrincipal?: AuthenticatedPrincipal;
@@ -18,18 +23,21 @@ const FORCE_PASSWORD_CHANGE_ALLOWED_PATHS = new Set(['/auth/change-password']);
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  private readonly jwtIssuer: string | undefined;
-  private readonly jwtAudience: string | undefined;
+  private readonly jwtIssuer: string;
+  private readonly jwtAudience: string;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly tokenRevocationService: TokenRevocationService,
     private readonly authPrincipalService: AuthPrincipalService,
   ) {
+    const jwtContract = getJwtContract(configService);
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      algorithms: ['HS256'],
+      algorithms: jwtContract.algorithms,
+      issuer: jwtContract.issuer,
+      audience: jwtContract.audience,
       passReqToCallback: true,
       secretOrKeyProvider: (_request, _rawJwtToken, done) => {
         try {
@@ -40,10 +48,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       },
     });
 
-    this.jwtIssuer =
-      configService.get<string>('JWT_ISSUER')?.trim() || undefined;
-    this.jwtAudience =
-      configService.get<string>('JWT_AUDIENCE')?.trim() || undefined;
+    this.jwtIssuer = jwtContract.issuer;
+    this.jwtAudience = jwtContract.audience;
   }
 
   async validate(
@@ -53,20 +59,20 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       unknown
     >,
   ) {
-    // Validação de issuer e audience — ativada quando JWT_ISSUER / JWT_AUDIENCE estão configurados.
-    if (this.jwtIssuer && payload.iss !== this.jwtIssuer) {
+    if (payload.iss !== this.jwtIssuer) {
       throw new UnauthorizedException(
         'Token inválido: emissor não reconhecido',
       );
     }
 
-    if (this.jwtAudience) {
-      const aud = payload.aud;
-      const audiences = Array.isArray(aud) ? aud : aud ? [aud] : [];
-      if (!audiences.includes(this.jwtAudience)) {
-        throw new UnauthorizedException('Token inválido: audience incorreta');
-      }
+    const aud = payload.aud;
+    const audiences = Array.isArray(aud) ? aud : aud ? [aud] : [];
+    if (!audiences.includes(this.jwtAudience)) {
+      throw new UnauthorizedException('Token inválido: audience incorreta');
     }
+
+    assertJwtTokenType(payload, JWT_ACCESS_TOKEN_TYPE);
+    assertJwtHasExpiration(payload);
 
     // Checar blacklist: tokens revogados via logout são rejeitados imediatamente,
     // sem esperar o TTL natural expirar.

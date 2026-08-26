@@ -119,7 +119,7 @@ function resolveTenantBackupUploadedPath(filePath: string): string {
 @Controller('admin')
 @TenantOptional()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN_GERAL)
+@Roles(Role.SUPER_ADMIN)
 export class TenantBackupAdminController {
   private readonly logger = new Logger(TenantBackupAdminController.name);
 

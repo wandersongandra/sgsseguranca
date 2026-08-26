@@ -3,6 +3,18 @@ import { UnauthorizedException } from '@nestjs/common';
 import { JwtStrategy } from './jwt.strategy';
 
 describe('JwtStrategy', () => {
+  const issuer = 'https://jwt.test.sgs.local';
+  const audience = 'sgs-test';
+  const accessPayload = (overrides: Record<string, unknown> = {}) => ({
+    sub: 'user-1',
+    jti: 'token-1',
+    iss: issuer,
+    aud: audience,
+    exp: 4_102_444_800,
+    token_type: 'access',
+    ...overrides,
+  });
+
   const buildStrategy = () => {
     const tokenRevocationService = {
       isRevoked: jest.fn().mockResolvedValue(false),
@@ -11,7 +23,14 @@ describe('JwtStrategy', () => {
       resolveAccessPrincipal: jest.fn(),
     };
     const strategy = new JwtStrategy(
-      { get: () => undefined } as unknown as ConfigService,
+      {
+        get: (key: string) =>
+          ({
+            JWT_SECRET: 'a'.repeat(64),
+            JWT_ISSUER: issuer,
+            JWT_AUDIENCE: audience,
+          })[key],
+      } as unknown as ConfigService,
       tokenRevocationService as never,
       authPrincipalService as never,
     );
@@ -34,7 +53,7 @@ describe('JwtStrategy', () => {
 
     const result = await strategy.validate(
       { authPrincipal: principal } as never,
-      { sub: 'user-1', jti: 'token-1' },
+      accessPayload(),
     );
 
     expect(result).toBe(principal);
@@ -58,13 +77,16 @@ describe('JwtStrategy', () => {
           tokenSource: 'local' as const,
         },
       } as never,
-      { sub: 'auth-user-2', jti: 'token-2' },
+      accessPayload({ sub: 'auth-user-2', jti: 'token-2' }),
     );
 
-    expect(authPrincipalService.resolveAccessPrincipal).toHaveBeenCalledWith({
-      sub: 'auth-user-2',
-      jti: 'token-2',
-    });
+    expect(authPrincipalService.resolveAccessPrincipal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sub: 'auth-user-2',
+        jti: 'token-2',
+        token_type: 'access',
+      }),
+    );
     expect(result).toEqual({ id: 'user-2' });
   });
 
@@ -85,7 +107,7 @@ describe('JwtStrategy', () => {
             tokenSource: 'local' as const,
           },
         } as never,
-        { sub: 'user-1', jti: 'revoked-token' },
+        accessPayload({ jti: 'revoked-token' }),
       ),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
@@ -105,8 +127,7 @@ describe('JwtStrategy', () => {
 
     await expect(
       strategy.validate({ path: '/aprs' } as never, {
-        sub: 'user-1',
-        jti: 'token-1',
+        ...accessPayload(),
         scope: 'force_change',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
@@ -122,7 +143,7 @@ describe('JwtStrategy', () => {
 
     const result = await strategy.validate(
       { path: '/auth/change-password' } as never,
-      { sub: 'user-1', jti: 'token-1', scope: 'force_change' },
+      { ...accessPayload(), scope: 'force_change' },
     );
 
     expect(result).toEqual({ id: 'user-1' });
@@ -139,12 +160,46 @@ describe('JwtStrategy', () => {
       id: 'user-ok',
     });
 
-    const result = await strategy.validate({} as never, {
-      sub: 'user-ok',
-      jti: 'jti-redis-down',
-    });
+    const result = await strategy.validate(
+      {} as never,
+      accessPayload({ sub: 'user-ok', jti: 'jti-redis-down' }),
+    );
 
     expect(result).toEqual({ id: 'user-ok' });
     expect(authPrincipalService.resolveAccessPrincipal).toHaveBeenCalled();
+  });
+
+  it('bloqueia issuer e audience ausentes ou incorretos', async () => {
+    const { strategy } = buildStrategy();
+
+    for (const payload of [
+      accessPayload({ iss: undefined }),
+      accessPayload({ iss: 'https://evil.example' }),
+      accessPayload({ aud: undefined }),
+      accessPayload({ aud: 'other-api' }),
+    ]) {
+      await expect(
+        strategy.validate({} as never, payload),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+    }
+  });
+
+  it('bloqueia refresh ou token legado sem token_type no caminho de access', async () => {
+    const { strategy } = buildStrategy();
+
+    await expect(
+      strategy.validate({} as never, accessPayload({ token_type: 'refresh' })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+    await expect(
+      strategy.validate({} as never, accessPayload({ token_type: undefined })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('bloqueia access token sem expiração', async () => {
+    const { strategy } = buildStrategy();
+
+    await expect(
+      strategy.validate({} as never, accessPayload({ exp: undefined })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

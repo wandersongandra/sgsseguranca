@@ -5,7 +5,15 @@ import { ConfigService } from '@nestjs/config';
 import { AuthRedisService } from '../../../shared/redis/redis.service';
 import * as crypto from 'crypto';
 import { getRefreshTokenSecret } from '../auth-security.config';
-import { normalizeAccessTokenClaims } from '../utils/access-token-claims.util';
+import {
+  getJwtContract,
+  JWT_REFRESH_TOKEN_TYPE,
+} from '../auth-security.config';
+import {
+  assertJwtHasExpiration,
+  assertJwtTokenType,
+  normalizeAccessTokenClaims,
+} from '../utils/access-token-claims.util';
 
 type RefreshCookieRequest = {
   cookies?: Record<string, string | undefined>;
@@ -20,6 +28,11 @@ function cookieExtractor(req?: RefreshCookieRequest): string | null {
 }
 
 @Injectable()
+/**
+ * @deprecated The runtime refresh contract is AuthService.refresh(), which
+ * performs issuer/audience/type validation and atomic rotation. This strategy
+ * remains only as a compatibility test surface and is not registered by AuthModule.
+ */
 export class JwtRefreshStrategy extends PassportStrategy(
   Strategy,
   'jwt-refresh',
@@ -28,11 +41,14 @@ export class JwtRefreshStrategy extends PassportStrategy(
     private configService: ConfigService,
     private redisService: AuthRedisService,
   ) {
+    const jwtContract = getJwtContract(configService);
     const jwtSecret = getRefreshTokenSecret(configService);
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([cookieExtractor]),
       ignoreExpiration: false,
-      algorithms: ['HS256'],
+      algorithms: jwtContract.algorithms,
+      issuer: jwtContract.issuer,
+      audience: jwtContract.audience,
       passReqToCallback: true,
       secretOrKey: jwtSecret,
     });
@@ -46,6 +62,21 @@ export class JwtRefreshStrategy extends PassportStrategy(
     if (!refreshToken) {
       throw new UnauthorizedException();
     }
+
+    const jwtContract = getJwtContract(this.configService);
+    if (payload.iss !== jwtContract.issuer) {
+      throw new UnauthorizedException('Emissor de refresh inválido');
+    }
+    const audiences = Array.isArray(payload.aud)
+      ? payload.aud
+      : payload.aud
+        ? [payload.aud]
+        : [];
+    if (!audiences.includes(jwtContract.audience)) {
+      throw new UnauthorizedException('Audience de refresh inválida');
+    }
+    assertJwtTokenType(payload, JWT_REFRESH_TOKEN_TYPE);
+    assertJwtHasExpiration(payload);
 
     const normalized = normalizeAccessTokenClaims(payload);
     const client = this.redisService.getClient();

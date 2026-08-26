@@ -75,6 +75,10 @@ describe('AuthService', () => {
   };
   let configService: { get: jest.Mock };
   let mailService: { sendMailSimple: jest.Mock };
+  let authPrincipalService: {
+    resolveCurrentUserContext: jest.Mock;
+    invalidateBridgeCache: jest.Mock;
+  };
   let dataSource: {
     transaction: jest.Mock;
     query: jest.Mock;
@@ -197,6 +201,8 @@ describe('AuthService', () => {
               if (key === 'JWT_REFRESH_SECRET') {
                 return 'test-refresh-secret-1234567890';
               }
+              if (key === 'JWT_ISSUER') return 'https://jwt.test.sgs.local';
+              if (key === 'JWT_AUDIENCE') return 'sgs-test';
               if (key === 'LEGACY_PASSWORD_AUTH_ENABLED') {
                 return true;
               }
@@ -247,10 +253,17 @@ describe('AuthService', () => {
         },
         {
           provide: AuthPrincipalService,
-          useValue: {
-            resolveCurrentUserContext: jest.fn().mockResolvedValue(null),
+          useValue: (authPrincipalService = {
+            resolveCurrentUserContext: jest.fn(
+              (params: { appUserId?: string }) =>
+                Promise.resolve({
+                  companyId:
+                    params.appUserId === 'user-1' ? 'company-1' : '123',
+                  profileName: 'TST',
+                }),
+            ),
             invalidateBridgeCache: jest.fn(),
-          },
+          }),
         },
       ],
     }).compile();
@@ -571,11 +584,16 @@ describe('AuthService', () => {
         expect.objectContaining({
           sub: user.id,
           isAdminGeral: true,
+          token_type: 'access',
         }),
       );
       expect(accessTokenCall?.[0]).not.toHaveProperty('cpf');
       expect(refreshTokenCall?.[0]).toEqual(
-        expect.objectContaining({ sub: user.id, isAdminGeral: true }),
+        expect.objectContaining({
+          sub: user.id,
+          isAdminGeral: true,
+          token_type: 'refresh',
+        }),
       );
       expect(refreshTokenCall?.[0]).not.toHaveProperty('cpf');
       expect(refreshTokenCall?.[1]).toEqual(
@@ -669,6 +687,8 @@ describe('AuthService', () => {
         sub: '123',
         cpf: '123',
         company_id: '123',
+        token_type: 'refresh',
+        exp: Math.floor(Date.now() / 1000) + 900,
       };
       jwtService.verifyAsync.mockResolvedValue(verifiedPayload);
       redisService.atomicConsumeRefreshToken.mockResolvedValue('1');
@@ -696,6 +716,8 @@ describe('AuthService', () => {
         sub: 'user-1',
         cpf: '123',
         company_id: 'company-1',
+        token_type: 'refresh',
+        exp: Math.floor(Date.now() / 1000) + 900,
       });
       redisService.atomicConsumeRefreshToken.mockResolvedValue(null);
       redisService.isTokenConsumed.mockResolvedValue(false);
@@ -734,6 +756,8 @@ describe('AuthService', () => {
         sub: 'user-1',
         cpf: '123',
         company_id: 'company-1',
+        token_type: 'refresh',
+        exp: Math.floor(Date.now() / 1000) + 900,
       });
       redisService.atomicConsumeRefreshToken.mockResolvedValue(null);
       redisService.isTokenConsumed.mockResolvedValue(false);
@@ -749,6 +773,8 @@ describe('AuthService', () => {
         sub: 'user-1',
         cpf: '123',
         company_id: 'company-1',
+        token_type: 'refresh',
+        exp: Math.floor(Date.now() / 1000) + 900,
       });
       redisService.atomicConsumeRefreshToken.mockResolvedValue(null);
       redisService.isTokenConsumed.mockResolvedValue(true);
@@ -771,6 +797,38 @@ describe('AuthService', () => {
       await expect(service.refresh('invalid')).rejects.toThrow(
         UnauthorizedException,
       );
+    });
+
+    it('rejeita refresh token sem expiração antes de consultar sessão ou tenant', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-1',
+        company_id: 'company-1',
+        token_type: 'refresh',
+      });
+
+      await expect(
+        service.refresh('missing-exp-refresh-token'),
+      ).rejects.toThrow(UnauthorizedException);
+      expect(
+        authPrincipalService.resolveCurrentUserContext,
+      ).not.toHaveBeenCalled();
+      expect(redisService.atomicConsumeRefreshToken).not.toHaveBeenCalled();
+    });
+
+    it('não aceita access token no endpoint de refresh', async () => {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-1',
+        company_id: 'company-1',
+        token_type: 'access',
+        exp: Math.floor(Date.now() / 1000) + 900,
+      });
+
+      await expect(service.refresh('access-as-refresh-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(
+        authPrincipalService.resolveCurrentUserContext,
+      ).not.toHaveBeenCalled();
     });
   });
   describe('forgotPassword', () => {
@@ -919,6 +977,8 @@ describe('AuthService', () => {
         sub: 'user-1',
         cpf: '123',
         company_id: 'company-1',
+        token_type: 'refresh',
+        exp: Math.floor(Date.now() / 1000) + 900,
       });
       await service.logout('valid-refresh-token');
 
@@ -940,6 +1000,8 @@ describe('AuthService', () => {
           sub: 'user-1',
           cpf: '123',
           company_id: 'company-1',
+          token_type: 'refresh',
+          exp: Math.floor(Date.now() / 1000) + 900,
         })
         .mockResolvedValueOnce({
           sub: 'user-1',
@@ -947,6 +1009,7 @@ describe('AuthService', () => {
           exp: now + 300,
           cpf: '123',
           company_id: 'company-1',
+          token_type: 'access',
         });
 
       await service.logout('valid-refresh-token', 'valid-access-token');

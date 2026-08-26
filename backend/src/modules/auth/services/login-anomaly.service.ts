@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserSession } from '../entities/user-session.entity';
 import { MailService } from '../../../infra/mail/mail.service';
+import { maskEmail } from '../../../shared/logging/log-sanitizer.util';
+import { maskIpAddress } from '../../../shared/security/evidence-integrity.util';
 
 /**
  * Serviço de detecção de anomalias em logins.
@@ -93,7 +95,7 @@ export class LoginAnomalyService {
         event: 'login_new_ip_prefix',
         severity: 'MEDIUM',
         userId,
-        currentIp,
+        currentIp: maskIpAddress(currentIp),
         currentPrefix,
         knownPrefixes: [...knownPrefixes],
       });
@@ -158,13 +160,13 @@ export class LoginAnomalyService {
       );
       this.logger.log({
         event: 'login_anomaly_alert_sent',
-        email: userEmail,
-        ip: currentIp,
+        email: maskEmail(userEmail),
+        ip: maskIpAddress(currentIp),
       });
     } catch (error) {
       this.logger.error({
         event: 'login_anomaly_alert_failed',
-        email: userEmail,
+        email: maskEmail(userEmail),
         message: error instanceof Error ? error.message : String(error),
       });
     }

@@ -9,8 +9,8 @@ import { TestApp, type LoginSession } from '../helpers/test-app';
  *
  * Cenários cobertos:
  *   1. /auth/me sem x-company-id: todos os roles recebem 200 (TenantOptional)
- *   2. GET /companies sem x-company-id: ADMIN_GERAL vê todas; ADMIN_EMPRESA
- *      vê só a própria; TST recebe 403 (sem can_view_companies)
+ *   2. GET /companies sem x-company-id: ADMIN_GERAL e ADMIN_EMPRESA veem
+ *      somente a própria; TST recebe 403 (sem can_view_companies)
  */
 const describeE2E =
   process.env.E2E_INFRA_AVAILABLE === 'false' ? describe.skip : describe;
@@ -75,7 +75,7 @@ describeE2E('RLS Hardening — validação de auth pós-migration-361', () => {
   });
 
   describe('GET /companies sem x-company-id (isolamento de listagem)', () => {
-    it('ADMIN_GERAL lista todas as empresas sem header de tenant', async () => {
+    it('ADMIN_GERAL lista somente a própria empresa sem header de tenant', async () => {
       const tenantA = testApp.getTenant('tenantA');
       const tenantB = testApp.getTenant('tenantB');
 
@@ -89,7 +89,7 @@ describeE2E('RLS Hardening — validação de auth pós-migration-361', () => {
       expect(Array.isArray(body.data)).toBe(true);
       const ids = (body.data ?? []).map((c) => c.id);
       expect(ids).toContain(tenantA.companyId);
-      expect(ids).toContain(tenantB.companyId);
+      expect(ids).not.toContain(tenantB.companyId);
     });
 
     it('ADMIN_EMPRESA sem header de tenant vê apenas a própria empresa (sem cross-tenant)', async () => {

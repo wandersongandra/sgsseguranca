@@ -5,7 +5,7 @@
  *   1. Fluxo de autenticação: login → /auth/me → refresh → logout
  *   2. Acesso a rotas comuns por roles corretas (não admin)
  *   3. Isolamento cross-tenant ainda funciona em endpoints de negócio
- *   4. RLS validation endpoints retornam resposta estruturada para ADMIN_GERAL
+ *   4. RLS validation endpoints continuam restritos ao SUPER_ADMIN explícito
  *   5. Admin routes agora retornam 401 sem token (antes não exigiam)
  *
  * Pré-condição: docker compose -f ../ops/test/compose/docker-compose.e2e.yml up -d
@@ -20,6 +20,7 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
   let testApp: TestApp;
 
   let adminGeralSession: LoginSession;
+  let superAdminSession: LoginSession;
   let adminEmpresaSession: LoginSession;
   let tstSession: LoginSession;
   let trabalhadorSession: LoginSession;
@@ -30,6 +31,7 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
     await testApp.resetDatabase();
 
     adminGeralSession = await testApp.loginAs(Role.ADMIN_GERAL, 'tenantA');
+    superAdminSession = await testApp.loginAs(Role.SUPER_ADMIN, 'tenantA');
     adminEmpresaSession = await testApp.loginAs(Role.ADMIN_EMPRESA, 'tenantA');
     tstSession = await testApp.loginAs(Role.TST, 'tenantA');
     trabalhadorSession = await testApp.loginAs(Role.TRABALHADOR, 'tenantA');
@@ -146,7 +148,7 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
   // ────────────────────────────────────────────────────────────────────────────
   // 3. Admin routes: comportamento ANTES vs DEPOIS da Fase 1
   //    ANTES: acesso sem token era permitido (bug)
-  //    DEPOIS: exige JWT + ADMIN_GERAL
+  //    DEPOIS: exige JWT + SUPER_ADMIN explícito
   // ────────────────────────────────────────────────────────────────────────────
 
   describe('Smoke: Rotas /admin/* agora exigem autenticação (regressão da Fase 1)', () => {
@@ -162,13 +164,13 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
       expect(response.status).toBe(401);
     });
 
-    it('GET /admin/security/score com ADMIN_GERAL → resposta estruturada (não 401/403)', async () => {
+    it('GET /admin/security/score com SUPER_ADMIN → resposta estruturada', async () => {
       const response = await testApp
         .request()
         .get('/admin/security/score')
-        .set(testApp.authHeaders(adminGeralSession));
+        .set(testApp.authHeaders(superAdminSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(200);
 
       // Verifica estrutura da resposta quando chega no handler
       if (response.status === 200) {
@@ -183,13 +185,13 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
       }
     });
 
-    it('GET /admin/security/validate-rls com ADMIN_GERAL → resposta estruturada', async () => {
+    it('GET /admin/security/validate-rls com SUPER_ADMIN → resposta estruturada', async () => {
       const response = await testApp
         .request()
         .get('/admin/security/validate-rls')
-        .set(testApp.authHeaders(adminGeralSession));
+        .set(testApp.authHeaders(superAdminSession));
 
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(200);
 
       if (response.status === 200) {
         const body = response.body as {
@@ -244,13 +246,13 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
       const response = await testApp
         .request()
         .post('/admin/security/test-isolation/nao-uuid/outro-nao-uuid')
-        .set(testApp.authHeaders(adminGeralSession))
+        .set(testApp.authHeaders(superAdminSession))
         .set(csrfHeaders);
 
       expect(response.status).toBe(400);
     });
 
-    it('POST /admin/security/test-isolation com UUIDs válidos → não 401/403', async () => {
+    it('POST /admin/security/test-isolation com UUIDs válidos → executa para SUPER_ADMIN', async () => {
       const tenantA = testApp.getTenant('tenantA');
       const tenantB = testApp.getTenant('tenantB');
 
@@ -259,11 +261,11 @@ describeE2E('E2E P0 Smoke — Regressão Fase 1', () => {
         .post(
           `/admin/security/test-isolation/${tenantA.companyId}/${tenantB.companyId}`,
         )
-        .set(testApp.authHeaders(adminGeralSession))
+        .set(testApp.authHeaders(superAdminSession))
         .set(csrfHeaders);
 
       // Com UUIDs válidos, passa validação e executa teste de isolamento
-      expect([401, 403]).not.toContain(response.status);
+      expect(response.status).toBe(200);
 
       // Resposta deve ter estrutura de resultado de isolamento
       if (response.status === 200) {

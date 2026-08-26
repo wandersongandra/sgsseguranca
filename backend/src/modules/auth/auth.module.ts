@@ -11,7 +11,6 @@ import { MailModule } from '../../infra/mail/mail.module';
 import { PdfSecurityController } from './controllers/pdf-security.controller';
 import { SessionsController } from './controllers/sessions.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
-import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { PdfRateLimitService } from './services/pdf-rate-limit.service';
 import { SessionsService } from './services/sessions.service';
 import { BruteForceService } from './brute-force.service';
@@ -29,6 +28,7 @@ import { FileInspectionModule } from '../../shared/security/file-inspection.modu
 import {
   getAccessTokenSecret,
   getAccessTokenTtl,
+  getJwtSignOptions,
   isInfiniteTtl,
 } from './auth-security.config';
 import type { SignOptions } from 'jsonwebtoken';
@@ -56,11 +56,12 @@ import type { SignOptions } from 'jsonwebtoken';
           configService.get<string>('JWT_EXPIRES_IN')?.trim();
         const accessTokenTtl = (configuredAccessTokenTtl?.trim() ||
           getAccessTokenTtl()) as NonNullable<SignOptions['expiresIn']>;
+        const jwtSignOptions = getJwtSignOptions(configService);
         const signOptions: JwtSignOptions | undefined = isInfiniteTtl(
           accessTokenTtl,
         )
-          ? undefined
-          : { expiresIn: accessTokenTtl };
+          ? jwtSignOptions
+          : { expiresIn: accessTokenTtl, ...jwtSignOptions };
         return signOptions
           ? { secret: jwtSecret, signOptions }
           : { secret: jwtSecret };
@@ -72,7 +73,6 @@ import type { SignOptions } from 'jsonwebtoken';
     AuthService,
     AuthPrincipalService,
     JwtStrategy,
-    JwtRefreshStrategy,
     PdfRateLimitService,
     SessionsService,
     BruteForceService,

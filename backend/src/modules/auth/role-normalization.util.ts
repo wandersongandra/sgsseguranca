@@ -6,7 +6,8 @@ import { Role } from './enums/roles.enum';
  * (trim + remocao de acentos + upper-case).
  */
 const ROLE_ALIASES: Record<string, Role> = {
-  SUPER_ADMIN: Role.ADMIN_GERAL,
+  SUPER_ADMIN: Role.SUPER_ADMIN,
+  'SUPER ADMIN': Role.SUPER_ADMIN,
   'ADMINISTRADOR GERAL': Role.ADMIN_GERAL,
   'ADMINISTRADOR EMPRESA': Role.ADMIN_EMPRESA,
   'ADMINISTRADOR DA EMPRESA': Role.ADMIN_EMPRESA,

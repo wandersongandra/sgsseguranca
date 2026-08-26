@@ -1233,6 +1233,7 @@ export class AprsService {
     // resolvidos via RBAC), evitando bloquear admins legítimos com grafia divergente
     // ou perfil não carregado no token.
     const privilegedRoles = new Set<Role>([
+      Role.SUPER_ADMIN,
       Role.ADMIN_GERAL,
       Role.ADMIN_EMPRESA,
       Role.TST,

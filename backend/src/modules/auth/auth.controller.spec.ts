@@ -12,6 +12,7 @@ import type { Request, Response } from 'express';
 import type { LoginDto } from './dto/login.dto';
 import type { ConfirmPasswordDto } from './dto/confirm-password.dto';
 import type { MfaService } from './services/mfa.service';
+import type { TenantService } from '../../shared/tenant/tenant.service';
 import { Role } from './enums/roles.enum';
 
 type RefreshRequest = Partial<Request> & {
@@ -62,8 +63,12 @@ describe('AuthController security hardening', () => {
     | 'getStatus'
     | 'createBootstrapEnrollmentResponse'
     | 'createLoginChallenge'
+    | 'verifyLoginChallenge'
+    | 'activateBootstrapChallenge'
     | 'verifyStepUp'
   >;
+  let authSessionUserLoader: jest.Mock;
+  let tenantService: Pick<TenantService, 'run'>;
 
   const createResponse = (): MockResponse =>
     ({
@@ -136,6 +141,8 @@ describe('AuthController security hardening', () => {
       }),
       createBootstrapEnrollmentResponse: jest.fn(),
       createLoginChallenge: jest.fn(),
+      verifyLoginChallenge: jest.fn(),
+      activateBootstrapChallenge: jest.fn(),
       verifyStepUp: jest.fn().mockResolvedValue({
         stepUpToken: 'step-up-token',
         expiresIn: 300,
@@ -148,22 +155,27 @@ describe('AuthController security hardening', () => {
       }),
     };
 
+    authSessionUserLoader = jest.fn().mockResolvedValue({
+      id: 'user-1',
+      nome: 'Usuário Teste',
+      cpf: '12345678900',
+      email: 'user@example.com',
+      company_id: 'company-1',
+      profile: { id: 'profile-1', nome: 'Administrador Geral' },
+      profile_id: 'profile-1',
+      status: true,
+      created_at: new Date('2026-03-28T00:00:00.000Z'),
+      updated_at: new Date('2026-03-28T00:00:00.000Z'),
+    });
+    tenantService = {
+      run: jest.fn((_context, callback) => callback()),
+    };
+
     controller = new AuthController(
       authService as AuthService,
       {
         findOne: jest.fn(),
-        findAuthSessionUser: jest.fn().mockResolvedValue({
-          id: 'user-1',
-          nome: 'Usuário Teste',
-          cpf: '12345678900',
-          email: 'user@example.com',
-          company_id: 'company-1',
-          profile: { id: 'profile-1', nome: 'Administrador Geral' },
-          profile_id: 'profile-1',
-          status: true,
-          created_at: new Date('2026-03-28T00:00:00.000Z'),
-          updated_at: new Date('2026-03-28T00:00:00.000Z'),
-        }),
+        findAuthSessionUser: authSessionUserLoader,
         findOneWithPassword: jest.fn(),
         hasSignaturePin: jest.fn(),
         setSignaturePin: jest.fn(),
@@ -187,6 +199,7 @@ describe('AuthController security hardening', () => {
             : undefined,
         ),
       } as unknown as ConfigService,
+      tenantService as TenantService,
     );
   });
 
@@ -614,6 +627,60 @@ describe('AuthController security hardening', () => {
       companyId: 'company-1',
       profileName: 'Administrador Geral',
     });
+  });
+
+  it('reentra no tenant do challenge antes de recarregar o usuário no bootstrap MFA', async () => {
+    (mfaService.activateBootstrapChallenge as jest.Mock).mockResolvedValue({
+      userId: 'user-1',
+      companyId: 'company-1',
+    });
+    (authService.login as jest.Mock).mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      user: { id: 'user-1', company_id: 'company-1' },
+    });
+
+    const result = await controller.activateBootstrapMfa(
+      buildLoginRequest({ headers: { 'user-agent': 'jest' } }),
+      { challengeToken: 'bootstrap-token', code: '123456' },
+      createResponse(),
+    );
+
+    expect(tenantService.run).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId: 'company-1',
+        isSuperAdmin: false,
+        userId: 'user-1',
+      }),
+      expect.any(Function),
+    );
+    expect(authSessionUserLoader).toHaveBeenCalledWith('user-1');
+    expect(result.accessToken).toBe('access-token');
+  });
+
+  it('reentra no tenant do challenge antes de recarregar o usuário no login MFA', async () => {
+    (mfaService.verifyLoginChallenge as jest.Mock).mockResolvedValue({
+      userId: 'user-1',
+      companyId: 'company-1',
+    });
+    (authService.login as jest.Mock).mockResolvedValue({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      user: { id: 'user-1', company_id: 'company-1' },
+    });
+
+    const result = await controller.verifyLoginMfa(
+      buildLoginRequest({ headers: { 'user-agent': 'jest' } }),
+      { challengeToken: 'login-token', code: '123456' },
+      createResponse(),
+    );
+
+    expect(tenantService.run).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: 'company-1', isSuperAdmin: false }),
+      expect.any(Function),
+    );
+    expect(authSessionUserLoader).toHaveBeenCalledWith('user-1');
+    expect(result.accessToken).toBe('access-token');
   });
 
   it('me usa leitura leve de sessão e retorna RBAC', async () => {

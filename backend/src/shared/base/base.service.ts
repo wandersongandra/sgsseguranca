@@ -1,4 +1,4 @@
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import {
   Repository,
   FindOptionsWhere,
@@ -6,6 +6,7 @@ import {
   ObjectLiteral,
 } from 'typeorm';
 import { TenantService } from '../tenant/tenant.service';
+import { RequestContext } from '../middleware/request-context.middleware';
 
 type SensitiveWriteFields = {
   company_id?: unknown;
@@ -18,15 +19,24 @@ type SensitiveWriteFields = {
 };
 
 export abstract class BaseService<T extends ObjectLiteral> {
+  private readonly logger = new Logger(BaseService.name);
+
   constructor(
     protected readonly repository: Repository<T>,
     protected readonly tenantService: TenantService,
     protected readonly entityName: string,
   ) {}
 
-  protected getTenantId(): string {
+  protected getTenantId(operation = 'tenant-scoped operation'): string {
     const tenantId = this.tenantService.getTenantId();
     if (!tenantId) {
+      this.logger.warn({
+        event: 'tenant_context_required',
+        scope: 'TENANT_REQUIRED',
+        service: this.entityName,
+        operation,
+        requestId: RequestContext.getRequestId() ?? null,
+      });
       throw new BadRequestException(
         `Contexto de empresa não definido para ${this.entityName}.`,
       );
@@ -36,9 +46,9 @@ export abstract class BaseService<T extends ObjectLiteral> {
 
   protected applyTenantFilter(
     where: FindOptionsWhere<T> = {},
+    operation = 'tenant-scoped query',
   ): FindOptionsWhere<T> {
-    const tenantId = this.tenantService.getTenantId();
-    if (!tenantId) return where;
+    const tenantId = this.getTenantId(operation);
 
     return {
       ...where,
@@ -74,7 +84,7 @@ export abstract class BaseService<T extends ObjectLiteral> {
     options?: { take?: number; select?: (keyof T)[] },
   ): Promise<T[]> {
     return this.repository.find({
-      where: this.applyTenantFilter(where),
+      where: this.applyTenantFilter(where, 'findAll'),
       ...(options?.take !== undefined && { take: options.take }),
       ...(options?.select?.length && { select: options.select }),
     });
@@ -84,10 +94,13 @@ export abstract class BaseService<T extends ObjectLiteral> {
     id: string,
     options: { relations?: string[]; where?: FindOptionsWhere<T> } = {},
   ): Promise<T> {
-    const where = this.applyTenantFilter({
-      ...(options.where ?? {}),
-      id,
-    } as unknown as FindOptionsWhere<T>);
+    const where = this.applyTenantFilter(
+      {
+        ...(options.where ?? {}),
+        id,
+      } as unknown as FindOptionsWhere<T>,
+      'findOne',
+    );
 
     const entity = await this.repository.findOne({
       where,
@@ -107,7 +120,7 @@ export abstract class BaseService<T extends ObjectLiteral> {
 
     const entity = this.repository.create({
       ...next,
-      company_id: this.getTenantId(),
+      company_id: this.getTenantId('create'),
     } as DeepPartial<T> & { company_id: string });
     return this.repository.save(entity);
   }
