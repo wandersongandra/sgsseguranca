@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RdoAuditEvent } from './entities/rdo-audit-event.entity';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 
 @Injectable()
 export class RdoAuditService {
@@ -75,7 +76,7 @@ export class RdoAuditService {
     originalName: string,
   ): Promise<void> {
     await this.recordEvent(rdoId, 'PDF_GENERATED', {
-      fileKey,
+      keyFingerprint: storageKeyFingerprint(fileKey),
       originalName,
     });
   }

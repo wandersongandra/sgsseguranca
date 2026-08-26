@@ -10,6 +10,8 @@ import type { DocumentGovernanceService } from '../document-registry/document-go
 import type { AuditService } from '../audit-trail/audit.service';
 import type { Site } from '../sites/entities/site.entity';
 import type { NonConformityWorkflowLockService } from './services/nonconformity-workflow-lock.service';
+import { stringContainingMatcher } from '../../../test/helpers/typed-matchers';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 type RemoveFinalDocumentReferenceInput = Parameters<
   DocumentGovernanceService['removeFinalDocumentReference']
@@ -34,7 +36,12 @@ describe('NonConformitiesService', () => {
   };
   let documentStorageService: Pick<
     DocumentStorageService,
-    'uploadFile' | 'deleteFile' | 'getSignedUrl' | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'deleteFile'
+    | 'getSignedUrl'
+    | 'generateDocumentKey'
+    | 'uploadFileWithCapability'
   >;
   let documentBundleService: Pick<
     DocumentBundleService,
@@ -89,7 +96,17 @@ describe('NonConformitiesService', () => {
       findOne: jest.fn(),
     };
     documentStorageService = {
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       uploadFile: jest.fn(),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
       generateDocumentKey: jest.fn(
         (
@@ -812,8 +829,12 @@ describe('NonConformitiesService', () => {
       'foto.png',
     );
 
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      expect.stringContaining('nonconformity-attachments'),
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: stringContainingMatcher('nonconformity-attachments'),
+      }),
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
       'image/png',
     );
@@ -883,7 +904,9 @@ describe('NonConformitiesService', () => {
     });
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/nonconformity-attachments/nc-1/foto.png',
+      expect.objectContaining({
+        key: 'documents/company-1/nonconformity-attachments/nc-1/foto.png',
+      }),
     );
   });
 

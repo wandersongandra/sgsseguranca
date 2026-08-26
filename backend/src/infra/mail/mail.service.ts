@@ -52,6 +52,7 @@ import {
 } from '../../shared/logging/log-sanitizer.util';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { PrivilegedDbService } from '../../shared/database/privileged-db.service';
+import type { StorageObjectOwner } from '../../shared/storage/storage-object-reference';
 
 type MailContext = { companyId?: string; userId?: string };
 
@@ -337,6 +338,7 @@ export class MailService {
 
     // Normaliza o tipo para evitar problemas de case
     const type = documentType.toUpperCase().trim();
+    let storageOwner = this.resolveStoredDocumentOwner(type, documentId);
 
     try {
       switch (type) {
@@ -534,6 +536,10 @@ export class MailService {
               new Date(a.generated_at).getTime(),
           )[0];
           fileKey = latest.file_url;
+          storageOwner = {
+            resourceType: 'photographic-report-export',
+            resourceId: latest.id,
+          };
           docName = `Relatório Fotográfico — ${report.client_name} / ${report.project_name}`;
           subject = docName;
           break;
@@ -569,6 +575,7 @@ export class MailService {
       companyId: resolvedCompanyId,
       userId: undefined,
       artifactLabel: docName,
+      owner: storageOwner,
     });
     const attachmentFilename = this.buildAttachmentFilename(docName, fileKey);
 
@@ -632,6 +639,7 @@ export class MailService {
       expiresInSeconds?: number;
       companyId?: string;
       userId?: string;
+      owner?: StorageObjectOwner;
     },
   ): Promise<DocumentMailDispatchResponseDto> {
     if (!fileKey || !email) {
@@ -644,6 +652,7 @@ export class MailService {
       companyId: options?.companyId,
       userId: options?.userId,
       artifactLabel: docName,
+      owner: options?.owner,
     });
     const attachmentFilename = this.buildAttachmentFilename(docName, fileKey);
 
@@ -1121,10 +1130,22 @@ export class MailService {
       companyId?: string;
       userId?: string;
       artifactLabel: string;
+      owner?: StorageObjectOwner;
     },
   ): Promise<Buffer> {
     try {
-      return await this.documentStorageService.downloadFileBuffer(fileKey);
+      if (!context.owner) {
+        throw new BadRequestException(
+          'Owner autoritativo é obrigatório para anexos de storage.',
+        );
+      }
+      return await this.documentStorageService.downloadFileBuffer(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          context.owner,
+          'p1-document-storage-downloadFileBuffer',
+        ),
+      );
     } catch (error) {
       const message = this.extractErrorMessage(error);
       this.logger.warn({
@@ -1144,6 +1165,38 @@ export class MailService {
         `O artefato oficial de ${context.artifactLabel} não pôde ser obtido no storage governado para envio por e-mail.`,
       );
     }
+  }
+
+  private resolveStoredDocumentOwner(
+    documentType: string,
+    documentId: string,
+  ): StorageObjectOwner {
+    const resourceTypeByDocumentType: Record<string, string> = {
+      PT: 'pt',
+      APR: 'apr',
+      ARR: 'arr',
+      REPORT: 'report',
+      MONTHLY_REPORT: 'report',
+      TRAINING: 'training',
+      TREINAMENTO: 'training',
+      TRN: 'training',
+      CHECKLIST: 'checklist',
+      DDS: 'dds',
+      DID: 'did',
+      CAT: 'cat',
+      NONCONFORMITY: 'nonconformity',
+      NC: 'nonconformity',
+      AUDIT: 'audit',
+      RDO: 'rdo',
+      PHOTOGRAPHIC_REPORT: 'photographic_report',
+    };
+    const resourceType = resourceTypeByDocumentType[documentType];
+    if (!resourceType) {
+      throw new BadRequestException(
+        `Tipo de documento não suportado para anexo: ${documentType}.`,
+      );
+    }
+    return { resourceType, resourceId: documentId };
   }
 
   private async sendWithConfiguredProvider(options: {

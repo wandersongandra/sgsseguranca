@@ -1,9 +1,25 @@
 import JSZip from 'jszip';
 import { DossiersService } from './dossiers.service';
+import type {
+  StorageObjectOwner,
+  StorageObjectReference,
+} from '../../shared/storage/storage-object-reference';
 
 describe('DossiersService bundle resilience', () => {
   it('builds the dossier bundle even when one governed artifact is unavailable', async () => {
     const storageService = {
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: StorageObjectOwner,
+          purpose: string,
+        ): StorageObjectReference => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+        }),
+      ),
       downloadFileBuffer: jest
         .fn()
         .mockResolvedValueOnce(Buffer.from('pdf-1'))
@@ -25,7 +41,6 @@ describe('DossiersService bundle resilience', () => {
       {} as never,
       {} as never,
       storageService as never,
-      {} as never,
       {} as never,
       {} as never,
     );

@@ -6,6 +6,7 @@
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { DocumentStorageService } from './document-storage.service';
 
@@ -17,6 +18,8 @@ export interface WeeklyBundleFilters {
 
 export interface WeeklyBundleDocument {
   fileKey: string;
+  resourceType: string;
+  resourceId: string;
   title: string;
   originalName?: string | null;
   date?: string | Date | null;
@@ -61,7 +64,14 @@ export class DocumentBundleService {
     for (const document of sortedDocuments) {
       try {
         const fileBuffer = await this.documentStorageService.downloadFileBuffer(
-          document.fileKey,
+          this.documentStorageService.referenceForExistingObject(
+            document.fileKey,
+            {
+              resourceType: document.resourceType,
+              resourceId: document.resourceId,
+            },
+            'p1-document-storage-downloadFileBuffer',
+          ),
         );
         const sourcePdf = await PDFDocument.load(fileBuffer);
         const pages = await mergedPdf.copyPages(
@@ -83,8 +93,8 @@ export class DocumentBundleService {
         this.logger.warn({
           event: 'weekly_bundle_document_skipped',
           moduleName,
-          fileKey: document.fileKey,
-          reason: error instanceof Error ? error.message : 'unknown_error',
+          keyFingerprint: this.diagnosticFingerprint(document.fileKey),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
         });
       }
     }
@@ -201,6 +211,10 @@ export class DocumentBundleService {
       buffer: Buffer.from(pdfBytes),
       fileName,
     };
+  }
+
+  private diagnosticFingerprint(value: string): string {
+    return createHash('sha256').update(value).digest('hex').slice(0, 16);
   }
 
   private getDateValue(date?: string | Date | null): number {

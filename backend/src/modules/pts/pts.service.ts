@@ -27,7 +27,10 @@ import {
   PtEvidencePhoto,
   PtEvidencePhotoFase,
 } from './entities/pt.entity';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { CreatePtDto, PtAtmosphericReadingDto } from './dto/create-pt.dto';
@@ -1190,11 +1193,16 @@ export class PtsService {
       file.originalname,
       { folderSegments: ['sites', pt.site_id] },
     );
-    await this.documentStorageService.uploadFile(
-      key,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'pt', resourceId: pt.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
     const uploadedToStorage = true;
 
     const folder = key.split('/').slice(0, -1).join('/');
@@ -1228,7 +1236,9 @@ export class PtsService {
     } catch (error) {
       if (uploadedToStorage) {
         await cleanupUploadedFile(this.logger, `pt:${pt.id}`, key, (fileKey) =>
-          this.documentStorageService.deleteFile(fileKey),
+          uploadedReference.key === fileKey
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
         );
       }
       throw error;
@@ -1237,7 +1247,7 @@ export class PtsService {
       event: 'pt_pdf_anexado',
       ptId: id,
       userId,
-      fileKey: key,
+      keyFingerprint: storageKeyFingerprint(key),
     });
 
     return {
@@ -1275,7 +1285,14 @@ export class PtsService {
     let availability: PtPdfAccessAvailability = 'ready';
     try {
       url = await this.documentStorageService.getSignedUrl(
-        pt.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          pt.pdf_file_key,
+          {
+            resourceType: 'pt',
+            resourceId: pt.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         3600,
       );
     } catch {
@@ -1595,7 +1612,16 @@ export class PtsService {
       originalName,
       { folderSegments: ['sites', pt.site_id] },
     );
-    await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'pt-photo', resourceId: pt.id },
+          'p1-document-storage-uploadFile',
+        ),
+        buffer,
+        mimeType,
+      );
 
     const photoReference = this.buildGovernedPtFileReference({
       v: 1,
@@ -1634,7 +1660,10 @@ export class PtsService {
         this.logger,
         `pt-photo:${pt.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -1691,7 +1720,14 @@ export class PtsService {
     let url: string | null;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        payload.fileKey,
+        this.documentStorageService.referenceForExistingObject(
+          payload.fileKey,
+          {
+            resourceType: 'pt-photo',
+            resourceId: pt.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         3600,
       );
     } catch {
@@ -1734,7 +1770,17 @@ export class PtsService {
             this.logger,
             `pt-photo-remove:${pt.id}`,
             payload.fileKey,
-            (key) => this.documentStorageService.deleteFile(key),
+            (key) =>
+              this.documentStorageService.deleteFile(
+                this.documentStorageService.referenceForExistingObject(
+                  key,
+                  {
+                    resourceType: 'pt-photo',
+                    resourceId: pt.id,
+                  },
+                  'p1-document-storage-deleteFile',
+                ),
+              ),
           );
         }
 
@@ -1793,7 +1839,16 @@ export class PtsService {
       originalName,
       { folderSegments: ['sites', pt.site_id] },
     );
-    await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'pt-checklist-attachment', resourceId: pt.id },
+          'p1-document-storage-uploadFile',
+        ),
+        buffer,
+        mimeType,
+      );
 
     const anexoReference = this.buildGovernedPtFileReference({
       v: 1,
@@ -1828,7 +1883,17 @@ export class PtsService {
               this.logger,
               `pt-checklist-anexo-replace:${lockedPt.id}`,
               previousRef.fileKey,
-              (key) => this.documentStorageService.deleteFile(key),
+              (key) =>
+                this.documentStorageService.deleteFile(
+                  this.documentStorageService.referenceForExistingObject(
+                    key,
+                    {
+                      resourceType: 'pt-checklist-attachment',
+                      resourceId: lockedPt.id,
+                    },
+                    'p1-document-storage-deleteFile',
+                  ),
+                ),
             );
           }
 
@@ -1843,7 +1908,10 @@ export class PtsService {
         this.logger,
         `pt-checklist-anexo:${pt.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -1897,7 +1965,14 @@ export class PtsService {
     let url: string | null;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        payload.fileKey,
+        this.documentStorageService.referenceForExistingObject(
+          payload.fileKey,
+          {
+            resourceType: 'pt-checklist-attachment',
+            resourceId: pt.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         3600,
       );
     } catch {
@@ -2085,7 +2160,13 @@ export class PtsService {
         await manager.getRepository(Pt).softDelete(id);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'pt', resourceId: pt.id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
     this.logger.log({ event: 'pt_soft_deleted', ptId: id });
   }
@@ -2127,6 +2208,8 @@ export class PtsService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'pt',
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,

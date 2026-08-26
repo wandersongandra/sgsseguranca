@@ -100,12 +100,14 @@ async function main() {
       );
 
       try {
-        const report = await integrityService.scan({
-          companyId,
-          verifyHashes,
-          includeOrphans,
-          limitPerSource,
-        });
+        const report = await runWithSuperAdminContext(app, () =>
+          integrityService.scan({
+            companyId,
+            verifyHashes,
+            includeOrphans,
+            limitPerSource,
+          }),
+        );
 
         await writeJsonFile(outputPath, report);
         await runWithSuperAdminContext(app, async () =>

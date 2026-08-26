@@ -7,6 +7,7 @@ import { User } from '../users/entities/user.entity';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -42,7 +43,17 @@ describe('DidsService', () => {
         (companyId: string, module: string, entityId: string) =>
           `documents/${companyId}/${module}/${entityId}/did-final.pdf`,
       ),
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
       getSignedUrl: jest.fn(() =>
         Promise.resolve('https://signed.example/pdf'),
@@ -433,7 +444,9 @@ describe('DidsService', () => {
 
     expect(results).toHaveLength(20);
     expect(results.every((result) => result.degraded === false)).toBe(true);
-    expect(documentStorageService.uploadFile).toHaveBeenCalledTimes(20);
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledTimes(20);
     expect(
       documentGovernanceService.registerFinalDocument,
     ).toHaveBeenCalledTimes(20);
@@ -527,7 +540,9 @@ describe('DidsService', () => {
       degraded: false,
     });
 
-    expect(documentStorageService.uploadFile).toHaveBeenCalledTimes(1);
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledTimes(1);
     expect(
       documentGovernanceService.registerFinalDocument,
     ).toHaveBeenCalledWith(

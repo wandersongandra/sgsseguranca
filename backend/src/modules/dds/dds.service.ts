@@ -49,6 +49,7 @@ import {
   toCursorPaginatedResponse,
 } from '../../shared/utils/cursor-pagination.util';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentVideosService } from '../document-videos/document-videos.service';
@@ -269,12 +270,6 @@ export class DdsService {
     ddsList.forEach((dds) => {
       dds.participant_count = countMap.get(dds.id) ?? 0;
     });
-  }
-
-  private sanitizeFileKey(fileKey: string): string {
-    // Manter apenas sufixo para evitar exposição de chaves S3 em logs
-    const parts = fileKey.split('/');
-    return `.../${parts.slice(-2).join('/')}`;
   }
 
   async create(createDdsDto: CreateDdsDto): Promise<Dds> {
@@ -792,11 +787,16 @@ export class DdsService {
       { folderSegments: ['sites', siteId] },
     );
     const storageMode = 's3' as const;
-    await this.documentStorageService.uploadFile(
-      key,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'dds', resourceId: id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
     const uploadedToStorage = true;
 
     const folder = key.split('/').slice(0, -1).join('/');
@@ -835,10 +835,9 @@ export class DdsService {
         event: 'dds_pdf_governance_registration_failed',
         ddsId: dds.id,
         companyId: dds.company_id,
-        errorMessage: error instanceof Error ? error.message : String(error),
-        errorStack: error instanceof Error ? error.stack : undefined,
+        errorName: error instanceof Error ? error.name : 'unknown_error',
         uploadedToStorage,
-        fileKeySuffix: this.sanitizeFileKey(key),
+        keyFingerprint: storageKeyFingerprint(key),
       });
 
       if (uploadedToStorage) {
@@ -846,7 +845,10 @@ export class DdsService {
           this.logger,
           `dds:${dds.id}`,
           key,
-          (fileKey) => this.documentStorageService.deleteFile(fileKey),
+          (fileKey) =>
+            uploadedReference.key === fileKey
+              ? this.documentStorageService.deleteFile(uploadedReference)
+              : Promise.resolve(),
         );
       }
       throw error;
@@ -857,7 +859,7 @@ export class DdsService {
       ddsId: dds.id,
       companyId: dds.company_id,
       storageMode,
-      fileKeySuffix: this.sanitizeFileKey(key),
+      keyFingerprint: storageKeyFingerprint(key),
     });
     return {
       fileKey: key,
@@ -910,7 +912,14 @@ export class DdsService {
     let message = 'PDF final governado disponível para acesso.';
     try {
       url = await this.documentStorageService.getSignedUrl(
-        dds.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          dds.pdf_file_key,
+          {
+            resourceType: 'dds',
+            resourceId: dds.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         DDS_PDF_SIGNED_URL_EXPIRY_SECONDS,
       );
     } catch {
@@ -1214,7 +1223,7 @@ export class DdsService {
       companyId: dds.company_id,
       attachmentId: result.attachment.id,
       mimeType: result.attachment.mime_type,
-      storageKey: result.attachment.storage_key,
+      keyFingerprint: storageKeyFingerprint(result.attachment.storage_key),
       actorId: actorId || null,
     });
 
@@ -1560,7 +1569,13 @@ export class DdsService {
         await manager.getRepository(Dds).softDelete(id);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'dds', resourceId: dds.id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
     this.logger.log({
       event: 'dds_archived',
@@ -1652,6 +1667,8 @@ export class DdsService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'dds',
+        resourceId: file.ddsId,
         title: file.tema,
         originalName: file.originalName,
         date: file.data,

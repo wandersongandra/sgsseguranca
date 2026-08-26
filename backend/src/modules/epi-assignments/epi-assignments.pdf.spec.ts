@@ -9,6 +9,8 @@ import { Epi } from '../epis/entities/epi.entity';
 import { User } from '../users/entities/user.entity';
 import { EpiAssignment } from './entities/epi-assignment.entity';
 import { EpiAssignmentsService } from './epi-assignments.service';
+import { stringContainingMatcher } from '../../../test/helpers/typed-matchers';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 describe('EpiAssignmentsService governed PDF', () => {
   it('gera o snapshot no backend, escapa HTML e não incorpora assinatura bruta', async () => {
@@ -52,18 +54,42 @@ describe('EpiAssignmentsService governed PDF', () => {
       }),
     } as unknown as PdfService;
     const uploadFileMock = jest.fn().mockResolvedValue(undefined);
-    const storage = {
+    const storage: Pick<
+      DocumentStorageService,
+      | 'generateDocumentKey'
+      | 'referenceForExistingObject'
+      | 'uploadFile'
+      | 'uploadFileWithCapability'
+      | 'deleteFile'
+      | 'getSignedUrl'
+    > = {
       generateDocumentKey: jest
         .fn()
         .mockReturnValue(
           'documents/company-1/epi/sites/site-1/11111111-1111-4111-8111-111111111111/file.pdf',
         ),
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: { resourceType: string; resourceId: string },
+          purpose: string,
+        ) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+          legacy: !key.startsWith('documents/company-1/'),
+        }),
+      ),
       uploadFile: uploadFileMock,
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn().mockResolvedValue(undefined),
       getSignedUrl: jest
         .fn()
         .mockResolvedValue('https://storage.invalid/signed'),
-    } as unknown as DocumentStorageService;
+    };
     const registerFinalDocumentMock = jest
       .fn()
       .mockResolvedValue({ hash: 'pdf-hash', registryEntry: {} });
@@ -78,7 +104,7 @@ describe('EpiAssignmentsService governed PDF', () => {
       {} as TenantService,
       {} as SignatureTimestampService,
       {} as AuditService,
-      storage,
+      storage as unknown as DocumentStorageService,
       pdfService,
       governance,
     );
@@ -104,8 +130,20 @@ describe('EpiAssignmentsService governed PDF', () => {
       availability: 'ready',
       url: 'https://storage.invalid/signed',
     });
-    expect(uploadFileMock).toHaveBeenCalledWith(
+    expect(storage.referenceForExistingObject).toHaveBeenCalledWith(
       expect.stringContaining('documents/company-1/epi/sites/site-1/'),
+      {
+        resourceType: 'epi',
+        resourceId: assignment.id,
+      },
+      'p1-document-storage-uploadFile',
+    );
+    expect(storage.uploadFileWithCapability).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'company-1',
+        key: stringContainingMatcher('documents/company-1/epi/sites/site-1/'),
+        purpose: 'p1-document-storage-uploadFile',
+      }),
       expect.any(Buffer),
       'application/pdf',
     );

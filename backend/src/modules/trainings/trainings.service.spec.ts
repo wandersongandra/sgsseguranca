@@ -7,13 +7,19 @@ import type { DocumentGovernanceService } from '../document-registry/document-go
 import type { DocumentRegistryService } from '../document-registry/document-registry.service';
 import type { DocumentRegistryEntry } from '../document-registry/entities/document-registry.entity';
 import type { MetricsService } from '../../shared/observability/metrics.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 describe('TrainingsService governed pdf', () => {
   let repository: Pick<Repository<Training>, 'findOne'>;
   let tenantService: Pick<TenantService, 'getTenantId'>;
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'getSignedUrl' | 'deleteFile'
+    | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'getSignedUrl'
+    | 'deleteFile'
   >;
   let documentGovernanceService: Pick<
     DocumentGovernanceService,
@@ -50,7 +56,23 @@ describe('TrainingsService governed pdf', () => {
         () =>
           'documents/company-1/trainings/training-1/1710000000000-TREINAMENTO_NR-35_2026-05-05.pdf',
       ),
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: { resourceType: string; resourceId: string },
+          purpose: string,
+        ) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+          legacy: !key.startsWith('documents/company-1/'),
+        }),
+      ),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       getSignedUrl: jest.fn(() =>
         Promise.resolve('https://storage.example.com/training.pdf'),
       ),
@@ -103,8 +125,24 @@ describe('TrainingsService governed pdf', () => {
       'training-1',
       'treinamento-final.pdf',
     );
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
+    expect(
+      documentStorageService.referenceForExistingObject,
+    ).toHaveBeenCalledWith(
       'documents/company-1/trainings/training-1/1710000000000-TREINAMENTO_NR-35_2026-05-05.pdf',
+      {
+        resourceType: 'training',
+        resourceId: 'training-1',
+      },
+      'p1-document-storage-uploadFile',
+    );
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'company-1',
+        key: 'documents/company-1/trainings/training-1/1710000000000-TREINAMENTO_NR-35_2026-05-05.pdf',
+        purpose: 'p1-document-storage-uploadFile',
+      }),
       file.buffer,
       'application/pdf',
     );
@@ -162,7 +200,15 @@ describe('TrainingsService governed pdf', () => {
     const result = await service.getPdfAccess('training-1');
 
     expect(documentStorageService.getSignedUrl).toHaveBeenCalledWith(
-      'documents/company-1/trainings/training-1/1710000000000-training.pdf',
+      expect.objectContaining({
+        tenantId: 'company-1',
+        key: 'documents/company-1/trainings/training-1/1710000000000-training.pdf',
+        owner: {
+          resourceType: 'training',
+          resourceId: 'training-1',
+        },
+        purpose: 'p1-document-storage-getSignedUrl',
+      }),
     );
     expect(result).toMatchObject({
       entityId: 'training-1',

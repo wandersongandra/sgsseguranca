@@ -7,6 +7,8 @@ import { UpdateRdoDto } from './dto/update-rdo.dto';
 import type { TenantService } from '../../shared/tenant/tenant.service';
 import type { MailService } from '../../infra/mail/mail.service';
 import type { DocumentStorageService } from '../../shared/services/document-storage.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
+import type { StorageObjectReference } from '../../shared/storage/storage-object-reference';
 import type { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import type { DocumentRegistryService } from '../document-registry/document-registry.service';
 import type { DocumentBundleService } from '../../shared/services/document-bundle.service';
@@ -95,6 +97,10 @@ describe('RdosService', () => {
   let documentStorageService: Pick<
     DocumentStorageService,
     | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'createReference'
+    | 'resolveExistingReference'
+    | 'referenceForExistingObject'
     | 'getSignedUrl'
     | 'downloadFileBuffer'
     | 'deleteFile'
@@ -232,7 +238,22 @@ describe('RdosService', () => {
       add: jest.fn().mockResolvedValue(undefined),
     };
     documentStorageService = {
+      createReference: jest.fn(
+        (reference: StorageObjectReference) => reference,
+      ),
+      referenceForExistingObject: jest.fn((key: string, owner, purpose) => ({
+        tenantId: COMPANY_ID,
+        key,
+        owner,
+        purpose,
+      })),
       uploadFile: jest.fn().mockResolvedValue(undefined),
+      uploadFileWithCapability: jest.fn((reference: StorageObjectReference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
+      resolveExistingReference: jest.fn((reference: StorageObjectReference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       getSignedUrl: jest.fn().mockResolvedValue('https://storage.test/rdo.pdf'),
       downloadFileBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-rdo')),
       deleteFile: jest.fn().mockResolvedValue(undefined),
@@ -586,7 +607,9 @@ describe('RdosService', () => {
     });
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/rdo-activity-photos/rdo-1/old-photo.jpg',
+      expect.objectContaining({
+        key: 'documents/company-1/rdo-activity-photos/rdo-1/old-photo.jpg',
+      }),
     );
   });
 
@@ -730,7 +753,7 @@ describe('RdosService', () => {
     expect(result.activityIndex).toBe(0);
     expect(result.photoIndex).toBe(0);
     expect(result.photoReference).toContain(RDO_ACTIVITY_PHOTO_REF_PREFIX);
-    expect(documentStorageService.uploadFile).toHaveBeenCalled();
+    expect(documentStorageService.uploadFileWithCapability).toHaveBeenCalled();
     expect(rdoAuditService.recordEvent).toHaveBeenCalledWith(
       RDO_ID,
       'ACTIVITY_PHOTO_UPLOADED',
@@ -792,7 +815,9 @@ describe('RdosService', () => {
       'documents/company-1/rdo-activity-photos/rdo-1/foto.jpg',
     );
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/rdo-activity-photos/rdo-1/foto.jpg',
+      expect.objectContaining({
+        key: 'documents/company-1/rdo-activity-photos/rdo-1/foto.jpg',
+      }),
     );
     expect(rdoAuditService.recordEvent).toHaveBeenCalledWith(
       RDO_ID,
@@ -1003,7 +1028,9 @@ describe('RdosService', () => {
     });
 
     expect(documentStorageService.downloadFileBuffer).toHaveBeenCalledWith(
-      'documents/company-1/rdos/11111111-2222-3333-4444-555555555555/rdo.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/rdos/11111111-2222-3333-4444-555555555555/rdo.pdf',
+      }),
     );
   });
 
@@ -1209,7 +1236,9 @@ describe('RdosService', () => {
 
     await service.remove(RDO_ID);
 
-    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(photoKey);
+    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ key: photoKey }),
+    );
   });
 
   it('bloqueia remocao fisica de RDO aprovado', async () => {

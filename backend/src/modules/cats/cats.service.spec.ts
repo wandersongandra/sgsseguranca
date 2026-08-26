@@ -7,7 +7,7 @@ import { Repository } from 'typeorm';
 import { AuditAction } from '../audit-trail/enums/audit-action.enum';
 import type { AuditService } from '../audit-trail/audit.service';
 import type { DocumentStorageService } from '../../shared/services/document-storage.service';
-import type { StorageService } from '../../shared/services/storage.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 import type { TenantService } from '../../shared/tenant/tenant.service';
 import type { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import type { DocumentRegistryService } from '../document-registry/document-registry.service';
@@ -66,13 +66,14 @@ describe('CatsService', () => {
   /** Linha devolvida pelo SELECT ... FOR UPDATE NOWAIT em cada teste. */
   let _lockedCatRow: Record<string, unknown> | null = null;
   let tenantService: Pick<TenantService, 'getContext' | 'getTenantId'>;
-  let storageService: Pick<
-    StorageService,
-    'uploadFile' | 'deleteFile' | 'getPresignedDownloadUrl'
-  >;
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'getSignedUrl' | 'deleteFile'
+    | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'getSignedUrl'
+    | 'deleteFile'
   >;
   let documentGovernanceService: Pick<
     DocumentGovernanceService,
@@ -137,20 +138,22 @@ describe('CatsService', () => {
       getContext: jest.fn(() => undefined),
       getTenantId: jest.fn(() => COMPANY_ID),
     };
-    storageService = {
-      uploadFile: jest.fn().mockResolvedValue(undefined),
-      deleteFile: jest.fn().mockResolvedValue(undefined),
-      getPresignedDownloadUrl: jest
-        .fn()
-        .mockResolvedValue('https://storage.example.test/file.pdf'),
-    };
     documentStorageService = {
+      referenceForExistingObject: jest.fn((key: string, owner, purpose) => ({
+        tenantId: COMPANY_ID,
+        key,
+        owner,
+        purpose,
+      })),
       generateDocumentKey: jest
         .fn()
         .mockReturnValue(
           'documents/company-1/cats/sites/site-1/cat-1/cat-final.pdf',
         ),
       uploadFile: jest.fn().mockResolvedValue(undefined),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       getSignedUrl: jest
         .fn()
         .mockResolvedValue('https://storage.example.test/cat-final.pdf'),
@@ -177,7 +180,6 @@ describe('CatsService', () => {
       usersRepository as unknown as Repository<User>,
       sitesRepository as unknown as Repository<Site>,
       tenantService as TenantService,
-      storageService as StorageService,
       documentStorageService as DocumentStorageService,
       documentGovernanceService as DocumentGovernanceService,
       documentRegistryService as DocumentRegistryService,
@@ -292,8 +294,10 @@ describe('CatsService', () => {
       ),
     ).rejects.toThrow('db-failure');
 
-    expect(storageService.uploadFile).toHaveBeenCalledTimes(1);
-    expect(storageService.deleteFile).toHaveBeenCalledTimes(1);
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledTimes(1);
+    expect(documentStorageService.deleteFile).toHaveBeenCalledTimes(1);
     expect(auditService.log).not.toHaveBeenCalled();
   });
 
@@ -316,7 +320,9 @@ describe('CatsService', () => {
     await service.removeAttachment(CAT_ID, attachment.id, 'user-1');
 
     expect(catsRepository.save).toHaveBeenCalledTimes(1);
-    expect(storageService.deleteFile).toHaveBeenCalledWith(attachment.file_key);
+    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ key: attachment.file_key }),
+    );
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({
         action: AuditAction.UPDATE,
@@ -353,7 +359,7 @@ describe('CatsService', () => {
       attachmentId: attachment.id,
       fileName: attachment.file_name,
       fileType: attachment.file_type,
-      url: 'https://storage.example.test/file.pdf',
+      url: 'https://storage.example.test/cat-final.pdf',
     });
     expect(auditService.log).toHaveBeenCalledWith(
       expect.objectContaining({

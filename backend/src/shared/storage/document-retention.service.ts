@@ -7,6 +7,7 @@ import {
   DocumentRegistryStatus,
 } from '../../modules/document-registry/entities/document-registry.entity';
 import { ForensicTrailService } from '../../modules/forensic-trail/forensic-trail.service';
+import { storageKeyFingerprint } from './storage-compensation.util';
 
 @Injectable()
 export class DocumentRetentionService {
@@ -64,7 +65,16 @@ export class DocumentRetentionService {
       return;
     }
 
-    await this.documentStorageService.deleteFile(registryEntry.file_key);
+    await this.documentStorageService.deleteFile(
+      this.documentStorageService.referenceForExistingObject(
+        registryEntry.file_key,
+        {
+          resourceType: registryEntry.module,
+          resourceId: registryEntry.entity_id,
+        },
+        `document-registry:${registryEntry.module}:pdf`,
+      ),
+    );
 
     await this.documentRegistryRepository.update(
       { id: registryEntry.id },
@@ -82,7 +92,7 @@ export class DocumentRetentionService {
         registryEntryId: registryEntry.id,
         documentType: registryEntry.document_type,
         documentCode: registryEntry.document_code,
-        fileKey: registryEntry.file_key,
+        keyFingerprint: storageKeyFingerprint(registryEntry.file_key),
         expiresAt: registryEntry.expires_at?.toISOString() || null,
       },
     });

@@ -1,4 +1,9 @@
 import { Logger } from '@nestjs/common';
+import { createHash } from 'node:crypto';
+
+export function storageKeyFingerprint(fileKey: string): string {
+  return createHash('sha256').update(fileKey).digest('hex').slice(0, 16);
+}
 
 export function isS3DisabledUploadError(error: unknown): boolean {
   return error instanceof Error && error.message === 'S3 is not enabled';
@@ -23,7 +28,7 @@ export async function cleanupUploadedFile(
     logger.log({
       event: 'storage_cleanup_succeeded',
       context,
-      fileKey,
+      keyFingerprint: storageKeyFingerprint(fileKey),
     });
     return {
       attempted: true,
@@ -40,8 +45,9 @@ export async function cleanupUploadedFile(
       {
         event: 'storage_cleanup_failed',
         context,
-        fileKey,
-        errorMessage,
+        keyFingerprint: storageKeyFingerprint(fileKey),
+        errorName:
+          cleanupError instanceof Error ? cleanupError.name : 'unknown_error',
       },
       cleanupError instanceof Error ? cleanupError.stack : undefined,
     );

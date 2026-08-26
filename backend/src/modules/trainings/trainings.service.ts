@@ -499,11 +499,16 @@ export class TrainingsService {
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
     const documentCode = this.buildPdfDocumentCode(training);
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'training', resourceId: training.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       const { hash, registryEntry } =
@@ -549,7 +554,10 @@ export class TrainingsService {
         this.logger,
         `trainings.attachPdf:${training.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -589,7 +597,14 @@ export class TrainingsService {
 
     try {
       url = await this.documentStorageService.getSignedUrl(
-        training.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          training.pdf_file_key,
+          {
+            resourceType: 'training',
+            resourceId: training.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
     } catch (error) {
       availability = 'registered_without_signed_url';

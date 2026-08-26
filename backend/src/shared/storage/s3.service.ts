@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'node:crypto';
 import {
   S3Client,
   PutObjectCommand,
@@ -18,11 +19,11 @@ import {
   normalizeInternalDownloadTtl,
 } from './storage-download-ttl';
 
-const getErrorMessage = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
-
 const getErrorStack = (error: unknown): string | undefined =>
   error instanceof Error ? error.stack : undefined;
+
+const storageKeyFingerprint = (key: string): string =>
+  createHash('sha256').update(key).digest('hex').slice(0, 16);
 
 const hasAsyncIterator = (value: unknown): value is AsyncIterable<unknown> => {
   if (typeof value !== 'object' || value === null) {
@@ -132,12 +133,19 @@ export class S3Service implements OnModuleDestroy {
       );
 
       const url = `https://${this.bucketName}.s3.${this.region}.amazonaws.com/${key}`;
-      this.logger.log(`File uploaded successfully: ${key}`);
+      this.logger.log({
+        event: 's3_file_uploaded',
+        keyFingerprint: storageKeyFingerprint(key),
+      });
 
       return url;
     } catch (error) {
       this.logger.error(
-        `Failed to upload file to S3: ${getErrorMessage(error)}`,
+        {
+          event: 's3_file_upload_failed',
+          keyFingerprint: storageKeyFingerprint(key),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
+        },
         getErrorStack(error),
       );
       throw error;
@@ -154,11 +162,58 @@ export class S3Service implements OnModuleDestroy {
     return this.signDownloadUrl(key, normalizeInternalDownloadTtl(expiresIn));
   }
 
+  async getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresIn = 600,
+  ): Promise<string> {
+    if (!this.useS3) {
+      throw new Error('S3 is not enabled');
+    }
+
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: contentType,
+    });
+
+    return this.integration.execute(
+      's3_presign_put',
+      () => getSignedUrl(this.s3Client, command, { expiresIn }),
+      { timeoutMs: 10_000 },
+    );
+  }
+
   async getEmailLinkSignedUrl(
     key: string,
     expiresIn: number = EMAIL_LINK_DOWNLOAD_TTL_SECONDS,
   ): Promise<string> {
     return this.signDownloadUrl(key, normalizeEmailLinkDownloadTtl(expiresIn));
+  }
+
+  async getInlineViewUrl(
+    key: string,
+    expiresIn: number = INTERNAL_DOWNLOAD_TTL_SECONDS,
+  ): Promise<string> {
+    if (!this.useS3) {
+      throw new Error('S3 is not enabled');
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ResponseCacheControl: 'private, no-store',
+      ResponseContentDisposition: 'inline',
+    });
+
+    return this.integration.execute(
+      's3_presign_inline_get',
+      () =>
+        getSignedUrl(this.s3Client, command, {
+          expiresIn: normalizeInternalDownloadTtl(expiresIn),
+        }),
+      { timeoutMs: 10_000 },
+    );
   }
 
   private async signDownloadUrl(
@@ -185,7 +240,11 @@ export class S3Service implements OnModuleDestroy {
       return url;
     } catch (error) {
       this.logger.error(
-        `Failed to generate signed URL: ${getErrorMessage(error)}`,
+        {
+          event: 's3_signed_url_generation_failed',
+          keyFingerprint: storageKeyFingerprint(key),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
+        },
         getErrorStack(error),
       );
       throw error;
@@ -225,7 +284,11 @@ export class S3Service implements OnModuleDestroy {
       return Buffer.concat(chunks);
     } catch (error) {
       this.logger.error(
-        `Failed to download file from S3: ${getErrorMessage(error)}`,
+        {
+          event: 's3_file_download_failed',
+          keyFingerprint: storageKeyFingerprint(key),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
+        },
         getErrorStack(error),
       );
       throw error;
@@ -251,10 +314,17 @@ export class S3Service implements OnModuleDestroy {
         () => this.s3Client.send(command),
         { timeoutMs: 10_000 },
       );
-      this.logger.log(`File deleted successfully: ${key}`);
+      this.logger.log({
+        event: 's3_file_deleted',
+        keyFingerprint: storageKeyFingerprint(key),
+      });
     } catch (error) {
       this.logger.error(
-        `Failed to delete file from S3: ${getErrorMessage(error)}`,
+        {
+          event: 's3_file_delete_failed',
+          keyFingerprint: storageKeyFingerprint(key),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
+        },
         getErrorStack(error),
       );
       throw error;

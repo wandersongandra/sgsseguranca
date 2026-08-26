@@ -26,6 +26,10 @@ import {
 } from '@nestjs/common';
 import { ReportsService } from '../../modules/reports/reports.service';
 import { IntegrationResilienceService } from '../../shared/resilience/integration-resilience.service';
+import type {
+  StorageObjectOwner,
+  StorageObjectReference,
+} from '../../shared/storage/storage-object-reference';
 import { DistributedLockService } from '../../shared/redis/distributed-lock.service';
 import { Cat } from '../../modules/cats/entities/cat.entity';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
@@ -103,6 +107,18 @@ describe('MailService', () => {
   };
 
   const mockDocumentStorageService = {
+    referenceForExistingObject: jest.fn(
+      (
+        key: string,
+        owner: StorageObjectOwner,
+        purpose: string,
+      ): StorageObjectReference => ({
+        tenantId: 'company-1',
+        key,
+        owner,
+        purpose,
+      }),
+    ),
     getPresignedDownloadUrl: jest.fn(),
     downloadFileBuffer: jest.fn(),
   };
@@ -636,7 +652,9 @@ describe('MailService', () => {
       );
 
       expect(findPtSpy).toHaveBeenCalledWith('pt-1');
-      expect(downloadBufferSpy).toHaveBeenCalledWith('pts/arquivo.pdf');
+      expect(downloadBufferSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ key: 'pts/arquivo.pdf' }),
+      );
       const sendPayload = getFirstMockArgument(mockResendSend);
       if (!isRecord(sendPayload) || !isUnknownArray(sendPayload.attachments)) {
         throw new Error('Payload do Resend para PT não contém anexos válidos.');
@@ -710,7 +728,9 @@ describe('MailService', () => {
 
       expect(findArrSpy).toHaveBeenCalledWith('arr-1');
       expect(downloadBufferSpy).toHaveBeenCalledWith(
-        'documents/company-1/arrs/arr-1/arr-final.pdf',
+        expect.objectContaining({
+          key: 'documents/company-1/arrs/arr-1/arr-final.pdf',
+        }),
       );
       expect(result).toMatchObject({
         success: true,
@@ -821,7 +841,9 @@ describe('MailService', () => {
 
       expect(findDidSpy).toHaveBeenCalledWith('did-1');
       expect(downloadBufferSpy).toHaveBeenCalledWith(
-        'documents/company-1/dids/did-1/did-final.pdf',
+        expect.objectContaining({
+          key: 'documents/company-1/dids/did-1/did-final.pdf',
+        }),
       );
       expect(result).toMatchObject({
         success: true,
@@ -864,7 +886,9 @@ describe('MailService', () => {
 
       expect(findAprSpy).toHaveBeenCalledWith('apr-1');
       expect(downloadBufferSpy).toHaveBeenCalledWith(
-        'documents/company-1/aprs/apr-1/apr-final.pdf',
+        expect.objectContaining({
+          key: 'documents/company-1/aprs/apr-1/apr-final.pdf',
+        }),
       );
       expect(result).toMatchObject({
         success: true,

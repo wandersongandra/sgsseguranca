@@ -35,7 +35,10 @@ import { MailService } from '../../infra/mail/mail.service';
 import { SignaturesService } from '../signatures/signatures.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { FileParserService } from '../document-import/services/file-parser.service';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { UsersService } from '../users/users.service';
@@ -1571,10 +1574,19 @@ export class ChecklistsService {
     await Promise.all(
       removedEntries.map(async ({ payload }) => {
         try {
-          await this.documentStorageService.deleteFile(payload.fileKey);
+          await this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              payload.fileKey,
+              {
+                resourceType: 'checklist-photo',
+                resourceId: checklistId,
+              },
+              'p1-document-storage-deleteFile',
+            ),
+          );
           this.logChecklistEvent('checklist_photo_removed_from_storage', null, {
             checklistId,
-            fileKey: payload.fileKey,
+            keyFingerprint: storageKeyFingerprint(payload.fileKey),
             originalName: payload.originalName,
           });
         } catch (error) {
@@ -1583,9 +1595,9 @@ export class ChecklistsService {
             null,
             {
               checklistId,
-              fileKey: payload.fileKey,
+              keyFingerprint: storageKeyFingerprint(payload.fileKey),
               originalName: payload.originalName,
-              errorMessage: error instanceof Error ? error.message : 'unknown',
+              errorName: error instanceof Error ? error.name : 'unknown_error',
             },
           );
         }
@@ -1674,7 +1686,14 @@ export class ChecklistsService {
 
     try {
       url = await this.documentStorageService.getPresignedDownloadUrl(
-        input.payload.fileKey,
+        this.documentStorageService.referenceForExistingObject(
+          input.payload.fileKey,
+          {
+            resourceType: 'checklist-photo',
+            resourceId: checklistId,
+          },
+          'p1-document-storage-getPresignedDownloadUrl',
+        ),
       );
     } catch (error) {
       availability = 'registered_without_signed_url';
@@ -1685,8 +1704,8 @@ export class ChecklistsService {
         scope: input.scope,
         itemIndex: input.itemIndex,
         photoIndex: input.photoIndex,
-        fileKey: input.payload.fileKey,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        keyFingerprint: storageKeyFingerprint(input.payload.fileKey),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
     }
 
@@ -1696,7 +1715,7 @@ export class ChecklistsService {
       itemIndex: input.itemIndex,
       photoIndex: input.photoIndex,
       availability,
-      fileKey: input.payload.fileKey,
+      keyFingerprint: storageKeyFingerprint(input.payload.fileKey),
     });
 
     return {
@@ -2001,7 +2020,10 @@ export class ChecklistsService {
     };
   }
 
-  private async resolveChecklistPdfImage(imageData: string): Promise<{
+  private async resolveChecklistPdfImage(
+    imageData: string,
+    checklistId: string,
+  ): Promise<{
     data: string;
     format: 'PNG' | 'JPEG';
   }> {
@@ -2011,7 +2033,14 @@ export class ChecklistsService {
     }
 
     const buffer = await this.documentStorageService.downloadFileBuffer(
-      governedPhoto.fileKey,
+      this.documentStorageService.referenceForExistingObject(
+        governedPhoto.fileKey,
+        {
+          resourceType: 'checklist-photo',
+          resourceId: checklistId,
+        },
+        'p1-document-storage-downloadFileBuffer',
+      ),
     );
     const base64 = buffer.toString('base64');
     const isPng =
@@ -2592,7 +2621,16 @@ export class ChecklistsService {
           await innerManager.getRepository(Checklist).softDelete(checklist.id);
         },
         cleanupStoredFile: (fileKey) =>
-          this.documentStorageService.deleteFile(fileKey),
+          this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              fileKey,
+              {
+                resourceType: 'checklist',
+                resourceId: checklist.id,
+              },
+              'p1-document-storage-deleteFile',
+            ),
+          ),
       });
     });
 
@@ -2626,7 +2664,16 @@ export class ChecklistsService {
       sanitizedOriginalName,
     );
 
-    await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'checklist-photo', resourceId: checklist.id },
+          'p1-document-storage-uploadFile',
+        ),
+        buffer,
+        mimeType,
+      );
 
     try {
       const photoReference = this.buildGovernedChecklistPhotoReference({
@@ -2669,7 +2716,7 @@ export class ChecklistsService {
       }
 
       this.logChecklistEvent('checklist_equipment_photo_uploaded', saved, {
-        fileKey,
+        keyFingerprint: storageKeyFingerprint(fileKey),
         originalName: sanitizedOriginalName,
         mimeType,
         signaturesReset,
@@ -2696,7 +2743,10 @@ export class ChecklistsService {
         this.logger,
         'checklists.attachEquipmentPhoto',
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       this.rethrowHttpAware(
         error,
@@ -2727,7 +2777,16 @@ export class ChecklistsService {
       sanitizedOriginalName,
     );
 
-    await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'checklist-photo', resourceId: checklist.id },
+          'p1-document-storage-uploadFile',
+        ),
+        buffer,
+        mimeType,
+      );
 
     try {
       const photoReference = this.buildGovernedChecklistPhotoReference({
@@ -2769,7 +2828,7 @@ export class ChecklistsService {
       this.logChecklistEvent('checklist_item_photo_uploaded', saved, {
         itemIndex,
         photoIndex,
-        fileKey,
+        keyFingerprint: storageKeyFingerprint(fileKey),
         originalName: sanitizedOriginalName,
         mimeType,
         signaturesReset,
@@ -2796,7 +2855,10 @@ export class ChecklistsService {
         this.logger,
         'checklists.attachItemPhoto',
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       this.rethrowHttpAware(
         error,
@@ -2912,8 +2974,13 @@ export class ChecklistsService {
     const logoKey = checklist.company?.logo_storage_key;
     if (logoKey) {
       try {
-        const buf =
-          await this.documentStorageService.downloadFileBuffer(logoKey);
+        const buf = await this.documentStorageService.downloadFileBuffer(
+          this.documentStorageService.referenceForExistingObject(
+            logoKey,
+            { resourceType: 'company', resourceId: checklist.company_id },
+            'p1-document-storage-downloadFileBuffer',
+          ),
+        );
         logoBase64 = buf.toString('base64');
         logoFormat = checklist.company?.logo_content_type?.includes('png')
           ? 'PNG'
@@ -2953,6 +3020,7 @@ export class ChecklistsService {
       try {
         const { data: imgData, format } = await this.resolveChecklistPdfImage(
           checklist.foto_equipamento,
+          checklist.id,
         );
         drawBackendSectionTitle(doc, currentY - 10, 'Evidência do equipamento');
         doc.setFillColor(...backendPdfTheme.surface);
@@ -3327,11 +3395,16 @@ export class ChecklistsService {
     );
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'checklist', resourceId: checklist.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       await this.documentGovernanceService.registerFinalDocument({
@@ -3368,7 +3441,7 @@ export class ChecklistsService {
       });
 
       this.logChecklistEvent('checklist_pdf_attached', checklist, {
-        fileKey,
+        keyFingerprint: storageKeyFingerprint(fileKey),
         folderPath,
         originalName: file.originalname,
       });
@@ -3383,7 +3456,10 @@ export class ChecklistsService {
         this.logger,
         `checklist:${checklist.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       this.rethrowHttpAware(error, 'Falha ao anexar PDF final do checklist.');
     }
@@ -3413,7 +3489,14 @@ export class ChecklistsService {
     let message = 'PDF final do checklist disponível para acesso.';
     try {
       url = await this.documentStorageService.getSignedUrl(
-        checklist.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          checklist.pdf_file_key,
+          {
+            resourceType: 'checklist',
+            resourceId: checklist.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
       if (!url) {
         availability = 'registered_without_signed_url';
@@ -3481,6 +3564,8 @@ export class ChecklistsService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'checklist',
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,

@@ -2,6 +2,8 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import type { TenantService } from '../../../shared/tenant/tenant.service';
 import type { DocumentStorageService } from '../../../shared/services/document-storage.service';
+import { markAuthorizedStorageReference } from '../../../shared/storage/storage-object-reference';
+import type { StorageObjectReference } from '../../../shared/storage/storage-object-reference';
 import { AprLog } from '../entities/apr-log.entity';
 import { Apr, AprStatus } from '../entities/apr.entity';
 import { AprsEvidenceService } from './aprs-evidence.service';
@@ -44,7 +46,13 @@ describe('AprsEvidenceService', () => {
   let tenantService: Pick<TenantService, 'getTenantId' | 'getContext' | 'run'>;
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'deleteFile' | 'getSignedUrl'
+    | 'generateDocumentKey'
+    | 'createReference'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'deleteFile'
+    | 'getSignedUrl'
   >;
 
   let riskItemRepository: { findOne: jest.Mock };
@@ -90,13 +98,38 @@ describe('AprsEvidenceService', () => {
       ) as TenantService['run'],
     };
     documentStorageService = {
+      createReference: jest.fn((reference) => reference),
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: { resourceType: string; resourceId: string },
+          purpose: string,
+        ) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+        }),
+      ),
       generateDocumentKey: jest.fn(
         () => 'documents/company-1/apr-evidences/apr-1/evidence.jpg',
       ),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn(
+        (
+          reference: StorageObjectReference,
+          _file: Parameters<
+            DocumentStorageService['uploadFileWithCapability']
+          >[1],
+          _contentType: string,
+          _metadata?: Record<string, string>,
+        ) => Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
-      getSignedUrl: jest.fn((key: string) =>
-        Promise.resolve(`https://signed.example/${encodeURIComponent(key)}`),
+      getSignedUrl: jest.fn((reference) =>
+        Promise.resolve(
+          `https://signed.example/${encodeURIComponent(reference.key)}`,
+        ),
       ),
     };
 
@@ -130,8 +163,12 @@ describe('AprsEvidenceService', () => {
       '127.0.0.1',
     );
 
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      'documents/company-1/apr-evidences/apr-1/evidence.jpg',
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'documents/company-1/apr-evidences/apr-1/evidence.jpg',
+      }),
       file.buffer,
       'image/jpeg',
     );
@@ -281,7 +318,9 @@ describe('AprsEvidenceService', () => {
     ).rejects.toThrow('constraint violation');
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/apr-evidences/apr-1/evidence.jpg',
+      expect.objectContaining({
+        key: 'documents/company-1/apr-evidences/apr-1/evidence.jpg',
+      }),
     );
   });
 

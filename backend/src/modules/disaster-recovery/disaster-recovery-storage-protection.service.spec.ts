@@ -1,6 +1,8 @@
 import { createHash } from 'crypto';
 import { DisasterRecoveryStorageProtectionService } from './disaster-recovery-storage-protection.service';
 import type { DisasterRecoveryIntegrityScanReport } from './disaster-recovery.types';
+import type { DocumentStorageService } from '../../shared/services/document-storage.service';
+import type { StorageObjectOwner } from '../../shared/storage/storage-object-reference';
 
 describe('DisasterRecoveryStorageProtectionService', () => {
   const buildIntegrityReport = (): DisasterRecoveryIntegrityScanReport => ({
@@ -47,6 +49,16 @@ describe('DisasterRecoveryStorageProtectionService', () => {
         endpoint: 'https://primary.example',
       }),
       downloadFileBuffer: jest.fn(),
+      downloadFileBufferPrivileged: jest.fn(),
+      fileExistsPrivileged: jest.fn(),
+      referenceForExistingObject: jest.fn(
+        (key: string, owner: StorageObjectOwner, purpose: string) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+        }),
+      ),
     };
     const replicaStorageService = {
       getConfigurationSummary: jest.fn().mockReturnValue({
@@ -57,12 +69,19 @@ describe('DisasterRecoveryStorageProtectionService', () => {
       fileExists: jest.fn(),
       uploadBuffer: jest.fn().mockResolvedValue(undefined),
     };
+    const tenantService = {
+      run: jest.fn(
+        (_context: unknown, callback: () => Buffer | Promise<Buffer>) =>
+          callback(),
+      ),
+    };
 
     const service = new DisasterRecoveryStorageProtectionService(
       executionService as never,
       integrityService as never,
-      documentStorageService as never,
+      documentStorageService as unknown as DocumentStorageService,
       replicaStorageService as never,
+      tenantService as never,
     );
 
     return {
@@ -71,6 +90,7 @@ describe('DisasterRecoveryStorageProtectionService', () => {
       integrityService,
       documentStorageService,
       replicaStorageService,
+      tenantService,
     };
   };
 
@@ -170,6 +190,7 @@ describe('DisasterRecoveryStorageProtectionService', () => {
       integrityService,
       documentStorageService,
       replicaStorageService,
+      tenantService,
     } = buildSubject();
     const integrityReport = buildIntegrityReport();
     integrityReport.inventory = [
@@ -190,7 +211,9 @@ describe('DisasterRecoveryStorageProtectionService', () => {
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(true);
     const buffer = Buffer.from('governed-document');
-    documentStorageService.downloadFileBuffer.mockResolvedValue(buffer);
+    documentStorageService.downloadFileBufferPrivileged.mockResolvedValue(
+      buffer,
+    );
 
     const report = await service.replicateGovernedArtifacts({
       dryRun: false,
@@ -213,6 +236,28 @@ describe('DisasterRecoveryStorageProtectionService', () => {
     const [uploadCall] = uploadBufferMock.mock.calls[0] || [];
 
     expect(executionService.startExecution).toHaveBeenCalledTimes(1);
+    expect(tenantService.run).toHaveBeenCalledWith(
+      {
+        companyId: 'company-1',
+        isSuperAdmin: true,
+        siteScope: 'all',
+      },
+      expect.any(Function),
+    );
+    expect(
+      documentStorageService.downloadFileBufferPrivileged,
+    ).toHaveBeenCalledWith({
+      tenantId: 'company-1',
+      key: 'documents/company-1/pt/doc-1/final.pdf',
+      owner: {
+        resourceType: 'disaster-recovery',
+        resourceId: 'storage-replication',
+      },
+      purpose: 'disaster-recovery-replication',
+    });
+    expect(
+      documentStorageService.referenceForExistingObject,
+    ).not.toHaveBeenCalled();
     expect(uploadCall).toBeDefined();
     expect(uploadCall.key).toBe('documents/company-1/pt/doc-1/final.pdf');
     expect(uploadCall.contentType).toBe('application/pdf');

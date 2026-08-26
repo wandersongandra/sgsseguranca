@@ -7,6 +7,7 @@ import { DocumentRegistryEntry } from './entities/document-registry.entity';
 import { WeeklyBundleFilters } from '../../shared/services/document-bundle.service';
 import { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 
 type GovernedModule =
   | 'apr'
@@ -170,7 +171,7 @@ export class DocumentGovernanceService {
               documentCode: registryEntry.document_code,
               documentType: registryEntry.document_type,
               title: registryEntry.title,
-              fileKey: registryEntry.file_key,
+              keyFingerprint: storageKeyFingerprint(registryEntry.file_key),
               folderPath: registryEntry.folder_path,
               originalName: registryEntry.original_name,
               mimeType: registryEntry.mime_type,
@@ -184,7 +185,13 @@ export class DocumentGovernanceService {
       });
     } catch (error) {
       this.logger.error(
-        `Falha ao registrar governança documental para ${input.module}:${input.entityId}. O upload externo, se já concluído, deve ser revisado manualmente (${input.fileKey}).`,
+        {
+          event: 'document_governance_registration_failed',
+          module: input.module,
+          entityId: input.entityId,
+          keyFingerprint: storageKeyFingerprint(input.fileKey),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
+        },
         error instanceof Error ? error.stack : undefined,
       );
       throw error;
@@ -285,7 +292,9 @@ export class DocumentGovernanceService {
             hadGovernedFile: Boolean(registryEntry),
             registryEntryId: registryEntry?.id || null,
             documentCode: registryEntry?.document_code || null,
-            fileKey: registryEntry?.file_key || null,
+            keyFingerprint: registryEntry?.file_key
+              ? storageKeyFingerprint(registryEntry.file_key)
+              : null,
             folderPath: registryEntry?.folder_path || null,
             originalName: registryEntry?.original_name || null,
             fileHash: registryEntry?.file_hash || null,
@@ -301,9 +310,14 @@ export class DocumentGovernanceService {
         await input.cleanupStoredFile(registryEntry.file_key);
       } catch (error) {
         this.logger.warn(
-          `Registry removido para ${input.module}:${input.entityId}, mas a limpeza do arquivo físico falhou (${registryEntry.file_key}): ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          {
+            event: 'document_governance_storage_cleanup_failed',
+            module: input.module,
+            entityId: input.entityId,
+            keyFingerprint: storageKeyFingerprint(registryEntry.file_key),
+            errorName: error instanceof Error ? error.name : 'unknown_error',
+          },
+          error instanceof Error ? error.stack : undefined,
         );
       }
     }
@@ -325,6 +339,8 @@ export class DocumentGovernanceService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: module,
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,

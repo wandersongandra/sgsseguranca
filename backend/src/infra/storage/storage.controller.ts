@@ -13,7 +13,7 @@ import { createHash } from 'crypto';
 import { JwtAuthGuard } from '../../modules/auth/jwt-auth.guard';
 import { TenantInterceptor } from '../../shared/tenant/tenant.interceptor';
 import { TenantGuard } from '../../shared/guards/tenant.guard';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { randomUUID } from 'crypto';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { RolesGuard } from '../../modules/auth/roles.guard';
@@ -53,6 +53,10 @@ function hasPdfMagicBytes(buffer: Buffer): boolean {
   return buffer.subarray(0, 5).equals(PDF_MAGIC);
 }
 
+function storageKeyFingerprint(key: string): string {
+  return createHash('sha256').update(key).digest('hex').slice(0, 16);
+}
+
 @Controller('storage')
 @ApiTags('storage')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
@@ -61,7 +65,7 @@ export class StorageController {
   private readonly logger = new Logger(StorageController.name);
 
   constructor(
-    private readonly storageService: StorageService,
+    private readonly documentStorageService: DocumentStorageService,
     private readonly tenantService: TenantService,
     private readonly auditService: AuditService,
     private readonly fileInspectionService: FileInspectionService,
@@ -125,10 +129,16 @@ export class StorageController {
 
     // P1 guardrail: arquivo vai para quarentena — não para documents/ diretamente
     const quarantineKey = `quarantine/${tenantId!}/${randomUUID()}.pdf`;
+    const quarantineReference =
+      this.documentStorageService.referenceForExistingObject(
+        quarantineKey,
+        { resourceType: 'upload', resourceId: quarantineKey },
+        'storage-quarantine-upload',
+      );
 
     // Guardrail P0: TTL de 10 minutos (reduzido de 1h)
-    const uploadUrl = await this.storageService.getPresignedUploadUrl(
-      quarantineKey,
+    const uploadUrl = await this.documentStorageService.getPresignedUploadUrl(
+      quarantineReference,
       contentType,
       PRESIGNED_UPLOAD_TTL_SECONDS,
     );
@@ -146,10 +156,10 @@ export class StorageController {
         userId: actorId,
         action: AuditAction.CREATE,
         entity: 'presigned_upload_url',
-        entityId: quarantineKey,
+        entityId: storageKeyFingerprint(quarantineKey),
         changes: {
           after: {
-            fileKey: quarantineKey,
+            keyFingerprint: storageKeyFingerprint(quarantineKey),
             tenantId,
             contentType,
             ttlSeconds: PRESIGNED_UPLOAD_TTL_SECONDS,
@@ -161,9 +171,12 @@ export class StorageController {
         companyId: tenantId!,
       });
     } catch (auditError) {
-      this.logger.error(
-        `[StorageController] Falha ao registrar auditoria para ${quarantineKey}: ${auditError instanceof Error ? auditError.message : String(auditError)}`,
-      );
+      this.logger.error({
+        event: 'storage_quarantine_audit_failed',
+        keyFingerprint: storageKeyFingerprint(quarantineKey),
+        errorName:
+          auditError instanceof Error ? auditError.name : 'unknown_error',
+      });
     }
 
     return {
@@ -232,10 +245,20 @@ export class StorageController {
       );
     }
 
+    const quarantineReference =
+      this.documentStorageService.referenceForExistingObject(
+        body.fileKey,
+        { resourceType: 'upload', resourceId: body.fileKey },
+        'storage-quarantine-promotion',
+      );
+
     // Baixar arquivo do S3 para validação server-side
     let fileBuffer: Buffer;
     try {
-      fileBuffer = await this.storageService.downloadFileBuffer(body.fileKey);
+      fileBuffer =
+        await this.documentStorageService.downloadFileBuffer(
+          quarantineReference,
+        );
     } catch {
       throw new BadRequestException(
         'Arquivo não encontrado na quarentena. Verifique se o upload foi concluído.',
@@ -247,7 +270,9 @@ export class StorageController {
       throw new BadRequestException('Arquivo enviado está vazio.');
     }
     if (fileBuffer.length > MAX_DOCUMENT_SIZE_BYTES) {
-      await this.storageService.deleteFile(body.fileKey).catch(() => undefined);
+      await this.documentStorageService
+        .deleteFile(quarantineReference)
+        .catch(() => undefined);
       throw new BadRequestException(
         `Arquivo excede o tamanho máximo permitido (${MAX_DOCUMENT_SIZE_BYTES / 1024 / 1024} MB).`,
       );
@@ -255,7 +280,9 @@ export class StorageController {
 
     // Validar magic bytes (PDF)
     if (!hasPdfMagicBytes(fileBuffer)) {
-      await this.storageService.deleteFile(body.fileKey).catch(() => undefined);
+      await this.documentStorageService
+        .deleteFile(quarantineReference)
+        .catch(() => undefined);
       throw new BadRequestException(
         'O arquivo não é um PDF válido (magic bytes inválidos).',
       );
@@ -269,8 +296,8 @@ export class StorageController {
         .toLowerCase();
       const expectedHash = body.sha256.toLowerCase().trim();
       if (actualHash !== expectedHash) {
-        await this.storageService
-          .deleteFile(body.fileKey)
+        await this.documentStorageService
+          .deleteFile(quarantineReference)
           .catch(() => undefined);
         throw new BadRequestException(
           'Integridade do arquivo comprometida: SHA-256 não confere.',
@@ -284,18 +311,29 @@ export class StorageController {
 
     // Promover para documents/
     const documentsKey = `documents/${tenantId!}/${randomUUID()}.pdf`;
-    await this.storageService.upload(
-      documentsKey,
+    const documentsReference = this.documentStorageService.createReference({
+      tenantId: tenantId!,
+      key: documentsKey,
+      owner: quarantineReference.owner,
+      purpose: 'storage-quarantine-promotion',
+    });
+    await this.documentStorageService.uploadFile(
+      documentsReference,
       fileBuffer,
       'application/pdf',
     );
 
     // Remover da quarentena (best-effort: falha não cancela a promoção)
-    await this.storageService.deleteFile(body.fileKey).catch((deleteError) => {
-      this.logger.warn(
-        `[StorageController] Falha ao remover arquivo de quarentena ${body.fileKey}: ${deleteError instanceof Error ? deleteError.message : String(deleteError)}`,
-      );
-    });
+    await this.documentStorageService
+      .deleteFile(quarantineReference)
+      .catch((deleteError) => {
+        this.logger.warn({
+          event: 'storage_quarantine_delete_failed',
+          keyFingerprint: storageKeyFingerprint(body.fileKey),
+          errorName:
+            deleteError instanceof Error ? deleteError.name : 'unknown_error',
+        });
+      });
 
     // Auditoria da promoção
     const actorId = req.user?.userId || req.user?.id || 'unknown';
@@ -310,11 +348,11 @@ export class StorageController {
         userId: actorId,
         action: AuditAction.CREATE,
         entity: 'document',
-        entityId: documentsKey,
+        entityId: storageKeyFingerprint(documentsKey),
         changes: {
           after: {
-            documentsKey,
-            quarantineKey: body.fileKey,
+            documentsKeyFingerprint: storageKeyFingerprint(documentsKey),
+            quarantineKeyFingerprint: storageKeyFingerprint(body.fileKey),
             tenantId,
             sizeBytes: fileBuffer.length,
             sha256Verified: !!body.sha256,
@@ -325,9 +363,12 @@ export class StorageController {
         companyId: tenantId!,
       });
     } catch (auditError) {
-      this.logger.error(
-        `[StorageController] Falha ao registrar auditoria de promoção para ${documentsKey}: ${auditError instanceof Error ? auditError.message : String(auditError)}`,
-      );
+      this.logger.error({
+        event: 'storage_promotion_audit_failed',
+        keyFingerprint: storageKeyFingerprint(documentsKey),
+        errorName:
+          auditError instanceof Error ? auditError.name : 'unknown_error',
+      });
     }
 
     return {

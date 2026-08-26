@@ -16,6 +16,7 @@ import { DocumentDownloadGrantService } from '../../shared/services/document-dow
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { SecurityAuditService } from '../../shared/security/security-audit.service';
 import { isLikelySignedToken } from '../../shared/security/signed-token.util';
+import { TenantService } from '../../shared/tenant/tenant.service';
 import { DownloadTokenParamDto } from './dto/download-token-param.dto';
 
 type DownloadRequest = Request & {
@@ -32,6 +33,7 @@ export class DocumentDownloadController {
     private readonly documentDownloadGrantService: DocumentDownloadGrantService,
     private readonly documentStorageService: DocumentStorageService,
     private readonly securityAudit: SecurityAuditService,
+    private readonly tenantService: TenantService,
   ) {}
 
   @Public()
@@ -70,18 +72,25 @@ export class DocumentDownloadController {
       );
     } catch (err) {
       // Token inválido, expirado ou já consumido — registra tentativa suspeita.
-      // Token de apenas 20 chars para evitar log de tokens válidos acidentalmente.
       this.securityAudit.bruteForceBlocked(
         ip,
-        `token_prefix:${normalizedToken.substring(0, 20)}`,
+        'token_rejected:invalid_or_expired',
       );
       throw err;
     }
 
     let buffer: Buffer;
     try {
-      buffer = await this.documentStorageService.downloadFileBuffer(
-        grant.file_key,
+      buffer = await this.tenantService.run(
+        {
+          companyId: grant.company_id,
+          isSuperAdmin: false,
+          siteScope: 'all',
+        },
+        () =>
+          this.documentStorageService.downloadFileBuffer(
+            this.documentDownloadGrantService.getAuthorizedReference(grant),
+          ),
       );
     } catch {
       throw new ServiceUnavailableException(

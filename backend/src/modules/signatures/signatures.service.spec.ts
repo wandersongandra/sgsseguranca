@@ -19,13 +19,16 @@ import {
   SIGNATURE_PROOF_SCOPES,
   SIGNATURE_VERIFICATION_MODES,
 } from './signature-proof.util';
+import { stringMatchingMatcher } from '../../../test/helpers/typed-matchers';
 
 describe('SignaturesService', () => {
   let service: SignaturesService;
   let storageService: {
     uploadFile: jest.Mock;
+    createReference: jest.Mock;
     downloadFileBuffer: jest.Mock;
     deleteFile: jest.Mock;
+    referenceForExistingObject: jest.Mock;
   };
   const savedEntities: Signature[] = [];
 
@@ -231,8 +234,16 @@ describe('SignaturesService', () => {
 
     storageService = {
       uploadFile: jest.fn().mockResolvedValue(undefined),
+      createReference: jest.fn((reference: unknown) => reference),
       downloadFileBuffer: jest.fn().mockResolvedValue(Buffer.from('')),
       deleteFile: jest.fn().mockResolvedValue(undefined),
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
     };
 
     service = new SignaturesService(
@@ -501,7 +512,7 @@ describe('SignaturesService', () => {
       },
     });
     expect(storageService.downloadFileBuffer).toHaveBeenCalledWith(
-      'signatures/dds-1/digital.dat',
+      expect.objectContaining({ key: 'signatures/dds-1/digital.dat' }),
     );
     expect(result[0]).toEqual(
       expect.objectContaining({
@@ -530,9 +541,11 @@ describe('SignaturesService', () => {
     );
 
     expect(storageService.uploadFile).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /^signatures\/apr-1\/drawn-\d+-[0-9a-f-]{36}\.dat$/,
-      ),
+      expect.objectContaining({
+        key: stringMatchingMatcher(
+          /^documents\/company-1\/signatures\/apr-1\/drawn-\d+-[0-9a-f-]{36}\.dat$/,
+        ),
+      }),
       Buffer.from(signatureData, 'utf8'),
       'application/octet-stream',
     );
@@ -797,7 +810,7 @@ describe('SignaturesService', () => {
 
     expect(repository.softDelete).toHaveBeenCalledWith({ id: 'signature-1' });
     expect(storageService.deleteFile).toHaveBeenCalledWith(
-      'signatures/apr-1/digital.dat',
+      expect.objectContaining({ key: 'signatures/apr-1/digital.dat' }),
     );
   });
 
@@ -817,7 +830,7 @@ describe('SignaturesService', () => {
     await service.removeByDocument('apr-1', 'APR', 'user-1');
 
     expect(storageService.deleteFile).toHaveBeenCalledWith(
-      'signatures/apr-1/digital.dat',
+      expect.objectContaining({ key: 'signatures/apr-1/digital.dat' }),
     );
   });
 
@@ -834,7 +847,7 @@ describe('SignaturesService', () => {
     );
 
     expect(storageService.deleteFile).toHaveBeenCalledWith(
-      'signatures/apr-1/digital.dat',
+      expect.objectContaining({ key: 'signatures/apr-1/digital.dat' }),
     );
   });
 
@@ -882,7 +895,7 @@ describe('SignaturesService', () => {
     });
 
     expect(storageService.deleteFile).toHaveBeenCalledWith(
-      'signatures/dds-1/team-photo.dat',
+      expect.objectContaining({ key: 'signatures/dds-1/team-photo.dat' }),
     );
   });
 

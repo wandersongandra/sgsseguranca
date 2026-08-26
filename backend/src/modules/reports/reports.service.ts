@@ -17,6 +17,7 @@ import { Dds } from '../dds/entities/dds.entity';
 import { Epi } from '../epis/entities/epi.entity';
 import { Pt } from '../pts/entities/pt.entity';
 import { Training } from '../trainings/entities/training.entity';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import {
   normalizeOffsetPagination,
   OffsetPage,
@@ -380,7 +381,16 @@ export class ReportsService {
         module: 'report',
         entityId: report.id,
         cleanupStoredFile: (fileKey) =>
-          this.documentStorageService.deleteFile(fileKey),
+          this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              fileKey,
+              {
+                resourceType: 'report',
+                resourceId: report.id,
+              },
+              'document-registry:report:pdf',
+            ),
+          ),
       });
     }
     // Soft delete: a entidade tem @DeleteDateColumn; hard delete destruiria
@@ -705,16 +715,25 @@ export class ReportsService {
   ): Promise<string | null> {
     if (!storageKey) return null;
     try {
-      const buf =
-        await this.documentStorageService.downloadFileBuffer(storageKey);
+      const buf = await this.documentStorageService.downloadFileBuffer(
+        this.documentStorageService.referenceForExistingObject(
+          storageKey,
+          {
+            resourceType: 'company',
+            resourceId: companyId,
+          },
+          'company-logo',
+        ),
+      );
       const mime = contentType ?? 'image/png';
       return `data:${mime};base64,${buf.toString('base64')}`;
     } catch (error) {
-      this.logger.warn(
-        `Logo da empresa ${companyId} indisponivel durante geracao de PDF: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.warn({
+        event: 'report_company_logo_download_failed',
+        companyId,
+        keyFingerprint: storageKeyFingerprint(storageKey),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
       return null;
     }
   }
@@ -802,17 +821,27 @@ export class ReportsService {
     let message = 'PDF final governado disponível para acesso.';
 
     try {
-      url = await this.documentStorageService.getSignedUrl(report.pdf_file_key);
+      url = await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          report.pdf_file_key,
+          {
+            resourceType: 'report',
+            resourceId: report.id,
+          },
+          'document-registry:report:pdf',
+        ),
+      );
     } catch (error) {
       availability = 'registered_without_signed_url';
       degraded = true;
       message =
         'PDF final registrado, mas a URL segura não está disponível no momento. Tente novamente quando o storage estiver saudável.';
-      this.logger.warn(
-        `URL assinada indisponível para PDF final do relatório ${report.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.warn({
+        event: 'report_pdf_signed_url_failed',
+        reportId: report.id,
+        keyFingerprint: storageKeyFingerprint(report.pdf_file_key),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
     }
 
     return {

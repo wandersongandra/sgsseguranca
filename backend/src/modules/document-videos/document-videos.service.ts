@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash } from 'crypto';
+import { randomUUID } from 'node:crypto';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import * as path from 'path';
 import { IsNull, Repository } from 'typeorm';
 import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
@@ -108,15 +110,23 @@ export class DocumentVideosService {
       input.documentId,
       safeOriginalName,
     );
+    const attachmentId = randomUUID();
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      input.buffer,
-      input.mimeType,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.createReference({
+          tenantId: input.companyId,
+          key: fileKey,
+          owner: { resourceType: 'document-video', resourceId: attachmentId },
+          purpose: 'document-video',
+        }),
+        input.buffer,
+        input.mimeType,
+      );
 
     const uploadedAt = new Date();
     const attachment = this.documentVideoRepository.create({
+      id: attachmentId,
       company_id: input.companyId,
       module: input.module,
       document_type: input.documentType || input.module,
@@ -146,7 +156,7 @@ export class DocumentVideosService {
           originalName: saved.original_name,
           mimeType: saved.mime_type,
           sizeBytes: saved.size_bytes,
-          storageKey: saved.storage_key,
+          keyFingerprint: storageKeyFingerprint(saved.storage_key),
           fileHash: saved.file_hash,
           processingStatus: saved.processing_status,
           availability: saved.availability,
@@ -158,7 +168,7 @@ export class DocumentVideosService {
         entityId: input.documentId,
         companyId: input.companyId,
         attachmentId: saved.id,
-        storageKey: saved.storage_key,
+        keyFingerprint: storageKeyFingerprint(saved.storage_key),
         mimeType: saved.mime_type,
         sizeBytes: saved.size_bytes,
         userId: input.uploadedById || undefined,
@@ -184,7 +194,10 @@ export class DocumentVideosService {
         this.logger,
         `document-video:${input.module}:${input.documentId}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          key === uploadedReference.key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -198,7 +211,14 @@ export class DocumentVideosService {
 
     try {
       const url = await this.documentStorageService.getSignedUrl(
-        attachment.storage_key,
+        this.documentStorageService.referenceForExistingObject(
+          attachment.storage_key,
+          {
+            resourceType: 'document-video',
+            resourceId: attachment.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
       await this.forensicTrailService.append({
         eventType: FORENSIC_EVENT_TYPES.VIDEO_ATTACHMENT_ACCESSED,
@@ -207,7 +227,7 @@ export class DocumentVideosService {
         companyId: input.companyId,
         metadata: {
           attachmentId: attachment.id,
-          storageKey: attachment.storage_key,
+          keyFingerprint: storageKeyFingerprint(attachment.storage_key),
           mimeType: attachment.mime_type,
           availability: 'ready',
         },
@@ -240,10 +260,10 @@ export class DocumentVideosService {
         companyId: input.companyId,
         metadata: {
           attachmentId: attachment.id,
-          storageKey: attachment.storage_key,
+          keyFingerprint: storageKeyFingerprint(attachment.storage_key),
           mimeType: attachment.mime_type,
           availability: 'registered_without_signed_url',
-          errorMessage: error instanceof Error ? error.message : 'unknown',
+          errorName: error instanceof Error ? error.name : 'unknown_error',
         },
       });
       this.logger.warn({
@@ -252,7 +272,7 @@ export class DocumentVideosService {
         entityId: input.documentId,
         companyId: input.companyId,
         attachmentId: attachment.id,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       return {
         entityId: input.documentId,
@@ -282,7 +302,16 @@ export class DocumentVideosService {
 
     let storageCleanup: 'deleted' | 'pending_manual_cleanup' = 'deleted';
     try {
-      await this.documentStorageService.deleteFile(attachment.storage_key);
+      await this.documentStorageService.deleteFile(
+        this.documentStorageService.referenceForExistingObject(
+          attachment.storage_key,
+          {
+            resourceType: 'document-video',
+            resourceId: attachment.id,
+          },
+          'p1-document-storage-deleteFile',
+        ),
+      );
     } catch (error) {
       storageCleanup = 'pending_manual_cleanup';
       this.logger.warn({
@@ -291,8 +320,8 @@ export class DocumentVideosService {
         entityId: input.documentId,
         companyId: input.companyId,
         attachmentId: attachment.id,
-        storageKey: attachment.storage_key,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        keyFingerprint: storageKeyFingerprint(attachment.storage_key),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
     }
 
@@ -304,7 +333,7 @@ export class DocumentVideosService {
       userId: input.removedById || undefined,
       metadata: {
         attachmentId: attachment.id,
-        storageKey: attachment.storage_key,
+        keyFingerprint: storageKeyFingerprint(attachment.storage_key),
         mimeType: attachment.mime_type,
         storageCleanup,
       },

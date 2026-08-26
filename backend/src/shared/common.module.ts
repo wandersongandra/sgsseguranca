@@ -8,7 +8,6 @@ import { PrivilegedDbService } from './database/privileged-db.service';
 import { ProvisioningDataSourceService } from './database/provisioning-datasource.service';
 import { PasswordService } from './services/password.service';
 import { CacheService } from './cache/cache.service';
-import { StorageService } from './services/storage.service';
 import { PdfService } from './services/pdf.service';
 import { PuppeteerPoolService } from './services/puppeteer-pool.service';
 import { PdfValidatorService } from './services/pdf-validator.service';
@@ -60,7 +59,6 @@ import { FileInspectionModule } from './security/file-inspection.module';
     ProvisioningDataSourceService,
     PasswordService,
     CacheService,
-    StorageService,
     PdfService,
     PuppeteerPoolService,
     PdfValidatorService,
@@ -89,7 +87,6 @@ import { FileInspectionModule } from './security/file-inspection.module';
     ProvisioningDataSourceService,
     PasswordService,
     CacheService,
-    StorageService,
     PdfService,
     PuppeteerPoolService,
     PdfValidatorService,

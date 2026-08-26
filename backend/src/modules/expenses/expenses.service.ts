@@ -288,11 +288,16 @@ export class ExpensesService {
       { folderSegments: ['sites', report.site_id, 'receipts', itemId] },
     );
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      buffer,
-      file.mimetype || 'application/octet-stream',
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'expense-item', resourceId: itemId },
+          'p1-document-storage-uploadFile',
+        ),
+        buffer,
+        file.mimetype || 'application/octet-stream',
+      );
 
     try {
       const item = this.itemsRepository.create({
@@ -315,7 +320,10 @@ export class ExpensesService {
         this.logger,
         `expense-report:${report.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -345,7 +353,14 @@ export class ExpensesService {
       this.logger,
       `expense-item:${item.id}`,
       item.receipt_file_key,
-      (key) => this.documentStorageService.deleteFile(key),
+      (key) =>
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            key,
+            { resourceType: 'expense-item', resourceId: item.id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     );
     return this.findOne(report.id);
   }
@@ -384,7 +399,14 @@ export class ExpensesService {
       originalName: item.receipt_original_name,
       mimeType: item.receipt_mime_type,
       url: await this.documentStorageService.getSignedUrl(
-        item.receipt_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          item.receipt_file_key,
+          {
+            resourceType: 'expense-item',
+            resourceId: item.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       ),
     };
   }

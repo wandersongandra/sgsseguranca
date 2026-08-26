@@ -10,6 +10,7 @@ import { resolveDisasterRecoveryEnvironment } from './disaster-recovery.util';
 import { DisasterRecoveryExecutionService } from './disaster-recovery-execution.service';
 import { DisasterRecoveryIntegrityService } from './disaster-recovery-integrity.service';
 import { DisasterRecoveryReplicaStorageService } from './disaster-recovery-replica-storage.service';
+import { TenantService } from '../../shared/tenant/tenant.service';
 
 type ReplicateGovernedArtifactsOptions = {
   dryRun?: boolean;
@@ -40,6 +41,7 @@ export class DisasterRecoveryStorageProtectionService {
     private readonly integrityService: DisasterRecoveryIntegrityService,
     private readonly documentStorageService: DocumentStorageService,
     private readonly replicaStorageService: DisasterRecoveryReplicaStorageService,
+    private readonly tenantService: TenantService,
   ) {}
 
   async replicateGovernedArtifacts(
@@ -274,8 +276,22 @@ export class DisasterRecoveryStorageProtectionService {
     }
 
     try {
-      const buffer = await this.documentStorageService.downloadFileBuffer(
-        input.inventoryItem.fileKey,
+      const buffer = await this.tenantService.run(
+        {
+          companyId: input.inventoryItem.companyId ?? undefined,
+          isSuperAdmin: true,
+          siteScope: 'all',
+        },
+        () =>
+          this.documentStorageService.downloadFileBufferPrivileged({
+            tenantId: input.inventoryItem.companyId || '',
+            key: input.inventoryItem.fileKey,
+            owner: {
+              resourceType: 'disaster-recovery',
+              resourceId: 'storage-replication',
+            },
+            purpose: 'disaster-recovery-replication',
+          }),
       );
       const sha256 = createHash('sha256').update(buffer).digest('hex');
 

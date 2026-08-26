@@ -70,6 +70,7 @@ import { AprsPdfService } from './services/aprs-pdf.service';
 import { AprsEvidenceService } from './services/aprs-evidence.service';
 import { AprWorkflowService } from './aprs-workflow.service';
 import { CacheService } from '../../shared/cache/cache.service';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import {
   AprMetricsService,
   CreateAprMetricDto as AprMetricPayload,
@@ -2060,7 +2061,13 @@ export class AprsService {
         await manager.getRepository(Apr).softDelete(id);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'apr', resourceId: id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
 
     // Limpar evidências órfãs: com a APR soft-deletada, os registros de
@@ -2070,7 +2077,7 @@ export class AprsService {
       this.logger.error({
         event: 'apr_evidence_cleanup_failed',
         aprId: id,
-        error: err instanceof Error ? err.message : String(err),
+        errorName: err instanceof Error ? err.name : 'unknown_error',
       });
     });
 
@@ -2101,20 +2108,37 @@ export class AprsService {
     let failed = 0;
 
     for (const evidence of evidences) {
-      const keys = [evidence.file_key, evidence.watermarked_file_key].filter(
-        Boolean,
-      ) as string[];
-      for (const key of keys) {
+      const files = [
+        evidence.file_key
+          ? { key: evidence.file_key, resourceType: 'apr-evidence' }
+          : null,
+        evidence.watermarked_file_key
+          ? {
+              key: evidence.watermarked_file_key,
+              resourceType: 'apr-evidence-watermarked',
+            }
+          : null,
+      ].filter(
+        (file): file is { key: string; resourceType: string } => file !== null,
+      );
+      for (const file of files) {
+        const { key, resourceType } = file;
         try {
-          await this.documentStorageService.deleteFile(key);
+          await this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              key,
+              { resourceType, resourceId: evidence.id },
+              'p1-document-storage-deleteFile',
+            ),
+          );
         } catch (err) {
           failed += 1;
           this.logger.warn({
             event: 'apr_evidence_file_delete_failed',
             aprId,
             evidenceId: evidence.id,
-            fileKey: key,
-            error: err instanceof Error ? err.message : String(err),
+            keyFingerprint: storageKeyFingerprint(key),
+            errorName: err instanceof Error ? err.name : 'unknown_error',
           });
         }
       }
@@ -2570,7 +2594,12 @@ export class AprsService {
         aprId: id,
         tenantId: tenantId ?? null,
         eventType: AprMetricEventType.APR_PDF_GENERATED,
-        metadata: { userId: userId ?? null, fileKey: result.fileKey },
+        metadata: {
+          userId: userId ?? null,
+          keyFingerprint: result.fileKey
+            ? storageKeyFingerprint(result.fileKey)
+            : null,
+        },
       });
     }
     return result;
@@ -2656,7 +2685,14 @@ export class AprsService {
     let message: string | undefined;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        apr.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          apr.pdf_file_key,
+          {
+            resourceType: 'apr',
+            resourceId: apr.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         3600,
       );
     } catch {
@@ -2944,6 +2980,8 @@ export class AprsService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'apr',
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,

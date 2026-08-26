@@ -10,7 +10,9 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
+import { createHash } from 'node:crypto';
 import { InjectRepository } from '@nestjs/typeorm';
+import { randomUUID } from 'node:crypto';
 import { FindOptionsWhere, QueryFailedError, Repository } from 'typeorm';
 import { TenantService } from '../../../shared/tenant/tenant.service';
 import { DdsService } from '../../dds/dds.service';
@@ -41,7 +43,7 @@ import { FileParserService } from './file-parser.service';
 import { DocumentClassifierService } from './document-classifier.service';
 import { DocumentInterpreterService } from './document-interpreter.service';
 import { DocumentValidationService } from './document-validation.service';
-import { StorageService } from '../../../shared/services/storage.service';
+import { DocumentStorageService } from '../../../shared/services/document-storage.service';
 import {
   getDocumentImportJobAttempts,
   getDocumentImportJobTimeoutMs,
@@ -88,7 +90,7 @@ export class DocumentImportService {
     private readonly documentValidationService: DocumentValidationService,
     private readonly ddsService: DdsService,
     private readonly tenantService: TenantService,
-    private readonly storageService: StorageService,
+    private readonly documentStorageService: DocumentStorageService,
     @InjectQueue('document-import')
     private readonly documentImportQueue: Queue,
   ) {}
@@ -139,14 +141,17 @@ export class DocumentImportService {
       return this.buildReplayEnqueueResponse(existingByHash, 'file_hash');
     }
 
+    const documentImportId = randomUUID();
     const stagingKey = await this.uploadStagingFile(
       empresaId,
       hash,
       fileBuffer,
       mimetype,
+      documentImportId,
     );
 
     const documentImport = this.documentImportRepository.create({
+      id: documentImportId,
       empresaId,
       hash,
       idempotencyKey: normalizedIdempotencyKey,
@@ -235,7 +240,7 @@ export class DocumentImportService {
         statusUrl,
         details: {
           stage: 'pre_enqueue_persist',
-          error: error instanceof Error ? error.message : String(error),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
         },
       });
     }
@@ -1186,7 +1191,7 @@ export class DocumentImportService {
     await this.documentImportRepository.save(record);
 
     if (stagingKeyToDelete) {
-      this.deleteStagingFile(stagingKeyToDelete);
+      this.deleteStagingFile(stagingKeyToDelete, record.id);
     }
   }
 
@@ -1363,7 +1368,7 @@ export class DocumentImportService {
   }
 
   private stagingS3Key(empresaId: string, hash: string): string {
-    return `document-import-staging/${empresaId}/${hash}`;
+    return `documents/${empresaId}/imports/staging/${hash}`;
   }
 
   private async uploadStagingFile(
@@ -1371,11 +1376,16 @@ export class DocumentImportService {
     hash: string,
     buffer: Buffer,
     mimeType: string,
+    documentImportId: string,
   ): Promise<string | null> {
     try {
       const key = this.stagingS3Key(empresaId, hash);
-      await this.storageService.uploadFile(
-        key,
+      await this.documentStorageService.uploadFile(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'document-import', resourceId: documentImportId },
+          'document-import-staging-upload',
+        ),
         buffer,
         mimeType || 'application/octet-stream',
       );
@@ -1385,7 +1395,7 @@ export class DocumentImportService {
         event: 'document_import_staging_upload_failed',
         empresaId,
         hash,
-        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       return null;
     }
@@ -1396,15 +1406,25 @@ export class DocumentImportService {
   ): Promise<Buffer | null> {
     if (record.arquivoStagingKey) {
       try {
-        return await this.storageService.downloadFileBuffer(
-          record.arquivoStagingKey,
+        return await this.documentStorageService.downloadFileBuffer(
+          this.documentStorageService.referenceForExistingObject(
+            record.arquivoStagingKey,
+            {
+              resourceType: 'document-import',
+              resourceId: record.id,
+            },
+            'p1-document-storage-downloadFileBuffer',
+          ),
         );
       } catch (error) {
         this.logger.warn({
           event: 'document_import_staging_download_failed',
           documentId: record.id,
-          key: record.arquivoStagingKey,
-          error: error instanceof Error ? error.message : String(error),
+          keyFingerprint: createHash('sha256')
+            .update(record.arquivoStagingKey)
+            .digest('hex')
+            .slice(0, 16),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
         });
       }
     }
@@ -1412,14 +1432,25 @@ export class DocumentImportService {
     return record.arquivoStaging ?? null;
   }
 
-  private deleteStagingFile(key: string): void {
-    this.storageService.deleteFile(key).catch((error: unknown) => {
-      this.logger.warn({
-        event: 'document_import_staging_delete_failed',
-        key,
-        error: error instanceof Error ? error.message : String(error),
+  private deleteStagingFile(key: string, documentImportId: string): void {
+    this.documentStorageService
+      .deleteFile(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'document-import', resourceId: documentImportId },
+          'p1-document-storage-deleteFile',
+        ),
+      )
+      .catch((error: unknown) => {
+        this.logger.warn({
+          event: 'document_import_staging_delete_failed',
+          keyFingerprint: createHash('sha256')
+            .update(key)
+            .digest('hex')
+            .slice(0, 16),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
+        });
       });
-    });
   }
 
   private buildStatusUrl(documentId: string) {

@@ -716,7 +716,16 @@ export class DocumentRegistryService {
 
     let url: string | null;
     try {
-      url = await this.documentStorageService.getSignedUrl(document.file_key);
+      url = await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          document.file_key,
+          {
+            resourceType: document.module,
+            resourceId: document.entity_id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
+      );
     } catch {
       return {
         entityId: document.entity_id,
@@ -757,6 +766,8 @@ export class DocumentRegistryService {
       filters,
       documents.map((document) => ({
         fileKey: document.file_key,
+        resourceType: document.module,
+        resourceId: document.entity_id,
         title: `[${document.module.toUpperCase()}] ${document.title}`,
         originalName: document.original_name,
         date: document.document_date,

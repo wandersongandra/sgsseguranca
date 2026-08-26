@@ -29,7 +29,6 @@ import { PdfValidatorService } from '../../shared/services/pdf-validator.service
 import type { PuppeteerPoolService } from '../../shared/services/puppeteer-pool.service';
 import type { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
 import type { RiskCalculationService } from '../../shared/services/risk-calculation.service';
-import type { StorageService } from '../../shared/services/storage.service';
 import type { TenantRepositoryFactory } from '../../shared/tenant/tenant-repository';
 import type { TenantService } from '../../shared/tenant/tenant.service';
 import { Dds, DdsStatus } from '../dds/entities/dds.entity';
@@ -316,9 +315,6 @@ describe('Document governance integration', () => {
       governanceService,
       signaturesService,
       buildPublicValidationGrantService(),
-      {
-        getPresignedInlineViewUrl: jest.fn(),
-      } as unknown as StorageService,
     );
     const aprsEvidenceService = new AprsEvidenceService(
       dataSource.getRepository(Apr),

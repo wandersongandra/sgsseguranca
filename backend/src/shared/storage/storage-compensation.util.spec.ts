@@ -66,7 +66,7 @@ describe('storage-compensation.util', () => {
       expect.objectContaining({
         event: 'storage_cleanup_failed',
         context: 'rdo:456',
-        errorMessage: 'storage delete failed',
+        errorName: 'Error',
       }),
       expect.any(String),
     );

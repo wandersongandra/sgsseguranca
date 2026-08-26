@@ -369,8 +369,8 @@ export function resolveReplicaStorageRuntimeConfig(
       AWS_ENDPOINT: endpoint || undefined,
       AWS_S3_ENDPOINT: undefined,
       AWS_REGION: region,
-      AWS_ACCESS_KEY_ID: REDACTED
-      AWS_SECRET_ACCESS_KEY: REDACTED
+      AWS_ACCESS_KEY_ID: accessKeyId || undefined,
+      AWS_SECRET_ACCESS_KEY: secretAccessKey || undefined,
       S3_FORCE_PATH_STYLE: forcePathStyle ? 'true' : 'false',
     },
   };

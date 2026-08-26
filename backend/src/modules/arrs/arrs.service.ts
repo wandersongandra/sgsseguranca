@@ -28,7 +28,10 @@ import {
 import { Site } from '../sites/entities/site.entity';
 import { User } from '../users/entities/user.entity';
 import { UserSite } from '../users/entities/user-site.entity';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import { Arr, ArrStatus, ARR_ALLOWED_TRANSITIONS } from './entities/arr.entity';
 import { CreateArrDto } from './dto/create-arr.dto';
@@ -431,11 +434,16 @@ export class ArrsService {
     const documentCode = arr.document_code || this.buildArrDocumentCode(arr);
     const pdfGeneratedAt = new Date();
 
-    await this.documentStorageService.uploadFile(
-      key,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'arr', resourceId: arr.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       const { hash } =
@@ -475,7 +483,9 @@ export class ArrsService {
       }
     } catch (error) {
       await cleanupUploadedFile(this.logger, `arr:${arr.id}`, key, (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        uploadedReference.key === fileKey
+          ? this.documentStorageService.deleteFile(uploadedReference)
+          : Promise.resolve(),
       );
       throw error;
     }
@@ -484,7 +494,7 @@ export class ArrsService {
       event: 'arr_pdf_attached',
       arrId: arr.id,
       companyId: arr.company_id,
-      fileKey: key,
+      keyFingerprint: storageKeyFingerprint(key),
       previousStatus: arr.status,
       nextStatus:
         arr.status === ArrStatus.ANALISADA ? ArrStatus.TRATADA : arr.status,
@@ -584,7 +594,14 @@ export class ArrsService {
 
     try {
       url = await this.documentStorageService.getSignedUrl(
-        arr.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          arr.pdf_file_key,
+          {
+            resourceType: 'arr',
+            resourceId: arr.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         ARR_PDF_SIGNED_URL_EXPIRY_SECONDS,
       );
     } catch {
@@ -625,7 +642,13 @@ export class ArrsService {
         await manager.getRepository(Arr).softDelete(id);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'arr', resourceId: arr.id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
 
     this.logger.log({

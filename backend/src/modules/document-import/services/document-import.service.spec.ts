@@ -6,6 +6,10 @@
 import { DocumentImportStatus } from '../entities/document-import-status.enum';
 import { DocumentImportService } from './document-import.service';
 import { DocumentImport } from '../entities/document-import.entity';
+import type {
+  StorageObjectOwner,
+  StorageObjectReference,
+} from '../../../shared/storage/storage-object-reference';
 
 const COMPANY_ID = 'company-1';
 const DOCUMENT_ID = '11111111-1111-4111-8111-111111111111';
@@ -91,6 +95,7 @@ describe('DocumentImportService', () => {
     getJob: jest.Mock;
   };
   let storageService: {
+    referenceForExistingObject: jest.Mock;
     uploadFile: jest.Mock;
     downloadFileBuffer: jest.Mock;
     deleteFile: jest.Mock;
@@ -156,6 +161,18 @@ describe('DocumentImportService', () => {
       getJob: jest.fn(),
     };
     storageService = {
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: StorageObjectOwner,
+          purpose: string,
+        ): StorageObjectReference => ({
+          tenantId: COMPANY_ID,
+          key,
+          owner,
+          purpose,
+        }),
+      ),
       uploadFile: jest.fn().mockResolvedValue(undefined),
       downloadFileBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4')),
       deleteFile: jest.fn().mockResolvedValue(undefined),

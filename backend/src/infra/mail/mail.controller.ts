@@ -43,8 +43,6 @@ import { TenantService } from '../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { Authorize } from '../../modules/auth/authorize.decorator';
 import { DocumentMailDispatchResponseDto } from './dto/document-mail-dispatch-response.dto';
-import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
 import { RequestTimeout } from '../../shared/decorators/request-timeout.decorator';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { maskEmail } from '../../shared/logging/log-sanitizer.util';
@@ -83,7 +81,6 @@ export class MailController {
     private readonly mailService: MailService,
     private readonly mailDlqService: MailDlqService,
     @InjectQueue('mail') private readonly mailQueue: Queue,
-    private readonly documentStorageService: DocumentStorageService,
     private readonly tenantService: TenantService,
     private readonly fileInspectionService: FileInspectionService,
   ) {}
@@ -357,10 +354,8 @@ export class MailController {
     }
 
     const companyId = getRequiredCompanyId(req);
-    const folder = companyId ? `mail/${companyId}` : 'mail';
-    const fileKey = `uploads/${folder}/${randomUUID()}.pdf`;
     const resolvedDocName = body.docName?.trim() || file.originalname;
-    let pdfBuffer!: Buffer;
+    let pdfBuffer: Buffer;
 
     this.mailService.assertDispatchAvailable();
 
@@ -375,86 +370,12 @@ export class MailController {
       await unlink(file.path).catch(() => undefined);
     }
 
-    try {
-      await this.documentStorageService.uploadFile(
-        fileKey,
-        pdfBuffer,
-        file.mimetype || 'application/pdf',
-      );
-
-      try {
-        await this.mailQueue.add(
-          'send-file-key',
-          {
-            fileKey,
-            email,
-            subject: body.subject,
-            docName: resolvedDocName,
-            expiresInSeconds: 604800,
-            companyId,
-            userId: req.user?.userId,
-          },
-          defaultJobOptions,
-        );
-
-        this.logger.warn({
-          event: 'mail_document_local_fallback_queued',
-          companyId,
-          userId: req.user?.userId,
-          artifactType: 'local_uploaded_pdf',
-          fallbackUsed: true,
-          isOfficial: false,
-          recipient: maskEmail(email),
-        });
-
-        return this.mailService.buildDocumentDispatchResponse({
-          message:
-            'Solicitação recebida. O PDF local será enviado por e-mail em instantes. Este envio não substitui o documento final governado.',
-          deliveryMode: 'queued',
-          artifactType: 'local_uploaded_pdf',
-          isOfficial: false,
-          fallbackUsed: true,
-          fileKey,
-        });
-      } catch (error) {
-        this.logger.warn(
-          `Fila de e-mail indisponível para upload, aplicando fallback síncrono pelo arquivo já armazenado: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-
-        try {
-          return await this.mailService.sendStoredFileKey(fileKey, email, {
-            subject: body.subject,
-            docName: resolvedDocName,
-            expiresInSeconds: 604800,
-            companyId,
-            userId: req.user?.userId,
-          });
-        } catch (sendError) {
-          await cleanupUploadedFile(
-            this.logger,
-            'mail_uploaded_document_sync_fallback',
-            fileKey,
-            (key) => this.documentStorageService.deleteFile(key),
-          );
-          throw sendError;
-        }
-      }
-    } catch (error) {
-      this.logger.warn(
-        `Storage documental indisponível para upload, aplicando fallback síncrono por buffer: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      return this.mailService.sendUploadedPdfBuffer(pdfBuffer, email, {
-        subject: body.subject,
-        docName: resolvedDocName,
-        companyId,
-        userId: req.user?.userId,
-      });
-    }
+    return this.mailService.sendUploadedPdfBuffer(pdfBuffer, email, {
+      subject: body.subject,
+      docName: resolvedDocName,
+      companyId,
+      userId: req.user?.userId,
+    });
   }
 
   @Post('alerts/dispatch')

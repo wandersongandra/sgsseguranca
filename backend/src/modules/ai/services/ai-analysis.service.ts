@@ -118,16 +118,7 @@ export class AiAnalysisService {
     tenantId: string,
   ): Promise<AiAnalysisResult> {
     const visionModel = this.requireVisionModel();
-    let imageBuffer = buffer;
-    if (!imageBuffer || imageBuffer.length === 0) {
-      const keyFromContext = this.extractStorageKeyFromContext(context);
-      if (keyFromContext) {
-        imageBuffer =
-          await this.documentStorageService.downloadFileBuffer(keyFromContext);
-      }
-    }
-
-    if (!imageBuffer || imageBuffer.length === 0) {
+    if (!buffer || buffer.length === 0) {
       throw new BadRequestException('Imagem inválida para análise.');
     }
 
@@ -149,7 +140,7 @@ export class AiAnalysisService {
         ],
       });
 
-      const strippedBuffer = stripJpegExifMetadata(imageBuffer);
+      const strippedBuffer = stripJpegExifMetadata(buffer);
       const dataUrl = `data:image/jpeg;base64,${strippedBuffer.toString('base64')}`;
       const { payload, model } =
         await this.requestOpenAiChatCompletion<OpenAiChatCompletion>({
@@ -240,16 +231,7 @@ export class AiAnalysisService {
     tenantId: string,
   ): Promise<SophiePhotographicReportImageJsonResponse> {
     const visionModel = this.requireVisionModel();
-    let imageBuffer = buffer;
-    if (!imageBuffer || imageBuffer.length === 0) {
-      const keyFromContext = this.extractStorageKeyFromContext(context);
-      if (keyFromContext) {
-        imageBuffer =
-          await this.documentStorageService.downloadFileBuffer(keyFromContext);
-      }
-    }
-
-    if (!imageBuffer || imageBuffer.length === 0) {
+    if (!buffer || buffer.length === 0) {
       throw new BadRequestException('Imagem inválida para análise.');
     }
 
@@ -272,7 +254,7 @@ export class AiAnalysisService {
         ],
       });
 
-      const strippedBuffer = stripJpegExifMetadata(imageBuffer);
+      const strippedBuffer = stripJpegExifMetadata(buffer);
       const dataUrl = `data:image/jpeg;base64,${strippedBuffer.toString('base64')}`;
       const { payload, model } =
         await this.requestOpenAiChatCompletion<OpenAiChatCompletion>({
@@ -577,25 +559,6 @@ export class AiAnalysisService {
         ],
         automation: this.buildPtAutomationDecision('Médio', flags),
       };
-    }
-  }
-
-  private extractStorageKeyFromContext(context?: string): string | null {
-    const text = this.toSafeString(context);
-    if (!text) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(text) as {
-        storageKey?: unknown;
-        key?: unknown;
-      };
-      const storageKey = this.toSafeString(parsed.storageKey || parsed.key);
-      return storageKey || null;
-    } catch {
-      const match = text.match(/(documents\/[a-zA-Z0-9_-]+\/[^\s"'`]+)/i);
-      return match?.[1] || null;
     }
   }
 

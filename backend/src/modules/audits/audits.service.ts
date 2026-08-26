@@ -26,7 +26,10 @@ import {
 } from '../../shared/services/document-bundle.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import {
@@ -587,7 +590,13 @@ export class AuditsService {
         await manager.getRepository(Audit).softDelete(auditId);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'audit', resourceId: auditId },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
     this.logger.log({
       event: 'audit_removed',
@@ -621,11 +630,16 @@ export class AuditsService {
       file.originalname,
       { folderSegments: ['sites', audit.site_id] },
     );
-    await this.documentStorageService.uploadFile(
-      key,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'audit', resourceId: audit.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
     const uploadedToStorage = true;
 
     const folder = key.split('/').slice(0, -1).join('/');
@@ -658,7 +672,10 @@ export class AuditsService {
           this.logger,
           `audit:${audit.id}`,
           key,
-          (fileKey) => this.documentStorageService.deleteFile(fileKey),
+          (fileKey) =>
+            uploadedReference.key === fileKey
+              ? this.documentStorageService.deleteFile(uploadedReference)
+              : Promise.resolve(),
         );
       }
       throw error;
@@ -669,7 +686,7 @@ export class AuditsService {
       auditId: audit.id,
       companyId: audit.company_id,
       userId,
-      fileKey: key,
+      keyFingerprint: storageKeyFingerprint(key),
     });
 
     return {
@@ -702,7 +719,14 @@ export class AuditsService {
     let message: string | null = null;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        audit.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          audit.pdf_file_key,
+          {
+            resourceType: 'audit',
+            resourceId: audit.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         3600,
       );
     } catch {
@@ -760,6 +784,8 @@ export class AuditsService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'audit',
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,

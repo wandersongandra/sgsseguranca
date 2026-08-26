@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'node:crypto';
 import {
   S3Client,
   PutObjectCommand,
@@ -48,6 +49,18 @@ const isReadableBody = (
 const toBufferChunk = (chunk: Buffer | Uint8Array | string): Buffer =>
   Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
 
+const storageKeyFingerprint = (key: string): string =>
+  createHash('sha256').update(key).digest('hex').slice(0, 16);
+
+/**
+ * @deprecated INTERNAL_ONLY — compatibilidade de infraestrutura histórica.
+ *
+ * O domínio não deve injetar esta classe nem enviar chaves brutas ao provider.
+ * Novos uploads, downloads, deletes e URLs assinadas passam por
+ * DocumentStorageService, que exige tenant, owner, purpose e chave validada.
+ * A classe permanece somente para scripts/testes de migração explicitamente
+ * autorizados; não é registrada nos módulos Nest de runtime.
+ */
 @Injectable()
 export class StorageService {
   private s3Client: S3Client;
@@ -109,7 +122,10 @@ export class StorageService {
       timeoutMs: 30_000,
     });
 
-    this.logger.log(`Arquivo enviado com sucesso: ${key}`);
+    this.logger.log({
+      event: 'legacy_storage_file_uploaded',
+      keyFingerprint: storageKeyFingerprint(key),
+    });
   }
 
   async uploadFile(
@@ -147,7 +163,10 @@ export class StorageService {
       { timeoutMs: 10_000 },
     );
 
-    this.logger.log(`Presigned Upload URL gerada para: ${key}`);
+    this.logger.log({
+      event: 'legacy_storage_presigned_upload_created',
+      keyFingerprint: storageKeyFingerprint(key),
+    });
     return url;
   }
 
@@ -261,7 +280,10 @@ export class StorageService {
       },
     );
 
-    this.logger.log(`Arquivo deletado: ${key}`);
+    this.logger.log({
+      event: 'legacy_storage_file_deleted',
+      keyFingerprint: storageKeyFingerprint(key),
+    });
   }
 
   async fileExists(key: string): Promise<boolean> {

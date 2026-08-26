@@ -17,7 +17,7 @@ import {
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { StorageController } from './storage.controller';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { AuditService } from '../../modules/audit-trail/audit.service';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
@@ -27,6 +27,11 @@ import { TenantGuard } from '../../shared/guards/tenant.guard';
 import { TenantInterceptor } from '../../shared/tenant/tenant.interceptor';
 import { Role } from '../../modules/auth/enums/roles.enum';
 import { PermissionsGuard } from '../../modules/auth/permissions.guard';
+import { stringMatchingMatcher } from '../../../test/helpers/typed-matchers';
+import type {
+  StorageObjectOwner,
+  StorageObjectReference,
+} from '../../shared/storage/storage-object-reference';
 
 jest.setTimeout(10000);
 
@@ -79,12 +84,31 @@ const passAllInterceptor = {
 
 describe('StorageController — Guardrails de Upload PDF (P0)', () => {
   let app: INestApplication;
-  let storageService: { getPresignedUploadUrl: jest.Mock };
+  let storageService: {
+    referenceForExistingObject: jest.Mock;
+    createReference: jest.Mock;
+    getPresignedUploadUrl: jest.Mock;
+  };
   let auditService: { log: jest.Mock };
   let tenantService: { getTenantId: jest.Mock; isSuperAdmin: jest.Mock };
 
   beforeAll(async () => {
     storageService = {
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: StorageObjectOwner,
+          purpose: string,
+        ): StorageObjectReference => ({
+          tenantId: FAKE_TENANT_ID,
+          key,
+          owner,
+          purpose,
+        }),
+      ),
+      createReference: jest.fn(
+        (input: StorageObjectReference): StorageObjectReference => input,
+      ),
       getPresignedUploadUrl: jest.fn().mockResolvedValue(FAKE_PRESIGNED_URL),
     };
     auditService = {
@@ -98,7 +122,7 @@ describe('StorageController — Guardrails de Upload PDF (P0)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [StorageController],
       providers: [
-        { provide: StorageService, useValue: storageService },
+        { provide: DocumentStorageService, useValue: storageService },
         { provide: TenantService, useValue: tenantService },
         { provide: AuditService, useValue: auditService },
         {
@@ -234,7 +258,9 @@ describe('StorageController — Guardrails de Upload PDF (P0)', () => {
         .send({ filename: 'doc.pdf' });
 
       expect(storageService.getPresignedUploadUrl).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.objectContaining({
+          key: stringMatchingMatcher(/^quarantine\//),
+        }),
         'application/pdf',
         600,
       );
@@ -386,7 +412,9 @@ describe('StorageController — Guardrails de Upload PDF (P0)', () => {
         .send({ filename: 'doc.pdf' });
 
       expect(storageService.getPresignedUploadUrl).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.objectContaining({
+          key: stringMatchingMatcher(/^quarantine\//),
+        }),
         'application/pdf',
         expect.any(Number),
       );
@@ -397,7 +425,11 @@ describe('StorageController — Guardrails de Upload PDF (P0)', () => {
 // ─── Fase 2: Controle de acesso por role ────────────────────────────────────
 
 describe('StorageController — Controle de acesso por role (Fase 2)', () => {
-  let storageService: { getPresignedUploadUrl: jest.Mock };
+  let storageService: {
+    referenceForExistingObject: jest.Mock;
+    createReference: jest.Mock;
+    getPresignedUploadUrl: jest.Mock;
+  };
   let auditService: { log: jest.Mock };
   let tenantService: { getTenantId: jest.Mock; isSuperAdmin: jest.Mock };
 
@@ -409,7 +441,7 @@ describe('StorageController — Controle de acesso por role (Fase 2)', () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [StorageController],
       providers: [
-        { provide: StorageService, useValue: storageService },
+        { provide: DocumentStorageService, useValue: storageService },
         {
           provide: TenantService,
           useValue: tenantSvcOverride ?? tenantService,
@@ -443,6 +475,21 @@ describe('StorageController — Controle de acesso por role (Fase 2)', () => {
 
   beforeAll(() => {
     storageService = {
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: StorageObjectOwner,
+          purpose: string,
+        ): StorageObjectReference => ({
+          tenantId: FAKE_TENANT_ID,
+          key,
+          owner,
+          purpose,
+        }),
+      ),
+      createReference: jest.fn(
+        (input: StorageObjectReference): StorageObjectReference => input,
+      ),
       getPresignedUploadUrl: jest
         .fn()
         .mockResolvedValue('https://s3.example.com'),

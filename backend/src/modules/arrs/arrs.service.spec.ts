@@ -7,6 +7,8 @@ import { TenantService } from '../../shared/tenant/tenant.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { PdfService } from '../../shared/services/pdf.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
+import { stringContainingMatcher } from '../../../test/helpers/typed-matchers';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -16,7 +18,15 @@ describe('ArrsService', () => {
   let service: ArrsService;
   let arrRepository: jest.Mocked<Repository<Arr>>;
   let tenantService: Partial<TenantService>;
-  let documentStorageService: Partial<DocumentStorageService>;
+  let documentStorageService: Pick<
+    DocumentStorageService,
+    | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'deleteFile'
+    | 'getSignedUrl'
+  >;
   let documentGovernanceService: Partial<DocumentGovernanceService>;
   let pdfService: Partial<PdfService>;
 
@@ -51,7 +61,23 @@ describe('ArrsService', () => {
             'arr-final.pdf',
           ].join('/'),
       ),
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: { resourceType: string; resourceId: string },
+          purpose: string,
+        ) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+          legacy: !key.startsWith('documents/company-1/'),
+        }),
+      ),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
       getSignedUrl: jest.fn(() =>
         Promise.resolve('https://signed.example/arr.pdf'),
@@ -351,7 +377,9 @@ describe('ArrsService', () => {
     });
 
     expect(result.degraded).toBe(false);
-    expect(documentStorageService.uploadFile).toHaveBeenCalledTimes(1);
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledTimes(1);
     expect(
       documentGovernanceService.registerFinalDocument,
     ).toHaveBeenCalledWith(
@@ -522,10 +550,28 @@ describe('ArrsService', () => {
     expect(pdfService.generateFromHtml).toHaveBeenCalled();
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>alert(1)</script>');
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
+    expect(
+      documentStorageService.referenceForExistingObject,
+    ).toHaveBeenCalledWith(
       expect.stringContaining(
         'documents/company-1/arr/sites/site-1/arr-generated/',
       ),
+      {
+        resourceType: 'arr',
+        resourceId: 'arr-generated',
+      },
+      'p1-document-storage-uploadFile',
+    );
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'company-1',
+        key: stringContainingMatcher(
+          'documents/company-1/arr/sites/site-1/arr-generated/',
+        ),
+        purpose: 'p1-document-storage-uploadFile',
+      }),
       expect.any(Buffer),
       'application/pdf',
     );

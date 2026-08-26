@@ -203,7 +203,10 @@ export class DisasterRecoveryIntegrityService {
         continue;
       }
 
-      const exists = await this.safeFileExists(entry.file_key);
+      const exists = await this.safeFileExists(
+        entry.company_id,
+        entry.file_key,
+      );
       if (!exists) {
         issues.push({
           severity: 'critical',
@@ -224,7 +227,10 @@ export class DisasterRecoveryIntegrityService {
       }
 
       if (options.verifyHashes && entry.file_hash) {
-        const actualHash = await this.safeComputeHash(entry.file_key);
+        const actualHash = await this.safeComputeHash(
+          entry.company_id,
+          entry.file_key,
+        );
         if (actualHash && actualHash !== entry.file_hash) {
           issues.push({
             severity: 'critical',
@@ -286,7 +292,10 @@ export class DisasterRecoveryIntegrityService {
         continue;
       }
 
-      const exists = await this.safeFileExists(attachment.storage_key);
+      const exists = await this.safeFileExists(
+        attachment.company_id,
+        attachment.storage_key,
+      );
       if (!exists) {
         issues.push({
           severity: 'high',
@@ -343,7 +352,10 @@ export class DisasterRecoveryIntegrityService {
           continue;
         }
 
-        const exists = await this.safeFileExists(attachment.file_key);
+        const exists = await this.safeFileExists(
+          cat.company_id,
+          attachment.file_key,
+        );
         if (!exists) {
           issues.push({
             severity: 'high',
@@ -401,7 +413,10 @@ export class DisasterRecoveryIntegrityService {
           continue;
         }
 
-        const exists = await this.safeFileExists(attachment.fileKey);
+        const exists = await this.safeFileExists(
+          nc.company_id,
+          attachment.fileKey,
+        );
         if (!exists) {
           issues.push({
             severity: 'high',
@@ -490,7 +505,10 @@ export class DisasterRecoveryIntegrityService {
         continue;
       }
 
-      const originalExists = await this.safeFileExists(evidence.file_key);
+      const originalExists = await this.safeFileExists(
+        companyId,
+        evidence.file_key,
+      );
       if (!originalExists) {
         issues.push({
           severity: 'high',
@@ -507,7 +525,10 @@ export class DisasterRecoveryIntegrityService {
           },
         });
       } else if (options.verifyHashes && evidence.hash_sha256) {
-        const actualHash = await this.safeComputeHash(evidence.file_key);
+        const actualHash = await this.safeComputeHash(
+          companyId,
+          evidence.file_key,
+        );
         if (actualHash && actualHash !== evidence.hash_sha256) {
           issues.push({
             severity: 'high',
@@ -530,6 +551,7 @@ export class DisasterRecoveryIntegrityService {
 
       if (evidence.watermarked_file_key) {
         const watermarkedExists = await this.safeFileExists(
+          companyId,
           evidence.watermarked_file_key,
         );
         if (!watermarkedExists) {
@@ -558,9 +580,12 @@ export class DisasterRecoveryIntegrityService {
     const orphanKeys = new Set<string>();
 
     for (const prefix of prefixes) {
-      const keys = await this.documentStorageService.listKeys(prefix, {
-        maxKeys: 5000,
-      });
+      const keys = await this.documentStorageService.listKeysPrivileged(
+        prefix,
+        { resourceType: 'disaster-recovery', resourceId: 'storage-orphans' },
+        'disaster-recovery-storage-orphan-scan',
+        { maxKeys: 5000 },
+      );
       for (const key of keys) {
         if (!referencedKeys.has(key)) {
           orphanKeys.add(key);
@@ -608,31 +633,60 @@ export class DisasterRecoveryIntegrityService {
     });
   }
 
-  private async safeFileExists(key: string): Promise<boolean> {
+  private async safeFileExists(
+    tenantId: string | null,
+    key: string,
+  ): Promise<boolean> {
     try {
-      return await this.documentStorageService.fileExists(key);
+      if (!tenantId) return false;
+      return await this.documentStorageService.fileExistsPrivileged({
+        tenantId,
+        key,
+        owner: {
+          resourceType: 'disaster-recovery',
+          resourceId: 'integrity-scan',
+        },
+        purpose: 'disaster-recovery-integrity',
+      });
     } catch (error) {
-      this.logger.warn(
-        `Falha ao consultar existência do artefato ${key}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.warn({
+        event: 'dr_storage_exists_probe_failed',
+        keyFingerprint: this.storageDiagnosticFingerprint(key),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
       return false;
     }
   }
 
-  private async safeComputeHash(key: string): Promise<string | null> {
+  private async safeComputeHash(
+    tenantId: string | null,
+    key: string,
+  ): Promise<string | null> {
     try {
-      const buffer = await this.documentStorageService.downloadFileBuffer(key);
+      if (!tenantId) return null;
+      const buffer =
+        await this.documentStorageService.downloadFileBufferPrivileged({
+          tenantId,
+          key,
+          owner: {
+            resourceType: 'disaster-recovery',
+            resourceId: 'integrity-scan',
+          },
+          purpose: 'disaster-recovery-integrity',
+        });
       return createHash('sha256').update(buffer).digest('hex');
     } catch (error) {
-      this.logger.warn(
-        `Falha ao calcular hash do artefato ${key}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.warn({
+        event: 'dr_storage_hash_probe_failed',
+        keyFingerprint: this.storageDiagnosticFingerprint(key),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
       return null;
     }
+  }
+
+  private storageDiagnosticFingerprint(value: string): string {
+    return createHash('sha256').update(value).digest('hex').slice(0, 16);
   }
 
   private inferModuleFromKey(key: string): string {

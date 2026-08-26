@@ -1,5 +1,8 @@
 import { ConfigService } from '@nestjs/config';
-import { ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import * as openAiRequestUtil from '../openai-request.util';
 import { AiAnalysisService } from './ai-analysis.service';
 import { AprsService } from '../../aprs/aprs.service';
@@ -195,6 +198,18 @@ describe('AiAnalysisService', () => {
       'tenant-c',
       'image-analysis',
     );
+  });
+
+  it('rejeita imagem vazia sem resolver chave de storage a partir do contexto', async () => {
+    await expect(
+      service.analyzeImage(
+        Buffer.alloc(0),
+        JSON.stringify({ storageKey: 'documents/tenant-c/forged.jpg' }),
+        'tenant-c',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(documentStorageService.downloadFileBuffer).not.toHaveBeenCalled();
   });
 
   it('bloqueia imagem antes de enviar ao GPT-OSS textual da NVIDIA', async () => {

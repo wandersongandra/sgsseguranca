@@ -10,7 +10,6 @@ import { Cat } from '../cats/entities/cat.entity';
 import { Checklist } from '../checklists/entities/checklist.entity';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
-import { StorageService } from '../../shared/services/storage.service';
 import {
   normalizeOffsetPagination,
   toOffsetPage,
@@ -193,7 +192,6 @@ export class DashboardDocumentPendenciesService {
     @InjectRepository(Site)
     private readonly sitesRepository: Repository<Site>,
     private readonly documentStorageService: DocumentStorageService,
-    private readonly storageService: StorageService,
     @Inject(CACHE_MANAGER)
     private readonly cacheManager: Cache,
     private readonly dashboardDocumentAvailabilitySnapshotService: DashboardDocumentAvailabilitySnapshotService,
@@ -2373,7 +2371,16 @@ export class DashboardDocumentPendenciesService {
           provider: 'document',
           storageKey: entry.file_key,
           resolver: () =>
-            this.documentStorageService.getSignedUrl(entry.file_key),
+            this.documentStorageService.getSignedUrl(
+              this.documentStorageService.referenceForExistingObject(
+                entry.file_key,
+                {
+                  resourceType: entry.module,
+                  resourceId: entry.entity_id,
+                },
+                `document-registry:${entry.module}:pdf`,
+              ),
+            ),
         });
         if (available) {
           return null;
@@ -2528,7 +2535,16 @@ export class DashboardDocumentPendenciesService {
             provider: 'document',
             storageKey: attachment.storage_key,
             resolver: () =>
-              this.documentStorageService.getSignedUrl(attachment.storage_key),
+              this.documentStorageService.getSignedUrl(
+                this.documentStorageService.referenceForExistingObject(
+                  attachment.storage_key,
+                  {
+                    resourceType: 'document-video',
+                    resourceId: attachment.id,
+                  },
+                  'document-video',
+                ),
+              ),
           });
           unavailable = !available;
         }
@@ -2642,7 +2658,16 @@ export class DashboardDocumentPendenciesService {
               provider: 'document',
               storageKey: payload.fileKey,
               resolver: () =>
-                this.documentStorageService.getSignedUrl(payload.fileKey),
+                this.documentStorageService.getSignedUrl(
+                  this.documentStorageService.referenceForExistingObject(
+                    payload.fileKey,
+                    {
+                      resourceType: 'nc-attachment',
+                      resourceId: nc.id,
+                    },
+                    'p1-document-storage-getSignedUrl',
+                  ),
+                ),
             });
             if (available) {
               return null;
@@ -2691,7 +2716,16 @@ export class DashboardDocumentPendenciesService {
             provider: 'generic',
             storageKey: attachment.file_key,
             resolver: () =>
-              this.storageService.getPresignedDownloadUrl(attachment.file_key),
+              this.documentStorageService.getSignedUrl(
+                this.documentStorageService.referenceForExistingObject(
+                  attachment.file_key,
+                  {
+                    resourceType: 'cat-attachment',
+                    resourceId: cat.id,
+                  },
+                  'p1-document-storage-getSignedUrl',
+                ),
+              ),
           });
           if (available) {
             return null;

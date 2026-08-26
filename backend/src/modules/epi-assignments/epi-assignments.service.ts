@@ -535,11 +535,16 @@ export class EpiAssignmentsService {
     );
     const folder = key.split('/').slice(0, -1).join('/');
 
-    await this.documentStorageService.uploadFile(
-      key,
-      buffer,
-      'application/pdf',
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'epi', resourceId: assignment.id },
+          'p1-document-storage-uploadFile',
+        ),
+        buffer,
+        'application/pdf',
+      );
 
     try {
       const { hash } =
@@ -587,7 +592,10 @@ export class EpiAssignmentsService {
         this.logger,
         `epi-assignment:${assignment.id}`,
         key,
-        (fileKey) => this.documentStorageService.deleteFile(fileKey),
+        (fileKey) =>
+          uploadedReference.key === fileKey
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -616,7 +624,14 @@ export class EpiAssignmentsService {
 
     try {
       const url = await this.documentStorageService.getSignedUrl(
-        assignment.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          assignment.pdf_file_key,
+          {
+            resourceType: 'epi',
+            resourceId: assignment.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         EPI_PDF_SIGNED_URL_EXPIRY_SECONDS,
       );
       return {

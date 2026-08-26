@@ -13,7 +13,6 @@ import { JwtAuthGuard } from '../../modules/auth/jwt-auth.guard';
 import { PermissionsGuard } from '../../modules/auth/permissions.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
 import { TenantGuard } from '../../shared/guards/tenant.guard';
-import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { TenantInterceptor } from '../../shared/tenant/tenant.interceptor';
 import { TenantService } from '../../shared/tenant/tenant.service';
@@ -52,11 +51,6 @@ describe('MailController (http)', () => {
     assertDispatchAvailable: jest.fn(),
   };
 
-  const documentStorageService = {
-    uploadFile: jest.fn(),
-    deleteFile: jest.fn(),
-  };
-
   const mailQueue = {
     add: jest.fn(),
   };
@@ -72,8 +66,6 @@ describe('MailController (http)', () => {
     mailService.sendUploadedPdfBuffer.mockReset();
     mailService.buildDocumentDispatchResponse.mockReset();
     mailService.assertDispatchAvailable.mockReset();
-    documentStorageService.uploadFile.mockReset();
-    documentStorageService.deleteFile.mockReset();
     mailQueue.add.mockReset();
   });
 
@@ -90,10 +82,6 @@ describe('MailController (http)', () => {
         {
           provide: MailService,
           useValue: mailService,
-        },
-        {
-          provide: DocumentStorageService,
-          useValue: documentStorageService,
         },
         {
           provide: TenantService,
@@ -325,9 +313,6 @@ describe('MailController (http)', () => {
 
   it('degrada para envio síncrono por buffer quando o storage falha', async () => {
     const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    documentStorageService.uploadFile.mockRejectedValue(
-      new Error('Storage offline'),
-    );
     mailService.sendUploadedPdfBuffer.mockResolvedValue({
       success: true,
       message:
@@ -357,7 +342,6 @@ describe('MailController (http)', () => {
         });
       });
 
-    expect(documentStorageService.uploadFile).toHaveBeenCalledTimes(1);
     expect(mailQueue.add).not.toHaveBeenCalled();
     expect(mailService.sendUploadedPdfBuffer).toHaveBeenCalledWith(
       expect.any(Buffer),

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import {
   PRIVACY_SUBPROCESSORS,
   PrivacySubprocessor,
@@ -108,7 +108,7 @@ export type TenantStorageExpungePlanResponse = {
 export class PrivacyGovernanceService {
   constructor(
     private readonly dataSource: DataSource,
-    private readonly storageService: StorageService,
+    private readonly documentStorageService: DocumentStorageService,
   ) {}
 
   getSubprocessors(): SubprocessorRegistryResponse {
@@ -234,7 +234,16 @@ export class PrivacyGovernanceService {
         const keys = (
           await Promise.all(
             prefixes.map((prefix) =>
-              this.storageService.listKeys(prefix, { maxKeys: 500 }),
+              this.documentStorageService.listKeys(
+                this.documentStorageService.createPrefixReference({
+                  tenantId: companyId,
+                  prefix,
+                  owner: { resourceType: 'company', resourceId: companyId },
+                  purpose: 'privacy-tenant-storage-manifest',
+                  legacy: prefix.startsWith('reports/'),
+                }),
+                { maxKeys: 500 },
+              ),
             ),
           )
         ).flat();

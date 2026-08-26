@@ -7,7 +7,7 @@ import { TestHelper } from '../../../test/helpers/test.helper';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { Cache } from 'cache-manager';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { GDPRDeletionService } from '../admin/services/gdpr-deletion.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
@@ -17,11 +17,26 @@ import { User } from '../users/entities/user.entity';
 import { Profile } from '../profiles/entities/profile.entity';
 import { Dds } from '../dds/entities/dds.entity';
 import type { SelectQueryBuilder } from 'typeorm';
+import type { StorageObjectOwner } from '../../shared/storage/storage-object-reference';
+
+type CompanyDocumentStorageMock = Pick<
+  DocumentStorageService,
+  | 'referenceForExistingObject'
+  | 'uploadFile'
+  | 'deleteFile'
+  | 'downloadFileBuffer'
+  | 'getInlineViewUrl'
+>;
+type DownloadFileBufferMock = jest.MockedFunction<
+  DocumentStorageService['downloadFileBuffer']
+>;
 
 describe('CompaniesService', () => {
   let service: CompaniesService;
   let repo: jest.Mocked<Repository<Company>>;
   let cacheManager: jest.Mocked<Cache>;
+  let documentStorageService: CompanyDocumentStorageMock;
+  let downloadFileBufferMock: DownloadFileBufferMock;
   /**
    * A conexão de provisionamento é uma dependência do serviço, mas quem cobre
    * o comportamento dela é `companies.service.lifecycle.spec.ts` (bloco
@@ -34,6 +49,27 @@ describe('CompaniesService', () => {
   };
 
   beforeEach(async () => {
+    downloadFileBufferMock = jest
+      .fn<
+        ReturnType<DocumentStorageService['downloadFileBuffer']>,
+        Parameters<DocumentStorageService['downloadFileBuffer']>
+      >()
+      .mockResolvedValue(Buffer.from('png-bytes'));
+    documentStorageService = {
+      referenceForExistingObject: jest.fn(
+        (key: string, owner: StorageObjectOwner, purpose: string) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+          legacy: !key.startsWith('documents/company-1/'),
+        }),
+      ),
+      uploadFile: jest.fn().mockResolvedValue(undefined),
+      deleteFile: jest.fn().mockResolvedValue(undefined),
+      downloadFileBuffer: downloadFileBufferMock,
+      getInlineViewUrl: jest.fn().mockResolvedValue(null),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompaniesService,
@@ -65,14 +101,7 @@ describe('CompaniesService', () => {
             del: jest.fn(),
           },
         },
-        {
-          provide: StorageService,
-          useValue: {
-            uploadFile: jest.fn(),
-            deleteFile: jest.fn().mockResolvedValue(undefined),
-            getPresignedInlineViewUrl: jest.fn(),
-          },
-        },
+        { provide: DocumentStorageService, useValue: documentStorageService },
         {
           provide: FileInspectionService,
           useValue: {
@@ -225,14 +254,7 @@ describe('CompaniesService', () => {
 
   describe('getLogoDataUrl', () => {
     it('retorna a logo do storage como data URL e grava em cache', async () => {
-      const storage = (
-        service as unknown as {
-          storageService: { downloadFileBuffer?: jest.Mock };
-        }
-      ).storageService;
-      storage.downloadFileBuffer = jest
-        .fn()
-        .mockResolvedValue(Buffer.from('png-bytes'));
+      downloadFileBufferMock.mockResolvedValue(Buffer.from('png-bytes'));
       (cacheManager.get as jest.Mock).mockResolvedValue(undefined);
       (repo.findOne as jest.Mock).mockResolvedValue({
         id: 'company-1',
@@ -250,6 +272,16 @@ describe('CompaniesService', () => {
         'company:logo:company-1',
         result.logo_data_url,
         expect.any(Number),
+      );
+      expect(
+        documentStorageService.referenceForExistingObject,
+      ).toHaveBeenCalledWith(
+        'companies/company-1/logo-abc.png',
+        {
+          resourceType: 'company',
+          resourceId: 'company-1',
+        },
+        'p1-document-storage-downloadFileBuffer',
       );
     });
 

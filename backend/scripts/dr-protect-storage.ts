@@ -8,6 +8,7 @@ import {
   hasFlag,
   parseCliArgs,
   resolveReplicaStorageRuntimeConfig,
+  runWithSuperAdminContext,
   withNestAppContext,
   writeJsonFile,
 } from './disaster-recovery/common';
@@ -121,15 +122,17 @@ async function main() {
       const protectionService = app.get(
         DisasterRecoveryStorageProtectionService,
       );
-      const report = await protectionService.replicateGovernedArtifacts({
-        dryRun,
-        triggerSource,
-        requestedByUserId,
-        artifactPath: outputPath,
-        companyId,
-        limitPerSource,
-        forceReplace,
-      });
+      const report = await runWithSuperAdminContext(app, () =>
+        protectionService.replicateGovernedArtifacts({
+          dryRun,
+          triggerSource,
+          requestedByUserId,
+          artifactPath: outputPath,
+          companyId,
+          limitPerSource,
+          forceReplace,
+        }),
+      );
 
       await writeJsonFile(outputPath, report);
       await appendAuditLog(auditPath, {

@@ -21,8 +21,10 @@ import { AuditService } from '../audit-trail/audit.service';
 import { AuditAction } from '../audit-trail/enums/audit-action.enum';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { StorageService } from '../../shared/services/storage.service';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import {
   ResolvedSiteAccessScope,
   resolveSiteAccessScopeFromTenantService,
@@ -64,7 +66,6 @@ export class CatsService {
     @InjectRepository(Site)
     private readonly sitesRepository: Repository<Site>,
     private readonly tenantService: TenantService,
-    private readonly storageService: StorageService,
     private readonly documentStorageService: DocumentStorageService,
     private readonly documentGovernanceService: DocumentGovernanceService,
     private readonly documentRegistryService: DocumentRegistryService,
@@ -454,8 +455,10 @@ export class CatsService {
       input.originalName || `cat-anexo-${Date.now()}.bin`,
     );
     const folder = path.posix.join(
-      'cats',
+      'documents',
       cat.company_id,
+      'cats',
+      cat.id,
       String(timestamp.getUTCFullYear()),
       String(timestamp.getUTCMonth() + 1).padStart(2, '0'),
     );
@@ -467,11 +470,16 @@ export class CatsService {
       `${cat.id}-${Date.now()}-${fileHash.slice(0, 12)}-${safeName}`,
     );
 
-    await this.storageService.uploadFile(
-      fileKey,
-      input.fileBuffer,
-      input.mimeType || 'application/octet-stream',
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'cat', resourceId: cat.id },
+          'cat-attachment-upload',
+        ),
+        input.fileBuffer,
+        input.mimeType || 'application/octet-stream',
+      );
 
     const attachment: CatAttachment = {
       id: randomUUID(),
@@ -500,7 +508,7 @@ export class CatsService {
         companyId: cat.company_id,
         attachmentId: attachment.id,
         category: attachment.category,
-        fileKey: attachment.file_key,
+        keyFingerprint: storageKeyFingerprint(attachment.file_key),
         fileHash: attachment.file_hash,
       });
     } catch (error) {
@@ -508,7 +516,10 @@ export class CatsService {
         this.logger,
         'cats.addAttachment',
         fileKey,
-        (key) => this.storageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -543,7 +554,16 @@ export class CatsService {
 
     let storageCleanup: 'deleted' | 'pending_manual_cleanup' = 'deleted';
     try {
-      await this.storageService.deleteFile(attachment.file_key);
+      await this.documentStorageService.deleteFile(
+        this.documentStorageService.referenceForExistingObject(
+          attachment.file_key,
+          {
+            resourceType: 'cat-attachment',
+            resourceId: cat.id,
+          },
+          'p1-document-storage-deleteFile',
+        ),
+      );
     } catch (error) {
       storageCleanup = 'pending_manual_cleanup';
       this.logger.error(
@@ -555,7 +575,7 @@ export class CatsService {
       event: 'cat_attachment_removed',
       companyId: cat.company_id,
       attachmentId,
-      fileKey: attachment.file_key,
+      keyFingerprint: storageKeyFingerprint(attachment.file_key),
       storageCleanup,
     });
   }
@@ -578,15 +598,22 @@ export class CatsService {
       throw new NotFoundException('Anexo não encontrado para esta CAT.');
     }
 
-    const url = await this.storageService.getPresignedDownloadUrl(
-      attachment.file_key,
+    const url = await this.documentStorageService.getSignedUrl(
+      this.documentStorageService.referenceForExistingObject(
+        attachment.file_key,
+        {
+          resourceType: 'cat-attachment',
+          resourceId: cat.id,
+        },
+        'p1-document-storage-getSignedUrl',
+      ),
     );
     await this.writeAuditLog(AuditAction.READ, cat, actorId, {
       event: 'cat_attachment_accessed',
       companyId: cat.company_id,
       attachmentId: attachment.id,
       category: attachment.category,
-      fileKey: attachment.file_key,
+      keyFingerprint: storageKeyFingerprint(attachment.file_key),
     });
     return {
       attachmentId: attachment.id,
@@ -627,11 +654,16 @@ export class CatsService {
     );
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'cat', resourceId: cat.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       const { hash, registryEntry } =
@@ -663,7 +695,7 @@ export class CatsService {
         event: 'cat_final_pdf_emitted',
         companyId: cat.company_id,
         status: cat.status,
-        fileKey,
+        keyFingerprint: storageKeyFingerprint(fileKey),
         folderPath,
         originalName,
         documentCode: registryEntry.document_code,
@@ -688,7 +720,10 @@ export class CatsService {
         this.logger,
         `cats.attachPdf:${cat.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -749,7 +784,16 @@ export class CatsService {
     let message = 'PDF final governado disponível para acesso.';
 
     try {
-      url = await this.documentStorageService.getSignedUrl(cat.pdf_file_key);
+      url = await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          cat.pdf_file_key,
+          {
+            resourceType: 'cat',
+            resourceId: cat.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
+      );
     } catch (error) {
       availability = 'registered_without_signed_url';
       degraded = true;
@@ -782,7 +826,9 @@ export class CatsService {
       availability: payload.availability,
       hasFinalPdf: payload.hasFinalPdf,
       degraded: payload.degraded,
-      fileKey: payload.fileKey,
+      keyFingerprint: payload.fileKey
+        ? storageKeyFingerprint(payload.fileKey)
+        : null,
     });
 
     return payload;

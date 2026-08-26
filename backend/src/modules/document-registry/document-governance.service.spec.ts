@@ -6,6 +6,7 @@ import type { DocumentRegistryService } from './document-registry.service';
 import type { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import type { AppendForensicTrailEventInput } from '../forensic-trail/forensic-trail.service';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 
 describe('DocumentGovernanceService', () => {
   let service: DocumentGovernanceService;
@@ -160,7 +161,15 @@ describe('DocumentGovernanceService', () => {
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
     expect(loggerError).toHaveBeenCalledWith(
-      expect.stringContaining('Falha ao registrar governança documental'),
+      expect.objectContaining({
+        event: 'document_governance_registration_failed',
+        module: 'checklist',
+        entityId: 'checklist-1',
+        errorName: 'Error',
+        keyFingerprint: storageKeyFingerprint(
+          'documents/company-1/checklists/doc.pdf',
+        ),
+      }),
       failure.stack,
     );
   });
@@ -223,8 +232,8 @@ describe('DocumentGovernanceService', () => {
     expect(removalTrailInput.entityId).toBe('checklist-1');
     expect(removalTrailInput.companyId).toBe('company-1');
     expect(removalMetadata.hadGovernedFile).toBe(true);
-    expect(removalMetadata.fileKey).toBe(
-      'documents/company-1/checklists/doc.pdf',
+    expect(removalMetadata.keyFingerprint).toBe(
+      storageKeyFingerprint('documents/company-1/checklists/doc.pdf'),
     );
     expect(removalTrailOptions.manager).toBe(manager);
     expect(loggerDebug).toHaveBeenCalledWith(
@@ -337,6 +346,8 @@ describe('DocumentGovernanceService', () => {
           title: 'Auditoria interna',
           originalName: 'audit-final.pdf',
           date: new Date('2026-03-16T00:00:00.000Z'),
+          resourceType: 'audit',
+          resourceId: 'audit-1',
         },
       ],
     );

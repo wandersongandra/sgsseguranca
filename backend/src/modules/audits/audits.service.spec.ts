@@ -7,6 +7,7 @@ import type { DocumentBundleService } from '../../shared/services/document-bundl
 import type { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import type { DocumentStorageService } from '../../shared/services/document-storage.service';
 import type { TenantService } from '../../shared/tenant/tenant.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -30,7 +31,12 @@ describe('AuditsService', () => {
   };
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'deleteFile' | 'getSignedUrl'
+    | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'deleteFile'
+    | 'getSignedUrl'
   >;
   let documentBundleService: Pick<
     DocumentBundleService,
@@ -57,10 +63,22 @@ describe('AuditsService', () => {
       generateDocumentKey: jest.fn(
         () => 'documents/company-1/audits/sites/site-1/audit-1/audit-final.pdf',
       ),
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
-      getSignedUrl: jest.fn((key: string) =>
-        Promise.resolve(`https://signed.example/${encodeURIComponent(key)}`),
+      getSignedUrl: jest.fn((reference) =>
+        Promise.resolve(
+          `https://signed.example/${encodeURIComponent(reference.key)}`,
+        ),
       ),
     };
     documentBundleService = {
@@ -681,7 +699,9 @@ describe('AuditsService', () => {
     ).rejects.toThrow('governance failed');
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/audits/sites/site-1/audit-1/audit-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/audits/sites/site-1/audit-1/audit-final.pdf',
+      }),
     );
   });
 

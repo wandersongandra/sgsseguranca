@@ -9,6 +9,7 @@
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DeepPartial, EntityManager } from 'typeorm';
 import { plainToClass } from 'class-transformer';
@@ -27,7 +28,7 @@ import {
 import { profileStage } from '../../shared/observability/perf-stage.util';
 import { escapeLikePattern } from '../../shared/utils/sql.util';
 import { normalizeOptionalSearchQuery } from '../../shared/utils/query-normalization.util';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { Site } from '../sites/entities/site.entity';
 import { Profile } from '../profiles/entities/profile.entity';
 import { Dds, DdsStatus } from '../dds/entities/dds.entity';
@@ -72,7 +73,7 @@ export class CompaniesService {
     @InjectRepository(Dds)
     private ddsRepository: Repository<Dds>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
-    private readonly storageService: StorageService,
+    private readonly documentStorageService: DocumentStorageService,
     private readonly gdprDeletionService: GDPRDeletionService,
     private readonly fileInspectionService: FileInspectionService,
     private readonly tenantService: TenantService,
@@ -125,14 +126,25 @@ export class CompaniesService {
     // antes da persistência no banco, evitando dois saves.
     const companyId = randomUUID();
     let logoStorageKey: string | null = null;
+    let uploadedLogoReference: Awaited<
+      ReturnType<DocumentStorageService['uploadFileWithCapability']>
+    > | null = null;
 
     if (parsedLogo) {
-      logoStorageKey = `companies/${companyId}/logo-${parsedLogo.sha256.slice(0, 16)}.${parsedLogo.extension}`;
-      await this.storageService.uploadFile(
-        logoStorageKey,
-        parsedLogo.buffer,
-        parsedLogo.contentType,
-      );
+      logoStorageKey = `documents/${companyId}/company-logo/${companyId}/logo-${parsedLogo.sha256.slice(0, 16)}.${parsedLogo.extension}`;
+      uploadedLogoReference =
+        await this.documentStorageService.uploadFileWithCapability(
+          this.documentStorageService.referenceForExistingObject(
+            logoStorageKey,
+            {
+              resourceType: 'company',
+              resourceId: companyId,
+            },
+            'p1-document-storage-uploadFile',
+          ),
+          parsedLogo.buffer,
+          parsedLogo.contentType,
+        );
     }
 
     let saved: Company;
@@ -148,17 +160,15 @@ export class CompaniesService {
       });
       saved = await this.companiesRepository.save(company);
     } catch (error) {
-      if (logoStorageKey) {
-        void this.storageService
-          .deleteFile(logoStorageKey)
+      if (uploadedLogoReference) {
+        void this.documentStorageService
+          .deleteFile(uploadedLogoReference)
           .catch((deleteErr: unknown) => {
             this.logger.warn({
               event: 'company_logo_cleanup_failed',
-              key: logoStorageKey,
-              error:
-                deleteErr instanceof Error
-                  ? deleteErr.message
-                  : String(deleteErr),
+              keyFingerprint: storageKeyFingerprint(uploadedLogoReference.key),
+              errorName:
+                deleteErr instanceof Error ? deleteErr.name : 'unknown_error',
             });
           });
       }
@@ -731,8 +741,15 @@ export class CompaniesService {
     let logoDataUrl: string | null = null;
     if (company.logo_storage_key) {
       try {
-        const buffer = await this.storageService.downloadFileBuffer(
-          company.logo_storage_key,
+        const buffer = await this.documentStorageService.downloadFileBuffer(
+          this.documentStorageService.referenceForExistingObject(
+            company.logo_storage_key,
+            {
+              resourceType: 'company',
+              resourceId: company.id,
+            },
+            'p1-document-storage-downloadFileBuffer',
+          ),
         );
         const contentType = company.logo_content_type || 'image/png';
         logoDataUrl = `data:${contentType};base64,${buffer.toString('base64')}`;
@@ -740,8 +757,8 @@ export class CompaniesService {
         this.logger.warn({
           event: 'company_logo_download_failed',
           companyId,
-          key: company.logo_storage_key,
-          error: error instanceof Error ? error.message : String(error),
+          keyFingerprint: storageKeyFingerprint(company.logo_storage_key),
+          errorName: error instanceof Error ? error.name : 'unknown_error',
         });
       }
     } else if (isInlineDataUrl(company.logo_url)) {
@@ -760,15 +777,22 @@ export class CompaniesService {
     }
 
     try {
-      dto.logo_url = await this.storageService.getPresignedInlineViewUrl(
-        company.logo_storage_key,
+      dto.logo_url = await this.documentStorageService.getInlineViewUrl(
+        this.documentStorageService.referenceForExistingObject(
+          company.logo_storage_key,
+          {
+            resourceType: 'company',
+            resourceId: company.id,
+          },
+          'p1-document-storage-getInlineViewUrl',
+        ),
       );
     } catch (error) {
       this.logger.warn({
         event: 'company_logo_presign_failed',
         companyId: company.id,
-        key: company.logo_storage_key,
-        error: error instanceof Error ? error.message : String(error),
+        keyFingerprint: storageKeyFingerprint(company.logo_storage_key),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       dto.logo_url = null;
     }
@@ -835,8 +859,16 @@ export class CompaniesService {
     company: Company,
     logo: ParsedDataUrl,
   ): Promise<void> {
-    const key = `companies/${company.id}/logo-${logo.sha256.slice(0, 16)}.${logo.extension}`;
-    await this.storageService.uploadFile(key, logo.buffer, logo.contentType);
+    const key = `documents/${company.id}/company-logo/${company.id}/logo-${logo.sha256.slice(0, 16)}.${logo.extension}`;
+    await this.documentStorageService.uploadFileWithCapability(
+      this.documentStorageService.referenceForExistingObject(
+        key,
+        { resourceType: 'company', resourceId: company.id },
+        'p1-document-storage-uploadFile',
+      ),
+      logo.buffer,
+      logo.contentType,
+    );
     company.logo_url = null;
     company.logo_storage_key = key;
     company.logo_content_type = logo.contentType;

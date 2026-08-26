@@ -45,7 +45,10 @@ import { defaultJobOptions } from '../../infra/queue/default-job-options';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import { DocumentBundleService } from '../../shared/services/document-bundle.service';
 import { WeeklyBundleFilters } from '../../shared/services/document-bundle.service';
 import { RdoAuditService } from './rdo-audit.service';
@@ -1336,6 +1339,27 @@ export class RdosService {
     );
     const previousActivityPhotoPayloads =
       this.collectGovernedActivityPhotoPayloads(rdo);
+    const previousActivityPhotoReferences = await Promise.all(
+      previousActivityPhotoPayloads.map((payload) =>
+        this.documentStorageService.resolveExistingReference(
+          this.documentStorageService.referenceForExistingObject(
+            payload.fileKey,
+            {
+              resourceType: 'rdo-activity-photo',
+              resourceId: rdo.id,
+            },
+            'rdo-activity-photo',
+          ),
+          'delete',
+        ),
+      ),
+    );
+    const previousActivityPhotoReferenceByKey = new Map(
+      previousActivityPhotoPayloads.map((payload, index) => [
+        payload.fileKey,
+        previousActivityPhotoReferences[index],
+      ]),
+    );
     Object.assign(rdo, { ...normalizedPayload, company_id: rdo.company_id });
     const {
       saved,
@@ -1364,13 +1388,13 @@ export class RdosService {
     await Promise.all(
       removedActivityPhotoPayloads.map((payload) =>
         this.documentStorageService
-          .deleteFile(payload.fileKey)
+          .deleteFile(previousActivityPhotoReferenceByKey.get(payload.fileKey)!)
           .catch((error) => {
             this.logger.warn({
               event: 'rdo_activity_photo_cleanup_failed_after_update',
               rdoId: saved.id,
-              fileKey: payload.fileKey,
-              message: error instanceof Error ? error.message : String(error),
+              keyFingerprint: storageKeyFingerprint(payload.fileKey),
+              errorName: error instanceof Error ? error.name : 'unknown_error',
             });
           }),
       ),
@@ -1623,11 +1647,17 @@ export class RdosService {
     );
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.createReference({
+          tenantId: rdo.company_id,
+          key: fileKey,
+          owner: { resourceType: 'rdo', resourceId: rdo.id },
+          purpose: 'rdo-pdf',
+        }),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       await this.documentGovernanceService.registerFinalDocument({
@@ -1655,14 +1685,16 @@ export class RdosService {
       });
     } catch (error) {
       await cleanupUploadedFile(this.logger, `rdo:${rdo.id}`, fileKey, (key) =>
-        this.documentStorageService.deleteFile(key),
+        key === uploadedReference.key
+          ? this.documentStorageService.deleteFile(uploadedReference)
+          : Promise.resolve(),
       );
       throw error;
     }
 
     this.logRdoEvent('rdo_pdf_uploaded', rdo, {
-      fileKey,
-      folderPath,
+      keyFingerprint: storageKeyFingerprint(fileKey),
+      folderPathFingerprint: storageKeyFingerprint(folderPath),
       originalName,
     });
 
@@ -1698,7 +1730,17 @@ export class RdosService {
       sanitizedOriginalName,
     );
 
-    await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.createReference({
+          tenantId: rdo.company_id,
+          key: fileKey,
+          owner: { resourceType: 'rdo-activity-photo', resourceId: rdo.id },
+          purpose: 'rdo-activity-photo',
+        }),
+        buffer,
+        mimeType,
+      );
 
     try {
       const photoReference = this.buildGovernedActivityPhotoReference({
@@ -1794,7 +1836,7 @@ export class RdosService {
           approvalReset,
           activityIndex,
           photoIndex,
-          fileKey,
+          keyFingerprint: storageKeyFingerprint(fileKey),
           originalName: sanitizedOriginalName,
           mimeType,
         },
@@ -1809,7 +1851,7 @@ export class RdosService {
       this.logRdoEvent('rdo_activity_photo_uploaded', saved, {
         activityIndex,
         photoIndex,
-        fileKey,
+        keyFingerprint: storageKeyFingerprint(fileKey),
         mimeType,
         signaturesReset,
       });
@@ -1833,7 +1875,10 @@ export class RdosService {
         this.logger,
         `rdos.attachActivityPhoto:${rdo.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          key === uploadedReference.key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -1862,7 +1907,14 @@ export class RdosService {
     let message: string | null = null;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        payload.fileKey,
+        this.documentStorageService.referenceForExistingObject(
+          payload.fileKey,
+          {
+            resourceType: 'rdo-activity-photo',
+            resourceId: rdo.id,
+          },
+          'rdo-activity-photo',
+        ),
         3600,
       );
     } catch {
@@ -1875,7 +1927,7 @@ export class RdosService {
       activityIndex,
       photoIndex,
       availability,
-      fileKey: payload.fileKey,
+      keyFingerprint: storageKeyFingerprint(payload.fileKey),
     });
 
     return {
@@ -1902,6 +1954,30 @@ export class RdosService {
 
     // Remoção atômica: re-lê a linha sob lock para não perder fotos gravadas
     // por uploads concorrentes desde a leitura inicial (read-modify-write do jsonb).
+    const currentActivity = this.getActivityOrThrow(rdo, activityIndex);
+    const currentPhoto = Array.isArray(currentActivity.fotos)
+      ? currentActivity.fotos[photoIndex]
+      : undefined;
+    const currentPayload =
+      this.parseGovernedActivityPhotoReference(currentPhoto);
+    if (!currentPayload) {
+      throw new NotFoundException(
+        'A foto da atividade não está em armazenamento governado.',
+      );
+    }
+    const authorizedRemovedReference =
+      await this.documentStorageService.resolveExistingReference(
+        this.documentStorageService.referenceForExistingObject(
+          currentPayload.fileKey,
+          {
+            resourceType: 'rdo-activity-photo',
+            resourceId: rdo.id,
+          },
+          'rdo-activity-photo',
+        ),
+        'delete',
+      );
+
     const {
       saved,
       signaturesReset,
@@ -1975,16 +2051,18 @@ export class RdosService {
       },
     );
 
+    const removedKeyFingerprint = storageKeyFingerprint(removedPayload.fileKey);
+
     await this.documentStorageService
-      .deleteFile(removedPayload.fileKey)
+      .deleteFile(authorizedRemovedReference)
       .catch((error) => {
         this.logger.warn({
           event: 'rdo_activity_photo_cleanup_failed',
           rdoId: saved.id,
           activityIndex,
           photoIndex,
-          fileKey: removedPayload.fileKey,
-          message: error instanceof Error ? error.message : String(error),
+          keyFingerprint: removedKeyFingerprint,
+          errorName: error instanceof Error ? error.name : 'unknown_error',
         });
       });
 
@@ -1995,7 +2073,7 @@ export class RdosService {
       approvalReset,
       activityIndex,
       photoIndex,
-      removedFileKey: removedPayload.fileKey,
+      removedKeyFingerprint,
     });
 
     if (signaturesReset) {
@@ -2007,7 +2085,7 @@ export class RdosService {
     this.logRdoEvent('rdo_activity_photo_removed', saved, {
       activityIndex,
       photoIndex,
-      removedFileKey: removedPayload.fileKey,
+      removedKeyFingerprint,
       signaturesReset,
     });
 
@@ -2050,7 +2128,7 @@ export class RdosService {
     this.logRdoEvent('rdo_video_attachment_uploaded', rdo, {
       attachmentId: result.attachment.id,
       mimeType: result.attachment.mime_type,
-      storageKey: result.attachment.storage_key,
+      keyFingerprint: storageKeyFingerprint(result.attachment.storage_key),
     });
     return result;
   }
@@ -2139,7 +2217,14 @@ export class RdosService {
     let message: string | null = null;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        registryEntry.file_key,
+        this.documentStorageService.referenceForExistingObject(
+          registryEntry.file_key,
+          {
+            resourceType: 'rdo',
+            resourceId: rdo.id,
+          },
+          'rdo-pdf',
+        ),
         3600,
       );
     } catch {
@@ -2177,7 +2262,14 @@ export class RdosService {
     }
 
     const buffer = await this.documentStorageService.downloadFileBuffer(
-      access.fileKey,
+      this.documentStorageService.referenceForExistingObject(
+        access.fileKey,
+        {
+          resourceType: 'rdo',
+          resourceId: id,
+        },
+        'rdo-pdf',
+      ),
     );
 
     return {
@@ -2313,6 +2405,8 @@ export class RdosService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'rdo',
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,
@@ -2329,6 +2423,31 @@ export class RdosService {
     const activityPhotoCountBeforeRemove = this.countActivityPhotos(rdo);
     const activityPhotoPayloads =
       this.collectGovernedActivityPhotoPayloads(rdo);
+    const authorizedFinalPdfReference = rdo.pdf_file_key
+      ? await this.documentStorageService.resolveExistingReference(
+          this.documentStorageService.referenceForExistingObject(
+            rdo.pdf_file_key,
+            { resourceType: 'rdo', resourceId: removedRdoId },
+            'rdo-pdf',
+          ),
+          'delete',
+        )
+      : null;
+    const authorizedActivityPhotoReferences = await Promise.all(
+      activityPhotoPayloads.map((payload) =>
+        this.documentStorageService.resolveExistingReference(
+          this.documentStorageService.referenceForExistingObject(
+            payload.fileKey,
+            {
+              resourceType: 'rdo-activity-photo',
+              resourceId: removedRdoId,
+            },
+            'rdo-activity-photo',
+          ),
+          'delete',
+        ),
+      ),
+    );
 
     if (rdo.status === 'aprovado' || rdo.status === 'cancelado') {
       throw new BadRequestException(
@@ -2355,7 +2474,10 @@ export class RdosService {
         );
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        authorizedFinalPdfReference &&
+        authorizedFinalPdfReference.key === fileKey
+          ? this.documentStorageService.deleteFile(authorizedFinalPdfReference)
+          : Promise.resolve(),
     });
     // Soft delete preserves rdo_audit_events (would be CASCADE-deleted by the
     // FK if we used rdosRepository.remove(), which issues a hard DELETE).
@@ -2363,13 +2485,17 @@ export class RdosService {
     await Promise.all(
       activityPhotoPayloads.map((payload) =>
         this.documentStorageService
-          .deleteFile(payload.fileKey)
+          .deleteFile(
+            authorizedActivityPhotoReferences[
+              activityPhotoPayloads.indexOf(payload)
+            ],
+          )
           .catch((error) => {
             this.logger.warn({
               event: 'rdo_activity_photo_cleanup_failed_on_remove',
               rdoId: removedRdoId,
-              fileKey: payload.fileKey,
-              message: error instanceof Error ? error.message : String(error),
+              keyFingerprint: storageKeyFingerprint(payload.fileKey),
+              errorName: error instanceof Error ? error.name : 'unknown_error',
             });
           }),
       ),

@@ -20,6 +20,7 @@ import { User } from '../users/entities/user.entity';
 import type { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import type { AppendForensicTrailEventInput } from '../forensic-trail/forensic-trail.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -90,7 +91,17 @@ describe('PtsService', () => {
       generateDocumentKey: jest.fn(
         () => 'documents/company-1/pts/sites/site-1/pt-1/pt-final.pdf',
       ),
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
     };
     documentGovernanceService = {
@@ -448,7 +459,9 @@ describe('PtsService', () => {
     );
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/pts/sites/site-1/pt-1/pt-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/pts/sites/site-1/pt-1/pt-final.pdf',
+      }),
     );
   });
 
@@ -464,9 +477,9 @@ describe('PtsService', () => {
       created_at: new Date('2026-03-14T07:00:00.000Z'),
     } as unknown as Pt;
     ptsRepository.findOne.mockResolvedValue(pt);
-    (documentStorageService.uploadFile as jest.Mock).mockRejectedValue(
-      new Error('S3 is not enabled'),
-    );
+    (
+      documentStorageService.uploadFileWithCapability as jest.Mock
+    ).mockRejectedValue(new Error('S3 is not enabled'));
     (
       documentGovernanceService.registerFinalDocument as jest.Mock
     ).mockRejectedValue(new Error('governance failed'));
@@ -1439,7 +1452,9 @@ describe('PtsService', () => {
         'user-1',
       );
 
-      expect(documentStorageService.uploadFile).toHaveBeenCalled();
+      expect(
+        documentStorageService.uploadFileWithCapability,
+      ).toHaveBeenCalled();
       expect(result.photoReference.startsWith('gst:pt-photo:')).toBe(true);
       expect(result.fase).toBe('antes');
       expect(result.legenda).toBe('Área isolada');

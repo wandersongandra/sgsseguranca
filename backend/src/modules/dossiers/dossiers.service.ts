@@ -1,6 +1,7 @@
 ﻿import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'crypto';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import JSZip from 'jszip';
@@ -11,7 +12,6 @@ import { Cat } from '../cats/entities/cat.entity';
 import { Checklist } from '../checklists/entities/checklist.entity';
 import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { StorageService } from '../../shared/services/storage.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { Dds } from '../dds/entities/dds.entity';
@@ -322,7 +322,6 @@ export class DossiersService {
     @InjectRepository(Site)
     private readonly sitesRepository: Repository<Site>,
     private readonly tenantService: TenantService,
-    private readonly storageService: StorageService,
     private readonly documentStorageService: DocumentStorageService,
     private readonly documentGovernanceService: DocumentGovernanceService,
     private readonly documentRegistryService: DocumentRegistryService,
@@ -475,8 +474,15 @@ export class DossiersService {
     let logoFormat: 'PNG' | 'JPEG' = 'PNG';
     if (user.company?.logo_storage_key) {
       try {
-        const buf = await this.storageService.downloadFileBuffer(
-          user.company.logo_storage_key,
+        const buf = await this.documentStorageService.downloadFileBuffer(
+          this.documentStorageService.referenceForExistingObject(
+            user.company.logo_storage_key,
+            {
+              resourceType: 'company',
+              resourceId: user.company.id,
+            },
+            'company-logo',
+          ),
         );
         logoBase64 = buf.toString('base64');
         logoFormat = user.company.logo_content_type?.includes('png')
@@ -903,7 +909,10 @@ export class DossiersService {
         tipo: 'CAT / Anexo complementar',
         referencia: cat.numero,
         arquivo: attachment.file_name,
-        url: await this.safeSignedUrl(attachment.file_key),
+        url: await this.safeSignedUrl(attachment.file_key, {
+          resourceType: 'cat-attachment',
+          resourceId: cat.id,
+        }),
       })),
     );
 
@@ -984,7 +993,14 @@ export class DossiersService {
             'ready';
           try {
             await this.documentStorageService.getSignedUrl(
-              registryEntry.file_key,
+              this.documentStorageService.referenceForExistingObject(
+                registryEntry.file_key,
+                {
+                  resourceType: candidate.modulo,
+                  resourceId: candidate.entityId,
+                },
+                'p1-document-storage-getSignedUrl',
+              ),
             );
           } catch (error) {
             availability = 'registered_without_signed_url';
@@ -1202,15 +1218,25 @@ export class DossiersService {
     }
   }
 
-  private async safeSignedUrl(fileKey: string): Promise<string> {
+  private async safeSignedUrl(
+    fileKey: string,
+    owner: { resourceType: string; resourceId: string },
+  ): Promise<string> {
     try {
       // CORREÇÃO: Chamando o método correto `getPresignedDownloadUrl`
-      return await this.storageService.getPresignedDownloadUrl(fileKey);
-    } catch (error) {
-      this.logger.error(
-        `Falha ao gerar URL assinada para a chave ${fileKey}`,
-        error,
+      return await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          owner,
+          'p1-document-storage-getSignedUrl',
+        ),
       );
+    } catch (error) {
+      this.logger.error({
+        event: 'dossier_signed_url_failed',
+        keyFingerprint: storageKeyFingerprint(fileKey),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
       return DOSSIER_DEGRADED_ATTACHMENT_URL;
     }
   }
@@ -1607,8 +1633,15 @@ export class DossiersService {
           artifact.arquivo || `${artifact.modulo}-${artifact.entityId}.pdf`,
           index,
         );
-        const buffer = await this.storageService.downloadFileBuffer(
-          artifact.fileKey,
+        const buffer = await this.documentStorageService.downloadFileBuffer(
+          this.documentStorageService.referenceForExistingObject(
+            artifact.fileKey,
+            {
+              resourceType: artifact.modulo,
+              resourceId: artifact.entityId,
+            },
+            'p1-document-storage-downloadFileBuffer',
+          ),
         );
 
         return {
@@ -1668,9 +1701,14 @@ export class DossiersService {
           ? result.reason.message
           : String(result.reason);
 
-      this.logger.warn(
-        `Falha ao anexar artefato oficial ao bundle do dossiê ${input.dossierCode}: ${artifact.modulo}:${artifact.entityId} (${artifact.fileKey}) -> ${reason}`,
-      );
+      this.logger.warn({
+        event: 'dossier_official_artifact_bundle_attach_failed',
+        dossierCode: input.dossierCode,
+        module: artifact.modulo,
+        entityId: artifact.entityId,
+        keyFingerprint: storageKeyFingerprint(artifact.fileKey),
+        reason,
+      });
 
       missingOfficialDocuments.push({
         modulo: artifact.modulo,
@@ -1939,11 +1977,16 @@ export class DossiersService {
     );
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      input.file.buffer,
-      input.file.mimetype || 'application/pdf',
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'dossier', resourceId: input.entityId },
+          'p1-document-storage-uploadFile',
+        ),
+        input.file.buffer,
+        input.file.mimetype || 'application/pdf',
+      );
 
     try {
       const documentCode =
@@ -1966,16 +2009,28 @@ export class DossiersService {
           documentCode,
         });
 
-      this.logger.log(
-        `dossier_final_pdf_emitted kind=${input.kind} dossierId=${input.entityId} companyId=${input.companyId} fileKey=${fileKey} documentCode=${registryEntry.document_code || documentCode}`,
-      );
+      this.logger.log({
+        event: 'dossier_final_pdf_emitted',
+        kind: input.kind,
+        dossierId: input.entityId,
+        companyId: input.companyId,
+        keyFingerprint: storageKeyFingerprint(fileKey),
+        documentCode: registryEntry.document_code || documentCode,
+      });
 
       if (existingRegistry?.file_key && existingRegistry.file_key !== fileKey) {
         await cleanupUploadedFile(
           this.logger,
           `dossiers.attachGovernedPdf:cleanupPrevious:${input.kind}:${input.entityId}`,
           existingRegistry.file_key,
-          (key) => this.documentStorageService.deleteFile(key),
+          (key) =>
+            this.documentStorageService.deleteFile(
+              this.documentStorageService.referenceForExistingObject(
+                key,
+                { resourceType: 'dossier', resourceId: input.entityId },
+                'p1-document-storage-deleteFile',
+              ),
+            ),
         );
       }
 
@@ -1997,7 +2052,10 @@ export class DossiersService {
         this.logger,
         `dossiers.attachGovernedPdf:${input.kind}:${input.entityId}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -2054,7 +2112,14 @@ export class DossiersService {
 
     try {
       url = await this.documentStorageService.getSignedUrl(
-        registryEntry.file_key,
+        this.documentStorageService.referenceForExistingObject(
+          registryEntry.file_key,
+          {
+            resourceType: 'dossier',
+            resourceId: input.entityId,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
     } catch (error) {
       availability = 'registered_without_signed_url';

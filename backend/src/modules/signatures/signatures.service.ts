@@ -9,7 +9,7 @@
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   type EntityManager,
   type EntityTarget,
@@ -31,7 +31,7 @@ import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
 import { Signature } from './entities/signature.entity';
 import { CreateSignatureDto } from './dto/create-signature.dto';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
 import { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
@@ -160,7 +160,7 @@ export class SignaturesService {
     @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
     private readonly forensicTrailService: ForensicTrailService,
-    private readonly storageService: StorageService,
+    private readonly documentStorageService: DocumentStorageService,
   ) {}
 
   async create(
@@ -495,13 +495,16 @@ export class SignaturesService {
     const signedAt = new Date(generatedStamp.timestamp_issued_at);
     const signatureRepository =
       manager?.getRepository(Signature) ?? this.signaturesRepository;
+    const signatureId = randomUUID();
     const { inlineData, dataKey } = await this.resolveSignatureDataStorage(
       payload.document_id,
+      signatureId,
       payload.type,
       payload.signature_data,
     );
 
     const signature = signatureRepository.create({
+      id: signatureId,
       document_id: payload.document_id,
       document_type: payload.document_type,
       signature_data: inlineData,
@@ -1446,7 +1449,14 @@ export class SignaturesService {
           this.logger,
           `${context}:${signature.id}`,
           signature.signature_data_key,
-          (key) => this.storageService.deleteFile(key),
+          (key) =>
+            this.documentStorageService.deleteFile(
+              this.documentStorageService.referenceForExistingObject(
+                key,
+                { resourceType: 'signature', resourceId: signature.id },
+                'p1-document-storage-deleteFile',
+              ),
+            ),
         );
       }),
     );
@@ -1804,6 +1814,7 @@ export class SignaturesService {
    */
   private async resolveSignatureDataStorage(
     documentId: string,
+    signatureId: string,
     type: string,
     signatureData: string,
   ): Promise<{ inlineData: string | null; dataKey: string | null }> {
@@ -1812,10 +1823,21 @@ export class SignaturesService {
       return { inlineData: signatureData, dataKey: null };
     }
 
-    const key = `signatures/${documentId}/${type}-${Date.now()}-${randomUUID()}.dat`;
+    const tenantId = this.tenantService.getTenantId();
+    if (!tenantId) {
+      throw new BadRequestException(
+        'Contexto de tenant é obrigatório para armazenar dados de assinatura.',
+      );
+    }
+    const key = `documents/${tenantId}/signatures/${documentId}/${type}-${Date.now()}-${randomUUID()}.dat`;
     try {
-      await this.storageService.uploadFile(
-        key,
+      await this.documentStorageService.uploadFile(
+        this.documentStorageService.createReference({
+          tenantId,
+          key,
+          owner: { resourceType: 'signature', resourceId: signatureId },
+          purpose: 'signature-data-offload',
+        }),
         Buffer.from(signatureData, 'utf8'),
         'application/octet-stream',
       );
@@ -1825,7 +1847,7 @@ export class SignaturesService {
         event: 'signature_data_s3_offload_failed',
         documentId,
         type,
-        error: error instanceof Error ? error.message : String(error),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       // Fallback: keep inline even if large
       return { inlineData: signatureData, dataKey: null };
@@ -1846,16 +1868,26 @@ export class SignaturesService {
       return null;
     }
     try {
-      const buf = await this.storageService.downloadFileBuffer(
-        signature.signature_data_key,
+      const buf = await this.documentStorageService.downloadFileBuffer(
+        this.documentStorageService.referenceForExistingObject(
+          signature.signature_data_key,
+          {
+            resourceType: 'signature',
+            resourceId: signature.id,
+          },
+          'p1-document-storage-downloadFileBuffer',
+        ),
       );
       return buf.toString('utf8');
     } catch (error) {
       this.logger.warn({
         event: 'signature_data_s3_download_failed',
         signatureId: signature.id,
-        key: signature.signature_data_key,
-        error: error instanceof Error ? error.message : String(error),
+        keyFingerprint: createHash('sha256')
+          .update(signature.signature_data_key)
+          .digest('hex')
+          .slice(0, 16),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       return null;
     }

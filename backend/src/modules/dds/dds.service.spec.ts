@@ -9,6 +9,7 @@ import {
 import type { TenantService } from '../../shared/tenant/tenant.service';
 import type { DocumentBundleService } from '../../shared/services/document-bundle.service';
 import type { DocumentStorageService } from '../../shared/services/document-storage.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 import type { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import type { DocumentVideosService } from '../document-videos/document-videos.service';
 import type { SignaturesService } from '../signatures/signatures.service';
@@ -65,7 +66,12 @@ describe('DdsService', () => {
   };
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'deleteFile' | 'getSignedUrl'
+    | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'deleteFile'
+    | 'getSignedUrl'
   >;
   let documentBundleService: Pick<
     DocumentBundleService,
@@ -247,7 +253,17 @@ describe('DdsService', () => {
       generateDocumentKey: jest.fn(
         () => 'documents/company-1/dds/sites/site-1/dds-1/dds-final.pdf',
       ),
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
       getSignedUrl: jest.fn(() =>
         Promise.resolve('https://example.com/dds.pdf'),
@@ -739,6 +755,8 @@ describe('DdsService', () => {
           title: 'DDS Trabalho em Altura',
           originalName: 'dds-final.pdf',
           date: '2026-04-28',
+          resourceType: 'dds',
+          resourceId: 'dds-1',
         },
       ],
     );
@@ -787,9 +805,9 @@ describe('DdsService', () => {
         signature_data: 'sig-1',
       },
     ]);
-    (documentStorageService.uploadFile as jest.Mock).mockRejectedValue(
-      new Error('S3 is not enabled'),
-    );
+    (
+      documentStorageService.uploadFileWithCapability as jest.Mock
+    ).mockRejectedValue(new Error('S3 is not enabled'));
 
     const file = {
       originalname: 'dds-final.pdf',
@@ -1059,7 +1077,9 @@ describe('DdsService', () => {
     );
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/dds/sites/site-1/dds-1/dds-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/dds/sites/site-1/dds-1/dds-final.pdf',
+      }),
     );
   });
 

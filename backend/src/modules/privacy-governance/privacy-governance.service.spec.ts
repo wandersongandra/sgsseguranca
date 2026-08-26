@@ -1,21 +1,25 @@
 import { PrivacyGovernanceService } from './privacy-governance.service';
+import type { StoragePrefixReference } from '../../shared/storage/storage-object-reference';
 
 describe('PrivacyGovernanceService', () => {
   const makeService = () => {
     const dataSource = {
       query: jest.fn(),
     };
-    const storageService = {
+    const documentStorageService = {
+      createPrefixReference: jest.fn(
+        (input: StoragePrefixReference): StoragePrefixReference => input,
+      ),
       listKeys: jest.fn(),
     };
 
     return {
       service: new PrivacyGovernanceService(
         dataSource as never,
-        storageService as never,
+        documentStorageService as never,
       ),
       dataSource,
-      storageService,
+      documentStorageService,
     };
   };
 
@@ -77,7 +81,7 @@ describe('PrivacyGovernanceService', () => {
   });
 
   it('gera manifesto de storage do tenant a partir do document_registry', async () => {
-    const { service, dataSource, storageService } = makeService();
+    const { service, dataSource, documentStorageService } = makeService();
     dataSource.query
       .mockResolvedValueOnce([
         {
@@ -106,13 +110,13 @@ describe('PrivacyGovernanceService', () => {
       module: 'APR',
     });
     expect(result.storage.listingRequested).toBe(false);
-    expect(storageService.listKeys).not.toHaveBeenCalled();
+    expect(documentStorageService.listKeys).not.toHaveBeenCalled();
   });
 
   it('lista prefixos do storage quando solicitado', async () => {
-    const { service, dataSource, storageService } = makeService();
+    const { service, dataSource, documentStorageService } = makeService();
     dataSource.query.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-    storageService.listKeys
+    documentStorageService.listKeys
       .mockResolvedValueOnce(['documents/company-1/a.pdf'])
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce(['reports/company-1/b.pdf']);
@@ -121,7 +125,7 @@ describe('PrivacyGovernanceService', () => {
       includeStorageListing: true,
     });
 
-    expect(storageService.listKeys).toHaveBeenCalledTimes(3);
+    expect(documentStorageService.listKeys).toHaveBeenCalledTimes(3);
     expect(result.storage.keys).toEqual([
       'documents/company-1/a.pdf',
       'reports/company-1/b.pdf',

@@ -5,7 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import pLimit from 'p-limit';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
@@ -226,17 +226,25 @@ export class AprsEvidenceService {
       originalName,
     );
     const hashSha256 = createHash('sha256').update(file.buffer).digest('hex');
+    const evidenceId = randomUUID();
 
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.createReference({
+          tenantId: apr.company_id,
+          key: fileKey,
+          owner: { resourceType: 'apr-evidence', resourceId: evidenceId },
+          purpose: 'apr-evidence',
+        }),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       const evidenceRepository =
         this.aprsRepository.manager.getRepository(AprRiskEvidence);
       const evidence = evidenceRepository.create({
+        id: evidenceId,
         apr_id: apr.id,
         apr_risk_item_id: riskItem.id,
         uploaded_by_id: userId ?? null,
@@ -288,7 +296,10 @@ export class AprsEvidenceService {
         this.logger,
         `apr-evidence:${apr.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          key === uploadedReference.key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -367,7 +378,14 @@ export class AprsEvidenceService {
 
           try {
             url = await this.documentStorageService.getSignedUrl(
-              evidence.file_key,
+              this.documentStorageService.referenceForExistingObject(
+                evidence.file_key,
+                {
+                  resourceType: 'apr-evidence',
+                  resourceId: evidence.id,
+                },
+                'p1-document-storage-getSignedUrl',
+              ),
               3600,
             );
           } catch {
@@ -377,7 +395,14 @@ export class AprsEvidenceService {
           if (evidence.watermarked_file_key) {
             try {
               watermarkedUrl = await this.documentStorageService.getSignedUrl(
-                evidence.watermarked_file_key,
+                this.documentStorageService.referenceForExistingObject(
+                  evidence.watermarked_file_key,
+                  {
+                    resourceType: 'apr-evidence-watermarked',
+                    resourceId: evidence.id,
+                  },
+                  'p1-document-storage-getSignedUrl',
+                ),
                 3600,
               );
             } catch {

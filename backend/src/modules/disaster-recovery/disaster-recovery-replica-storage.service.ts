@@ -10,6 +10,7 @@ import {
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Readable } from 'stream';
 import { IntegrationResilienceService } from '../../shared/resilience/integration-resilience.service';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 
 const toBufferChunk = (chunk: Buffer | Uint8Array | string): Buffer =>
   Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
@@ -162,7 +163,7 @@ export class DisasterRecoveryReplicaStorageService {
     this.logger.log({
       event: 'dr_storage_replica_uploaded',
       bucketName: this.bucketName,
-      key: input.key,
+      keyFingerprint: storageKeyFingerprint(input.key),
       sizeBytes: input.buffer.byteLength,
     });
   }

@@ -46,7 +46,6 @@ describe('DashboardDocumentAvailabilitySnapshotService', () => {
       createMockRepo() as never,
       snapshotRepository as never,
       { getSignedUrl: jest.fn() } as never,
-      { getPresignedDownloadUrl: jest.fn() } as never,
     );
     serviceInternals = service as unknown as typeof serviceInternals;
   });

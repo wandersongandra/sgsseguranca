@@ -8,7 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as jwt from 'jsonwebtoken';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { DataSource, Repository } from 'typeorm';
 import { RequestContext } from '../middleware/request-context.middleware';
 import { TenantService } from '../tenant/tenant.service';
@@ -17,18 +17,26 @@ import {
   INTERNAL_DOWNLOAD_TTL_SECONDS,
   normalizeInternalDownloadTtl,
 } from '../storage/storage-download-ttl';
+import type { StorageObjectReference } from '../storage/storage-object-reference';
 
 type DownloadTokenPayload = {
   typ: 'document_download';
   gid: string;
   companyId: string;
   key: string;
+  ownerType: string;
+  ownerId: string;
+  purpose: string;
   uid?: string;
 };
 
 @Injectable()
 export class DocumentDownloadGrantService {
   private readonly logger = new Logger(DocumentDownloadGrantService.name);
+  private readonly authorizedReferences = new WeakMap<
+    DocumentDownloadGrant,
+    StorageObjectReference
+  >();
 
   constructor(
     @InjectRepository(DocumentDownloadGrant)
@@ -39,13 +47,12 @@ export class DocumentDownloadGrantService {
   ) {}
 
   async issueRestrictedAppDownloadUrl(input: {
-    fileKey: string;
+    reference: StorageObjectReference;
     originalName?: string | null;
-    companyId?: string | null;
     contentType?: string | null;
     expiresIn?: number;
   }): Promise<string> {
-    const fileKey = String(input.fileKey || '').trim();
+    const fileKey = String(input.reference.key || '').trim();
     if (!fileKey.startsWith('documents/')) {
       throw new BadRequestException(
         'Somente documentos oficiais em documents/ podem receber token de download restrito.',
@@ -58,13 +65,25 @@ export class DocumentDownloadGrantService {
       );
     }
 
-    const companyId =
-      input.companyId?.trim() || this.extractCompanyIdFromDocumentsKey(fileKey);
+    const companyId = input.reference.tenantId.trim();
     if (!companyId) {
       throw new BadRequestException(
         'Não foi possível resolver a empresa dona do documento governado.',
       );
     }
+
+    if (this.tenantService.isSuperAdmin()) {
+      throw new ForbiddenException(
+        'Download restrito exige contexto tenant-scoped explícito.',
+      );
+    }
+    if (this.tenantService.getTenantId()?.trim() !== companyId) {
+      throw new ForbiddenException(
+        'Download restrito exige o tenant atual do documento.',
+      );
+    }
+
+    await this.assertRegistryBoundReference(input.reference);
 
     const expiresIn = normalizeInternalDownloadTtl(
       input.expiresIn ?? INTERNAL_DOWNLOAD_TTL_SECONDS,
@@ -102,6 +121,9 @@ export class DocumentDownloadGrantService {
         gid: grantId,
         companyId,
         key: fileKey,
+        ownerType: input.reference.owner.resourceType,
+        ownerId: input.reference.owner.resourceId,
+        purpose: input.reference.purpose,
         uid: issuedForUserId || undefined,
       } satisfies DownloadTokenPayload,
       this.getSecret(),
@@ -118,7 +140,9 @@ export class DocumentDownloadGrantService {
       event: 'document_download_grant_issued',
       grantId,
       companyId,
-      fileKey,
+      keyFingerprint: this.diagnosticFingerprint(fileKey),
+      ownerType: input.reference.owner.resourceType,
+      purpose: input.reference.purpose,
       expiresIn,
       issuedForUserId,
     });
@@ -136,7 +160,7 @@ export class DocumentDownloadGrantService {
   ): Promise<DocumentDownloadGrant> {
     const decoded = this.verifyToken(token);
 
-    return this.tenantService.run(
+    const grant = await this.tenantService.run(
       { companyId: decoded.companyId, isSuperAdmin: false, siteScope: 'all' },
       () =>
         this.dataSource.transaction(async (manager) => {
@@ -199,12 +223,33 @@ export class DocumentDownloadGrantService {
             event: 'document_download_grant_consumed',
             grantId: grant.id,
             companyId: grant.company_id,
-            fileKey: grant.file_key,
+            keyFingerprint: this.diagnosticFingerprint(grant.file_key),
           });
 
           return grant;
         }),
     );
+
+    this.authorizedReferences.set(grant, {
+      tenantId: grant.company_id,
+      key: grant.file_key,
+      owner: {
+        resourceType: decoded.ownerType,
+        resourceId: decoded.ownerId,
+      },
+      purpose: decoded.purpose,
+    });
+    return grant;
+  }
+
+  getAuthorizedReference(grant: DocumentDownloadGrant): StorageObjectReference {
+    const reference = this.authorizedReferences.get(grant);
+    if (!reference) {
+      throw new ForbiddenException(
+        'Download restrito sem referência autorizada.',
+      );
+    }
+    return reference;
   }
 
   private verifyToken(token: string): DownloadTokenPayload {
@@ -216,6 +261,9 @@ export class DocumentDownloadGrantService {
         gid?: unknown;
         companyId?: unknown;
         key?: unknown;
+        ownerType?: unknown;
+        ownerId?: unknown;
+        purpose?: unknown;
         uid?: unknown;
       };
 
@@ -226,6 +274,9 @@ export class DocumentDownloadGrantService {
       const gid = readStringClaim(decoded.gid);
       const companyId = readStringClaim(decoded.companyId);
       const key = readStringClaim(decoded.key);
+      const ownerType = readStringClaim(decoded.ownerType);
+      const ownerId = readStringClaim(decoded.ownerId);
+      const purpose = readStringClaim(decoded.purpose);
       const uidRaw = decoded.uid;
       const uid =
         typeof uidRaw === 'string' && uidRaw.trim().length > 0
@@ -236,7 +287,10 @@ export class DocumentDownloadGrantService {
         typ !== 'document_download' ||
         !gid ||
         !companyId ||
-        !key.startsWith('documents/')
+        !key.startsWith('documents/') ||
+        !ownerType ||
+        !ownerId ||
+        !purpose
       ) {
         throw new Error('invalid_download_token_payload');
       }
@@ -246,12 +300,15 @@ export class DocumentDownloadGrantService {
         gid,
         companyId,
         key,
+        ownerType,
+        ownerId,
+        purpose,
         uid,
       };
-    } catch (error) {
+    } catch (_error) {
       this.logger.warn({
         event: 'document_download_token_rejected',
-        reason: error instanceof Error ? error.message : String(error),
+        reason: 'invalid_or_expired_token',
       });
       throw new ForbiddenException(
         'Token de download inválido, expirado ou já consumido.',
@@ -273,11 +330,6 @@ export class DocumentDownloadGrantService {
     return secret;
   }
 
-  private extractCompanyIdFromDocumentsKey(fileKey: string): string | null {
-    const segments = fileKey.split('/');
-    return segments[1]?.trim() || null;
-  }
-
   private normalizeOriginalName(originalName?: string | null): string | null {
     const normalized = String(originalName || '').trim();
     if (!normalized) {
@@ -285,5 +337,48 @@ export class DocumentDownloadGrantService {
     }
 
     return normalized.replace(/[^\w.\- ]+/g, '_');
+  }
+
+  private diagnosticFingerprint(value: string): string {
+    return createHash('sha256').update(value).digest('hex').slice(0, 16);
+  }
+
+  private async assertRegistryBoundReference(
+    reference: StorageObjectReference,
+  ): Promise<void> {
+    const rows = await this.dataSource.query<Array<Record<string, unknown>>>(
+      `SELECT company_id, module, entity_id, file_key, status, deleted_at
+         FROM document_registry
+        WHERE company_id = $1
+          AND module = $2
+          AND entity_id = $3
+          AND file_key = $4
+          AND status = 'ACTIVE'
+          AND deleted_at IS NULL
+        LIMIT 1`,
+      [
+        reference.tenantId.trim(),
+        reference.owner.resourceType.trim(),
+        reference.owner.resourceId.trim(),
+        reference.key.trim(),
+      ],
+    );
+    const row = rows[0];
+    const registryPurpose = row
+      ? `document-registry:${String(row.module)}:pdf`
+      : null;
+
+    if (
+      !row ||
+      String(row.company_id) !== reference.tenantId.trim() ||
+      String(row.module) !== reference.owner.resourceType.trim() ||
+      String(row.entity_id) !== reference.owner.resourceId.trim() ||
+      String(row.file_key) !== reference.key.trim() ||
+      reference.purpose.trim() !== registryPurpose
+    ) {
+      throw new ForbiddenException(
+        'Download restrito requer documento governado autorizado.',
+      );
+    }
   }
 }

@@ -28,7 +28,10 @@ import { UserSite } from '../users/entities/user-site.entity';
 import { Did, DidStatus, DID_ALLOWED_TRANSITIONS } from './entities/did.entity';
 import { CreateDidDto } from './dto/create-did.dto';
 import { UpdateDidDto } from './dto/update-did.dto';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
 import { FORENSIC_EVENT_TYPES } from '../forensic-trail/forensic-trail.constants';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
 
@@ -420,11 +423,16 @@ export class DidsService {
     const folder = key.split('/').slice(0, -1).join('/');
     const storageMode = 's3' as const;
 
-    await this.documentStorageService.uploadFile(
-      key,
-      file.buffer,
-      file.mimetype,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'did', resourceId: did.id },
+          'p1-document-storage-uploadFile',
+        ),
+        file.buffer,
+        file.mimetype,
+      );
 
     try {
       await this.documentGovernanceService.registerFinalDocument({
@@ -454,7 +462,9 @@ export class DidsService {
       });
     } catch (error) {
       await cleanupUploadedFile(this.logger, `did:${did.id}`, key, (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        uploadedReference.key === fileKey
+          ? this.documentStorageService.deleteFile(uploadedReference)
+          : Promise.resolve(),
       );
       throw error;
     }
@@ -463,7 +473,7 @@ export class DidsService {
       event: 'did_pdf_attached',
       didId: did.id,
       companyId: did.company_id,
-      fileKey: key,
+      keyFingerprint: storageKeyFingerprint(key),
       previousStatus: did.status,
       nextStatus:
         did.status === DidStatus.ALINHADO ? DidStatus.EXECUTADO : did.status,
@@ -510,7 +520,14 @@ export class DidsService {
 
     try {
       url = await this.documentStorageService.getSignedUrl(
-        did.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          did.pdf_file_key,
+          {
+            resourceType: 'did',
+            resourceId: did.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         DID_PDF_SIGNED_URL_EXPIRY_SECONDS,
       );
     } catch {
@@ -551,7 +568,13 @@ export class DidsService {
         await manager.getRepository(Did).softDelete(id);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'did', resourceId: did.id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
 
     this.logger.log({

@@ -6,7 +6,6 @@ import { Audit } from '../audits/entities/audit.entity';
 import { Cat } from '../cats/entities/cat.entity';
 import { Checklist } from '../checklists/entities/checklist.entity';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { StorageService } from '../../shared/services/storage.service';
 import { Dds } from '../dds/entities/dds.entity';
 import {
   DocumentRegistryEntry,
@@ -16,6 +15,7 @@ import { Inspection } from '../../shared/entities/inspection.entity';
 import { NonConformity } from '../nonconformities/entities/nonconformity.entity';
 import { Pt } from '../pts/entities/pt.entity';
 import { Rdo } from '../rdos/entities/rdo.entity';
+import type { StorageObjectOwner } from '../../shared/storage/storage-object-reference';
 import {
   DashboardDocumentAvailabilityPendencyType,
   DashboardDocumentAvailabilitySnapshot,
@@ -121,7 +121,6 @@ export class DashboardDocumentAvailabilitySnapshotService {
     @InjectRepository(DashboardDocumentAvailabilitySnapshot)
     private readonly snapshotRepository: Repository<DashboardDocumentAvailabilitySnapshot>,
     private readonly documentStorageService: DocumentStorageService,
-    private readonly storageService: StorageService,
   ) {}
 
   async ensureSnapshotsAvailable(input: {
@@ -491,6 +490,10 @@ export class DashboardDocumentAvailabilitySnapshotService {
         const check = await this.resolveAvailability({
           kind: DashboardDocumentAvailabilitySnapshotKind.REGISTRY_DOCUMENT,
           fileKey: entry.file_key,
+          owner: {
+            resourceType: entry.module,
+            resourceId: entry.entity_id,
+          },
         });
         const metadata =
           metadataMap.get(
@@ -548,6 +551,10 @@ export class DashboardDocumentAvailabilitySnapshotService {
             const check = await this.resolveAvailability({
               kind: DashboardDocumentAvailabilitySnapshotKind.CAT_ATTACHMENT,
               fileKey: attachment.file_key,
+              owner: {
+                resourceType: 'cat-attachment',
+                resourceId: cat.id,
+              },
             });
 
             return {
@@ -613,6 +620,10 @@ export class DashboardDocumentAvailabilitySnapshotService {
             const check = await this.resolveAvailability({
               kind: DashboardDocumentAvailabilitySnapshotKind.NONCONFORMITY_ATTACHMENT,
               fileKey: payload.fileKey,
+              owner: {
+                resourceType: 'nc-attachment',
+                resourceId: nonConformity.id,
+              },
             });
 
             return {
@@ -652,15 +663,16 @@ export class DashboardDocumentAvailabilitySnapshotService {
   private async resolveAvailability(input: {
     kind: DashboardDocumentAvailabilitySnapshotKind;
     fileKey: string;
+    owner: StorageObjectOwner;
   }): Promise<{ available: boolean; errorMessage: string | null }> {
     try {
-      if (
-        input.kind === DashboardDocumentAvailabilitySnapshotKind.CAT_ATTACHMENT
-      ) {
-        await this.storageService.getPresignedDownloadUrl(input.fileKey);
-      } else {
-        await this.documentStorageService.getSignedUrl(input.fileKey);
-      }
+      await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          input.fileKey,
+          input.owner,
+          'p1-document-storage-getSignedUrl',
+        ),
+      );
 
       return { available: true, errorMessage: null };
     } catch (error) {

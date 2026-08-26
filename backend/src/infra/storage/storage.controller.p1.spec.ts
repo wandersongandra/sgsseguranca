@@ -21,13 +21,14 @@ import { randomUUID } from 'crypto';
 import { createHash } from 'crypto';
 
 import { StorageController } from './storage.controller';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { AuditService } from '../../modules/audit-trail/audit.service';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { JwtAuthGuard } from '../../modules/auth/jwt-auth.guard';
 import { TenantGuard } from '../../shared/guards/tenant.guard';
 import { RolesGuard } from '../../modules/auth/roles.guard';
+import { stringMatchingMatcher } from '../../../test/helpers/typed-matchers';
 import { TenantInterceptor } from '../../shared/tenant/tenant.interceptor';
 import { PermissionsGuard } from '../../modules/auth/permissions.guard';
 
@@ -46,11 +47,32 @@ const PDF_VALID_BUFFER = Buffer.concat([
 ]);
 
 const makeStorageService = () => ({
+  referenceForExistingObject: jest.fn(
+    (
+      key: string,
+      owner: { resourceType: string; resourceId: string },
+      purpose: string,
+    ) => ({
+      tenantId: TENANT_ID,
+      key,
+      owner,
+      purpose,
+      ...(key.startsWith('documents/') ? {} : { legacy: false }),
+    }),
+  ),
+  createReference: jest.fn(
+    (input: {
+      tenantId: string;
+      key: string;
+      owner: { resourceType: string; resourceId: string };
+      purpose: string;
+    }) => input,
+  ),
   getPresignedUploadUrl: jest
     .fn()
     .mockResolvedValue('https://s3.example.com/upload'),
   downloadFileBuffer: jest.fn().mockResolvedValue(PDF_VALID_BUFFER),
-  upload: jest.fn().mockResolvedValue(undefined),
+  uploadFile: jest.fn().mockResolvedValue(undefined),
   deleteFile: jest.fn().mockResolvedValue(undefined),
 });
 
@@ -111,7 +133,7 @@ async function buildApp(overrides?: {
   const module = await Test.createTestingModule({
     controllers: [StorageController],
     providers: [
-      { provide: StorageService, useValue: storage },
+      { provide: DocumentStorageService, useValue: storage },
       { provide: TenantService, useValue: tenant },
       { provide: AuditService, useValue: audit },
       { provide: FileInspectionService, useValue: fileInspection },
@@ -351,7 +373,9 @@ describe('StorageController P1 — Quarantine Flow', () => {
         .post('/storage/complete-upload')
         .send({ fileKey: QUARANTINE_KEY });
 
-      expect(storage.deleteFile).toHaveBeenCalledWith(QUARANTINE_KEY);
+      expect(storage.deleteFile).toHaveBeenCalledWith(
+        expect.objectContaining({ key: QUARANTINE_KEY }),
+      );
       await app.close();
     });
 
@@ -361,8 +385,10 @@ describe('StorageController P1 — Quarantine Flow', () => {
         .post('/storage/complete-upload')
         .send({ fileKey: QUARANTINE_KEY });
 
-      expect(storage.upload).toHaveBeenCalledWith(
-        expect.stringMatching(/^documents\//),
+      expect(storage.uploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          key: stringMatchingMatcher(/^documents\//),
+        }),
         expect.any(Buffer),
         'application/pdf',
       );

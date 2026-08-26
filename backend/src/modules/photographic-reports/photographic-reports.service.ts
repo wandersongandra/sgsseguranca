@@ -11,9 +11,10 @@ import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { Repository, IsNull } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
+import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
 import { SignaturesService } from '../signatures/signatures.service';
 import type { Signature } from '../signatures/entities/signature.entity';
@@ -32,6 +33,7 @@ import { TenantService } from '../../shared/tenant/tenant.service';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { AiAnalysisService } from '../ai/services/ai-analysis.service';
+import type { AuthorizedStorageObjectReference } from '../../shared/storage/storage-object-reference';
 import {
   cleanupUploadedTempFile,
   createTemporaryUploadOptions,
@@ -290,39 +292,55 @@ export class PhotographicReportsService {
     return String(left || '').localeCompare(String(right || ''));
   }
 
-  private async signUrl(storageKey?: string | null): Promise<string | null> {
+  private async signUrl(
+    storageKey: string | null | undefined,
+    owner: { resourceType: string; resourceId: string },
+  ): Promise<string | null> {
     if (!storageKey) {
       return null;
     }
     try {
-      return await this.documentStorageService.getSignedUrl(storageKey, 3600);
-    } catch (error) {
-      this.logger.warn(
-        `Falha ao assinar URL de storage ${storageKey}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+      return await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          storageKey,
+          owner,
+          'p1-document-storage-getSignedUrl',
+        ),
+        3600,
       );
+    } catch (error) {
+      this.logger.warn({
+        event: 'photographic_report_storage_url_failed',
+        keyFingerprint: storageKeyFingerprint(storageKey),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
       return null;
     }
   }
 
   private async fileBufferToDataUrl(
-    storageKey?: string | null,
+    storageKey: string | null | undefined,
+    owner: { resourceType: string; resourceId: string },
     mimeType = 'image/jpeg',
   ): Promise<string | null> {
     if (!storageKey) {
       return null;
     }
     try {
-      const buffer =
-        await this.documentStorageService.downloadFileBuffer(storageKey);
+      const buffer = await this.documentStorageService.downloadFileBuffer(
+        this.documentStorageService.referenceForExistingObject(
+          storageKey,
+          owner,
+          'p1-document-storage-downloadFileBuffer',
+        ),
+      );
       return `data:${mimeType};base64,${buffer.toString('base64')}`;
     } catch (error) {
-      this.logger.warn(
-        `Falha ao carregar imagem ${storageKey} para renderização: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.warn({
+        event: 'photographic_report_image_load_failed',
+        keyFingerprint: storageKeyFingerprint(storageKey),
+        errorName: error instanceof Error ? error.name : 'unknown_error',
+      });
       return null;
     }
   }
@@ -431,7 +449,10 @@ export class PhotographicReportsService {
     image: PhotographicReportImage,
     dayMap: Map<string, PhotographicReportDayResponse>,
   ): Promise<PhotographicReportImageResponse> {
-    const downloadUrl = await this.signUrl(image.image_url);
+    const downloadUrl = await this.signUrl(image.image_url, {
+      resourceType: 'photographic-report-image',
+      resourceId: image.id,
+    });
     return {
       id: image.id,
       report_id: image.report_id,
@@ -482,7 +503,10 @@ export class PhotographicReportsService {
       report_id: exportEntity.report_id,
       export_type: exportEntity.export_type,
       file_url: exportEntity.file_url,
-      download_url: await this.signUrl(exportEntity.file_url),
+      download_url: await this.signUrl(exportEntity.file_url, {
+        resourceType: 'photographic-report-export',
+        resourceId: exportEntity.id,
+      }),
       generated_by: exportEntity.generated_by,
       generated_at: exportEntity.generated_at.toISOString(),
     };
@@ -1151,35 +1175,46 @@ export class PhotographicReportsService {
       );
     }
 
-    const exportKeys = Array.from(
-      new Set(
-        (report.exports || []).map((entry) => entry.file_url).filter(Boolean),
-      ),
-    );
-    const imageKeys = Array.from(
-      new Set(
-        (report.images || []).map((entry) => entry.image_url).filter(Boolean),
-      ),
+    const imagesToRemove = (report.images || []).filter((entry) =>
+      Boolean(entry.image_url),
     );
 
-    for (const fileKey of imageKeys) {
+    for (const image of imagesToRemove) {
       try {
-        await this.documentStorageService.deleteFile(fileKey);
+        await this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            image.image_url,
+            {
+              resourceType: 'photographic-report-image',
+              resourceId: image.id,
+            },
+            'p1-document-storage-deleteFile',
+          ),
+        );
       } catch (error) {
         this.logger.warn(
-          `Falha ao limpar imagem do relatório ${report.id} (${fileKey}): ${
+          `Falha ao limpar imagem do relatório ${report.id}: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
       }
     }
 
-    for (const fileKey of exportKeys) {
+    for (const exportEntity of report.exports || []) {
       try {
-        await this.documentStorageService.deleteFile(fileKey);
+        await this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            exportEntity.file_url,
+            {
+              resourceType: 'photographic-report-export',
+              resourceId: exportEntity.id,
+            },
+            'p1-document-storage-deleteFile',
+          ),
+        );
       } catch (error) {
         this.logger.warn(
-          `Falha ao limpar arquivo do relatório ${report.id} (${fileKey}): ${
+          `Falha ao limpar arquivo do relatório ${report.id}: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
@@ -1344,6 +1379,7 @@ export class PhotographicReportsService {
     // e um literal de 11 colunas escrito à mão no insert() — e só a segunda
     // chegava ao banco.
     const createdImages: QueryDeepPartialEntity<PhotographicReportImage>[] = [];
+    const createdImageReferences: AuthorizedStorageObjectReference[] = [];
 
     try {
       for (let index = 0; index < files.length; index += 1) {
@@ -1380,12 +1416,23 @@ export class PhotographicReportsService {
             ],
           },
         );
+        const imageId = randomUUID();
 
-        await this.documentStorageService.uploadFile(
-          storageKey,
-          buffer,
-          file.mimetype,
-        );
+        const uploadedReference =
+          await this.documentStorageService.uploadFileWithCapability(
+            this.documentStorageService.createReference({
+              tenantId: companyId,
+              key: storageKey,
+              owner: {
+                resourceType: 'photographic-report-image',
+                resourceId: imageId,
+              },
+              purpose: 'photographic-report-image',
+            }),
+            buffer,
+            file.mimetype,
+          );
+        createdImageReferences.push(uploadedReference);
 
         // Integridade da evidência. O hash é dos bytes RECEBIDOS: o cliente
         // re-encoda a imagem antes de enviar, então isto comprova que o
@@ -1394,6 +1441,7 @@ export class PhotographicReportsService {
         const hashSha256 = createHash('sha256').update(buffer).digest('hex');
 
         createdImages.push({
+          id: imageId,
           company_id: companyId,
           report_id: report.id,
           report_day_id: targetDay?.id || null,
@@ -1451,11 +1499,14 @@ export class PhotographicReportsService {
 
       return await this.findOne(report.id);
     } catch (error) {
-      for (const image of createdImages) {
+      for (const [index, image] of createdImages.entries()) {
         const storageKey = image.image_url;
         if (typeof storageKey !== 'string') continue;
         try {
-          await this.documentStorageService.deleteFile(storageKey);
+          const uploadedReference = createdImageReferences[index];
+          if (uploadedReference) {
+            await this.documentStorageService.deleteFile(uploadedReference);
+          }
         } catch {
           /* best effort cleanup */
         }
@@ -1590,7 +1641,16 @@ export class PhotographicReportsService {
     const image = await this.ensureImageBelongsToReport(report, imageId);
 
     try {
-      await this.documentStorageService.deleteFile(image.image_url);
+      await this.documentStorageService.deleteFile(
+        this.documentStorageService.referenceForExistingObject(
+          image.image_url,
+          {
+            resourceType: 'photographic-report-image',
+            resourceId: image.id,
+          },
+          'p1-document-storage-deleteFile',
+        ),
+      );
     } catch (error) {
       this.logger.warn(
         `Falha ao remover imagem do storage (${image.image_url}): ${
@@ -1704,7 +1764,14 @@ export class PhotographicReportsService {
       : null;
 
     const buffer = await this.documentStorageService.downloadFileBuffer(
-      image.image_url,
+      this.documentStorageService.referenceForExistingObject(
+        image.image_url,
+        {
+          resourceType: 'photographic-report-image',
+          resourceId: image.id,
+        },
+        'p1-document-storage-downloadFileBuffer',
+      ),
     );
     const analysis =
       await this.aiAnalysisService.analyzePhotographicReportImage(
@@ -1752,7 +1819,14 @@ export class PhotographicReportsService {
           null
         : null;
       const buffer = await this.documentStorageService.downloadFileBuffer(
-        image.image_url,
+        this.documentStorageService.referenceForExistingObject(
+          image.image_url,
+          {
+            resourceType: 'photographic-report-image',
+            resourceId: image.id,
+          },
+          'p1-document-storage-downloadFileBuffer',
+        ),
       );
       const analysis =
         await this.aiAnalysisService.analyzePhotographicReportImage(
@@ -1881,7 +1955,14 @@ export class PhotographicReportsService {
     // Perdê-lo não pode custar a identidade da empresa no documento.
     try {
       const buf = await this.documentStorageService.downloadFileBuffer(
-        company.logo_storage_key,
+        this.documentStorageService.referenceForExistingObject(
+          company.logo_storage_key,
+          {
+            resourceType: 'company',
+            resourceId: company.id,
+          },
+          'p1-document-storage-downloadFileBuffer',
+        ),
       );
       const mime = company.logo_content_type ?? 'image/png';
       return {
@@ -2072,6 +2153,10 @@ export class PhotographicReportsService {
         ...image,
         data_url: await this.fileBufferToDataUrl(
           image.image_url,
+          {
+            resourceType: 'photographic-report-image',
+            resourceId: image.id,
+          },
           // `mime_type` real, gravado no upload desde a migration 370.
           // `guessImageMimeType` fica como fallback para linhas anteriores.
           image.mime_type ?? this.guessImageMimeType(image.image_url),
@@ -2126,6 +2211,10 @@ export class PhotographicReportsService {
         ...image,
         data_url: await this.fileBufferToDataUrl(
           image.image_url,
+          {
+            resourceType: 'photographic-report-image',
+            resourceId: image.id,
+          },
           this.guessImageMimeType(image.image_url),
         ),
         activity_date_label: image.day?.activity_date || report.start_date,
@@ -2148,6 +2237,7 @@ export class PhotographicReportsService {
   private async persistExportRecord(params: {
     report: PhotographicReport;
     fileKey: string;
+    exportId: string;
     exportType: PhotographicReportExportType;
     originalName: string;
     mimeType: string;
@@ -2200,6 +2290,7 @@ export class PhotographicReportsService {
 
     return this.exportRepository.save(
       this.exportRepository.create({
+        id: params.exportId,
         company_id: params.report.company_id,
         report_id: params.report.id,
         export_type: params.exportType,
@@ -2236,18 +2327,33 @@ export class PhotographicReportsService {
       fileName,
       { folderSegments: ['exports', params.exportType] },
     );
+    const exportId = randomUUID();
 
     const buffer =
       params.exportType === PhotographicReportExportType.PDF
         ? await this.buildPdfBuffer(params.report)
         : await this.buildWordBuffer(params.report);
 
-    await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.createReference({
+          tenantId: companyId,
+          key: fileKey,
+          owner: {
+            resourceType: 'photographic-report-export',
+            resourceId: exportId,
+          },
+          purpose: 'photographic-report-export',
+        }),
+        buffer,
+        mimeType,
+      );
 
     try {
       await this.persistExportRecord({
         report: await this.findReportEntity(params.report.id, companyId),
         fileKey,
+        exportId,
         exportType: params.exportType,
         originalName: fileName,
         mimeType,
@@ -2255,7 +2361,7 @@ export class PhotographicReportsService {
       });
     } catch (error) {
       try {
-        await this.documentStorageService.deleteFile(fileKey);
+        await this.documentStorageService.deleteFile(uploadedReference);
       } catch {
         /* best effort cleanup */
       }
@@ -2325,7 +2431,14 @@ export class PhotographicReportsService {
       exportId,
     );
     const buffer = await this.documentStorageService.downloadFileBuffer(
-      exportEntity.file_url,
+      this.documentStorageService.referenceForExistingObject(
+        exportEntity.file_url,
+        {
+          resourceType: 'photographic-report-export',
+          resourceId: exportEntity.id,
+        },
+        'p1-document-storage-downloadFileBuffer',
+      ),
     );
     const fileName =
       exportEntity.file_url.split('/').pop() ||
@@ -2359,7 +2472,10 @@ export class PhotographicReportsService {
       };
     }
 
-    const url = await this.signUrl(registryEntry.file_key);
+    const url = await this.signUrl(registryEntry.file_key, {
+      resourceType: 'photographic_report',
+      resourceId: report.id,
+    });
     return {
       entityId: report.id,
       hasFinalPdf: true,

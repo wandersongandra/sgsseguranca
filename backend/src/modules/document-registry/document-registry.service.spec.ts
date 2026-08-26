@@ -17,7 +17,10 @@ describe('DocumentRegistryService', () => {
     DocumentBundleService,
     'buildWeeklyPdfBundle'
   >;
-  let documentStorageService: Pick<DocumentStorageService, 'getSignedUrl'>;
+  let documentStorageService: Pick<
+    DocumentStorageService,
+    'getSignedUrl' | 'referenceForExistingObject'
+  >;
   let queryBuilder: {
     where: jest.Mock;
     andWhere: jest.Mock;
@@ -65,6 +68,12 @@ describe('DocumentRegistryService', () => {
       buildWeeklyPdfBundle: jest.fn(),
     };
     documentStorageService = {
+      referenceForExistingObject: jest.fn((key: string, owner, purpose) => ({
+        tenantId: 'company-1',
+        key,
+        owner,
+        purpose,
+      })),
       getSignedUrl: jest.fn().mockResolvedValue('/storage/download/token'),
     };
 
@@ -190,7 +199,9 @@ describe('DocumentRegistryService', () => {
       url: '/storage/download/token',
     });
     expect(documentStorageService.getSignedUrl).toHaveBeenCalledWith(
-      'documents/company-1/dds/sites/site-1/dds-1/final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/dds/sites/site-1/dds-1/final.pdf',
+      }),
     );
   });
 

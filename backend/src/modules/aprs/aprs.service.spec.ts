@@ -15,7 +15,6 @@ import type { DocumentStorageService } from '../../shared/services/document-stor
 import type { PdfService } from '../../shared/services/pdf.service';
 import type { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import type { SignaturesService } from '../signatures/signatures.service';
-import type { StorageService } from '../../shared/services/storage.service';
 import type { AprRiskMatrixService } from './apr-risk-matrix.service';
 import type { AprExcelService } from './apr-excel.service';
 import type { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
@@ -28,6 +27,7 @@ import { AprsEvidenceService } from './services/aprs-evidence.service';
 import { AprsPdfService } from './services/aprs-pdf.service';
 import { AprWorkflowService } from './aprs-workflow.service';
 import { BadRequestException } from '@nestjs/common';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -94,7 +94,13 @@ describe('AprsService', () => {
   };
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'deleteFile' | 'getSignedUrl'
+    | 'generateDocumentKey'
+    | 'createReference'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'deleteFile'
+    | 'getSignedUrl'
   >;
   let pdfService: Pick<PdfService, 'generateFromHtml'>;
   let documentGovernanceService: Pick<
@@ -231,10 +237,23 @@ describe('AprsService', () => {
       generateDocumentKey: jest.fn(
         () => 'documents/company-1/aprs/apr-1/apr-final.pdf',
       ),
+      createReference: jest.fn((reference) => reference),
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
-      getSignedUrl: jest.fn((key: string) =>
-        Promise.resolve(`https://signed.example/${encodeURIComponent(key)}`),
+      getSignedUrl: jest.fn((reference) =>
+        Promise.resolve(
+          `https://signed.example/${encodeURIComponent(reference.key)}`,
+        ),
       ),
     };
     pdfService = {
@@ -359,9 +378,6 @@ describe('AprsService', () => {
       documentGovernanceService as DocumentGovernanceService,
       signaturesService as SignaturesService,
       { issueToken: jest.fn().mockResolvedValue('token-publico') } as never,
-      {
-        getPresignedInlineViewUrl: jest.fn(),
-      } as unknown as StorageService,
     );
     const aprsEvidenceService = new AprsEvidenceService(
       aprRepository as unknown as Repository<Apr>,
@@ -960,8 +976,10 @@ describe('AprsService', () => {
       expect.stringContaining('ANÁLISE PRELIMINAR DE RISCOS'),
       expect.any(Object),
     );
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      expect.stringContaining('/aprs/apr-1/'),
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ key: expect.stringContaining('/aprs/apr-1/') }),
       expect.any(Buffer),
       'application/pdf',
     );
@@ -1535,8 +1553,12 @@ describe('AprsService', () => {
     expect(typeof result.hashSha256).toBe('string');
     expect(result.hashSha256).toBeTruthy();
 
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      'documents/company-1/aprs/apr-1/apr-final.pdf',
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'documents/company-1/aprs/apr-1/apr-final.pdf',
+      }),
       file.buffer,
       'image/jpeg',
     );

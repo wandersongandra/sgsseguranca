@@ -4,7 +4,7 @@ import { CompaniesService } from './companies.service';
 import { Company } from './entities/company.entity';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { StorageService } from '../../shared/services/storage.service';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { Site } from '../sites/entities/site.entity';
 import { User } from '../users/entities/user.entity';
 import { Profile } from '../profiles/entities/profile.entity';
@@ -17,6 +17,7 @@ import {
   InternalServerErrorException,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { StorageObjectOwner } from '../../shared/storage/storage-object-reference';
 
 const COMPANY_ID = 'company-uuid-1';
 
@@ -129,11 +130,23 @@ describe('CompaniesService — lifecycle e validação', () => {
         { provide: getRepositoryToken(Dds), useValue: makeMockRepo() },
         { provide: CACHE_MANAGER, useValue: cacheManager },
         {
-          provide: StorageService,
+          provide: DocumentStorageService,
           useValue: {
-            uploadFile: jest.fn().mockResolvedValue({ key: 'logo/key.png' }),
+            referenceForExistingObject: jest.fn(
+              (key: string, owner: StorageObjectOwner, purpose: string) => ({
+                tenantId: COMPANY_ID,
+                key,
+                owner,
+                purpose,
+                legacy: !key.startsWith(`documents/${COMPANY_ID}/`),
+              }),
+            ),
+            uploadFile: jest.fn().mockResolvedValue(undefined),
             deleteFile: jest.fn().mockResolvedValue(undefined),
-            getPresignedInlineViewUrl: jest.fn().mockResolvedValue(null),
+            downloadFileBuffer: jest
+              .fn()
+              .mockResolvedValue(Buffer.from('logo-bytes')),
+            getInlineViewUrl: jest.fn().mockResolvedValue(null),
           },
         },
         {

@@ -796,14 +796,23 @@ export class NonConformitiesService {
         }
 
         try {
-          await this.documentStorageService.deleteFile(payload.fileKey);
+          await this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              payload.fileKey,
+              {
+                resourceType: 'nc-attachment',
+                resourceId: nc.id,
+              },
+              'p1-document-storage-deleteFile',
+            ),
+          );
           this.logNcEvent('log', 'nc_attachment_removed_from_storage', {
             entityId: nc.id,
           });
         } catch (error) {
           this.logNcEvent('warn', 'nc_attachment_storage_cleanup_failed', {
             entityId: nc.id,
-            errorMessage: error instanceof Error ? error.message : 'unknown',
+            errorName: error instanceof Error ? error.name : 'unknown_error',
           });
         }
       }),
@@ -1657,7 +1666,13 @@ export class NonConformitiesService {
         await manager.getRepository(NonConformity).softDelete(locked.id);
       },
       cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(fileKey),
+        this.documentStorageService.deleteFile(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'nonconformity', resourceId: nonConformity.id },
+            'p1-document-storage-deleteFile',
+          ),
+        ),
     });
     if (!before) {
       throw new ConflictException(
@@ -1738,6 +1753,8 @@ export class NonConformitiesService {
       filters,
       files.map((file) => ({
         fileKey: file.fileKey,
+        resourceType: 'nonconformity',
+        resourceId: file.entityId,
         title: file.title,
         originalName: file.originalName,
         date: file.date,
@@ -1768,7 +1785,14 @@ export class NonConformitiesService {
 
     try {
       const url = await this.documentStorageService.getSignedUrl(
-        nc.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          nc.pdf_file_key,
+          {
+            resourceType: 'nonconformity',
+            resourceId: nc.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
       const response: NonConformityPdfAccessResponse = {
         entityId: nc.id,
@@ -1801,7 +1825,7 @@ export class NonConformitiesService {
       this.logNcEvent('warn', 'nc_pdf_access_storage_degraded', {
         entityId: nc.id,
         availability: response.availability,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       return response;
     }
@@ -1837,14 +1861,26 @@ export class NonConformitiesService {
       },
     );
 
+    let uploadedReference: Awaited<
+      ReturnType<DocumentStorageService['uploadFileWithCapability']>
+    > | null = null;
     try {
       assertLeaseHealthy();
-      await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+      uploadedReference =
+        await this.documentStorageService.uploadFileWithCapability(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'nonconformity', resourceId: nc.id },
+            'p1-document-storage-uploadFile',
+          ),
+          buffer,
+          mimeType,
+        );
     } catch (error) {
       this.logNcEvent('warn', 'nc_attachment_upload_failed', {
         entityId: nc.id,
         mimeType,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       throw error;
     }
@@ -1890,16 +1926,22 @@ export class NonConformitiesService {
       saved = lockedSaved;
       beforeSnapshot = snapshot;
     } catch (error) {
+      if (!uploadedReference) {
+        throw error;
+      }
       await cleanupUploadedFile(
         this.logger,
         `nonconformity-attachment:${nc.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       this.logNcEvent('warn', 'nc_attachment_persist_failed', {
         entityId: nc.id,
         mimeType,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       throw error;
     }
@@ -1998,7 +2040,16 @@ export class NonConformitiesService {
     await this.logAudit(AuditAction.UPDATE, saved.id, before, saved);
 
     try {
-      await this.documentStorageService.deleteFile(attachment.fileKey);
+      await this.documentStorageService.deleteFile(
+        this.documentStorageService.referenceForExistingObject(
+          attachment.fileKey,
+          {
+            resourceType: 'nc-attachment',
+            resourceId: nc.id,
+          },
+          'p1-document-storage-deleteFile',
+        ),
+      );
       this.logNcEvent('log', 'nc_attachment_removed_immediately', {
         entityId: saved.id,
         attachmentCount: saved.anexos?.length ?? 0,
@@ -2014,7 +2065,7 @@ export class NonConformitiesService {
     } catch (error) {
       this.logNcEvent('warn', 'nc_attachment_storage_cleanup_pending', {
         entityId: saved.id,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       return {
         entityId: saved.id,
@@ -2050,7 +2101,14 @@ export class NonConformitiesService {
 
     try {
       const url = await this.documentStorageService.getSignedUrl(
-        governedAttachment.fileKey,
+        this.documentStorageService.referenceForExistingObject(
+          governedAttachment.fileKey,
+          {
+            resourceType: 'nc-attachment',
+            resourceId: nc.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
       const response: NonConformityAttachmentAccessResponse = {
         entityId: nc.id,
@@ -2087,7 +2145,7 @@ export class NonConformitiesService {
       this.logNcEvent('warn', 'nc_attachment_storage_degraded', {
         entityId: nc.id,
         index,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       return response;
     }
@@ -2138,7 +2196,8 @@ export class NonConformitiesService {
     this.assertNcDocumentMutable(nc);
 
     const detectedMimeType = detectMimeFromMagicBytes(buffer);
-    const supportedMimeTypes = SUPPORTED_NC_PHOTO_MIME_TYPES as readonly string[];
+    const supportedMimeTypes =
+      SUPPORTED_NC_PHOTO_MIME_TYPES as readonly string[];
     if (!detectedMimeType || !supportedMimeTypes.includes(detectedMimeType)) {
       throw new BadRequestException(
         'Formato de foto não suportado. Use JPEG, PNG ou WebP.',
@@ -2163,15 +2222,27 @@ export class NonConformitiesService {
       { folderSegments: nc.site_id ? ['sites', nc.site_id] : [] },
     );
 
+    let uploadedReference: Awaited<
+      ReturnType<DocumentStorageService['uploadFileWithCapability']>
+    > | null = null;
     try {
       assertLeaseHealthy();
-      await this.documentStorageService.uploadFile(fileKey, buffer, mimeType);
+      uploadedReference =
+        await this.documentStorageService.uploadFileWithCapability(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'nonconformity', resourceId: nc.id },
+            'p1-document-storage-uploadFile',
+          ),
+          buffer,
+          mimeType,
+        );
     } catch (error) {
       this.logNcEvent('warn', 'nc_photo_upload_failed', {
         entityId: nc.id,
         field,
         mimeType,
-        errorMessage: error instanceof Error ? error.message : 'unknown',
+        errorName: error instanceof Error ? error.name : 'unknown_error',
       });
       throw error;
     }
@@ -2217,17 +2288,24 @@ export class NonConformitiesService {
       saved = lockedSaved;
       beforeSnapshot = snapshot;
     } catch (error) {
+      if (!uploadedReference) {
+        throw error;
+      }
       await cleanupUploadedFile(
         this.logger,
         `nonconformity-photo:${nc.id}:${field}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
 
     await this.logAudit(AuditAction.UPDATE, saved.id, beforeSnapshot, saved);
-    const savedFotos: string[] = (saved as unknown as Record<string, unknown>)[field] as string[] ?? [];
+    const savedFotos: string[] =
+      ((saved as unknown as Record<string, unknown>)[field] as string[]) ?? [];
 
     return {
       entityId: saved.id,
@@ -2279,7 +2357,8 @@ export class NonConformitiesService {
     const nc = await this.findOneEntity(id);
     this.assertNcDocumentMutable(nc);
 
-    const fotos: string[] = (nc as unknown as Record<string, unknown>)[field] as string[] ?? [];
+    const fotos: string[] =
+      ((nc as unknown as Record<string, unknown>)[field] as string[]) ?? [];
     const fotoReference = fotos[index];
     const parsed = this.parseGovernedAttachmentReference(fotoReference);
     if (!parsed || !fotoReference) {
@@ -2299,16 +2378,16 @@ export class NonConformitiesService {
       (locked) => {
         this.assertNcDocumentMutable(locked);
         const lockedFotos: string[] =
-          (locked as unknown as Record<string, unknown>)[field] as string[] ?? [];
+          ((locked as unknown as Record<string, unknown>)[field] as string[]) ??
+          [];
         if (lockedFotos[index] !== fotoReference) {
           throw new ConflictException(
             'A lista de fotos foi alterada por outra operação. Recarregue antes de tentar remover novamente.',
           );
         }
         const beforeSnapshot = { ...locked };
-        (locked as unknown as Record<string, unknown>)[field] = lockedFotos.filter(
-          (_, i) => i !== index,
-        );
+        (locked as unknown as Record<string, unknown>)[field] =
+          lockedFotos.filter((_, i) => i !== index);
         return beforeSnapshot;
       },
       { expectedUpdatedAt: nc.updated_at, assertLeaseHealthy },
@@ -2317,9 +2396,18 @@ export class NonConformitiesService {
     await this.logAudit(AuditAction.UPDATE, saved.id, before, saved);
 
     const savedFotos: string[] =
-      (saved as unknown as Record<string, unknown>)[field] as string[] ?? [];
+      ((saved as unknown as Record<string, unknown>)[field] as string[]) ?? [];
     try {
-      await this.documentStorageService.deleteFile(parsed.fileKey);
+      await this.documentStorageService.deleteFile(
+        this.documentStorageService.referenceForExistingObject(
+          parsed.fileKey,
+          {
+            resourceType: 'nc-photo',
+            resourceId: saved.id,
+          },
+          'p1-document-storage-deleteFile',
+        ),
+      );
       return {
         entityId: saved.id,
         field,
@@ -2364,7 +2452,7 @@ export class NonConformitiesService {
   ): Promise<NonConformityAttachmentAccessResponse> {
     const nc = await this.findOneEntity(id);
     const fotos: string[] =
-      (nc as unknown as Record<string, unknown>)[field] as string[] ?? [];
+      ((nc as unknown as Record<string, unknown>)[field] as string[]) ?? [];
     const fotoValue = fotos[index];
     const parsed = this.parseGovernedAttachmentReference(fotoValue);
 
@@ -2380,7 +2468,16 @@ export class NonConformitiesService {
     }
 
     try {
-      const url = await this.documentStorageService.getSignedUrl(parsed.fileKey);
+      const url = await this.documentStorageService.getSignedUrl(
+        this.documentStorageService.referenceForExistingObject(
+          parsed.fileKey,
+          {
+            resourceType: 'nc-photo',
+            resourceId: nc.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
+      );
       return {
         entityId: nc.id,
         index,

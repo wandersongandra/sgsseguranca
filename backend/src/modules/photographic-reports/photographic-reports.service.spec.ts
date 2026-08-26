@@ -10,6 +10,8 @@ import { PhotographicReportImage } from './entities/photographic-report-image.en
 import { PhotographicReportExport } from './entities/photographic-report-export.entity';
 import { CreatePhotographicReportDto } from './dto/create-photographic-report.dto';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
+import { DocumentStorageService } from '../../shared/services/document-storage.service';
+import type { StorageObjectOwner } from '../../shared/storage/storage-object-reference';
 
 type ReportRepoMock = Pick<
   Repository<PhotographicReport>,
@@ -21,6 +23,7 @@ type ImageRepoMock = Pick<
   'save' | 'findOne'
 >;
 type ExportRepoMock = Pick<Repository<PhotographicReportExport>, 'save'>;
+type DeleteFileMock = jest.MockedFunction<DocumentStorageService['deleteFile']>;
 
 describe('PhotographicReportsService', () => {
   const reportRepository: jest.Mocked<ReportRepoMock> = {
@@ -45,9 +48,22 @@ describe('PhotographicReportsService', () => {
   const tenantService = {
     getTenantId: jest.fn(() => 'company-1'),
   };
-  const documentStorageService = {
-    deleteFile: jest.fn().mockResolvedValue(undefined),
+  const documentStorageService: Pick<
+    DocumentStorageService,
+    'referenceForExistingObject' | 'deleteFile'
+  > = {
+    referenceForExistingObject: jest.fn(
+      (key: string, owner: StorageObjectOwner, purpose: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner,
+        purpose,
+        legacy: !key.startsWith('documents/company-1/'),
+      }),
+    ),
+    deleteFile: jest.fn().mockResolvedValue(undefined) as DeleteFileMock,
   };
+  const deleteFileMock = documentStorageService.deleteFile as DeleteFileMock;
   const documentGovernanceService = {
     removeFinalDocumentReference: jest.fn().mockResolvedValue(undefined),
   };
@@ -125,9 +141,18 @@ describe('PhotographicReportsService', () => {
       status: PhotographicReportStatus.RASCUNHO,
       deleted_at: null,
       images: [
-        { image_url: 'companies/company-1/report-1/images/a.jpg' },
-        { image_url: 'companies/company-1/report-1/images/a.jpg' },
-        { image_url: 'companies/company-1/report-1/images/b.jpg' },
+        {
+          id: 'image-a-1',
+          image_url: 'companies/company-1/report-1/images/a.jpg',
+        },
+        {
+          id: 'image-a-2',
+          image_url: 'companies/company-1/report-1/images/a.jpg',
+        },
+        {
+          id: 'image-b-1',
+          image_url: 'companies/company-1/report-1/images/b.jpg',
+        },
       ],
       exports: [],
     } as unknown as PhotographicReport;
@@ -149,11 +174,39 @@ describe('PhotographicReportsService', () => {
         exports: true,
       },
     });
-    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
+    expect(
+      documentStorageService.referenceForExistingObject,
+    ).toHaveBeenCalledWith(
       'companies/company-1/report-1/images/a.jpg',
+      {
+        resourceType: 'photographic-report-image',
+        resourceId: 'image-a-1',
+      },
+      'p1-document-storage-deleteFile',
+    );
+    expect(
+      documentStorageService.referenceForExistingObject,
+    ).toHaveBeenCalledWith(
+      'companies/company-1/report-1/images/b.jpg',
+      {
+        resourceType: 'photographic-report-image',
+        resourceId: 'image-b-1',
+      },
+      'p1-document-storage-deleteFile',
     );
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'companies/company-1/report-1/images/b.jpg',
+      expect.objectContaining({
+        tenantId: 'company-1',
+        key: 'companies/company-1/report-1/images/a.jpg',
+        purpose: 'p1-document-storage-deleteFile',
+      }),
+    );
+    expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: 'company-1',
+        key: 'companies/company-1/report-1/images/b.jpg',
+        purpose: 'p1-document-storage-deleteFile',
+      }),
     );
     expect(
       documentGovernanceService.removeFinalDocumentReference,
@@ -313,7 +366,7 @@ describe('PhotographicReportsService', () => {
       reportRepository.save.mockImplementation((entity) =>
         Promise.resolve(entity as PhotographicReport),
       );
-      documentStorageService.deleteFile.mockResolvedValue(undefined);
+      deleteFileMock.mockResolvedValue(undefined);
 
       return image;
     }

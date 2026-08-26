@@ -29,7 +29,6 @@ describe('DashboardDocumentPendenciesService', () => {
   let signaturesRepository: MockRepo;
   let sitesRepository: MockRepo;
   let documentStorageService: { getSignedUrl: jest.Mock };
-  let storageService: { getPresignedDownloadUrl: jest.Mock };
   let cacheManager: { get: jest.Mock; set: jest.Mock };
   let documentAvailabilitySnapshotService: {
     scheduleRefreshIfNeeded: jest.Mock;
@@ -58,9 +57,6 @@ describe('DashboardDocumentPendenciesService', () => {
     sitesRepository = createMockRepo();
     documentStorageService = {
       getSignedUrl: jest.fn(),
-    };
-    storageService = {
-      getPresignedDownloadUrl: jest.fn(),
     };
     documentAvailabilitySnapshotService = {
       scheduleRefreshIfNeeded: jest.fn().mockResolvedValue({
@@ -103,7 +99,6 @@ describe('DashboardDocumentPendenciesService', () => {
       signaturesRepository as never,
       sitesRepository as never,
       documentStorageService as never,
-      storageService as never,
       cacheManager as never,
       documentAvailabilitySnapshotService as never,
       publicValidationGrantService as never,
@@ -141,7 +136,7 @@ describe('DashboardDocumentPendenciesService', () => {
     expect(documentVideosRepository.find).not.toHaveBeenCalled();
     expect(nonConformitiesRepository.find).not.toHaveBeenCalled();
     expect(documentStorageService.getSignedUrl).not.toHaveBeenCalled();
-    expect(storageService.getPresignedDownloadUrl).not.toHaveBeenCalled();
+    expect(documentStorageService.getSignedUrl).not.toHaveBeenCalled();
     expect(
       documentAvailabilitySnapshotService.scheduleRefreshIfNeeded,
     ).not.toHaveBeenCalled();

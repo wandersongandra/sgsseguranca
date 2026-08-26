@@ -8,6 +8,7 @@ import type { TenantService } from '../../shared/tenant/tenant.service';
 import type { MailService } from '../../infra/mail/mail.service';
 import type { SignaturesService } from '../signatures/signatures.service';
 import type { DocumentStorageService } from '../../shared/services/document-storage.service';
+import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
 import type { UsersService } from '../users/users.service';
 import type { SitesService } from '../sites/sites.service';
 import type { NotificationsGateway } from '../notifications/notifications.gateway';
@@ -17,6 +18,7 @@ import type { FileParserService } from '../document-import/services/file-parser.
 import type { ConfigService } from '@nestjs/config';
 import type { IntegrationResilienceService } from '../../shared/resilience/integration-resilience.service';
 import type { OpenAiCircuitBreakerService } from '../../shared/resilience/openai-circuit-breaker.service';
+import { stringContainingMatcher } from '../../../test/helpers/typed-matchers';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -50,6 +52,8 @@ describe('ChecklistsService', () => {
   let documentStorageService: Pick<
     DocumentStorageService,
     | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'referenceForExistingObject'
     | 'generateDocumentKey'
     | 'getPresignedDownloadUrl'
     | 'getSignedUrl'
@@ -118,7 +122,16 @@ describe('ChecklistsService', () => {
         }),
       };
     documentStorageService = {
+      referenceForExistingObject: jest.fn((key: string, owner, purpose) => ({
+        tenantId: 'company-1',
+        key,
+        owner,
+        purpose,
+      })),
       uploadFile: jest.fn(),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       generateDocumentKey: jest.fn(
         (
           companyId: string,
@@ -313,8 +326,12 @@ describe('ChecklistsService', () => {
         'documents/company-1/checklists/sites/site-1/2026/week-',
       ),
     );
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      expect.stringContaining('checklist-oficial.pdf'),
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: stringContainingMatcher('checklist-oficial.pdf'),
+      }),
       Buffer.from('%PDF-checklist-ui'),
       'application/pdf',
     );
