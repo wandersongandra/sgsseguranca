@@ -142,10 +142,13 @@ SECURITY_TEST_REPORT.md
 vulnerability-report.md
 security-audit-report.md
 reports/
+SGS-BACKEND-*.md
 
 # SQL legados/depreciados e artefatos de diagnóstico pontuais
 scripts/deprecated-sql/
 temp-semgrep-scan.json
+backend/semgrep-precommit.json
+semgrep-*.json
 .tmp_pr_body.md
 
 # Worktrees e artefatos de ferramentas de IA

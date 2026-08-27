@@ -10,6 +10,7 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
     "target": "ES2023",
     "sourceMap": true,
     "outDir": "./dist",
@@ -34,11 +35,5 @@
     "strictBindCallApply": false,
     "useUnknownInCatchVariables": true
   },
-  "exclude": [
-    "node_modules",
-    "dist",
-    "test",
-    "scripts",
-    "../frontend/**"
-  ]
+  "exclude": ["node_modules", "dist", "test", "scripts", "../frontend/**"]
 }

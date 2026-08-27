@@ -10,7 +10,6 @@
     "scripts",
     "**/*.spec.ts",
     "**/*.smoke-spec.ts",
-    "check-db.ts",
     "test-multi-tenant.security.ts"
   ]
 }

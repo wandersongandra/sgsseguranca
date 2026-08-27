@@ -11,7 +11,6 @@ export default tseslint.config(
       'dist/**',
       'coverage/**',
       'scripts/**',
-      'check-db.ts',
       'load-test.js',
       'test-security.js',
       'test-validation.js',

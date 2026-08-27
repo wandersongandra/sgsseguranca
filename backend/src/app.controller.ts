@@ -9,6 +9,31 @@ import { DataSource } from 'typeorm';
 import { Public } from './shared/decorators/public.decorator';
 import { shouldRequireNoPendingMigrations } from './shared/database/migration-startup.guard';
 import { RedisService } from './shared/redis/redis.service';
+import migrationCompatibility from '../migration-history-compatibility.json';
+
+const LEGACY_MIGRATION_ALIASES: Record<string, string> =
+  migrationCompatibility.aliases;
+
+function getMigrationName(migration: {
+  name?: string;
+  constructor?: { name?: string };
+}): string {
+  return String(migration.name || migration.constructor?.name || '');
+}
+
+function isEffectivelyExecuted(
+  migrationName: string,
+  executedMigrationNames: Set<string>,
+): boolean {
+  if (executedMigrationNames.has(migrationName)) {
+    return true;
+  }
+
+  return Object.entries(LEGACY_MIGRATION_ALIASES).some(
+    ([legacyName, canonicalName]) =>
+      canonicalName === migrationName && executedMigrationNames.has(legacyName),
+  );
+}
 
 @Controller()
 export class AppController {
@@ -125,7 +150,18 @@ export class AppController {
     }
 
     try {
-      const hasPendingMigrations = await this.dataSource.showMigrations();
+      const executedRows: Array<{ name?: string }> =
+        await this.dataSource.query('SELECT name FROM "migrations"');
+      const executedMigrationNames = new Set(
+        executedRows.map((row) => String(row.name || '')).filter(Boolean),
+      );
+      const hasPendingMigrations = this.dataSource.migrations.some(
+        (migration) =>
+          !isEffectivelyExecuted(
+            getMigrationName(migration),
+            executedMigrationNames,
+          ),
+      );
       if (hasPendingMigrations) {
         return {
           status: 'down' as const,
