@@ -1,5 +1,6 @@
 import * as net from 'net';
 import { bootstrapBackendTestEnvironment } from './test-env';
+import { isE2EInfraSkipAllowed } from '../../src/shared/testing/e2e-infra-policy';
 
 bootstrapBackendTestEnvironment();
 
@@ -77,9 +78,19 @@ export default async function globalSetup() {
   process.env.E2E_INFRA_AVAILABLE = available ? 'true' : 'false';
 
   if (!available) {
+    if (!isE2EInfraSkipAllowed()) {
+      throw new Error(
+        `E2E fail-closed: infraestrutura indisponível (DB=${
+          db ? '✓' : '✗'
+        } Redis=${redis ? '✓' : '✗'}). ` +
+          'PostgreSQL e Redis são obrigatórios para CI/release. ' +
+          'Para desenvolvimento local, use E2E_ALLOW_INFRA_SKIP=true.',
+      );
+    }
+
     console.warn(
       `\n⚠️  E2E: infraestrutura indisponível (DB=${db ? '✓' : '✗'} Redis=${redis ? '✓' : '✗'}). ` +
-        `Testes E2E serão ignorados.\n` +
+        `Skip local explicitamente habilitado; testes E2E serão ignorados.\n` +
         `   Inicie os serviços com: docker compose -f ../ops/test/compose/docker-compose.e2e.yml up -d\n`,
     );
     return;
