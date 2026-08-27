@@ -10,12 +10,20 @@ import { ReportsService } from './reports.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
 import { MetricsService } from '../../shared/observability/metrics.service';
 import { TenantQuotaService } from '../../shared/queue/tenant-quota.service';
-import { getPdfGenerationConcurrency } from '../../shared/services/pdf-runtime-config';
+import {
+  getPdfGenerationConcurrency,
+  getPdfQueueJobTimeoutMs,
+} from '../../shared/services/pdf-runtime-config';
 import { captureException } from '../../shared/monitoring/sentry';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentRegistryEntry } from '../document-registry/entities/document-registry.entity';
-import { cleanupUploadedFile } from '../../shared/storage/storage-compensation.util';
+import {
+  cleanupUploadedFile,
+  storageKeyFingerprint,
+} from '../../shared/storage/storage-compensation.util';
+import { withJobTimeout } from '../../infra/queue/job-timeout.util';
+import type { AuthorizedStorageObjectReference } from '../../shared/storage/storage-object-reference';
 
 interface PdfGenerationJobData {
   reportType: string;
@@ -33,7 +41,6 @@ interface DeadLetterPayload {
   data: unknown;
   error: {
     message: string;
-    stack?: string;
   };
   failedAt: string;
 }
@@ -54,8 +61,11 @@ const parsePdfGenerationJobData = (
 
   if (
     typeof reportType !== 'string' ||
+    !reportType.trim() ||
     typeof userId !== 'string' ||
-    typeof companyId !== 'string'
+    !userId.trim() ||
+    typeof companyId !== 'string' ||
+    !companyId.trim()
   ) {
     return null;
   }
@@ -68,6 +78,14 @@ const parsePdfGenerationJobData = (
   };
 };
 
+function throwIfAborted(signal: AbortSignal): void {
+  if (!signal.aborted) return;
+
+  const error = new Error('Job de PDF cancelado após o timeout.');
+  error.name = 'AbortError';
+  throw error;
+}
+
 // concurrency: 3 — Puppeteer é memory-intensive (~200-400 MB por instância).
 // Não ultrapasse 3 por container; ajuste para 1 se o plano Railway for small.
 const PDF_GENERATION_CONCURRENCY = getPdfGenerationConcurrency();
@@ -76,6 +94,7 @@ const PDF_RSS_WARN_THRESHOLD_MB = parseInt(
   process.env.PDF_GENERATION_RSS_WARN_MB || '900',
   10,
 );
+const PDF_TIMEOUT_CANCELLATION_GRACE_MS = 45_000;
 
 function checkRssAndWarn(logger: { warn: (msg: object) => void }): void {
   const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
@@ -112,7 +131,12 @@ export class PdfProcessor extends WorkerHost {
   ): Promise<{ url: string | null } | void> {
     const start = Date.now();
     const jobData = parsePdfGenerationJobData(job.data);
-    const companyId = jobData?.companyId;
+    if (job.name !== 'generate' || !jobData) {
+      throw new Error(
+        `Payload inválido para job de PDF ${job.id ?? 'sem-id'}: tenantId/companyId obrigatório.`,
+      );
+    }
+    const companyId = jobData.companyId;
     const quota = await this.tenantQuota.tryAcquire('pdf', companyId);
     if (!quota.acquired) {
       const delayMs = this.tenantQuota.getDelayMs('pdf');
@@ -127,33 +151,22 @@ export class PdfProcessor extends WorkerHost {
       throw new DelayedError();
     }
     try {
-      switch (job.name) {
-        case 'generate': {
-          if (!jobData) {
-            throw new Error(
-              `Payload inválido para job de PDF ${job.id ?? 'sem-id'}.`,
-            );
-          }
-
-          const result = await this.handleGenerate(job, jobData);
-          this.metricsService.recordQueueJob(
-            'pdf-generation',
-            job.name,
-            Date.now() - start,
-            'success',
-            companyId,
-          );
-          return result;
-        }
-        default:
-          this.logger.warn(`[Job ${job.id}] Tipo desconhecido: ${job.name}`);
-          this.metricsService.recordQueueJob(
-            'pdf-generation',
-            job.name,
-            Date.now() - start,
-            'error',
-          );
-      }
+      const result = await withJobTimeout(
+        (signal) => this.handleGenerate(job, jobData, signal),
+        getPdfQueueJobTimeoutMs(),
+        { jobName: job.name, jobId: job.id, logger: this.logger },
+        {
+          waitForSettledOnTimeoutMs: PDF_TIMEOUT_CANCELLATION_GRACE_MS,
+        },
+      );
+      this.metricsService.recordQueueJob(
+        'pdf-generation',
+        job.name,
+        Date.now() - start,
+        'success',
+        companyId,
+      );
+      return result;
     } catch (err) {
       this.metricsService.recordQueueJob(
         'pdf-generation',
@@ -175,9 +188,11 @@ export class PdfProcessor extends WorkerHost {
   private async handleGenerate(
     job: Job<unknown, unknown, string>,
     data: PdfGenerationJobData,
+    signal: AbortSignal,
   ): Promise<{ url: string | null }> {
     const start = Date.now();
     const { reportType, params, userId, companyId } = data;
+    throwIfAborted(signal);
     this.logger.log({
       event: 'pdf_job_started',
       jobId: job.id,
@@ -192,15 +207,19 @@ export class PdfProcessor extends WorkerHost {
     const jobSiteScope = jobData?.siteScope as 'single' | 'all' | undefined;
     const jobSiteId = jobData?.siteId as string | undefined;
 
-    const artifact = await this.tenantService.run(
-      {
-        companyId,
-        isSuperAdmin: false,
-        siteScope: jobSiteScope ?? 'all',
-        siteId: jobSiteId,
-      },
-      async () => this.reportsService.generateBuffer(reportType, params),
+    const tenantContext = {
+      companyId,
+      isSuperAdmin: false,
+      siteScope: jobSiteScope ?? ('all' as const),
+      siteId: jobSiteId,
+    };
+    const artifact = await this.tenantService.run(tenantContext, async () =>
+      this.reportsService.generateBuffer(reportType, params, signal),
     );
+    throwIfAborted(signal);
+    if (artifact.report.company_id !== companyId) {
+      throw new Error('Tenant do relatório não coincide com o job de PDF.');
+    }
     const previousFileKey = artifact.report.pdf_file_key || null;
     const fileKey = this.documentStorageService.generateDocumentKey(
       artifact.report.company_id,
@@ -211,66 +230,120 @@ export class PdfProcessor extends WorkerHost {
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
 
     let uploadedToStorage = false;
+    let uploadedReference: AuthorizedStorageObjectReference | undefined;
     let registryEntry!: DocumentRegistryEntry;
-    try {
-      await this.documentStorageService.uploadFile(
-        fileKey,
-        artifact.buffer,
-        'application/pdf',
-      );
-      uploadedToStorage = true;
-
-      ({ registryEntry } =
-        await this.documentGovernanceService.registerFinalDocument({
-          companyId: artifact.report.company_id,
-          module: 'report',
-          entityId: artifact.report.id,
-          title: artifact.title,
-          documentDate: artifact.report.created_at,
-          documentCode: artifact.documentCode,
-          fileKey,
-          folderPath,
-          originalName: artifact.originalName,
-          mimeType: 'application/pdf',
-          fileBuffer: artifact.buffer,
-          createdBy: userId,
-          persistEntityMetadata: async (manager, computedHash) => {
-            await manager.getRepository('reports').update(artifact.report.id, {
-              pdf_file_key: fileKey,
-              pdf_folder_path: folderPath,
-              pdf_original_name: artifact.originalName,
-              pdf_file_hash: computedHash,
-              pdf_generated_at: new Date(),
-            });
-          },
-        }));
-    } catch (error) {
-      if (uploadedToStorage) {
-        await cleanupUploadedFile(
-          this.logger,
-          `pdf-report:${artifact.report.id}`,
-          fileKey,
-          (key) => this.documentStorageService.deleteFile(key),
-        );
-      }
-      throw error;
-    }
-
-    if (previousFileKey && previousFileKey !== fileKey) {
-      await this.documentStorageService
-        .deleteFile(previousFileKey)
-        .catch((error) => {
-          this.logger.warn(
-            `Falha ao limpar PDF mensal anterior (${previousFileKey}) após reemissão de ${artifact.report.id}: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
+    let registrationCommitted = false;
+    const url = await this.tenantService.run(tenantContext, async () => {
+      try {
+        throwIfAborted(signal);
+        uploadedReference =
+          await this.documentStorageService.uploadFileWithCapability(
+            this.documentStorageService.referenceForExistingObject(
+              fileKey,
+              { resourceType: 'report', resourceId: artifact.report.id },
+              'p1-document-storage-uploadFile',
+            ),
+            artifact.buffer,
+            'application/pdf',
           );
-        });
-    }
+        uploadedToStorage = true;
+        throwIfAborted(signal);
 
-    const url = await this.documentStorageService
-      .getSignedUrl(fileKey)
-      .catch(() => null);
+        ({ registryEntry } =
+          await this.documentGovernanceService.registerFinalDocument({
+            companyId: artifact.report.company_id,
+            module: 'report',
+            entityId: artifact.report.id,
+            title: artifact.title,
+            documentDate: artifact.report.created_at,
+            documentCode: artifact.documentCode,
+            fileKey,
+            folderPath,
+            originalName: artifact.originalName,
+            mimeType: 'application/pdf',
+            fileBuffer: artifact.buffer,
+            createdBy: userId,
+            persistEntityMetadata: async (manager, computedHash) => {
+              const query = manager
+                .createQueryBuilder()
+                .update('reports')
+                .set({
+                  pdf_file_key: fileKey,
+                  pdf_folder_path: folderPath,
+                  pdf_original_name: artifact.originalName,
+                  pdf_file_hash: computedHash,
+                  pdf_generated_at: new Date(),
+                })
+                .where('id = :reportId AND company_id = :companyId', {
+                  reportId: artifact.report.id,
+                  companyId,
+                })
+                .andWhere(
+                  previousFileKey
+                    ? 'pdf_file_key = :previousFileKey'
+                    : 'pdf_file_key IS NULL',
+                  previousFileKey ? { previousFileKey } : undefined,
+                );
+              const updateResult = await query.execute();
+              if (updateResult.affected !== 1) {
+                throw new Error(
+                  'Publicação do PDF perdeu a posse do relatório para outra tentativa.',
+                );
+              }
+            },
+          }));
+        registrationCommitted = true;
+        if (signal.aborted) return null;
+      } catch (error) {
+        if (uploadedToStorage && !registrationCommitted) {
+          await cleanupUploadedFile(
+            this.logger,
+            `pdf-report:${artifact.report.id}`,
+            fileKey,
+            (key) =>
+              uploadedReference && uploadedReference.key === key
+                ? this.documentStorageService.deleteFile(uploadedReference)
+                : Promise.resolve(),
+          );
+        }
+        throw error;
+      }
+
+      if (signal.aborted) return null;
+      if (previousFileKey && previousFileKey !== fileKey) {
+        await this.documentStorageService
+          .deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              previousFileKey,
+              { resourceType: 'report', resourceId: artifact.report.id },
+              'p1-document-storage-deleteFile',
+            ),
+          )
+          .catch((error) => {
+            this.logger.warn(
+              {
+                event: 'pdf_previous_file_cleanup_failed',
+                reportId: artifact.report.id,
+                keyFingerprint: storageKeyFingerprint(previousFileKey),
+                errorName:
+                  error instanceof Error ? error.name : 'unknown_error',
+              },
+              error instanceof Error ? error.stack : undefined,
+            );
+          });
+      }
+
+      const signedUrl = await this.documentStorageService
+        .getSignedUrl(
+          this.documentStorageService.referenceForExistingObject(
+            fileKey,
+            { resourceType: 'report', resourceId: artifact.report.id },
+            'p1-document-storage-getSignedUrl',
+          ),
+        )
+        .catch(() => null);
+      return signal.aborted ? null : signedUrl;
+    });
 
     this.metricsService.recordPdfGeneration(companyId, Date.now() - start);
     this.logger.log({
@@ -282,7 +355,7 @@ export class PdfProcessor extends WorkerHost {
       sizeBytes: artifact.buffer.length,
       durationMs: Date.now() - start,
       reportId: artifact.report.id,
-      fileKey,
+      keyFingerprint: storageKeyFingerprint(fileKey),
       documentCode: registryEntry.document_code || artifact.documentCode,
       rssMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
     });
@@ -311,10 +384,15 @@ export class PdfProcessor extends WorkerHost {
     const maxAttempts = job.opts.attempts ?? 1;
     const isFinal = job.attemptsMade >= maxAttempts;
 
-    this.logger.error(
-      `[Job ${job.id}] Falhou${isFinal ? ' definitivamente' : ''}. Tipo: ${job.name}. Erro: ${error.message}`,
-      error.stack,
-    );
+    this.logger.error({
+      event: 'pdf_generation_job_failed',
+      jobId: job.id,
+      jobName: job.name,
+      attemptsMade: job.attemptsMade,
+      finalAttempt: isFinal,
+      companyId: jobData?.companyId,
+      errorName: error.name || 'unknown_error',
+    });
 
     if (!isFinal) return;
 
@@ -337,11 +415,7 @@ export class PdfProcessor extends WorkerHost {
         // job.data pode conter HTML gerado — truncar para evitar payload gigante na DLQ
         data: this.sanitizeJobDataForDlq(job.data),
         error: {
-          message: error.message,
-          stack:
-            process.env.NODE_ENV === 'production'
-              ? error.stack?.split('\n').slice(0, 3).join('\n')
-              : error.stack,
+          message: error.name || 'UnknownError',
         },
         failedAt: new Date().toISOString(),
       };

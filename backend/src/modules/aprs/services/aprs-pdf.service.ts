@@ -20,7 +20,6 @@ import { DocumentGovernanceService } from '../../document-registry/document-gove
 import { SignaturesService } from '../../signatures/signatures.service';
 import type { Signature } from '../../signatures/entities/signature.entity';
 import { PublicValidationGrantService } from '../../../shared/services/public-validation-grant.service';
-import { StorageService } from '../../../shared/services/storage.service';
 import { AprLog } from '../entities/apr-log.entity';
 import { AprRiskEvidence } from '../entities/apr-risk-evidence.entity';
 import { Apr, AprStatus } from '../entities/apr.entity';
@@ -36,6 +35,7 @@ const APR_PDF_LOG_ACTIONS = {
 } as const;
 
 const APR_PUBLIC_VALIDATION_PORTAL = 'apr_public_validation';
+const MAX_APR_LOGO_BYTES = 2 * 1024 * 1024;
 
 type AprPdfLogAction =
   (typeof APR_PDF_LOG_ACTIONS)[keyof typeof APR_PDF_LOG_ACTIONS];
@@ -64,7 +64,6 @@ export class AprsPdfService {
     @Inject(forwardRef(() => SignaturesService))
     private readonly signaturesService: SignaturesService,
     private readonly publicValidationGrantService: PublicValidationGrantService,
-    private readonly storageService: StorageService,
   ) {}
 
   private ensureAprStatus(status: string): AprStatus {
@@ -315,6 +314,54 @@ export class AprsPdfService {
       return value;
     }
     return null;
+  }
+
+  /**
+   * Materializa a logo governada antes do Chromium. O renderer não recebe
+   * presigned URL: requests externas durante PDF são bloqueadas pelo
+   * PdfService.
+   */
+  private async resolveAprCompanyLogoDataUri(
+    storageKey: string,
+    companyId: string,
+  ): Promise<string | null> {
+    const buffer = await this.documentStorageService.downloadFileBuffer(
+      this.documentStorageService.referenceForExistingObject(
+        storageKey,
+        { resourceType: 'company', resourceId: companyId },
+        'company-logo',
+      ),
+    );
+    if (buffer.length === 0 || buffer.length > MAX_APR_LOGO_BYTES) {
+      return null;
+    }
+
+    let mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | null = null;
+    if (
+      buffer.length >= 8 &&
+      buffer
+        .subarray(0, 8)
+        .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    ) {
+      mimeType = 'image/png';
+    } else if (
+      buffer.length >= 3 &&
+      buffer[0] === 0xff &&
+      buffer[1] === 0xd8 &&
+      buffer[2] === 0xff
+    ) {
+      mimeType = 'image/jpeg';
+    } else if (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    ) {
+      mimeType = 'image/webp';
+    }
+
+    return mimeType
+      ? `data:${mimeType};base64,${buffer.toString('base64')}`
+      : null;
   }
 
   private buildAprSignatureProofLabel(input: {
@@ -646,7 +693,7 @@ export class AprsPdfService {
     signatures: Signature[];
     evidences: AprRiskEvidence[];
     isSuperseded?: boolean;
-    logoUrl?: string | null;
+    logoDataUri?: string | null;
     authenticity?: AprPdfAuthenticityMetadata;
   }): Promise<string> {
     const {
@@ -655,7 +702,7 @@ export class AprsPdfService {
       signatures,
       evidences,
       isSuperseded,
-      logoUrl,
+      logoDataUri,
       authenticity,
     } = input;
     const riskItems = this.normalizeAprRiskItemsForPdf(apr);
@@ -691,7 +738,7 @@ export class AprsPdfService {
               event: 'apr_pdf_signature_data_resolve_failed',
               aprId: apr.id,
               signatureId: signature.id,
-              error: error instanceof Error ? error.message : String(error),
+              errorName: error instanceof Error ? error.name : 'unknown_error',
             });
             return null;
           });
@@ -1871,11 +1918,11 @@ export class AprsPdfService {
                 <table class="doc-title-table">
                   <tr>
                     ${
-                      logoUrl
-                        ? `<td class="logo-box"><img src="${logoUrl}" class="logo-img" alt="Logo" /></td>`
+                      logoDataUri
+                        ? `<td class="logo-box"><img src="${this.escapeHtml(logoDataUri)}" class="logo-img" alt="Logo" /></td>`
                         : ''
                     }
-                    <td class="doc-title-main" style="width: ${logoUrl ? '70%' : '84%'}">APR - ANÁLISE PRELIMINAR DE RISCOS</td>
+                    <td class="doc-title-main" style="width: ${logoDataUri ? '70%' : '84%'}">APR - ANÁLISE PRELIMINAR DE RISCOS</td>
                     <td class="doc-code-box">
                       <div><strong>Código</strong></div>
                       <div>${this.escapeHtml(documentCode)}</div>
@@ -2141,7 +2188,14 @@ export class AprsPdfService {
     let message: string | null = null;
     try {
       url = await this.documentStorageService.getSignedUrl(
-        apr.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          apr.pdf_file_key,
+          {
+            resourceType: 'apr',
+            resourceId: apr.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
         3600,
       );
     } catch {
@@ -2188,11 +2242,16 @@ export class AprsPdfService {
       input.originalName,
       { folderSegments: ['sites', apr.site_id] },
     );
-    await this.documentStorageService.uploadFile(
-      key,
-      input.buffer,
-      input.mimeType,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          key,
+          { resourceType: 'apr', resourceId: apr.id },
+          'p1-document-storage-uploadFile',
+        ),
+        input.buffer,
+        input.mimeType,
+      );
     const uploadedToStorage = true;
     const folder = key.split('/').slice(0, -1).join('/');
     const verificationCode =
@@ -2239,7 +2298,10 @@ export class AprsPdfService {
           this.logger,
           `apr:${apr.id}`,
           key,
-          (fileKey) => this.documentStorageService.deleteFile(fileKey),
+          (fileKey) =>
+            uploadedReference.key === fileKey
+              ? this.documentStorageService.deleteFile(uploadedReference)
+              : Promise.resolve(),
         );
       }
       throw error;
@@ -2297,11 +2359,12 @@ export class AprsPdfService {
       ]);
 
       // Resolve company logo if available
-      let logoUrl: string | null = null;
+      let logoDataUri: string | null = null;
       if (full.company?.logo_storage_key) {
         try {
-          logoUrl = await this.storageService.getPresignedInlineViewUrl(
+          logoDataUri = await this.resolveAprCompanyLogoDataUri(
             full.company.logo_storage_key,
+            full.company_id,
           );
         } catch {
           this.logger.warn(
@@ -2316,7 +2379,7 @@ export class AprsPdfService {
         signatures,
         evidences,
         isSuperseded: true,
-        logoUrl,
+        logoDataUri,
       });
       const generatedAt = new Date();
       const buffer = await this.pdfService.generateFromHtml(html, {
@@ -2386,11 +2449,12 @@ export class AprsPdfService {
     const generatedAt = new Date();
 
     // Resolve company logo if available
-    let logoUrl: string | null = null;
+    let logoDataUri: string | null = null;
     if (apr.company?.logo_storage_key) {
       try {
-        logoUrl = await this.storageService.getPresignedInlineViewUrl(
+        logoDataUri = await this.resolveAprCompanyLogoDataUri(
           apr.company.logo_storage_key,
+          apr.company_id,
         );
       } catch {
         this.logger.warn(`Falha ao resolver URL da logo para PDF da APR ${id}`);
@@ -2403,7 +2467,7 @@ export class AprsPdfService {
       signatures,
       evidences,
       isSuperseded: supersedingRow != null,
-      logoUrl,
+      logoDataUri,
       authenticity: {
         verificationCode,
         generatedAt,

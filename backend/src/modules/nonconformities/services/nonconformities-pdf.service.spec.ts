@@ -1,9 +1,9 @@
 import { EntityManager, Repository } from 'typeorm';
 import type { TenantService } from '../../../shared/tenant/tenant.service';
 import type { DocumentStorageService } from '../../../shared/services/document-storage.service';
-import type { StorageService } from '../../../shared/services/storage.service';
 import type { PdfService } from '../../../shared/services/pdf.service';
 import type { DocumentGovernanceService } from '../../document-registry/document-governance.service';
+import { markAuthorizedStorageReference } from '../../../shared/storage/storage-object-reference';
 import type { PublicValidationGrantService } from '../../../shared/services/public-validation-grant.service';
 import { NonConformity } from '../entities/nonconformity.entity';
 import { NcStatus } from '../nonconformities.service';
@@ -34,8 +34,9 @@ describe('NonConformitiesPdfService', () => {
     | 'deleteFile'
     | 'getSignedUrl'
     | 'downloadFileBuffer'
+    | 'referenceForExistingObject'
+    | 'uploadFileWithCapability'
   >;
-  let storageService: Pick<StorageService, 'downloadFileBuffer'>;
   let pdfService: Pick<PdfService, 'generateFromHtml' | 'computeHash'>;
   let documentGovernanceService: Pick<
     DocumentGovernanceService,
@@ -118,19 +119,28 @@ describe('NonConformitiesPdfService', () => {
       })),
     };
     documentStorageService = {
+      referenceForExistingObject: jest.fn((key: string) => ({
+        tenantId: 'company-1',
+        key,
+        owner: { resourceType: 'test', resourceId: key },
+        purpose: 'test',
+        legacy: !key.startsWith('documents/company-1/'),
+      })),
       generateDocumentKey: jest.fn(
         () =>
           'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
       ),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
-      getSignedUrl: jest.fn((key: string) =>
-        Promise.resolve(`https://signed.example/${encodeURIComponent(key)}`),
+      getSignedUrl: jest.fn((reference) =>
+        Promise.resolve(
+          `https://signed.example/${encodeURIComponent(reference.key)}`,
+        ),
       ),
       downloadFileBuffer: jest.fn(() => Promise.resolve(Buffer.from('img'))),
-    };
-    storageService = {
-      downloadFileBuffer: jest.fn().mockResolvedValue(Buffer.from('')),
     };
     pdfService = {
       generateFromHtml: jest.fn(() => Promise.resolve(Buffer.from('%PDF-1.4'))),
@@ -168,7 +178,6 @@ describe('NonConformitiesPdfService', () => {
       ncRepository as unknown as Repository<NonConformity>,
       tenantService as TenantService,
       documentStorageService as DocumentStorageService,
-      storageService as StorageService,
       pdfService as PdfService,
       documentGovernanceService as DocumentGovernanceService,
       workflowLock as unknown as NonConformityWorkflowLockService,
@@ -213,8 +222,12 @@ describe('NonConformitiesPdfService', () => {
     const result = await service.generateFinalPdf('nc-1', 'user-1');
 
     expect(pdfService.generateFromHtml).toHaveBeenCalled();
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      }),
       expect.any(Buffer),
       'application/pdf',
     );
@@ -243,7 +256,7 @@ describe('NonConformitiesPdfService', () => {
     await service.generateFinalPdf('nc-1', 'user-1');
 
     expect(assertLeaseHealthy).toHaveBeenCalledTimes(4);
-    expect(documentStorageService.uploadFile).toHaveBeenCalled();
+    expect(documentStorageService.uploadFileWithCapability).toHaveBeenCalled();
     expect(documentGovernanceService.registerFinalDocument).toHaveBeenCalled();
   });
 
@@ -319,7 +332,9 @@ describe('NonConformitiesPdfService', () => {
     );
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      }),
     );
   });
 
@@ -349,7 +364,9 @@ describe('NonConformitiesPdfService', () => {
     });
     expect(builder.andWhere).toHaveBeenCalledWith('pdf_file_key IS NULL');
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      }),
     );
   });
 
@@ -388,7 +405,9 @@ describe('NonConformitiesPdfService', () => {
     expect(result.generated).toBe(false);
     expect(result.fileKey).toBe(currentNc.pdf_file_key);
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/nonconformities/sites/site-1/nc-1/nc-final.pdf',
+      }),
     );
   });
 
@@ -459,7 +478,9 @@ describe('NonConformitiesPdfService', () => {
     ]);
 
     expect(pdfService.generateFromHtml).toHaveBeenCalledTimes(1);
-    expect(documentStorageService.uploadFile).toHaveBeenCalledTimes(1);
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledTimes(1);
     expect(first.generated).toBe(true);
     expect(second.generated).toBe(false);
     expect(first.fileKey).toBe(currentNc.pdf_file_key);
@@ -542,7 +563,7 @@ describe('NonConformitiesPdfService', () => {
   });
 
   it('incorpora a logo de storage como data URI, sem depender de rede externa', async () => {
-    (storageService.downloadFileBuffer as jest.Mock).mockResolvedValue(
+    (documentStorageService.downloadFileBuffer as jest.Mock).mockResolvedValue(
       Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
     );
     ncRepository.findOne.mockResolvedValue({

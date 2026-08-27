@@ -332,18 +332,22 @@ export class HealthController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.SUPER_ADMIN)
   @Authorize('can_view_system_health')
-  puppeteer() {
+  async puppeteer() {
     try {
-      const stats = this.puppeteerPool.getPoolStats();
-      const ready = stats.total > 0 && stats.available > 0 && stats.inUse >= 0;
+      const probe = await this.puppeteerPool.probeRuntime();
       return {
-        status: ready ? 'up' : 'degraded',
-        pool: stats,
+        status: 'up',
+        runtime: {
+          durationMs: probe.durationMs,
+          pool: probe.stats,
+        },
       };
     } catch (error) {
+      const stats = this.puppeteerPool.getPoolStats();
       return {
         status: 'down',
-        message: error instanceof Error ? error.message : String(error),
+        error: error instanceof Error ? error.name : 'UnknownError',
+        pool: stats,
       };
     }
   }

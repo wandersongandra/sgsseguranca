@@ -1380,7 +1380,15 @@ export class DocumentStorageService {
       'p1-document-storage-moveFile',
       'p1-document-storage-replaceFile',
     ]);
-    return boundedPurposes.has(purpose);
+    if (boundedPurposes.has(purpose)) return true;
+
+    const registryPurpose = purpose.split(':');
+    return (
+      registryPurpose.length === 3 &&
+      registryPurpose[0] === 'document-registry' &&
+      registryPurpose[2] === 'pdf' &&
+      this.isRegistryOwnerType(registryPurpose[1])
+    );
   }
 
   private assertNewUploadReference(

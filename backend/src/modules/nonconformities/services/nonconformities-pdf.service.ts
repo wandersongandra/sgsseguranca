@@ -9,6 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
 import { randomBytes } from 'crypto';
+import { createHash } from 'node:crypto';
 import QRCode from 'qrcode';
 import { NonConformity } from '../entities/nonconformity.entity';
 import { NcStatus } from '../nonconformities.service';
@@ -18,7 +19,6 @@ import {
   resolveSiteAccessScopeFromTenantService,
 } from '../../../shared/tenant/site-access-scope.util';
 import { DocumentStorageService } from '../../../shared/services/document-storage.service';
-import { StorageService } from '../../../shared/services/storage.service';
 import { PdfService } from '../../../shared/services/pdf.service';
 import { DocumentGovernanceService } from '../../document-registry/document-governance.service';
 import { cleanupUploadedFile } from '../../../shared/storage/storage-compensation.util';
@@ -87,7 +87,6 @@ export class NonConformitiesPdfService {
     private readonly nonConformitiesRepository: Repository<NonConformity>,
     private readonly tenantService: TenantService,
     private readonly documentStorageService: DocumentStorageService,
-    private readonly storageService: StorageService,
     private readonly pdfService: PdfService,
     private readonly documentGovernanceService: DocumentGovernanceService,
     private readonly workflowLock: NonConformityWorkflowLockService,
@@ -144,7 +143,14 @@ export class NonConformitiesPdfService {
 
     try {
       const url = await this.documentStorageService.getSignedUrl(
-        nc.pdf_file_key,
+        this.documentStorageService.referenceForExistingObject(
+          nc.pdf_file_key,
+          {
+            resourceType: 'nonconformity',
+            resourceId: nc.id,
+          },
+          'p1-document-storage-getSignedUrl',
+        ),
       );
       return {
         entityId: nc.id,
@@ -157,9 +163,11 @@ export class NonConformitiesPdfService {
         message: null,
       };
     } catch (error) {
-      this.logger.warn(
-        `Falha ao obter URL assinada do PDF final da NC ${id}: ${error instanceof Error ? error.message : 'unknown'}`,
-      );
+      this.logger.warn({
+        event: 'nonconformity_final_pdf_signed_url_failed',
+        nonconformityId: id,
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+      });
       return {
         entityId: nc.id,
         hasFinalPdf: true,
@@ -221,6 +229,7 @@ export class NonConformitiesPdfService {
       try {
         logoDataUri = await this.resolveCompanyLogoDataUri(
           nc.company.logo_storage_key,
+          nc.company_id,
         );
       } catch {
         this.logger.warn(
@@ -327,11 +336,16 @@ export class NonConformitiesPdfService {
     const folderPath = fileKey.split('/').slice(0, -1).join('/');
 
     input.assertLeaseHealthy();
-    await this.documentStorageService.uploadFile(
-      fileKey,
-      input.buffer,
-      input.mimeType,
-    );
+    const uploadedReference =
+      await this.documentStorageService.uploadFileWithCapability(
+        this.documentStorageService.referenceForExistingObject(
+          fileKey,
+          { resourceType: 'nonconformity', resourceId: nc.id },
+          'p1-document-storage-uploadFile',
+        ),
+        input.buffer,
+        input.mimeType,
+      );
 
     try {
       input.assertLeaseHealthy();
@@ -384,7 +398,10 @@ export class NonConformitiesPdfService {
         this.logger,
         `nonconformity:${nc.id}`,
         fileKey,
-        (key) => this.documentStorageService.deleteFile(key),
+        (key) =>
+          uploadedReference.key === key
+            ? this.documentStorageService.deleteFile(uploadedReference)
+            : Promise.resolve(),
       );
       throw error;
     }
@@ -520,8 +537,15 @@ export class NonConformitiesPdfService {
    */
   private async resolveCompanyLogoDataUri(
     storageKey: string,
+    companyId: string,
   ): Promise<string | null> {
-    const buffer = await this.storageService.downloadFileBuffer(storageKey);
+    const buffer = await this.documentStorageService.downloadFileBuffer(
+      this.documentStorageService.referenceForExistingObject(
+        storageKey,
+        { resourceType: 'company', resourceId: companyId },
+        'p1-document-storage-downloadFileBuffer',
+      ),
+    );
     if (buffer.length === 0 || buffer.length > MAX_COMPANY_LOGO_BYTES) {
       this.logger.warn(
         `Logo da empresa ignorado no PDF da NC: tamanho inválido (${buffer.length} bytes)`,
@@ -684,7 +708,14 @@ export class NonConformitiesPdfService {
           }
           try {
             const buffer = await this.documentStorageService.downloadFileBuffer(
-              governed.fileKey,
+              this.documentStorageService.referenceForExistingObject(
+                governed.fileKey,
+                {
+                  resourceType: 'nc-attachment',
+                  resourceId: nc.id,
+                },
+                'p1-document-storage-downloadFileBuffer',
+              ),
             );
             const mimeType = this.resolveSupportedImageMimeType(buffer);
             if (!mimeType) {
@@ -699,9 +730,14 @@ export class NonConformitiesPdfService {
               buffer,
             );
           } catch (error) {
-            this.logger.warn(
-              `Falha ao incorporar anexo governado no PDF (${governed.fileKey}): ${error instanceof Error ? error.message : 'unknown'}`,
-            );
+            this.logger.warn({
+              event: 'nonconformity_governed_attachment_embed_failed',
+              keyFingerprint: createHash('sha256')
+                .update(governed.fileKey)
+                .digest('hex')
+                .slice(0, 16),
+              errorName: error instanceof Error ? error.name : 'unknown_error',
+            });
             unembeddedAttachments.push(
               `${label} (falha ao carregar a pré-visualização; disponível no storage oficial da não conformidade)`,
             );

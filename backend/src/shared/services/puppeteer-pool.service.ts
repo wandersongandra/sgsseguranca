@@ -34,6 +34,8 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
   private readonly maxPageTimeout = getPdfPageTimeoutMs();
   private readonly acquireTimeoutMs = getPdfBrowserAcquireTimeoutMs();
   private readonly maxUsesPerBrowser = getPdfBrowserMaxUses();
+  private browserLaunchQueue: Promise<void> = Promise.resolve();
+  private readonly pageOwners = new WeakMap<Page, PooledBrowser>();
   private cleanupInterval?: NodeJS.Timeout;
 
   onModuleInit() {
@@ -70,11 +72,7 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
 
     if (!pooledBrowser) {
       if (this.browserPool.length < this.poolSize) {
-        const nextId =
-          this.browserPool.length === 0
-            ? 0
-            : Math.max(...this.browserPool.map((b) => b.id)) + 1;
-        await this.addBrowserToPool(nextId);
+        await this.addBrowserToPool();
         pooledBrowser = this.browserPool.find((b) => !b.inUse);
       }
       if (!pooledBrowser) {
@@ -121,20 +119,33 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
+    let page: Page | undefined;
     try {
-      const page = await pooledBrowser.browser.newPage();
+      page = await pooledBrowser.browser.newPage();
 
       // Configurar timeout da página
       page.setDefaultTimeout(this.maxPageTimeout);
       page.setDefaultNavigationTimeout(this.maxPageTimeout);
+      await page.setJavaScriptEnabled(false);
 
       // Limpar listeners ao fechar página
       page.on('error', (error) => {
         this.logger.error('Erro na página:', error);
       });
 
+      this.pageOwners.set(page, pooledBrowser);
       return page;
     } catch (error) {
+      if (page) {
+        try {
+          await page.close();
+        } catch (closeError) {
+          this.logger.warn(
+            'Erro ao limpar página após falha de inicialização:',
+            closeError,
+          );
+        }
+      }
       pooledBrowser.inUse = false;
       this.logger.error(
         `Erro ao criar página no browser ${pooledBrowser.id}:`,
@@ -148,15 +159,14 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
   }
 
   async releasePage(page: Page): Promise<void> {
+    const pooledBrowser = this.pageOwners.get(page);
+    this.pageOwners.delete(page);
+
     try {
       await page.close();
     } catch (error) {
       this.logger.error('Erro ao fechar página:', error);
     }
-
-    // Identificar corretamente o browser dono da página
-    const browser = page.browser();
-    const pooledBrowser = this.browserPool.find((b) => b.browser === browser);
 
     if (pooledBrowser) {
       pooledBrowser.inUse = false;
@@ -241,8 +251,30 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async addBrowserToPool(id: number): Promise<void> {
+  private async addBrowserToPool(): Promise<void> {
+    let releaseLaunchQueue!: () => void;
+    const previousLaunch = this.browserLaunchQueue;
+    this.browserLaunchQueue = new Promise<void>((resolve) => {
+      releaseLaunchQueue = resolve;
+    });
+
+    await previousLaunch;
+
+    let id = -1;
     try {
+      // Outra requisição pode ter criado um browser enquanto esta aguardava a
+      // fila. Evita lançar browsers extras em uma onda concorrente de getPage.
+      if (
+        this.browserPool.length >= this.poolSize ||
+        this.browserPool.some((browser) => !browser.inUse)
+      ) {
+        return;
+      }
+
+      id =
+        this.browserPool.length === 0
+          ? 0
+          : Math.max(...this.browserPool.map((browser) => browser.id)) + 1;
       const { browser, userDataDir } = await this.launchBrowser();
       this.browserPool.push({
         id,
@@ -264,7 +296,40 @@ export class PuppeteerPoolService implements OnModuleInit, OnModuleDestroy {
         return;
       }
       this.logger.error(`Erro ao inicializar browser ${id}: ${String(error)}`);
+    } finally {
+      releaseLaunchQueue();
     }
+  }
+
+  /**
+   * Sonda leve do runtime real. Não gera PDF nem faz request externo: cria
+   * uma página, renderiza um HTML mínimo com JavaScript desabilitado e libera
+   * a página pelo mesmo caminho usado pela geração.
+   */
+  async probeRuntime(): Promise<{
+    durationMs: number;
+    stats: ReturnType<PuppeteerPoolService['getPoolStats']>;
+  }> {
+    const startedAt = Date.now();
+    let page: Page | undefined;
+    try {
+      page = await this.getPage();
+      await page.setContent(
+        '<!doctype html><html lang="pt-BR"><body>SGS PDF runtime probe</body></html>',
+        {
+          waitUntil: 'domcontentloaded',
+          timeout: Math.min(this.maxPageTimeout, 5_000),
+        },
+      );
+    } finally {
+      if (page) {
+        await this.releasePage(page);
+      }
+    }
+    return {
+      durationMs: Date.now() - startedAt,
+      stats: this.getPoolStats(),
+    };
   }
 
   /**

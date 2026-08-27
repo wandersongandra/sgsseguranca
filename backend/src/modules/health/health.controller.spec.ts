@@ -13,6 +13,18 @@ describe('HealthController readiness', () => {
       get: jest.fn().mockResolvedValue('ok'),
       del: jest.fn().mockResolvedValue(undefined),
     };
+    const puppeteerPool = {
+      getPoolStats: jest.fn().mockReturnValue({
+        total: 0,
+        inUse: 0,
+        available: 0,
+        poolSize: 2,
+      }),
+      probeRuntime: jest.fn().mockResolvedValue({
+        durationMs: 12,
+        stats: { total: 1, inUse: 0, available: 1, poolSize: 2 },
+      }),
+    };
     const controller = new HealthController(
       { check: jest.fn() } as never,
       {
@@ -25,7 +37,7 @@ describe('HealthController readiness', () => {
       redis as never,
       redis as never,
       redis as never,
-      {} as never,
+      puppeteerPool as never,
       {} as never,
       // PrivilegedDbService — só usado por /health/detailed.
       { isEnabled: () => true } as never,
@@ -33,7 +45,7 @@ describe('HealthController readiness', () => {
       undefined,
     );
 
-    return { controller, redis, cacheManager };
+    return { controller, redis, cacheManager, puppeteerPool };
   }
 
   it('só retorna ready após validar banco, quatro tiers e cache distribuído', async () => {
@@ -77,5 +89,31 @@ describe('HealthController readiness', () => {
     expect(cacheManager.set).toHaveBeenCalledTimes(1);
     expect(cacheManager.get).toHaveBeenCalledTimes(1);
     expect(cacheManager.del).toHaveBeenCalledTimes(1);
+  });
+
+  it('executa probe leve real do runtime Puppeteer na rota administrativa', async () => {
+    const { controller, puppeteerPool } = createController();
+
+    await expect(controller.puppeteer()).resolves.toEqual({
+      status: 'up',
+      runtime: {
+        durationMs: 12,
+        pool: { total: 1, inUse: 0, available: 1, poolSize: 2 },
+      },
+    });
+    expect(puppeteerPool.probeRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('não expõe a mensagem bruta da falha do Chromium', async () => {
+    const { controller, puppeteerPool } = createController();
+    puppeteerPool.probeRuntime.mockRejectedValue(
+      new Error('secret path /tmp/private-profile'),
+    );
+
+    await expect(controller.puppeteer()).resolves.toEqual({
+      status: 'down',
+      error: 'Error',
+      pool: { total: 0, inUse: 0, available: 0, poolSize: 2 },
+    });
   });
 });

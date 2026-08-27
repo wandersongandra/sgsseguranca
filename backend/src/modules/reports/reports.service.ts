@@ -47,6 +47,14 @@ type MonthRange = {
   nextMonth: string;
 };
 
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+
+  const error = new Error('Geração de PDF cancelada após o timeout.');
+  error.name = 'AbortError';
+  throw error;
+}
+
 export type ReportPdfAccessAvailability =
   'not_emitted' | 'ready' | 'registered_without_signed_url';
 
@@ -401,6 +409,7 @@ export class ReportsService {
   async generateBuffer(
     reportType: string,
     params: unknown,
+    signal?: AbortSignal,
   ): Promise<GeneratedReportArtifact> {
     switch (reportType) {
       case 'monthly': {
@@ -417,7 +426,13 @@ export class ReportsService {
             'Parâmetros obrigatórios ausentes para relatório mensal (companyId, year, month)',
           );
         }
-        return this.generateMonthlyReport(companyId, year, month, generatedBy);
+        return this.generateMonthlyReport(
+          companyId,
+          year,
+          month,
+          generatedBy,
+          signal,
+        );
       }
       default:
         throw new BadRequestException(
@@ -431,7 +446,9 @@ export class ReportsService {
     year: number,
     month: number,
     generatedBy?: string,
+    signal?: AbortSignal,
   ): Promise<GeneratedReportArtifact> {
+    throwIfAborted(signal);
     const { siteId, siteScope, isSuperAdmin } = this.getTenantContextOrThrow();
 
     // Defense-in-depth: ensure the tenant context company matches the job params (protects against tampered jobs)
@@ -456,11 +473,14 @@ export class ReportsService {
       throw new NotFoundException('Empresa nao encontrada.');
     }
 
+    throwIfAborted(signal);
+
     const logoDataUrl = await this.resolveLogoDataUrl(
       companyId,
       company.logo_storage_key,
       company.logo_content_type,
     );
+    throwIfAborted(signal);
     const logoHtml: string | null = logoDataUrl
       ? `<img src="${logoDataUrl}" alt="Logo" style="max-height:30px;max-width:120px;object-fit:contain;" />`
       : null;
@@ -470,6 +490,7 @@ export class ReportsService {
       async () =>
         this.buildMonthlyReportRecord(companyId, year, month, generatedBy),
     );
+    throwIfAborted(signal);
 
     const html = this.buildMonthlyReportHtml({
       companyName: company.razao_social,
@@ -480,21 +501,27 @@ export class ReportsService {
       logoHtml,
     });
 
-    const buffer = await this.pdfService.generateFromHtml(html, {
-      landscape: true,
-      preferCssPageSize: true,
-      displayHeaderFooter: true,
-      headerTemplate: '<div></div>',
-      footerTemplate: this.buildMonthlyReportFooterTemplate(
-        company.razao_social,
-      ),
-      margin: {
-        top: '0mm',
-        right: '0mm',
-        bottom: '8mm',
-        left: '0mm',
+    throwIfAborted(signal);
+    const buffer = await this.pdfService.generateFromHtml(
+      html,
+      {
+        landscape: true,
+        preferCssPageSize: true,
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: this.buildMonthlyReportFooterTemplate(
+          company.razao_social,
+        ),
+        margin: {
+          top: '0mm',
+          right: '0mm',
+          bottom: '8mm',
+          left: '0mm',
+        },
       },
-    });
+      signal,
+    );
+    throwIfAborted(signal);
 
     return {
       buffer,

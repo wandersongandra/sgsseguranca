@@ -116,4 +116,98 @@ describe('PuppeteerPoolService', () => {
       }),
     );
   });
+
+  it('serializa o bootstrap e não lança browsers além do pool em concorrência', async () => {
+    process.env.PDF_BROWSER_POOL_SIZE = '2';
+    let launchCount = 0;
+    const browser = {
+      connected: true,
+      process: jest.fn(() => ({ pid: 9000 })),
+      close: jest.fn().mockResolvedValue(undefined),
+      newPage: jest.fn().mockImplementation(() =>
+        Promise.resolve({
+          setDefaultTimeout: jest.fn(),
+          setDefaultNavigationTimeout: jest.fn(),
+          setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
+          on: jest.fn(),
+          close: jest.fn().mockResolvedValue(undefined),
+          setContent: jest.fn().mockResolvedValue(undefined),
+        }),
+      ),
+    } as never;
+    jest.spyOn(puppeteer, 'launch').mockImplementation(async () => {
+      launchCount += 1;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      return browser;
+    });
+
+    const service = new PuppeteerPoolService();
+    await Promise.all(
+      Array.from({ length: 5 }, async () => {
+        const page = await service.getPage();
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        await service.releasePage(page);
+      }),
+    );
+    await service.onModuleDestroy();
+
+    expect(launchCount).toBeLessThanOrEqual(2);
+  });
+
+  it('retorna estatísticas após liberar a página do probe', async () => {
+    const page = {
+      setDefaultTimeout: jest.fn(),
+      setDefaultNavigationTimeout: jest.fn(),
+      setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
+      on: jest.fn(),
+      setContent: jest.fn().mockResolvedValue(undefined),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      connected: true,
+      process: jest.fn(() => ({ pid: 9010 })),
+      close: jest.fn().mockResolvedValue(undefined),
+      newPage: jest.fn().mockResolvedValue(page),
+    } as never;
+    jest.spyOn(puppeteer, 'launch').mockResolvedValue(browser);
+
+    const service = new PuppeteerPoolService();
+    await expect(service.probeRuntime()).resolves.toMatchObject({
+      stats: { inUse: 0, available: 1 },
+    });
+    expect(page.close).toHaveBeenCalledTimes(1);
+    await service.onModuleDestroy();
+  });
+
+  it('fecha a página quando a configuração segura falha', async () => {
+    process.env.PDF_BROWSER_POOL_SIZE = '1';
+    const page = {
+      setDefaultTimeout: jest.fn(),
+      setDefaultNavigationTimeout: jest.fn(),
+      setJavaScriptEnabled: jest
+        .fn()
+        .mockRejectedValue(new Error('javascript setup failed')),
+      on: jest.fn(),
+      close: jest.fn().mockResolvedValue(undefined),
+    };
+    const browser = {
+      connected: true,
+      process: jest.fn(() => ({ pid: 9020 })),
+      close: jest.fn().mockResolvedValue(undefined),
+      newPage: jest.fn().mockResolvedValue(page),
+    } as never;
+    jest.spyOn(puppeteer, 'launch').mockResolvedValue(browser);
+
+    const service = new PuppeteerPoolService();
+
+    await expect(service.getPage()).rejects.toThrow('javascript setup failed');
+
+    expect(page.close).toHaveBeenCalledTimes(1);
+    expect(service.getPoolStats()).toMatchObject({
+      total: 1,
+      inUse: 0,
+      available: 1,
+    });
+    await service.onModuleDestroy();
+  });
 });

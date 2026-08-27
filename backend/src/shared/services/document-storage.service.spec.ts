@@ -229,6 +229,36 @@ describe('DocumentStorageService', () => {
     });
   });
 
+  it('aceita somente finalidades document-registry de PDF para objetos registrados', async () => {
+    const issueRestrictedAppDownloadUrl = jest
+      .fn()
+      .mockResolvedValue('/storage/download/token');
+    const service = new DocumentStorageService(
+      createConfigService({ AWS_BUCKET_NAME: 'managed-bucket' }),
+      {} as S3Service,
+      {
+        getTenantId: jest.fn().mockReturnValue(tenantId),
+      } as unknown as TenantService,
+      {
+        issueRestrictedAppDownloadUrl,
+      } as unknown as DocumentDownloadGrantService,
+      createDataSource(),
+    );
+
+    await expect(
+      service.getSignedUrl(
+        service.createReference({
+          tenantId,
+          key: 'documents/company-1/reports/report-1/report.pdf',
+          owner: { resourceType: 'report', resourceId: 'report-1' },
+          purpose: 'document-registry:report:pdf',
+        }),
+      ),
+    ).resolves.toBe('/storage/download/token');
+
+    expect(issueRestrictedAppDownloadUrl).toHaveBeenCalled();
+  });
+
   it('permite TTL explícito de até 4h apenas via fluxo de e-mail', async () => {
     const getEmailLinkSignedUrl = jest.fn().mockResolvedValue('signed-url');
     const service = new DocumentStorageService(

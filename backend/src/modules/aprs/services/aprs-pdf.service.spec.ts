@@ -7,6 +7,7 @@ import type { SignaturesService } from '../../signatures/signatures.service';
 import { AprLog } from '../entities/apr-log.entity';
 import { Apr, AprStatus } from '../entities/apr.entity';
 import { AprsPdfService } from './aprs-pdf.service';
+import { markAuthorizedStorageReference } from '../../../shared/storage/storage-object-reference';
 
 type RegisterFinalDocumentInput = Parameters<
   DocumentGovernanceService['registerFinalDocument']
@@ -28,7 +29,12 @@ describe('AprsPdfService', () => {
   let tenantService: Pick<TenantService, 'getTenantId' | 'getContext'>;
   let documentStorageService: Pick<
     DocumentStorageService,
-    'generateDocumentKey' | 'uploadFile' | 'deleteFile' | 'getSignedUrl'
+    | 'generateDocumentKey'
+    | 'referenceForExistingObject'
+    | 'uploadFile'
+    | 'uploadFileWithCapability'
+    | 'deleteFile'
+    | 'getSignedUrl'
   >;
   let pdfService: Pick<PdfService, 'generateFromHtml'>;
   let documentGovernanceService: Pick<
@@ -72,13 +78,30 @@ describe('AprsPdfService', () => {
       })),
     };
     documentStorageService = {
+      referenceForExistingObject: jest.fn(
+        (
+          key: string,
+          owner: { resourceType: string; resourceId: string },
+          purpose: string,
+        ) => ({
+          tenantId: 'company-1',
+          key,
+          owner,
+          purpose,
+        }),
+      ),
       generateDocumentKey: jest.fn(
         () => 'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
       ),
       uploadFile: jest.fn(() => Promise.resolve()),
+      uploadFileWithCapability: jest.fn((reference) =>
+        Promise.resolve(markAuthorizedStorageReference(reference)),
+      ),
       deleteFile: jest.fn(() => Promise.resolve()),
-      getSignedUrl: jest.fn((key: string) =>
-        Promise.resolve(`https://signed.example/${encodeURIComponent(key)}`),
+      getSignedUrl: jest.fn((reference) =>
+        Promise.resolve(
+          `https://signed.example/${encodeURIComponent(reference.key)}`,
+        ),
       ),
     };
     pdfService = {
@@ -120,7 +143,6 @@ describe('AprsPdfService', () => {
       documentGovernanceService as DocumentGovernanceService,
       signaturesService as SignaturesService,
       { issueToken: jest.fn().mockResolvedValue('token-publico') } as never,
-      { getPresignedInlineViewUrl: jest.fn().mockResolvedValue(null) } as never,
     );
   });
 
@@ -143,8 +165,12 @@ describe('AprsPdfService', () => {
       userId: 'user-1',
     });
 
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
+      }),
       buffer,
       'application/pdf',
     );
@@ -190,7 +216,9 @@ describe('AprsPdfService', () => {
     ).rejects.toThrow('governance falhou');
 
     expect(documentStorageService.deleteFile).toHaveBeenCalledWith(
-      'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
+      expect.objectContaining({
+        key: 'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
+      }),
     );
   });
 
@@ -383,8 +411,12 @@ describe('AprsPdfService', () => {
       expect.not.stringContaining('jghuhuihui'),
       expect.any(Object),
     );
-    expect(documentStorageService.uploadFile).toHaveBeenCalledWith(
-      'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'documents/company-1/aprs/sites/site-1/apr-1/apr-final.pdf',
+      }),
       expect.any(Buffer),
       'application/pdf',
     );

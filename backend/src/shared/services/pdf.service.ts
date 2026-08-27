@@ -26,6 +26,18 @@ type PdfGenerationOptions = {
   };
 };
 
+const MAX_INLINE_IMAGE_DATA_URL_CHARS = 4 * 1024 * 1024;
+const INLINE_IMAGE_DATA_URL_PATTERN =
+  /^data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+/]+={0,2}$/i;
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (!signal?.aborted) return;
+
+  const error = new Error('Geração de PDF cancelada após o timeout.');
+  error.name = 'AbortError';
+  throw error;
+}
+
 @Injectable()
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
@@ -47,8 +59,10 @@ export class PdfService {
   async generateFromHtml(
     html: string,
     options?: PdfGenerationOptions,
+    signal?: AbortSignal,
   ): Promise<Buffer> {
     this.logger.log('Gerando PDF a partir de HTML...');
+    throwIfAborted(signal);
     this.pdfValidator.validateHtmlContent(html);
 
     let page: Awaited<ReturnType<PuppeteerPoolService['getPage']>>;
@@ -66,7 +80,20 @@ export class PdfService {
       });
     }
 
+    let abortPage: (() => void) | undefined;
     try {
+      abortPage = () => {
+        void page.close().catch(() => undefined);
+      };
+      signal?.addEventListener('abort', abortPage, { once: true });
+      if (signal?.aborted) abortPage();
+      throwIfAborted(signal);
+
+      // Os templates oficiais não dependem de JavaScript. Desabilitar a
+      // execução impede que qualquer valor interpolado no HTML vire código
+      // executável no Chromium, inclusive em uma futura regressão de escape.
+      await page.setJavaScriptEnabled(false);
+
       // Bloquear todas as requests de rede externas durante geração de PDF.
       // Defesa em profundidade contra SSRF cego: o HTML vem de template com dados
       // HTML-escaped, mas interceptamos requests para garantir que nenhum recurso
@@ -74,24 +101,24 @@ export class PdfService {
       await page.setRequestInterception(true);
       page.on('request', (req) => {
         const url = req.url();
-        // Permitir apenas dados inline e recursos locais
-        if (
-          url.startsWith('data:') ||
-          url.startsWith('blob:') ||
-          url === 'about:blank'
-        ) {
-          void req.continue();
+        // Permitir apenas imagens inline controladas e about:blank. Fontes,
+        // logos, QR codes e assinaturas são materializados pelos serviços de
+        // domínio antes do render; nenhum host externo é necessário.
+        if (this.isAllowedInlineResource(url) || url === 'about:blank') {
+          void req.continue().catch(() => undefined);
         } else {
-          void req.abort('blockedbyclient');
+          void req.abort('blockedbyclient').catch(() => undefined);
         }
       });
 
+      throwIfAborted(signal);
       await page.setContent(html, {
         // domcontentloaded em vez de networkidle0: o template não depende de recursos remotos.
         // Mais rápido e elimina o risco de SSRF cego por recursos externos.
         waitUntil: 'domcontentloaded',
         timeout: 30_000,
       });
+      throwIfAborted(signal);
 
       const pdfOptions = {
         format: options?.format ?? 'A4',
@@ -113,6 +140,7 @@ export class PdfService {
       const pdfUint8Array = await page.pdf({
         ...pdfOptions,
       });
+      throwIfAborted(signal);
 
       const pdfBuffer = Buffer.from(pdfUint8Array);
 
@@ -130,8 +158,18 @@ export class PdfService {
           'Não foi possível gerar o PDF no momento. Tente novamente em instantes.',
       });
     } finally {
+      if (signal && abortPage) {
+        signal.removeEventListener('abort', abortPage);
+      }
       await this.puppeteerPool.releasePage(page);
     }
+  }
+
+  private isAllowedInlineResource(url: string): boolean {
+    return (
+      url.length <= MAX_INLINE_IMAGE_DATA_URL_CHARS &&
+      INLINE_IMAGE_DATA_URL_PATTERN.test(url)
+    );
   }
 
   async signAndSave(

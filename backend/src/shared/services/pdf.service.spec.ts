@@ -181,6 +181,7 @@ describe('PdfService', () => {
   it('traduz falha de renderização em ServiceUnavailableException', async () => {
     const releasePage = jest.fn().mockResolvedValue(undefined);
     const page = {
+      setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
       setRequestInterception: jest.fn().mockResolvedValue(undefined),
       on: jest.fn(),
       setContent: jest.fn().mockResolvedValue(undefined),
@@ -195,9 +196,50 @@ describe('PdfService', () => {
     expect(releasePage).toHaveBeenCalledWith(page);
   });
 
+  it('fecha a página quando o sinal aborta durante o render', async () => {
+    const releasePage = jest.fn().mockResolvedValue(undefined);
+    let releaseContent!: () => void;
+    const page = {
+      setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
+      setRequestInterception: jest.fn().mockResolvedValue(undefined),
+      on: jest.fn(),
+      setContent: jest.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            releaseContent = resolve;
+          }),
+      ),
+      pdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4')),
+      close: jest.fn().mockResolvedValue(true),
+    };
+    puppeteerPool.getPage = jest.fn().mockResolvedValue(page);
+    puppeteerPool.releasePage = releasePage;
+    const controller = new AbortController();
+
+    const generation = service.generateFromHtml(
+      '<html><body>Teste</body></html>',
+      undefined,
+      controller.signal,
+    );
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await Promise.resolve();
+    }
+
+    expect(page.setContent).toHaveBeenCalled();
+    controller.abort();
+    expect(page.close).toHaveBeenCalledTimes(1);
+
+    releaseContent();
+    await expect(generation).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(releasePage).toHaveBeenCalledWith(page);
+  });
+
   it('permite configurar orientação retrato com preferencia pelo tamanho CSS', async () => {
     const releasePage = jest.fn().mockResolvedValue(undefined);
     const page = {
+      setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
       setRequestInterception: jest.fn().mockResolvedValue(undefined),
       on: jest.fn(),
       setContent: jest.fn().mockResolvedValue(undefined),
@@ -222,12 +264,14 @@ describe('PdfService', () => {
         printBackground: true,
       }),
     );
+    expect(page.setJavaScriptEnabled).toHaveBeenCalledWith(false);
     expect(releasePage).toHaveBeenCalledWith(page);
   });
 
   it('encaminha templates de header e footer quando displayHeaderFooter estiver ativo', async () => {
     const releasePage = jest.fn().mockResolvedValue(undefined);
     const page = {
+      setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
       setRequestInterception: jest.fn().mockResolvedValue(undefined),
       on: jest.fn(),
       setContent: jest.fn().mockResolvedValue(undefined),
@@ -264,5 +308,53 @@ describe('PdfService', () => {
       }),
     );
     expect(releasePage).toHaveBeenCalledWith(page);
+  });
+
+  it('bloqueia data URLs que não sejam imagens permitidas ou excedam o limite', async () => {
+    const releasePage = jest.fn().mockResolvedValue(undefined);
+    let requestHandler:
+      | ((request: {
+          url: () => string;
+          continue: jest.Mock;
+          abort: jest.Mock;
+        }) => void)
+      | undefined;
+    const page = {
+      setJavaScriptEnabled: jest.fn().mockResolvedValue(undefined),
+      setRequestInterception: jest.fn().mockResolvedValue(undefined),
+      on: jest.fn((event: string, handler: typeof requestHandler) => {
+        if (event === 'request') requestHandler = handler;
+      }),
+      setContent: jest.fn().mockResolvedValue(undefined),
+      pdf: jest.fn().mockResolvedValue(Buffer.from('%PDF-1.4')),
+    };
+    puppeteerPool.getPage = jest.fn().mockResolvedValue(page);
+    puppeteerPool.releasePage = releasePage;
+
+    await service.generateFromHtml('<html><body>Teste</body></html>');
+
+    const makeRequest = (url: string) => ({
+      url: () => url,
+      continue: jest.fn().mockResolvedValue(undefined),
+      abort: jest.fn().mockResolvedValue(undefined),
+    });
+    const valid = makeRequest(
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB',
+    );
+    const svg = makeRequest('data:image/svg+xml;base64,PHN2Zy8+');
+    const html = makeRequest('data:text/html;base64,PGh0bWw+');
+    const oversized = makeRequest(
+      `data:image/png;base64,${'A'.repeat(4 * 1024 * 1024)}`,
+    );
+
+    requestHandler?.(valid);
+    requestHandler?.(svg);
+    requestHandler?.(html);
+    requestHandler?.(oversized);
+
+    expect(valid.continue).toHaveBeenCalledTimes(1);
+    expect(svg.abort).toHaveBeenCalledWith('blockedbyclient');
+    expect(html.abort).toHaveBeenCalledWith('blockedbyclient');
+    expect(oversized.abort).toHaveBeenCalledWith('blockedbyclient');
   });
 });
