@@ -2,6 +2,7 @@ import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import * as crypto from 'crypto';
 import { AsyncLocalStorage } from 'async_hooks';
+import { getRequestIp } from '../utils/request-ip.util';
 
 export const requestContextStorage = new AsyncLocalStorage<
   Map<string, unknown>
@@ -30,7 +31,7 @@ export class RequestContextMiddleware implements NestMiddleware {
     // So req.user is usually NOT available in Middleware unless we do something custom.
     // However, let's implement as requested. We can also set 'ip' and 'userAgent' here.
 
-    store.set('ip', req.ip);
+    store.set('ip', getRequestIp(req));
     store.set('userAgent', req.headers['user-agent']);
 
     // Mantém uma única origem de requestId para todo o pipeline.

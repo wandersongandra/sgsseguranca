@@ -50,6 +50,7 @@ import {
   validateFileMagicBytes,
 } from '../../shared/interceptors/file-upload.interceptor';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 import { UserThrottle } from '../../shared/decorators/user-throttle.decorator';
 import { TenantThrottle } from '../../shared/decorators/tenant-throttle.decorator';
 
@@ -81,7 +82,7 @@ export class PtsController {
       user?: { id?: string; userId?: string; sub?: string };
     },
   ): string {
-    return req.ip || req.socket.remoteAddress || 'unknown';
+    return getRequestIp(req) || 'unknown';
   }
 
   constructor(

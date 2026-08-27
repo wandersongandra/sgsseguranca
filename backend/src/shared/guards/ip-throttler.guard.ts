@@ -8,6 +8,7 @@ import {
 import { ThrottlerGuard } from '@nestjs/throttler';
 import * as crypto from 'crypto';
 import { sanitizeLogUrl } from '../logging/log-sanitizer.util';
+import { getRequestIp } from '../utils/request-ip.util';
 
 const authFallbackBuckets = new Map<
   string,
@@ -16,10 +17,11 @@ const authFallbackBuckets = new Map<
 const authFallbackLogBuckets = new Map<string, number>();
 type AuthFallbackPolicy = { limit: number; ttlMs: number };
 type GuardRequest = Record<string, unknown> & {
-  ip?: string;
   path?: string;
   url?: string;
-  headers?: Record<string, unknown>;
+  headers?: Record<string, string | string[] | undefined>;
+  socket?: { remoteAddress?: string | null } | null;
+  connection?: { remoteAddress?: string | null } | null;
 };
 
 const normalizeGuardPath = (value: string | undefined): string => {
@@ -99,7 +101,7 @@ export class IpThrottlerGuard extends ThrottlerGuard {
   }
 
   protected getTracker(req: GuardRequest): Promise<string> {
-    const ip = String(req.ip || '');
+    const ip = getRequestIp(req) || '';
     const path = normalizeGuardPath(String(req.path || req.url || ''));
     const userAgentHeader = req.headers?.['user-agent'];
     const fingerprintHeader = req.headers?.['x-client-fingerprint'];

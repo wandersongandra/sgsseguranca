@@ -51,6 +51,7 @@ import {
 } from '../../shared/security/sensitive-action.guard';
 import { AuditRead } from '../../shared/security/audit-read.decorator';
 import { ConsentsService } from '../consents/consents.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 
 type AuthenticatedRequest = ExpressRequest & {
   user?: { sub?: string; userId?: string };
@@ -133,7 +134,7 @@ export class UsersController {
     if (!userId) {
       throw new UnauthorizedException('Usuário não autenticado.');
     }
-    const ip = typeof req.ip === 'string' && req.ip.trim() ? req.ip : 'unknown';
+    const ip = getRequestIp(req) ?? 'unknown';
     const userAgentHeader = req.headers['user-agent'];
     const userAgent = Array.isArray(userAgentHeader)
       ? userAgentHeader.join(' ')

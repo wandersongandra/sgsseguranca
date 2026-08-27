@@ -43,6 +43,10 @@ import {
 } from './shared/security/cors-origins';
 import { ALLOWED_CORS_HEADERS } from './shared/security/cors-headers';
 import { constantTimeEquals } from './shared/security/constant-time.util';
+import {
+  createTrustedProxyPolicy,
+  getRequestIp,
+} from './shared/utils/request-ip.util';
 import type { VersionValue } from '@nestjs/common/interfaces';
 
 const WEB_SERVICE_NAME = process.env.OTEL_SERVICE_NAME ?? 'sgs-backend';
@@ -166,6 +170,10 @@ async function bootstrap() {
     );
   }
 
+  const trustedProxyPolicy = createTrustedProxyPolicy(process.env, {
+    requireInProduction: isProductionEnv,
+  });
+
   if (!('DOMMatrix' in globalThis)) {
     Object.defineProperty(globalThis, 'DOMMatrix', {
       value: class DOMMatrix {
@@ -186,6 +194,8 @@ async function bootstrap() {
   const httpAdapterInstance = app
     .getHttpAdapter()
     .getInstance() as Partial<ExpressApplication>;
+
+  httpAdapterInstance.set?.('trust proxy', trustedProxyPolicy.isTrusted);
 
   if (process.env.REDIS_DISABLED === 'true') {
     bootstrapLogger.warn({
@@ -256,10 +266,6 @@ async function bootstrap() {
       next();
     };
     app.use('/admin/queues', bullBoardAuth, bullBoardAdapter.getRouter());
-  }
-
-  if (isProductionEnv) {
-    httpAdapterInstance.set?.('trust proxy', 1);
   }
 
   app.use(compression({ threshold: 1024, level: 6 }));
@@ -426,10 +432,7 @@ async function bootstrap() {
       { count: number; resetAt: number }
     >();
     const swaggerRateLimitMiddleware: RequestHandler = (req, res, next) => {
-      const ip =
-        (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-        req.socket?.remoteAddress ||
-        'unknown';
+      const ip = getRequestIp(req) || 'unknown';
       const now = Date.now();
       const windowMs = 60_000;
       const limit = 30;

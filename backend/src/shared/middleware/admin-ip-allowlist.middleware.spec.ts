@@ -9,12 +9,15 @@ function makeConfig(values: Record<string, string | undefined>): ConfigService {
   } as ConfigService;
 }
 
-function makeRequest(ip = '203.0.113.10'): Request {
+function makeRequest(
+  ip = '203.0.113.10',
+  headers: Record<string, string> = {},
+): Request {
   return {
-    ip,
     path: '/admin/security/score',
     method: 'GET',
-    headers: {},
+    headers,
+    socket: { remoteAddress: ip },
   } as Request;
 }
 
@@ -62,6 +65,28 @@ describe('AdminIpAllowlistMiddleware', () => {
 
     expect(() =>
       middleware.use(makeRequest('203.0.113.10'), {} as Response, next),
+    ).toThrow(ForbiddenException);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('bloqueia XFF forjado por acesso direto mesmo quando aponta para IP permitido', () => {
+    const middleware = new AdminIpAllowlistMiddleware(
+      makeConfig({
+        NODE_ENV: 'production',
+        ADMIN_IP_ALLOWLIST_REQUIRED: 'true',
+        ADMIN_IP_ALLOWLIST: '203.0.113.10',
+      }),
+    );
+    const next = jest.fn() as NextFunction;
+
+    expect(() =>
+      middleware.use(
+        makeRequest('198.51.100.5', {
+          'x-forwarded-for': '203.0.113.10',
+        }),
+        {} as Response,
+        next,
+      ),
     ).toThrow(ForbiddenException);
     expect(next).not.toHaveBeenCalled();
   });

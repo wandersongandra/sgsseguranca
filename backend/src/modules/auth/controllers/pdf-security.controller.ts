@@ -25,6 +25,7 @@ import {
 } from '../../../shared/interceptors/file-upload.interceptor';
 import { Authorize } from '../authorize.decorator';
 import { FileInspectionService } from '../../../shared/security/file-inspection.service';
+import { getRequestIp } from '../../../shared/utils/request-ip.util';
 
 interface PdfSecurityRequestUser {
   id?: string;
@@ -99,10 +100,7 @@ export class PdfSecurityController {
       this.fileInspectionService,
     );
     const { userId, companyId } = resolvePdfSecurityActor(req);
-    const ip =
-      typeof req.ip === 'string' && req.ip.trim().length > 0
-        ? req.ip
-        : 'unknown';
+    const ip = getRequestIp(req) ?? 'unknown';
 
     // Check rate limit (Mass Download Detection)
     try {

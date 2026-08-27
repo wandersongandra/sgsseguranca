@@ -190,18 +190,17 @@ describe('ForbiddenSpikeInterceptor', () => {
       });
   });
 
-  it('ignora X-Forwarded-For bruto e usa apenas o IP normalizado pelo Express', (done) => {
+  it('ignora X-Forwarded-For bruto e usa apenas o peer de transporte', (done) => {
     mockRedis.get.mockResolvedValue(null);
     mockRedis.eval.mockResolvedValue(1);
 
     const ctx = {
       switchToHttp: () => ({
         getRequest: () => ({
-          ip: '10.0.0.1',
           path: '/test',
           method: 'POST',
           headers: { 'x-forwarded-for': '203.0.113.1, 10.0.0.1' },
-          socket: {},
+          socket: { remoteAddress: '10.0.0.1' },
           user: undefined,
         }),
       }),

@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../shared/decorators/public.decorator';
 import { TenantOptional } from '../../shared/decorators/tenant-optional.decorator';
 import { SubmitPublicDdsSignatureDto } from './dto/dds-signature-invite.dto';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 import { assertValidSignedToken } from '../../shared/security/signed-token.util';
 import {
   DdsSignatureInviteService,
@@ -59,7 +60,7 @@ export class PublicDdsSignatureController {
         acceptedTerms: dto.accepted_terms,
         signatureData: dto.signature_data,
         turnstileToken: dto.turnstileToken ?? null,
-        ip: req.ip || req.socket.remoteAddress || null,
+        ip: getRequestIp(req),
         userAgent: this.getRequestUserAgent(req),
       },
     );

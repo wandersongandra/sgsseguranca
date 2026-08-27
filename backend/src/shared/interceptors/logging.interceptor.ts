@@ -16,6 +16,7 @@ import {
   sanitizeLogUrl,
   sanitizeLogValue,
 } from '../logging/log-sanitizer.util';
+import { getRequestIp } from '../utils/request-ip.util';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -38,7 +39,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const url = sanitizeLogUrl(request.url);
     const body = request.body as Record<string, unknown> | null;
     const headers = request.headers;
-    const ip = request.ip || '';
+    const ip = getRequestIp(request) || '';
     const userAgent = (headers['user-agent'] as string) || '';
     const requestId =
       request.requestId ||

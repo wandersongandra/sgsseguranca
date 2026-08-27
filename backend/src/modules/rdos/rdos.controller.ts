@@ -52,6 +52,7 @@ import {
   validateFileMagicBytes,
 } from '../../shared/interceptors/file-upload.interceptor';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 
 @Controller('rdos')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
@@ -76,7 +77,7 @@ export class RdosController {
       user?: { id?: string; userId?: string; sub?: string };
     },
   ): string {
-    return req.ip || req.socket.remoteAddress || 'unknown';
+    return getRequestIp(req) || 'unknown';
   }
 
   private getRequestErrorMessage(error: unknown): string {

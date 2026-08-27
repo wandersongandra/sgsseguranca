@@ -1,4 +1,5 @@
 import { URL } from 'node:url';
+import { createTrustedProxyPolicy } from '../utils/request-ip.util';
 
 export type EnvironmentComponent =
   'api' | 'worker' | 'migration' | 'script' | 'loadtest';
@@ -540,6 +541,7 @@ export const KNOWN_SGS_ENV_KEYS = new Set<string>([
   'THROTTLER_STORAGE_FAIL_OPEN',
   'THROTTLER_STORAGE_REDIS_TIMEOUT_MS',
   'THROTTLER_WINDOW_MS',
+  'TRUSTED_PROXY_CIDRS',
   'TURNSTILE_ENABLED',
   'TURNSTILE_SECRET_KEY',
   'TURNSTILE_VERIFY_TIMEOUT_MS',
@@ -929,6 +931,11 @@ export function validateCommonEnvironment(
   if (!['development', 'test', 'staging', 'production'].includes(nodeEnv)) {
     throw new EnvironmentContractError('NODE_ENV: INVALID_VALUE');
   }
+
+  createTrustedProxyPolicy(env, {
+    requireInProduction:
+      options.component === 'api' && nodeEnv === 'production',
+  });
 
   parseStrictPositiveInteger(env, 'PORT', { min: 1, max: 65535 });
   parseStrictBoolean(env, 'REDIS_DISABLED', false);

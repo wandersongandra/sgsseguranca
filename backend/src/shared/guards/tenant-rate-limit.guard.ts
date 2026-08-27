@@ -22,6 +22,7 @@ import {
   TenantThrottleOptions,
 } from '../decorators/tenant-throttle.decorator';
 import { sanitizeLogUrl } from '../logging/log-sanitizer.util';
+import { getRequestIp } from '../utils/request-ip.util';
 
 type TenantRateLimitRequest = TenantRequest & {
   method?: string;
@@ -130,7 +131,7 @@ export class TenantRateLimitGuard implements CanActivate {
         plan,
         method: request.method,
         path: sanitizedPath,
-        ip: request.ip,
+        ip: getRequestIp(request),
         errorName:
           error instanceof Error ? error.name : 'RateLimitStorageError',
         message: error instanceof Error ? error.message : String(error),
@@ -156,7 +157,7 @@ export class TenantRateLimitGuard implements CanActivate {
         plan,
         method: request.method,
         path: sanitizedPath,
-        ip: request.ip,
+        ip: getRequestIp(request),
         retryAfter: result.retryAfter ?? null,
         remaining: result.remaining,
         resetAt: result.resetAt,

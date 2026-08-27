@@ -15,6 +15,7 @@ import {
   type AuditableAction,
 } from '../decorators/audit-action.decorator';
 import { sanitizeLogUrl } from '../logging/log-sanitizer.util';
+import { getRequestIp } from '../utils/request-ip.util';
 
 type RequestUserPayload = {
   id?: string;
@@ -116,7 +117,7 @@ export class ForensicAuditInterceptor implements NestInterceptor {
         entityId: String(resourceId),
         companyId,
         userId,
-        ip: input.request.ip || input.request.socket?.remoteAddress || null,
+        ip: getRequestIp(input.request),
         userAgent: this.extractHeader(input.request.headers, 'user-agent'),
         metadata: {
           action: input.action,

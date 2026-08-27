@@ -28,6 +28,7 @@ import { ConsentsService } from './consents.service';
 import { AcceptConsentDto, CONSENT_TYPES } from './dto/accept-consent.dto';
 import { ConsentStatusResponseDto } from './dto/consent-status.dto';
 import { ConsentType } from './entities/consent-version.entity';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 
 type AuthenticatedRequest = ExpressRequest & {
   user?: { sub?: string; userId?: string };
@@ -35,17 +36,6 @@ type AuthenticatedRequest = ExpressRequest & {
 
 function isConsentType(value: string): value is ConsentType {
   return (CONSENT_TYPES as unknown as string[]).includes(value);
-}
-
-function extractClientIp(req: ExpressRequest): string | null {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0]?.trim() || null;
-  }
-  if (Array.isArray(forwarded) && forwarded.length > 0) {
-    return forwarded[0]?.split(',')[0]?.trim() || null;
-  }
-  return req.ip || req.socket?.remoteAddress || null;
 }
 
 @ApiTags('consents')
@@ -87,7 +77,7 @@ export class ConsentsController {
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = this.requireUserId(req);
-    const ip = extractClientIp(req);
+    const ip = getRequestIp(req);
     const userAgent = req.headers['user-agent']?.toString() ?? null;
 
     const saved = await this.consentsService.accept(
@@ -118,7 +108,7 @@ export class ConsentsController {
       throw new BadRequestException(`Tipo de consentimento inválido: ${type}`);
     }
 
-    const ip = extractClientIp(req);
+    const ip = getRequestIp(req);
     const userAgent = req.headers['user-agent']?.toString() ?? null;
 
     const revocation = await this.consentsService.revoke(userId, type, {

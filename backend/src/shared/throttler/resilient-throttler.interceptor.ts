@@ -10,6 +10,7 @@ import { Observable } from 'rxjs';
 import { Request, Response } from 'express';
 import { ResilientThrottlerService } from './resilient-throttler.service';
 import type { AuthenticatedPrincipal } from '../../modules/auth/auth-principal.service';
+import { getRequestIp } from '../utils/request-ip.util';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -85,17 +86,8 @@ export class ResilientThrottlerInterceptor implements NestInterceptor {
       return `user:${userId}`;
     }
 
-    // Fallback: IP do cliente
-    const forwardedFor = request.headers['x-forwarded-for'];
-    const forwardedIp = Array.isArray(forwardedFor)
-      ? forwardedFor[0]
-      : forwardedFor?.split(',')[0]?.trim();
-    const ip =
-      forwardedIp ||
-      request.ip ||
-      request.connection?.remoteAddress ||
-      request.socket.remoteAddress ||
-      'unknown';
+    // Fallback: IP resolvido pela autoridade de transporte central.
+    const ip = getRequestIp(request) || 'unknown';
 
     return `ip:${ip}`;
   }

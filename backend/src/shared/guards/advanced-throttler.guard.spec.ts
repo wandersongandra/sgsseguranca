@@ -2,7 +2,7 @@ import { Reflector } from '@nestjs/core';
 import { AdvancedThrottlerGuard } from './advanced-throttler.guard';
 
 describe('AdvancedThrottlerGuard', () => {
-  it('prefere o IP resolvido pelo request em vez de headers forjaveis', () => {
+  it('usa o peer de transporte quando não há proxy confiável configurado', () => {
     const guard = new AdvancedThrottlerGuard(
       {} as never,
       {} as never,
@@ -12,7 +12,6 @@ describe('AdvancedThrottlerGuard', () => {
     };
 
     const ip = guard.getRequestIP({
-      ip: '10.0.0.10',
       headers: {
         'x-forwarded-for': '203.0.113.10',
         'cf-connecting-ip': '198.51.100.20',
@@ -22,6 +21,6 @@ describe('AdvancedThrottlerGuard', () => {
       },
     });
 
-    expect(ip).toBe('10.0.0.10');
+    expect(ip).toBe('172.16.0.5');
   });
 });

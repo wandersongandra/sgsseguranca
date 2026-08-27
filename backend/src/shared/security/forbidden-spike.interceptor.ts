@@ -17,6 +17,7 @@ import type { Request } from 'express';
 import { Redis } from 'ioredis';
 import { isIP } from 'node:net';
 import { REDIS_CLIENT_RATE_LIMIT } from '../redis/redis.constants';
+import { getRequestIp } from '../utils/request-ip.util';
 import {
   SecurityAuditService,
   SecuritySeverity,
@@ -198,17 +199,8 @@ export class ForbiddenSpikeInterceptor implements NestInterceptor {
   }
 
   private extractIp(request: Request): string | null {
-    const normalizedIp = request.ip?.trim();
-    if (normalizedIp && isIP(normalizedIp) !== 0) {
-      return normalizedIp;
-    }
-
-    const remoteAddress = request.socket?.remoteAddress?.trim();
-    if (remoteAddress && isIP(remoteAddress) !== 0) {
-      return remoteAddress;
-    }
-
-    return null;
+    const ip = getRequestIp(request);
+    return ip && isIP(ip) !== 0 ? ip : null;
   }
 
   private counterKey(ip: string): string {

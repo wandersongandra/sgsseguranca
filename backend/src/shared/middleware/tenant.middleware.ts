@@ -19,6 +19,7 @@ import type { AuthenticatedPrincipal } from '../../modules/auth/auth-principal.s
 import { TenantValidationService } from '../tenant/tenant-validation.service';
 import { SecurityAuditService } from '../security/security-audit.service';
 import { sanitizeLogUrl } from '../logging/log-sanitizer.util';
+import { getRequestIp } from '../utils/request-ip.util';
 
 type TenantInfo = {
   companyId?: string;
@@ -125,7 +126,7 @@ export class TenantMiddleware implements NestMiddleware {
               event: 'tenant_switch',
               userId: principal.userId,
               tenantId: headerCompanyId,
-              ip: req.ip,
+              ip: getRequestIp(req),
               path: sanitizedRequestPath,
             });
             // Registra acesso cross-tenant na forensic trail para auditoria
@@ -144,7 +145,7 @@ export class TenantMiddleware implements NestMiddleware {
               this.logger.warn({
                 event: 'super_admin_missing_explicit_tenant',
                 userId: principal.userId,
-                ip: req.ip,
+                ip: getRequestIp(req),
                 path: sanitizedRequestPath,
               });
               throw new UnauthorizedException(
@@ -172,7 +173,7 @@ export class TenantMiddleware implements NestMiddleware {
               userId: principal.userId,
               headerCompanyId,
               tokenCompanyId: null,
-              ip: req.ip,
+              ip: getRequestIp(req),
               method: req.method,
               path: sanitizedRequestPath,
               userAgent: (req.headers['user-agent'] as string)?.slice(0, 200),
@@ -188,7 +189,7 @@ export class TenantMiddleware implements NestMiddleware {
               userId: principal.userId,
               tokenCompanyId: companyId,
               headerCompanyId,
-              ip: req.ip,
+              ip: getRequestIp(req),
               method: req.method,
               path: sanitizedRequestPath,
               userAgent: (req.headers['user-agent'] as string)?.slice(0, 200),

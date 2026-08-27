@@ -27,6 +27,7 @@ import { PublicValidationGrantService } from '../../shared/services/public-valid
 import { assertValidSignedToken } from '../../shared/security/signed-token.util';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { DocumentRegistryService } from '../document-registry/document-registry.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 
 type SuspiciousReason =
   | 'bot_user_agent'
@@ -322,7 +323,7 @@ export class PublicDdsValidationController {
   }
 
   private getRequestIp(req: Request): string | null {
-    return req.ip ?? req.socket?.remoteAddress ?? null;
+    return getRequestIp(req);
   }
 
   private getRequestUserAgent(req: Request): string | null {

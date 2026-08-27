@@ -26,6 +26,7 @@ import { FileInspectionService } from '../../shared/security/file-inspection.ser
 import { UserThrottle } from '../../shared/decorators/user-throttle.decorator';
 import { TenantThrottle } from '../../shared/decorators/tenant-throttle.decorator';
 import { assertQuarantineKey } from '../../shared/utils/s3-key.util';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 import {
   ApiBody,
   ApiCreatedResponse,
@@ -145,8 +146,7 @@ export class StorageController {
 
     // Guardrail P0: auditoria ao emitir URL de upload
     const actorId = req.user?.userId || req.user?.id || 'unknown';
-    const ipRaw = req.headers?.['x-forwarded-for'] ?? req.ip ?? 'unknown';
-    const ip = Array.isArray(ipRaw) ? ipRaw[0] : String(ipRaw);
+    const ip = getRequestIp(req) ?? 'unknown';
     const userAgent = String(
       req.headers?.['user-agent'] ?? 'unknown',
     ).substring(0, 255);
@@ -337,8 +337,7 @@ export class StorageController {
 
     // Auditoria da promoção
     const actorId = req.user?.userId || req.user?.id || 'unknown';
-    const ipRaw = req.headers?.['x-forwarded-for'] ?? req.ip ?? 'unknown';
-    const ip = Array.isArray(ipRaw) ? ipRaw[0] : String(ipRaw);
+    const ip = getRequestIp(req) ?? 'unknown';
     const userAgent = String(
       req.headers?.['user-agent'] ?? 'unknown',
     ).substring(0, 255);

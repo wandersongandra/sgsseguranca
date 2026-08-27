@@ -17,6 +17,7 @@ import { DocumentStorageService } from '../../shared/services/document-storage.s
 import { SecurityAuditService } from '../../shared/security/security-audit.service';
 import { isLikelySignedToken } from '../../shared/security/signed-token.util';
 import { TenantService } from '../../shared/tenant/tenant.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 import { DownloadTokenParamDto } from './dto/download-token-param.dto';
 
 type DownloadRequest = Request & {
@@ -49,7 +50,7 @@ export class DocumentDownloadController {
     @Req() req: DownloadRequest,
     @Res() res: Response,
   ): Promise<void> {
-    const ip = req.ip ?? req.socket?.remoteAddress;
+    const ip = getRequestIp(req) ?? undefined;
     const token = params.token;
     const normalizedToken = String(token || '').trim();
 

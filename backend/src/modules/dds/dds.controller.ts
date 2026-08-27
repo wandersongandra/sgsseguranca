@@ -61,6 +61,7 @@ import {
   readUploadedFileBuffer,
 } from '../../shared/interceptors/file-upload.interceptor';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 
 const parseTenantThrottle = (value: string | undefined, fallback: number) => {
   const parsed = Number(value);
@@ -194,7 +195,7 @@ export class DdsController {
       user?: { id?: string; userId?: string; sub?: string };
     },
   ): string {
-    return req.ip || req.socket.remoteAddress || 'unknown';
+    return getRequestIp(req) || 'unknown';
   }
 
   private getRequestUserAgent(req: Request): string | null {

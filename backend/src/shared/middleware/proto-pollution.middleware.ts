@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { Logger } from '@nestjs/common';
+import { getRequestIp } from '../utils/request-ip.util';
 
 const logger = new Logger('ProtoPollutionMiddleware');
 
@@ -51,7 +52,7 @@ export function protoPollutionMiddleware(
         event: 'proto_pollution_blocked',
         method: req.method,
         path: req.path,
-        ip: req.ip,
+        ip: getRequestIp(req),
         // Nunca logar o body completo — apenas sinalizar o evento
       });
 

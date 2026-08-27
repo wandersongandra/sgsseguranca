@@ -67,6 +67,7 @@ import {
   validateFileMagicBytes,
 } from '../../shared/interceptors/file-upload.interceptor';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
+import { getRequestIp } from '../../shared/utils/request-ip.util';
 
 const LEGACY_TRANSITION_SUNSET = 'Tue, 30 Jun 2026 00:00:00 GMT';
 const APR_LIST_SORT_OPTIONS = [
@@ -207,7 +208,7 @@ export class AprsController {
       user?: { id?: string; userId?: string; sub?: string };
     },
   ): string {
-    return req.ip || req.socket.remoteAddress || 'unknown';
+    return getRequestIp(req) || 'unknown';
   }
 
   constructor(
