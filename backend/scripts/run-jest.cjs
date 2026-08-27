@@ -10,7 +10,10 @@ const args = process.argv.slice(2);
 // o --max-old-space-size configurado. Remover apos identificar a causa
 // raiz do OOM nas 3 suites que ainda falham isoladas mesmo com
 // concorrencia de PDF forcada a 1.
-if (args.some((arg) => /jest-e2e/i.test(arg)) && process.env.DIAG_MEMORY === 'true') {
+if (
+  args.some((arg) => /jest-e2e/i.test(arg)) &&
+  process.env.DIAG_MEMORY === 'true'
+) {
   const toMB = (bytes) => Math.round(bytes / 1024 / 1024);
   console.log(
     `[diag-memory] total=${toMB(os.totalmem())}MB free=${toMB(os.freemem())}MB ` +
@@ -30,8 +33,16 @@ applyDefault('TZ', 'UTC');
 applyDefault('LOG_LEVEL', 'error');
 applyDefault('OTEL_ENABLED', 'false');
 applyDefault('NEW_RELIC_ENABLED', 'false');
-applyDefault('JWT_SECRET', 'test-jwt-secret-unit-tests-only-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
-applyDefault('JWT_REFRESH_SECRET', 'test-refresh-secret-unit-tests-only-bbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+applyDefault(
+  'JWT_SECRET',
+  'test-jwt-secret-unit-tests-only-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+);
+applyDefault(
+  'JWT_REFRESH_SECRET',
+  'test-refresh-secret-unit-tests-only-bbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+);
+applyDefault('JWT_ISSUER', 'https://jwt.test.sgs.local');
+applyDefault('JWT_AUDIENCE', 'sgs-test');
 applyDefault(
   'SECURITY_AUDIT_HMAC_KEY',
   'test-security-audit-hmac-key-only-cccccccccccccccccccccccc',
@@ -53,7 +64,9 @@ if (isE2EConfig) {
   }
   // Propagar --max-old-space-size para processos filhos (per-file Jest spawns).
   // Cada spawn herda env mas nao herda execArgv do processo pai.
-  const heapArg = process.execArgv.find((a) => /^--max-old-space-size=/.test(a));
+  const heapArg = process.execArgv.find((a) =>
+    /^--max-old-space-size=/.test(a),
+  );
   if (heapArg && !/--max-old-space-size\b/.test(env.NODE_OPTIONS)) {
     env.NODE_OPTIONS = `${env.NODE_OPTIONS} ${heapArg}`.trim();
   }
@@ -78,7 +91,8 @@ try {
 // Spawnar Jest por arquivo garante isolamento de memoria real: cada processo
 // Node morre apos o arquivo, liberando toda a memoria para o proximo.
 const specificTestFile = args.find(
-  (a) => !a.startsWith('-') && (a.endsWith('.e2e-spec.ts') || a.endsWith('.e2e.ts')),
+  (a) =>
+    !a.startsWith('-') && (a.endsWith('.e2e-spec.ts') || a.endsWith('.e2e.ts')),
 );
 
 if (isE2EConfig && !specificTestFile) {
@@ -102,10 +116,14 @@ if (isE2EConfig && !specificTestFile) {
   }
 
   const testRoot = path.resolve(__dirname, '..', 'test');
-  const scannedDirs = [path.join(testRoot, 'critical'), path.join(testRoot, 'aprs')];
-  const standaloneFiles = ['idor-security.e2e-spec.ts', 'multi-tenancy.e2e-spec.ts'].map((f) =>
-    path.join(testRoot, f),
-  );
+  const scannedDirs = [
+    path.join(testRoot, 'critical'),
+    path.join(testRoot, 'aprs'),
+  ];
+  const standaloneFiles = [
+    'idor-security.e2e-spec.ts',
+    'multi-tenancy.e2e-spec.ts',
+  ].map((f) => path.join(testRoot, f));
 
   const testFiles = [
     ...scannedDirs.flatMap(findE2EFiles),
@@ -151,10 +169,14 @@ if (isE2EConfig && !specificTestFile) {
 }
 
 // Caminho normal: arquivo especifico (test:e2e:dr) ou testes nao-E2E.
-const result = spawnSync(process.execPath, [...process.execArgv, jestBin, ...args], {
-  stdio: 'inherit',
-  env,
-});
+const result = spawnSync(
+  process.execPath,
+  [...process.execArgv, jestBin, ...args],
+  {
+    stdio: 'inherit',
+    env,
+  },
+);
 
 if (result.error) {
   throw result.error;
