@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -310,9 +311,8 @@ export class AprsEvidenceService {
     matchedIn?: 'original' | 'watermarked';
     message?: string;
   }> {
-    const normalizedHash = String(hash || '')
-      .trim()
-      .toLowerCase();
+    const normalizedHash =
+      typeof hash === 'string' ? hash.trim().toLowerCase() : '';
     if (!/^[a-f0-9]{64}$/.test(normalizedHash)) {
       return {
         verified: false,
@@ -320,23 +320,33 @@ export class AprsEvidenceService {
       };
     }
 
-    // Rota pública sem contexto de tenant — RLS bloquearia todas as linhas.
-    // Executamos a query como super-admin (is_super_admin() = true), que é
-    // permitido pela policy RESTRICTIVE de apr_risk_evidences (migration 079).
-    // O retorno é mínimo (verified + matchedIn) — sem metadados sensíveis.
-    const evidence = await this.tenantService.run(
-      { companyId: undefined, isSuperAdmin: true, siteScope: 'all' },
-      () =>
-        this.aprsRepository.manager.getRepository(AprRiskEvidence).findOne({
-          where: [
-            { hash_sha256: normalizedHash },
-            { watermarked_hash_sha256: normalizedHash },
-          ],
-          select: ['id', 'hash_sha256', 'watermarked_hash_sha256'],
-        }),
-    );
+    // A rota pública não possui tenant ALS. A função dedicada atravessa RLS
+    // com owner restrito e devolve somente a classificação do hash; não há
+    // fallback para super-admin na sessão de aplicação.
+    let queryResult: unknown;
+    try {
+      queryResult = await this.aprsRepository.manager.query(
+        'SELECT matched_in FROM public.verify_apr_evidence_by_hash_public($1)',
+        [normalizedHash],
+      );
+    } catch {
+      this.logger.warn('[APR public verification] database unavailable.');
+      throw new ServiceUnavailableException(
+        'Verificação pública de evidência temporariamente indisponível.',
+      );
+    }
+    const rows: unknown[] = Array.isArray(queryResult) ? queryResult : [];
+    const firstRow = rows[0];
+    const matchedInValue =
+      typeof firstRow === 'object' &&
+      firstRow !== null &&
+      'matched_in' in firstRow
+        ? firstRow.matched_in
+        : undefined;
+    const matchedIn =
+      typeof matchedInValue === 'string' ? matchedInValue : undefined;
 
-    if (!evidence) {
+    if (matchedIn !== 'original' && matchedIn !== 'watermarked') {
       return {
         verified: false,
         message: 'Hash não localizado na base de evidências da APR.',
@@ -345,8 +355,7 @@ export class AprsEvidenceService {
 
     return {
       verified: true,
-      matchedIn:
-        evidence.hash_sha256 === normalizedHash ? 'original' : 'watermarked',
+      matchedIn,
     };
   }
 

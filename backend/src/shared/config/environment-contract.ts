@@ -502,6 +502,7 @@ export const KNOWN_SGS_ENV_KEYS = new Set<string>([
   'SENTRY_SMOKE_MARKER',
   'SENTRY_TRACES_SAMPLE_RATE',
   'SGS_TEMP_DIR',
+  'SIGNATURE_TIMESTAMP_SECRET',
   'SIGNATURE_VERIFY_THROTTLE_LIMIT',
   'SIGNATURE_VERIFY_THROTTLE_TTL',
   'SMOKE_MAIL_RECIPIENT',
@@ -1036,11 +1037,31 @@ export function validateCommonEnvironment(
   if (isNonLocal && options.component === 'api') {
     assertSecret(env, 'JWT_SECRET', { required: true, minLength: 64 });
     assertSecret(env, 'JWT_REFRESH_SECRET', { required: true, minLength: 64 });
+    assertSecret(env, 'SIGNATURE_TIMESTAMP_SECRET', {
+      required: true,
+      minLength: 32,
+    });
     if (
       readString(env, 'JWT_SECRET') === readString(env, 'JWT_REFRESH_SECRET')
     ) {
       throw new EnvironmentContractError(
         'JWT_REFRESH_SECRET: MUST_DIFFER_FROM_JWT_SECRET',
+      );
+    }
+    if (
+      readString(env, 'SIGNATURE_TIMESTAMP_SECRET') ===
+      readString(env, 'JWT_SECRET')
+    ) {
+      throw new EnvironmentContractError(
+        'SIGNATURE_TIMESTAMP_SECRET: MUST_DIFFER_FROM_JWT_SECRET',
+      );
+    }
+    if (
+      readString(env, 'SIGNATURE_TIMESTAMP_SECRET') ===
+      readString(env, 'JWT_REFRESH_SECRET')
+    ) {
+      throw new EnvironmentContractError(
+        'SIGNATURE_TIMESTAMP_SECRET: MUST_DIFFER_FROM_JWT_REFRESH_SECRET',
       );
     }
     if (!readString(env, 'JWT_ISSUER'))

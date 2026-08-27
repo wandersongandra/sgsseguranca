@@ -14,6 +14,7 @@ function apiEnvironment(): NodeJS.ProcessEnv {
     DATABASE_URL: 'postgresql://user:password@db.example.invalid/sgs',
     JWT_SECRET: strong('access'),
     JWT_REFRESH_SECRET: strong('refresh'),
+    SIGNATURE_TIMESTAMP_SECRET: strong('signature'),
     JWT_ISSUER: 'https://api.example.invalid',
     JWT_AUDIENCE: 'sgs-test',
     REFRESH_CSRF_ENFORCED: 'true',
@@ -48,6 +49,17 @@ describe('environment contract', () => {
   it('valida configuração válida de API sem expor valores', () => {
     expect(() =>
       validateCommonEnvironment(apiEnvironment(), { component: 'api' }),
+    ).not.toThrow();
+  });
+
+  it('aceita três domínios criptográficos distintos em ambiente não local', () => {
+    const env = apiEnvironment();
+
+    expect(env.JWT_SECRET).not.toBe(env.JWT_REFRESH_SECRET);
+    expect(env.JWT_SECRET).not.toBe(env.SIGNATURE_TIMESTAMP_SECRET);
+    expect(env.JWT_REFRESH_SECRET).not.toBe(env.SIGNATURE_TIMESTAMP_SECRET);
+    expect(() =>
+      validateCommonEnvironment(env, { component: 'api' }),
     ).not.toThrow();
   });
 
@@ -90,6 +102,48 @@ describe('environment contract', () => {
     expect(() =>
       validateCommonEnvironment(missingClaims, { component: 'api' }),
     ).toThrow('JWT_ISSUER: REQUIRED');
+  });
+
+  it('exige chave de timestamp dedicada e diferente da chave JWT fora do local', () => {
+    const missingSignatureKey = apiEnvironment();
+    delete missingSignatureKey.SIGNATURE_TIMESTAMP_SECRET;
+    expect(() =>
+      validateCommonEnvironment(missingSignatureKey, { component: 'api' }),
+    ).toThrow('SIGNATURE_TIMESTAMP_SECRET: REQUIRED');
+
+    const placeholder = apiEnvironment();
+    placeholder.SIGNATURE_TIMESTAMP_SECRET =
+      'your_signature_timestamp_secret_change_me';
+    expect(() =>
+      validateCommonEnvironment(placeholder, { component: 'api' }),
+    ).toThrow('SIGNATURE_TIMESTAMP_SECRET: PLACEHOLDER');
+
+    const shared = apiEnvironment();
+    shared.SIGNATURE_TIMESTAMP_SECRET = shared.JWT_SECRET;
+    expect(() =>
+      validateCommonEnvironment(shared, { component: 'api' }),
+    ).toThrow('SIGNATURE_TIMESTAMP_SECRET: MUST_DIFFER_FROM_JWT_SECRET');
+  });
+
+  it('rejeita distinctness compartilhada entre timestamp e refresh JWT', () => {
+    const sharedWithRefresh = apiEnvironment();
+    sharedWithRefresh.SIGNATURE_TIMESTAMP_SECRET =
+      sharedWithRefresh.JWT_REFRESH_SECRET;
+
+    expect(() =>
+      validateCommonEnvironment(sharedWithRefresh, { component: 'api' }),
+    ).toThrow(
+      'SIGNATURE_TIMESTAMP_SECRET: MUST_DIFFER_FROM_JWT_REFRESH_SECRET',
+    );
+  });
+
+  it('rejeita typo da chave dedicada no namespace SGS', () => {
+    expect(() =>
+      assertNoUnknownSgsEnvironmentKeys({
+        ...apiEnvironment(),
+        SIGNATURE_TIMESTAP_SECRET: 'synthetic-typo',
+      }),
+    ).toThrow('SIGNATURE_TIMESTAP_SECRET');
   });
 
   it('falha quando feature ativa não possui dependência obrigatória', () => {

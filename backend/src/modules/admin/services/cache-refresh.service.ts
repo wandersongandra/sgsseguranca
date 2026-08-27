@@ -3,7 +3,8 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { PoolClient } from 'pg';
+import { PrivilegedDbService } from '../../../shared/database/privileged-db.service';
 
 interface RefreshResult {
   status: 'success' | 'error';
@@ -42,18 +43,32 @@ interface MaterializedViewRow {
 export class CacheRefreshService {
   private readonly logger = new Logger('CacheRefreshService');
 
-  constructor(private dataSource: DataSource) {}
+  constructor(private readonly privilegedDb: PrivilegedDbService) {}
 
-  private async queryRows<T>(sql: string): Promise<T[]> {
-    return this.dataSource.query(sql);
+  private async withCacheAdmin<T>(
+    operation: string,
+    callback: (client: PoolClient) => Promise<T>,
+  ): Promise<T> {
+    return this.privilegedDb.withRequiredPrivilegedClient(
+      operation,
+      async (client) => {
+        // Materialized views are cross-tenant snapshots. The dedicated admin
+        // connection must opt into the existing, role-gated global policy;
+        // the runtime pool never receives this flag.
+        await client.query(
+          "SELECT set_config('app.is_super_admin', 'true', false)",
+        );
+        try {
+          return await callback(client);
+        } finally {
+          await client.query('RESET app.is_super_admin');
+        }
+      },
+    );
   }
 
-  private getErrorMessage(error: unknown): string {
-    if (error instanceof Error) {
-      return error.message;
-    }
-
-    return typeof error === 'string' ? error : 'Unknown cache refresh error';
+  private getErrorType(error: unknown): string {
+    return error instanceof Error && error.name ? error.name : 'UnknownError';
   }
 
   private toInt(value: unknown): number {
@@ -71,16 +86,19 @@ export class CacheRefreshService {
 
   private async getAvailableMaterializedViews(
     viewNames: string[],
+    client: PoolClient,
   ): Promise<Set<string>> {
-    const rows: MaterializedViewRow[] = await this.dataSource.query(
-      `
+    const rows: MaterializedViewRow[] = await client
+      .query(
+        `
         SELECT matviewname
         FROM pg_matviews
-        WHERE schemaname = current_schema()
+        WHERE schemaname = 'public'
           AND matviewname = ANY($1::text[])
       `,
-      [viewNames],
-    );
+        [viewNames],
+      )
+      .then((result) => result.rows as MaterializedViewRow[]);
 
     return new Set(
       rows
@@ -100,9 +118,11 @@ export class CacheRefreshService {
     );
 
     try {
-      await this.dataSource.query(`
-        REFRESH MATERIALIZED VIEW CONCURRENTLY company_dashboard_metrics
-      `);
+      await this.withCacheAdmin('cache_refresh_dashboard', (client) =>
+        client.query(
+          'REFRESH MATERIALIZED VIEW CONCURRENTLY public.company_dashboard_metrics',
+        ),
+      );
 
       const duration = Date.now() - startTime;
 
@@ -115,8 +135,9 @@ export class CacheRefreshService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: unknown) {
-      const message = this.getErrorMessage(error);
-      this.logger.error(`[Dashboard] Refresh failed: ${message}`);
+      this.logger.error(
+        `[Dashboard] Refresh failed (${this.getErrorType(error)}).`,
+      );
       throw new ServiceUnavailableException(
         'Falha ao atualizar cache do dashboard.',
       );
@@ -134,9 +155,11 @@ export class CacheRefreshService {
     );
 
     try {
-      await this.dataSource.query(`
-        REFRESH MATERIALIZED VIEW CONCURRENTLY apr_risk_rankings
-      `);
+      await this.withCacheAdmin('cache_refresh_risk_rankings', (client) =>
+        client.query(
+          'REFRESH MATERIALIZED VIEW CONCURRENTLY public.apr_risk_rankings',
+        ),
+      );
 
       const duration = Date.now() - startTime;
 
@@ -149,8 +172,9 @@ export class CacheRefreshService {
         timestamp: new Date().toISOString(),
       };
     } catch (error: unknown) {
-      const message = this.getErrorMessage(error);
-      this.logger.error(`[RiskRankings] Refresh failed: ${message}`);
+      this.logger.error(
+        `[RiskRankings] Refresh failed (${this.getErrorType(error)}).`,
+      );
       throw new ServiceUnavailableException(
         'Falha ao atualizar cache de rankings de risco.',
       );
@@ -168,26 +192,8 @@ export class CacheRefreshService {
     this.logger.log('[CacheRefresh] Starting full cache refresh...');
 
     try {
-      // Refresh dashboard metrics
-      const dashboardResult: RefreshResult =
-        await this.refreshDashboard().catch(
-          (error: unknown): RefreshResult => ({
-            status: 'error',
-            table: 'company_dashboard_metrics',
-            error: this.getErrorMessage(error),
-          }),
-        );
-      results.push(dashboardResult);
-
-      // Refresh risk rankings
-      const riskResult: RefreshResult = await this.refreshRiskRankings().catch(
-        (error: unknown): RefreshResult => ({
-          status: 'error',
-          table: 'apr_risk_rankings',
-          error: this.getErrorMessage(error),
-        }),
-      );
-      results.push(riskResult);
+      results.push(await this.refreshDashboard());
+      results.push(await this.refreshRiskRankings());
 
       const totalDuration = Date.now() - startTime;
 
@@ -196,26 +202,18 @@ export class CacheRefreshService {
       );
 
       return {
-        status: results.every((r) => r.status === 'success')
-          ? 'success'
-          : 'partial',
+        status: 'success',
         views: results,
         total_duration_ms: totalDuration,
         timestamp: new Date().toISOString(),
       };
     } catch (error: unknown) {
-      const totalDuration = Date.now() - startTime;
-
       this.logger.error(
-        `[CacheRefresh] Full refresh failed: ${this.getErrorMessage(error)}`,
+        `[CacheRefresh] Full refresh failed (${this.getErrorType(error)}).`,
       );
-
-      return {
-        status: 'error',
-        views: results,
-        total_duration_ms: totalDuration,
-        timestamp: new Date().toISOString(),
-      };
+      throw new ServiceUnavailableException(
+        'Falha ao atualizar os caches administrativos.',
+      );
     }
   }
 
@@ -233,29 +231,57 @@ export class CacheRefreshService {
     timestamp: string;
   }> {
     try {
-      const requestedViews = [
-        'company_dashboard_metrics',
-        'apr_risk_rankings',
-      ] as const;
-      const availableViews = await this.getAvailableMaterializedViews([
-        ...requestedViews,
-      ]);
-      const dashboardAvailable = availableViews.has(
-        'company_dashboard_metrics',
+      const result = await this.withCacheAdmin(
+        'cache_status',
+        async (client) => {
+          const requestedViews = [
+            'company_dashboard_metrics',
+            'apr_risk_rankings',
+          ] as const;
+          const availableViews = await this.getAvailableMaterializedViews(
+            [...requestedViews],
+            client,
+          );
+          const dashboardAvailable = availableViews.has(
+            'company_dashboard_metrics',
+          );
+          const riskAvailable = availableViews.has('apr_risk_rankings');
+
+          const dashboardStatus = dashboardAvailable
+            ? ((
+                await client.query(
+                  'SELECT COUNT(*) as row_count FROM public.company_dashboard_metrics',
+                )
+              ).rows as CacheStatusRow[])
+            : [];
+
+          const riskStatus = riskAvailable
+            ? ((
+                await client.query(
+                  'SELECT COUNT(*) as row_count FROM public.apr_risk_rankings',
+                )
+              ).rows as CacheStatusRow[])
+            : [];
+
+          return {
+            requestedViews,
+            availableViews,
+            dashboardAvailable,
+            riskAvailable,
+            dashboardStatus,
+            riskStatus,
+          };
+        },
       );
-      const riskAvailable = availableViews.has('apr_risk_rankings');
 
-      const dashboardStatus = dashboardAvailable
-        ? await this.queryRows<CacheStatusRow>(`
-            SELECT COUNT(*) as row_count FROM company_dashboard_metrics
-          `)
-        : [];
-
-      const riskStatus = riskAvailable
-        ? await this.queryRows<CacheStatusRow>(`
-            SELECT COUNT(*) as row_count FROM apr_risk_rankings
-          `)
-        : [];
+      const {
+        requestedViews,
+        availableViews,
+        dashboardAvailable,
+        riskAvailable,
+        dashboardStatus,
+        riskStatus,
+      } = result;
 
       if (!dashboardAvailable || !riskAvailable) {
         this.logger.warn(
@@ -282,7 +308,7 @@ export class CacheRefreshService {
       };
     } catch (error: unknown) {
       this.logger.error(
-        `Failed to get cache status: ${this.getErrorMessage(error)}`,
+        `Failed to get cache status (${this.getErrorType(error)}).`,
       );
       throw new ServiceUnavailableException(
         'Falha ao consultar status do cache.',

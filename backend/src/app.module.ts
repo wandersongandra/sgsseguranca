@@ -421,6 +421,7 @@ export const validationSchema = Joi.object({
       .default('development-security-audit-hmac-key'),
   }),
   JWT_SECRET: Joi.string().min(64).required(),
+  SIGNATURE_TIMESTAMP_SECRET: Joi.string().optional().allow(''),
   JWT_ISSUER: Joi.string().trim().optional().allow(''),
   JWT_AUDIENCE: Joi.string().trim().optional().allow(''),
   MFA_ENABLED: Joi.boolean().default(true),

@@ -12,6 +12,7 @@ describe('AppModule production environment validation', () => {
     REDIS_DISABLED: 'true',
     JWT_SECRET: 'sgs-prod-access-key-A9'.repeat(4),
     JWT_REFRESH_SECRET: 'sgs-prod-refresh-key-B8'.repeat(4),
+    SIGNATURE_TIMESTAMP_SECRET: 's'.repeat(64),
     JWT_ISSUER: 'https://api.sgsseguranca.com.br',
     JWT_AUDIENCE: 'sgs-app',
     MFA_TOTP_ENCRYPTION_KEY: 'c'.repeat(32),
@@ -227,6 +228,31 @@ describe('AppModule production environment validation', () => {
     expect(getCustomMessage(weak)).toContain('não podem usar placeholders');
     expect(getCustomMessage(shared)).toContain(
       'JWT_REFRESH_SECRET: MUST_DIFFER_FROM_JWT_SECRET',
+    );
+  });
+
+  it('bloqueia produção sem chave dedicada de timestamp ou com chave JWT compartilhada', async () => {
+    const missing = await validate({
+      ...productionEnv,
+      SIGNATURE_TIMESTAMP_SECRET: '',
+    });
+    const shared = await validate({
+      ...productionEnv,
+      SIGNATURE_TIMESTAMP_SECRET: productionEnv.JWT_SECRET,
+    });
+    const sharedWithRefresh = await validate({
+      ...productionEnv,
+      SIGNATURE_TIMESTAMP_SECRET: productionEnv.JWT_REFRESH_SECRET,
+    });
+
+    expect(getCustomMessage(missing)).toContain(
+      'SIGNATURE_TIMESTAMP_SECRET: REQUIRED',
+    );
+    expect(getCustomMessage(shared)).toContain(
+      'SIGNATURE_TIMESTAMP_SECRET: MUST_DIFFER_FROM_JWT_SECRET',
+    );
+    expect(getCustomMessage(sharedWithRefresh)).toContain(
+      'SIGNATURE_TIMESTAMP_SECRET: MUST_DIFFER_FROM_JWT_REFRESH_SECRET',
     );
   });
 
