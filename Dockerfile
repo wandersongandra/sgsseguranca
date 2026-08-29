@@ -97,6 +97,7 @@ COPY --from=builder --chown=node:node /app/node_modules ./node_modules
 COPY --from=builder --chown=node:node /app/dist ./dist
 COPY --from=builder --chown=node:node /app/src/modules/sophie/kb ./dist/modules/sophie/kb
 COPY --from=builder --chown=node:node /app/scripts ./scripts
+COPY --from=builder --chown=node:node /app/migration-history-compatibility.json ./migration-history-compatibility.json
 COPY --from=builder --chown=node:node /app/newrelic.js ./newrelic.js
 
 COPY --chown=node:node backend/entrypoint.sh ./entrypoint.sh
