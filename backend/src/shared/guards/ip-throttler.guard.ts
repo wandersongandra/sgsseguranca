@@ -5,7 +5,7 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerException, ThrottlerGuard } from '@nestjs/throttler';
 import * as crypto from 'crypto';
 import { sanitizeLogUrl } from '../logging/log-sanitizer.util';
 import { getRequestIp } from '../utils/request-ip.util';
@@ -50,6 +50,10 @@ export class IpThrottlerGuard extends ThrottlerGuard {
     try {
       return await this.runThrottlerWithTimeout(super.canActivate(context));
     } catch (error) {
+      if (error instanceof ThrottlerException) {
+        throw error;
+      }
+
       const failClosedOnAuthRoutes = this.shouldFailClosedOnAuthRoutes();
       const isCriticalAuthRoute = this.isCriticalAuthPath(path);
       const isSensitivePublicRoute = this.isSensitivePublicPath(path);

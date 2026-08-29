@@ -3,7 +3,7 @@ import {
   ServiceUnavailableException,
   type ExecutionContext,
 } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerException, ThrottlerGuard } from '@nestjs/throttler';
 import { IpThrottlerGuard } from './ip-throttler.guard';
 
 type GuardWithTracker = IpThrottlerGuard & {
@@ -159,6 +159,49 @@ describe('IpThrottlerGuard', () => {
       IpThrottlerGuard.prototype.canActivate.call(guard, usersContext),
     ).resolves.toBe(true);
   });
+
+  it.each(['/auth/csrf', '/users/me'])(
+    'propaga a negação legítima de throttling em %s',
+    async (path) => {
+      jest
+        .spyOn(ThrottlerGuard.prototype, 'canActivate')
+        .mockRejectedValueOnce(new ThrottlerException());
+
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => ({ path, headers: {} }),
+        }),
+      } as ExecutionContext;
+
+      await expect(
+        IpThrottlerGuard.prototype.canActivate.call(guard, context),
+      ).rejects.toBeInstanceOf(ThrottlerException);
+    },
+  );
+
+  it.each([
+    '/auth/login',
+    '/auth/refresh',
+    '/auth/me',
+    '/public/documents/validate',
+  ])(
+    'propaga a negação legítima de throttling em rota protegida %s',
+    async (path) => {
+      jest
+        .spyOn(ThrottlerGuard.prototype, 'canActivate')
+        .mockRejectedValueOnce(new ThrottlerException());
+
+      const context = {
+        switchToHttp: () => ({
+          getRequest: () => ({ path, headers: {} }),
+        }),
+      } as ExecutionContext;
+
+      await expect(
+        IpThrottlerGuard.prototype.canActivate.call(guard, context),
+      ).rejects.toBeInstanceOf(ThrottlerException);
+    },
+  );
 
   it('aplica fallback local em rota crítica quando redis do throttler falha', async () => {
     process.env.NODE_ENV = 'production';
