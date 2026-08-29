@@ -23,16 +23,16 @@ o health check pelo domínio de produção agora responde em **~0,6s** ponta a p
 
 ## Topologia atual
 
-| Componente | Onde roda | Observação |
-|---|---|---|
-| API (Backend WEB) | Hostinger VPS, container Coolify | Porta interna 3001 |
-| Worker (BullMQ) | Hostinger VPS, **mesma VPS** da API | Container Coolify separado |
-| **Redis** | Hostinger VPS, container `sgs-redis` (self-hosted) | Rede Docker `coolify`, **não é mais Upstash** |
-| **ClamAV** | Hostinger VPS, container `clamav` | Rede Docker `coolify`, antivírus de upload |
-| Frontend | Vercel | Deploy manual, sem integração git |
-| Banco (PostgreSQL) | Neon | `sa-east-1` (São Paulo) — inalterado |
-| Storage | Backblaze B2 | inalterado |
-| DR Storage | Backblaze B2 (2ª conta) | inalterado |
+| Componente         | Onde roda                                          | Observação                                    |
+| ------------------ | -------------------------------------------------- | --------------------------------------------- |
+| API (Backend WEB)  | Hostinger VPS, container Coolify                   | Porta interna 3001                            |
+| Worker (BullMQ)    | Hostinger VPS, **mesma VPS** da API                | Container Coolify separado                    |
+| **Redis**          | Hostinger VPS, container `sgs-redis` (self-hosted) | Rede Docker `coolify`, **não é mais Upstash** |
+| **ClamAV**         | Hostinger VPS, container `clamav`                  | Rede Docker `coolify`, antivírus de upload    |
+| Frontend           | Vercel                                             | Deploy manual, sem integração git             |
+| Banco (PostgreSQL) | Neon                                               | `sa-east-1` (São Paulo) — inalterado          |
+| Storage            | Backblaze B2                                       | inalterado                                    |
+| DR Storage         | Backblaze B2 (2ª conta)                            | inalterado                                    |
 
 **Mudança importante:** API, Worker, Redis e ClamAV **compartilham a mesma máquina física** agora,
 comunicando-se pela rede Docker interna `coolify` (nomes de container, não IP/porta pública).
@@ -69,9 +69,9 @@ maior nem de serviços gerenciados de Redis/antivírus enquanto o volume de dado
 
 ### Apps no Coolify
 
-| App | UUID | Dockerfile | Domínio |
-|---|---|---|---|
-| backend-web | `s2jgvkq9trtm8c9itahmn7og` | `/Dockerfile` | `https://api.sgsseguranca.com.br` |
+| App            | UUID                       | Dockerfile           | Domínio                                            |
+| -------------- | -------------------------- | -------------------- | -------------------------------------------------- |
+| backend-web    | `s2jgvkq9trtm8c9itahmn7og` | `/Dockerfile`        | `https://api.sgsseguranca.com.br`                  |
 | backend-worker | `x3k7efj1x3pcl4ipcuswwmll` | `/Dockerfile.worker` | (sem domínio público — comunica só por fila/Redis) |
 
 - Repo: `complianceX/sgsseguranca`, branch: `main`
@@ -199,12 +199,12 @@ revisar `docker ps --format '{{.Names}} | {{.Ports}}'` regularmente.
 
 **Tentativa de restringir 80/443 aos IPs da Cloudflare via `ufw-docker` — CAUSOU INDISPONIBILIDADE
 REAL, revertida (2026-08-01).** Motivação: `getRequestIp()` (`backend/src/shared/utils/request-ip.util.ts`)
-usa só `request.ip` (via `trust proxy=1` do Express) e deliberadamente ignora headers como
-`CF-Connecting-IP`/`X-Forwarded-For` por serem forjáveis por quem conectar direto na origem — então
-hoje o IP logado em `login_failed` (e usado por brute-force/throttling/fail2ban) é o **IP de borda da
-Cloudflare**, não o do visitante real. Só seria seguro confiar em `CF-Connecting-IP` se a origem só
-aceitasse conexão vinda da própria Cloudflare — daí a tentativa de travar `80/443` no ufw aos ranges
-oficiais da Cloudflare via `ufw-docker` (necessário porque `docker run -p` fura o ufw puro, ver acima).
+usa a autoridade central de transporte e deliberadamente não promove headers alternativos como
+`CF-Connecting-IP`/`X-Forwarded-For` quando a origem pode ser alcançada diretamente. O modo
+`authenticated` agora permite uma cadeia encaminhada somente após o proxy upstream provar o
+header interno `X-SGS-Proxy-Auth`; o modo `cidr` legado continua exigindo CIDR explícita. Essa
+prova depende do lockdown efetivo do origin e da configuração do proxy, não apenas do DNS
+Cloudflare.
 
 O que aconteceu: `ufw-docker install` + `systemctl restart ufw` cria a chain `ufw-user-forward` e
 reordena o processamento de `DOCKER-USER` — e por algum motivo não totalmente diagnosticado (a

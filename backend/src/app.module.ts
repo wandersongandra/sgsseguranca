@@ -291,7 +291,13 @@ export const validationSchema = Joi.object({
     .allow(''),
   APP_ENV: Joi.string().optional().allow(''),
   APP_LOADTEST_MARKER: Joi.string().optional().allow(''),
+  TRUSTED_PROXY_MODE: Joi.string()
+    .valid('cidr', 'authenticated')
+    .optional()
+    .allow(''),
   TRUSTED_PROXY_CIDRS: Joi.string().optional().allow(''),
+  TRUSTED_FORWARDED_HOP_CIDRS: Joi.string().optional().allow(''),
+  TRUSTED_PROXY_AUTH_SECRET: Joi.string().optional().allow(''),
   REQUIRE_NO_PENDING_MIGRATIONS: Joi.boolean().optional(),
   DATABASE_MIGRATION_URL: Joi.string()
     .uri({ scheme: ['postgres', 'postgresql'] })

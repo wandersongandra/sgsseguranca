@@ -11,6 +11,7 @@ const strong = (prefix: string) => `${prefix}-${'x'.repeat(64)}`;
 function apiEnvironment(): NodeJS.ProcessEnv {
   return {
     NODE_ENV: 'staging',
+    TRUSTED_PROXY_MODE: 'cidr',
     DATABASE_URL: 'postgresql://user:password@db.example.invalid/sgs',
     JWT_SECRET: strong('access'),
     JWT_REFRESH_SECRET: strong('refresh'),
@@ -50,6 +51,47 @@ describe('environment contract', () => {
     expect(() =>
       validateCommonEnvironment(apiEnvironment(), { component: 'api' }),
     ).not.toThrow();
+  });
+
+  it('exige modo explícito de proxy em ambiente semelhante à produção', () => {
+    const missing = apiEnvironment();
+    delete missing.TRUSTED_PROXY_MODE;
+    expect(() =>
+      validateCommonEnvironment(missing, { component: 'api' }),
+    ).toThrow('TRUSTED_PROXY_MODE: REQUIRED_IN_PRODUCTION_LIKE_ENVIRONMENT');
+
+    const invalid = apiEnvironment();
+    invalid.TRUSTED_PROXY_MODE = 'trust-all';
+    expect(() =>
+      validateCommonEnvironment(invalid, { component: 'api' }),
+    ).toThrow('TRUSTED_PROXY_MODE: INVALID_VALUE');
+  });
+
+  it('valida o boundary autenticado sem fallback para outro segredo', () => {
+    const env = apiEnvironment();
+    env.TRUSTED_PROXY_MODE = 'authenticated';
+    env.TRUSTED_PROXY_AUTH_SECRET = strong('proxy-auth');
+    env.TRUSTED_FORWARDED_HOP_CIDRS = '10.0.0.0/8';
+
+    expect(() =>
+      validateCommonEnvironment(env, { component: 'api' }),
+    ).not.toThrow();
+
+    const missingSecret = { ...env };
+    delete missingSecret.TRUSTED_PROXY_AUTH_SECRET;
+    expect(() =>
+      validateCommonEnvironment(missingSecret, { component: 'api' }),
+    ).toThrow('TRUSTED_PROXY_AUTH_SECRET');
+
+    const sharedSecret = {
+      ...env,
+      TRUSTED_PROXY_AUTH_SECRET: env.JWT_SECRET,
+    };
+    expect(() =>
+      validateCommonEnvironment(sharedSecret, { component: 'api' }),
+    ).toThrow(
+      'TRUSTED_PROXY_AUTH_SECRET: MUST_DIFFER_FROM_APPLICATION_SECRETS',
+    );
   });
 
   it('aceita três domínios criptográficos distintos em ambiente não local', () => {

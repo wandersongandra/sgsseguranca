@@ -542,7 +542,10 @@ export const KNOWN_SGS_ENV_KEYS = new Set<string>([
   'THROTTLER_STORAGE_FAIL_OPEN',
   'THROTTLER_STORAGE_REDIS_TIMEOUT_MS',
   'THROTTLER_WINDOW_MS',
+  'TRUSTED_FORWARDED_HOP_CIDRS',
+  'TRUSTED_PROXY_AUTH_SECRET',
   'TRUSTED_PROXY_CIDRS',
+  'TRUSTED_PROXY_MODE',
   'TURNSTILE_ENABLED',
   'TURNSTILE_SECRET_KEY',
   'TURNSTILE_VERIFY_TIMEOUT_MS',
@@ -936,6 +939,9 @@ export function validateCommonEnvironment(
   createTrustedProxyPolicy(env, {
     requireInProduction:
       options.component === 'api' && nodeEnv === 'production',
+    requireExplicitMode:
+      options.component === 'api' &&
+      (nodeEnv === 'production' || nodeEnv === 'staging'),
   });
 
   parseStrictPositiveInteger(env, 'PORT', { min: 1, max: 65535 });
@@ -1041,6 +1047,25 @@ export function validateCommonEnvironment(
       required: true,
       minLength: 32,
     });
+
+    if (
+      readString(env, 'TRUSTED_PROXY_MODE').toLowerCase() === 'authenticated'
+    ) {
+      assertSecret(env, 'TRUSTED_PROXY_AUTH_SECRET', {
+        required: true,
+        minLength: 32,
+      });
+      const proxyAuthSecret = readString(env, 'TRUSTED_PROXY_AUTH_SECRET');
+      if (
+        proxyAuthSecret === readString(env, 'JWT_SECRET') ||
+        proxyAuthSecret === readString(env, 'JWT_REFRESH_SECRET') ||
+        proxyAuthSecret === readString(env, 'SIGNATURE_TIMESTAMP_SECRET')
+      ) {
+        throw new EnvironmentContractError(
+          'TRUSTED_PROXY_AUTH_SECRET: MUST_DIFFER_FROM_APPLICATION_SECRETS',
+        );
+      }
+    }
     if (
       readString(env, 'JWT_SECRET') === readString(env, 'JWT_REFRESH_SECRET')
     ) {

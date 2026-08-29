@@ -5,6 +5,7 @@ describe('AppModule production environment validation', () => {
 
   const productionEnv = {
     NODE_ENV: 'production',
+    TRUSTED_PROXY_MODE: 'cidr',
     TRUSTED_PROXY_CIDRS: '127.0.0.1/32',
     DATABASE_URL: `${postgresScheme}sgs_app:placeholder@ep-example.sa-east-1.aws.neon.tech/neondb`,
     DATABASE_SSL: true,

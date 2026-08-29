@@ -18,6 +18,7 @@ const SENSITIVE_QUERY_KEYS = new Set([
   'x-auth-token',
   'x-csrf-token',
   'x-refresh-csrf',
+  'x-sgs-proxy-auth',
 ]);
 
 const SENSITIVE_PATH_TOKEN_PREFIXES: string[][] = [

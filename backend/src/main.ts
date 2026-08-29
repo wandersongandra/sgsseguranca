@@ -47,6 +47,7 @@ import {
   createTrustedProxyPolicy,
   getRequestIp,
 } from './shared/utils/request-ip.util';
+import { createTrustedProxyAuthenticationMiddleware } from './shared/middleware/trusted-proxy-auth.middleware';
 import type { VersionValue } from '@nestjs/common/interfaces';
 
 const WEB_SERVICE_NAME = process.env.OTEL_SERVICE_NAME ?? 'sgs-backend';
@@ -172,6 +173,7 @@ async function bootstrap() {
 
   const trustedProxyPolicy = createTrustedProxyPolicy(process.env, {
     requireInProduction: isProductionEnv,
+    requireExplicitMode: isProductionEnv || process.env.NODE_ENV === 'staging',
   });
 
   if (!('DOMMatrix' in globalThis)) {
@@ -195,7 +197,16 @@ async function bootstrap() {
     .getHttpAdapter()
     .getInstance() as Partial<ExpressApplication>;
 
-  httpAdapterInstance.set?.('trust proxy', trustedProxyPolicy.isTrusted);
+  // Deve ser o primeiro middleware do app: consumidores de IP, rate limit e
+  // allowlist só podem observar o estado interno criado aqui.
+  app.use(createTrustedProxyAuthenticationMiddleware(trustedProxyPolicy));
+
+  // Express não recebe confiança ampla no modo autenticado. Nesse modo,
+  // somente getRequestIp() pode promover XFF após autenticação do proxy.
+  httpAdapterInstance.set?.(
+    'trust proxy',
+    trustedProxyPolicy.mode === 'cidr' ? trustedProxyPolicy.isTrusted : false,
+  );
 
   if (process.env.REDIS_DISABLED === 'true') {
     bootstrapLogger.warn({

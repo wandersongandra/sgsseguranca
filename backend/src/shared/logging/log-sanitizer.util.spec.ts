@@ -47,6 +47,16 @@ describe('log-sanitizer.util', () => {
     });
   });
 
+  it('redacts the authenticated proxy header from structured audit payloads', () => {
+    expect(
+      sanitizeLogObject({
+        'x-sgs-proxy-auth': 'proxy-auth-runtime-value',
+      }),
+    ).toEqual({
+      'x-sgs-proxy-auth': '***REDACTED***',
+    });
+  });
+
   it('masks bearer and Cloudflare tokens inside free text', () => {
     const cloudflareTokenFixture = 'cfut' + '_TESTTOKENVALUE1234567890';
 

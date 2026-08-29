@@ -1,8 +1,17 @@
+import { createHash } from 'node:crypto';
 import { BlockList, isIP } from 'node:net';
+import { constantTimeEquals } from '../security/constant-time.util';
 
-const TRUSTED_PROXY_CIDRS_ENV = 'TRUSTED_PROXY_CIDRS';
+export const TRUSTED_PROXY_MODE_ENV = 'TRUSTED_PROXY_MODE';
+export const TRUSTED_PROXY_CIDRS_ENV = 'TRUSTED_PROXY_CIDRS';
+export const TRUSTED_FORWARDED_HOP_CIDRS_ENV = 'TRUSTED_FORWARDED_HOP_CIDRS';
+export const TRUSTED_PROXY_AUTH_SECRET_ENV = 'TRUSTED_PROXY_AUTH_SECRET';
+export const TRUSTED_PROXY_AUTH_HEADER = 'x-sgs-proxy-auth';
+
+const AUTH_HEADER_MAX_LENGTH = 4096;
 const MAX_FORWARDED_FOR_LENGTH = 4096;
 const MAX_FORWARDED_FOR_ENTRIES = 32;
+const AUTH_SECRET_MIN_BYTES = 32;
 
 type IpFamily = 'ipv4' | 'ipv6';
 
@@ -11,6 +20,8 @@ type NormalizedIp = {
   family: IpFamily;
 };
 
+export type TrustedProxyMode = 'cidr' | 'authenticated';
+
 export type RequestIpInput = {
   headers?: Record<string, string | string[] | undefined>;
   socket?: { remoteAddress?: string | null } | null;
@@ -18,8 +29,12 @@ export type RequestIpInput = {
 };
 
 export type TrustedProxyPolicy = {
+  mode: TrustedProxyMode;
   cidrs: readonly string[];
+  forwardedHopCidrs: readonly string[];
   isTrusted: (address: string) => boolean;
+  isTrustedForwardedHop: (address: string) => boolean;
+  isProxyAuthHeaderValid: (request: RequestIpInput) => boolean;
 };
 
 export class TrustedProxyConfigurationError extends Error {
@@ -59,7 +74,10 @@ function normalizeIp(value: unknown): NormalizedIp | null {
   return { address: unbracketed, family: 'ipv6' };
 }
 
-function parseTrustedProxyCidr(value: string): {
+function parseTrustedProxyCidr(
+  value: string,
+  environmentKey: string,
+): {
   normalized: string;
   network: string;
   prefix: number;
@@ -67,25 +85,19 @@ function parseTrustedProxyCidr(value: string): {
 } {
   const separator = value.lastIndexOf('/');
   if (separator <= 0 || separator === value.length - 1) {
-    throw new TrustedProxyConfigurationError(
-      `${TRUSTED_PROXY_CIDRS_ENV}: INVALID_CIDR`,
-    );
+    throw new TrustedProxyConfigurationError(`${environmentKey}: INVALID_CIDR`);
   }
 
   const network = normalizeIp(value.slice(0, separator));
   const prefixRaw = value.slice(separator + 1);
   if (!network || !/^\d+$/.test(prefixRaw)) {
-    throw new TrustedProxyConfigurationError(
-      `${TRUSTED_PROXY_CIDRS_ENV}: INVALID_CIDR`,
-    );
+    throw new TrustedProxyConfigurationError(`${environmentKey}: INVALID_CIDR`);
   }
 
   const prefix = Number(prefixRaw);
   const maxPrefix = network.family === 'ipv4' ? 32 : 128;
   if (!Number.isSafeInteger(prefix) || prefix < 1 || prefix > maxPrefix) {
-    throw new TrustedProxyConfigurationError(
-      `${TRUSTED_PROXY_CIDRS_ENV}: UNSAFE_CIDR`,
-    );
+    throw new TrustedProxyConfigurationError(`${environmentKey}: UNSAFE_CIDR`);
   }
 
   return {
@@ -104,18 +116,18 @@ function readEnvironmentValue(
   return typeof value === 'string' ? value : '';
 }
 
-export function createTrustedProxyPolicy(
-  env: Record<string, unknown> = process.env,
-  options: { requireInProduction?: boolean } = {},
-): TrustedProxyPolicy {
-  const raw = readEnvironmentValue(env, TRUSTED_PROXY_CIDRS_ENV).trim();
-  const isProduction =
-    readEnvironmentValue(env, 'NODE_ENV').toLowerCase() === 'production';
-
+function createBlockList(
+  raw: string,
+  environmentKey: string,
+  required: boolean,
+): {
+  cidrs: readonly string[];
+  isTrusted: (address: string) => boolean;
+} {
   if (!raw) {
-    if (options.requireInProduction && isProduction) {
+    if (required) {
       throw new TrustedProxyConfigurationError(
-        `${TRUSTED_PROXY_CIDRS_ENV}: REQUIRED_IN_PRODUCTION`,
+        `${environmentKey}: REQUIRED_CONFIGURATION`,
       );
     }
 
@@ -129,11 +141,13 @@ export function createTrustedProxyPolicy(
     values.some((value) => value.length === 0)
   ) {
     throw new TrustedProxyConfigurationError(
-      `${TRUSTED_PROXY_CIDRS_ENV}: INVALID_CIDR_LIST`,
+      `${environmentKey}: INVALID_CIDR_LIST`,
     );
   }
 
-  const parsed = values.map(parseTrustedProxyCidr);
+  const parsed = values.map((value) =>
+    parseTrustedProxyCidr(value, environmentKey),
+  );
   const blockList = new BlockList();
   for (const cidr of parsed) {
     blockList.addSubnet(cidr.network, cidr.prefix, cidr.family);
@@ -150,13 +164,155 @@ export function createTrustedProxyPolicy(
   };
 }
 
+function readHeader(
+  request: RequestIpInput,
+  expectedName: string,
+): string | undefined {
+  const matchingEntries = Object.entries(request.headers ?? {}).filter(
+    ([name]) => name.toLowerCase() === expectedName,
+  );
+  if (matchingEntries.length !== 1) {
+    return undefined;
+  }
+
+  const value = matchingEntries[0][1];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isValidAuthSecret(value: string): boolean {
+  return (
+    Buffer.byteLength(value, 'utf8') >= AUTH_SECRET_MIN_BYTES &&
+    !/(?:changeme|change[-_ ]?me|your[-_ ]?(?:key|secret|password)|test[-_ ]?secret|default[-_ ]?(?:key|secret|password)|password|secret|example\.invalid|replace[-_ ]?me|<[^>]+>)/i.test(
+      value,
+    )
+  );
+}
+
+const proxyAuthenticationState = new WeakMap<object, boolean>();
+
+/** State interno produzido somente pelo middleware; headers não o controlam. */
+export function setTrustedProxyAuthenticationState(
+  request: RequestIpInput,
+  authenticated: boolean,
+): void {
+  proxyAuthenticationState.set(request, authenticated);
+}
+
+function hasTrustedProxyAuthenticationState(request: RequestIpInput): boolean {
+  return proxyAuthenticationState.get(request) === true;
+}
+
+export function createTrustedProxyPolicy(
+  env: Record<string, unknown> = process.env,
+  options: {
+    requireInProduction?: boolean;
+    requireExplicitMode?: boolean;
+  } = {},
+): TrustedProxyPolicy {
+  const rawMode = readEnvironmentValue(env, TRUSTED_PROXY_MODE_ENV)
+    .trim()
+    .toLowerCase();
+  const production =
+    readEnvironmentValue(env, 'NODE_ENV').toLowerCase() === 'production';
+  const requireExplicitMode =
+    options.requireExplicitMode === true ||
+    (options.requireInProduction === true && production);
+
+  if (!rawMode && requireExplicitMode) {
+    throw new TrustedProxyConfigurationError(
+      `${TRUSTED_PROXY_MODE_ENV}: REQUIRED_IN_PRODUCTION_LIKE_ENVIRONMENT`,
+    );
+  }
+
+  const mode: TrustedProxyMode = (rawMode || 'cidr') as TrustedProxyMode;
+  if (mode !== 'cidr' && mode !== 'authenticated') {
+    throw new TrustedProxyConfigurationError(
+      `${TRUSTED_PROXY_MODE_ENV}: INVALID_VALUE`,
+    );
+  }
+
+  const rawCidrs = readEnvironmentValue(env, TRUSTED_PROXY_CIDRS_ENV).trim();
+  if (mode === 'authenticated') {
+    if (rawCidrs) {
+      throw new TrustedProxyConfigurationError(
+        `${TRUSTED_PROXY_CIDRS_ENV}: MUST_BE_EMPTY_IN_AUTHENTICATED_MODE`,
+      );
+    }
+
+    const authSecret = readEnvironmentValue(env, TRUSTED_PROXY_AUTH_SECRET_ENV);
+    if (!authSecret) {
+      throw new TrustedProxyConfigurationError(
+        `${TRUSTED_PROXY_AUTH_SECRET_ENV}: REQUIRED_IN_AUTHENTICATED_MODE`,
+      );
+    }
+    if (!isValidAuthSecret(authSecret)) {
+      throw new TrustedProxyConfigurationError(
+        `${TRUSTED_PROXY_AUTH_SECRET_ENV}: INVALID_SECRET`,
+      );
+    }
+
+    const rawForwardedHops = readEnvironmentValue(
+      env,
+      TRUSTED_FORWARDED_HOP_CIDRS_ENV,
+    ).trim();
+    if (!rawForwardedHops) {
+      throw new TrustedProxyConfigurationError(
+        `${TRUSTED_FORWARDED_HOP_CIDRS_ENV}: REQUIRED_IN_AUTHENTICATED_MODE`,
+      );
+    }
+    const forwardedHops = createBlockList(
+      rawForwardedHops,
+      TRUSTED_FORWARDED_HOP_CIDRS_ENV,
+      false,
+    );
+
+    return {
+      mode,
+      cidrs: [],
+      forwardedHopCidrs: forwardedHops.cidrs,
+      isTrusted: () => false,
+      isTrustedForwardedHop: forwardedHops.isTrusted,
+      isProxyAuthHeaderValid: (request) => {
+        const header = readHeader(request, TRUSTED_PROXY_AUTH_HEADER);
+        return (
+          typeof header === 'string' &&
+          header.length <= AUTH_HEADER_MAX_LENGTH &&
+          constantTimeEquals(header, authSecret)
+        );
+      },
+    };
+  }
+
+  const trustedProxies = createBlockList(
+    rawCidrs,
+    TRUSTED_PROXY_CIDRS_ENV,
+    options.requireInProduction === true && production,
+  );
+
+  return {
+    mode,
+    cidrs: trustedProxies.cidrs,
+    forwardedHopCidrs: [],
+    isTrusted: trustedProxies.isTrusted,
+    isTrustedForwardedHop: () => false,
+    isProxyAuthHeaderValid: () => false,
+  };
+}
+
 let cachedPolicyKey: string | undefined;
 let cachedPolicy: TrustedProxyPolicy | undefined;
 
 function getDefaultTrustedProxyPolicy(): TrustedProxyPolicy {
-  const raw = String(process.env[TRUSTED_PROXY_CIDRS_ENV] ?? '').trim();
+  const mode = String(process.env[TRUSTED_PROXY_MODE_ENV] ?? '').trim();
+  const cidrs = String(process.env[TRUSTED_PROXY_CIDRS_ENV] ?? '').trim();
+  const forwardedHops = String(
+    process.env[TRUSTED_FORWARDED_HOP_CIDRS_ENV] ?? '',
+  ).trim();
+  const authSecretFingerprint = createHash('sha256')
+    .update(String(process.env[TRUSTED_PROXY_AUTH_SECRET_ENV] ?? ''))
+    .digest('hex');
   const nodeEnv = String(process.env.NODE_ENV ?? '').toLowerCase();
-  const cacheKey = `${nodeEnv}\u0000${raw}`;
+  const cacheKey = `${nodeEnv}\u0000${mode}\u0000${cidrs}\u0000${forwardedHops}\u0000${authSecretFingerprint}`;
   if (cachedPolicy && cachedPolicyKey === cacheKey) {
     return cachedPolicy;
   }
@@ -203,9 +359,11 @@ function readForwardedAddresses(
 }
 
 /**
- * Resolve the transport client address. Forwarded headers are considered only
- * after the immediate peer matches an explicitly configured proxy network.
- * This function is the sole application-level authority that parses XFF.
+ * Resolve o endereço do cliente a partir da autoridade de transporte.
+ *
+ * Em `cidr`, preserva o contrato histórico de XFF por CIDR. Em
+ * `authenticated`, XFF só é considerado após o middleware validar o header
+ * interno e somente os hops explicitamente confiáveis podem ser consumidos.
  */
 export function resolveClientIp(
   request: RequestIpInput,
@@ -216,12 +374,36 @@ export function resolveClientIp(
     return null;
   }
 
-  let effective = peer;
-  const forwarded = readForwardedAddresses(request);
-  if (!forwarded) {
-    return effective.address;
+  if (
+    policy.mode === 'authenticated' &&
+    !hasTrustedProxyAuthenticationState(request)
+  ) {
+    return peer.address;
   }
 
+  const forwarded = readForwardedAddresses(request);
+  if (!forwarded) {
+    return peer.address;
+  }
+
+  if (policy.mode === 'authenticated') {
+    let effective = peer;
+    for (let index = forwarded.length - 1; index >= 0; index -= 1) {
+      if (!policy.isTrustedForwardedHop(effective.address)) {
+        return effective.address;
+      }
+
+      effective = forwarded[index];
+      if (!policy.isTrustedForwardedHop(effective.address)) {
+        return effective.address;
+      }
+    }
+
+    // Sem cadeia de cliente autenticável, não promove o leftmost arbitrário.
+    return peer.address;
+  }
+
+  let effective = peer;
   for (let index = forwarded.length - 1; index >= 0; index -= 1) {
     if (!policy.isTrusted(effective.address)) {
       break;
