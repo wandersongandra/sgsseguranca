@@ -1,5 +1,5 @@
-import { clearSensitiveBrowserStorage } from "./browser-sensitive-storage";
-import { siteStore } from "./siteStore";
+import { clearSensitiveBrowserStorage } from './browser-sensitive-storage';
+import { siteStore } from './siteStore';
 
 type SelectedTenant = {
   companyId: string;
@@ -8,24 +8,23 @@ type SelectedTenant = {
 
 type Listener = (tenant: SelectedTenant | null) => void;
 
-const STORAGE_KEY = "cx_selected_tenant";
+const STORAGE_KEY = 'cx_selected_tenant';
 
 let current: SelectedTenant | null = null;
 const listeners = new Set<Listener>();
 let transition = Promise.resolve();
+let transitionVersion = 0;
 
 function isValidTenant(value: unknown): value is SelectedTenant {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== 'object' || value === null) return false;
   const v = value as Record<string, unknown>;
   return (
-    typeof v.companyId === "string" &&
-    v.companyId.length > 0 &&
-    typeof v.companyName === "string"
+    typeof v.companyId === 'string' && v.companyId.length > 0 && typeof v.companyName === 'string'
   );
 }
 
 function loadFromStorage(): SelectedTenant | null {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
@@ -42,7 +41,7 @@ function loadFromStorage(): SelectedTenant | null {
 }
 
 function saveToStorage(tenant: SelectedTenant | null) {
-  if (typeof window === "undefined") return;
+  if (typeof window === 'undefined') return;
   if (tenant) {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(tenant));
   } else {
@@ -52,33 +51,36 @@ function saveToStorage(tenant: SelectedTenant | null) {
 
 export const selectedTenantStore = {
   get(): SelectedTenant | null {
-    if (!current && typeof window !== "undefined") {
+    if (!current && typeof window !== 'undefined') {
       current = loadFromStorage();
     }
     return current;
   },
 
   set(tenant: SelectedTenant): Promise<void> {
-    transition = transition.then(async () => {
+    const requestedVersion = transitionVersion;
+    const applyTenant = async () => {
+      if (requestedVersion !== transitionVersion) return;
       const previousTenant = current ?? loadFromStorage();
-      if (
-        previousTenant?.companyId &&
-        previousTenant.companyId !== tenant.companyId
-      ) {
+      if (previousTenant?.companyId && previousTenant.companyId !== tenant.companyId) {
         await clearSensitiveBrowserStorage();
+        if (requestedVersion !== transitionVersion) return;
         // Quando a empresa muda, limpa a obra selecionada também
         siteStore.clear();
       }
       current = tenant;
       saveToStorage(tenant);
       for (const l of listeners) l(current);
-    });
+    };
+    transition = transition.then(applyTenant, applyTenant);
     return transition;
   },
 
   clear() {
+    transitionVersion += 1;
     current = null;
     saveToStorage(null);
+    siteStore.clear();
     for (const l of listeners) l(null);
   },
 

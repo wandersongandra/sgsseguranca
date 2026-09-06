@@ -1,3 +1,6 @@
+const { assertLoadtestEnvironment } = require('./loadtest-target-guard.cjs');
+assertLoadtestEnvironment({ requireDatabase: true });
+
 const { randomBytes, createCipheriv, createHmac } = require('node:crypto');
 const { Client } = require('/app/node_modules/pg');
 const argon2 = require('/app/node_modules/argon2');

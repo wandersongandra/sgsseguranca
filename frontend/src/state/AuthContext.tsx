@@ -1,33 +1,20 @@
 'use client';
 
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { tokenStore } from '@/lib/tokenStore';
 import { forcePasswordChangeStore } from '@/lib/forcePasswordChangeStore';
 import { authRefreshHint } from '@/lib/authRefreshHint';
 import { User } from '@/services/usersService';
-import {
-  clearAuthenticatedSession,
-  persistAuthenticatedSession,
-} from '@/lib/auth-session-state';
-import {
-  authService,
-  AuthLoginResponse,
-  AuthLoginResult,
-} from '@/services/authService';
+import { clearAuthenticatedSession, persistAuthenticatedSession } from '@/lib/auth-session-state';
+import { authService, AuthLoginResponse, AuthLoginResult } from '@/services/authService';
 import { Permission, PermissionPrefix, type AppPermission } from '@/lib/permissions';
 
 const REFRESH_CSRF_COOKIE_NAME = 'refresh_csrf';
 export const DEFAULT_IDLE_LOGOUT_MINUTES = 7 * 24 * 60;
 export const MIN_IDLE_LOGOUT_MINUTES = 5;
 export const MAX_IDLE_LOGOUT_MINUTES = 30 * 24 * 60;
+const LOGOUT_REQUEST_TIMEOUT_MS = 2_000;
 const VIEWER_ROLE_ALIASES = [
   'visualizador',
   'trabalhador',
@@ -44,6 +31,36 @@ function readCookie(name: string): string | null {
     .find((part) => part.startsWith(`${encoded}=`));
   if (!match) return null;
   return decodeURIComponent(match.slice(encoded.length + 1));
+}
+
+function resolveLogoutRedirectPath(redirectPath?: string): string {
+  const candidate = (redirectPath || '/login').trim();
+  if (!candidate.startsWith('/') || candidate.startsWith('//') || candidate.includes('\\')) {
+    return '/login';
+  }
+
+  try {
+    const parsed = new URL(candidate, 'https://sgs.invalid');
+    if (parsed.origin !== 'https://sgs.invalid') return '/login';
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return '/login';
+  }
+}
+
+async function requestServerLogout(): Promise<void> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const logoutRequest = Promise.resolve()
+      .then(() => authService.logout())
+      .catch(() => undefined);
+    const timeout = new Promise<void>((resolve) => {
+      timeoutId = setTimeout(resolve, LOGOUT_REQUEST_TIMEOUT_MS);
+    });
+    await Promise.race([logoutRequest, timeout]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
 }
 
 export function resolveIdleLogoutMs(): number | null {
@@ -71,13 +88,9 @@ interface AuthContextType {
   permissions: string[];
   isAdminGeral: boolean;
   hasPermission: (permission: AppPermission) => boolean;
-  login: (
-    cpf: string,
-    password: string,
-    turnstileToken?: string,
-  ) => Promise<AuthLoginResult>;
+  login: (cpf: string, password: string, turnstileToken?: string) => Promise<AuthLoginResult>;
   finalizeLogin: (data: AuthLoginResponse) => void;
-  logout: () => Promise<void>;
+  logout: (redirectPath?: string) => Promise<void>;
 }
 
 interface AuthStateContextType {
@@ -90,13 +103,9 @@ interface AuthStateContextType {
 
 interface AuthActionsContextType {
   hasPermission: (permission: AppPermission) => boolean;
-  login: (
-    cpf: string,
-    password: string,
-    turnstileToken?: string,
-  ) => Promise<AuthLoginResult>;
+  login: (cpf: string, password: string, turnstileToken?: string) => Promise<AuthLoginResult>;
   finalizeLogin: (data: AuthLoginResponse) => void;
-  logout: () => Promise<void>;
+  logout: (redirectPath?: string) => Promise<void>;
 }
 
 const AuthStateContext = createContext<AuthStateContextType | undefined>(undefined);
@@ -120,14 +129,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }) => {
       const nextRoles = session.roles || [];
       const nextPermissions = session.permissions || [];
-      const nextIsAdminGeral =
-        session.isAdminGeral === true || session.user?.isAdminGeral === true;
+      const nextIsAdminGeral = session.isAdminGeral === true || session.user?.isAdminGeral === true;
 
-      setUser(
-        session.user
-          ? { ...session.user, isAdminGeral: nextIsAdminGeral }
-          : null,
-      );
+      setUser(session.user ? { ...session.user, isAdminGeral: nextIsAdminGeral } : null);
       setRoles(nextRoles);
       setPermissions(nextPermissions);
       setIsAdminGeral(nextIsAdminGeral);
@@ -167,9 +171,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Access token fica apenas em memória.
         // Em reload, tentamos obter novo access token via refresh token (cookie httpOnly).
-        const hasRefreshCsrfCookie = Boolean(
-          readCookie(REFRESH_CSRF_COOKIE_NAME),
-        );
+        const hasRefreshCsrfCookie = Boolean(readCookie(REFRESH_CSRF_COOKIE_NAME));
         if (!hasRefreshCsrfCookie && authRefreshHint.get()) {
           authRefreshHint.clear();
         }
@@ -212,11 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [applyAuthenticatedSession, clearAuthState]);
 
   const login = useCallback(
-    async (
-      cpf: string,
-      password: string,
-      turnstileToken?: string,
-    ): Promise<AuthLoginResult> => {
+    async (cpf: string, password: string, turnstileToken?: string): Promise<AuthLoginResult> => {
       try {
         clearAuthState();
         await authService.getCsrfToken();
@@ -283,16 +281,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [applyAuthenticatedSession, router],
   );
 
-  const logout = useCallback(async () => {
-    try {
-      await authService.logout();
-    } catch {
-      // Ignora falhas de rede no logout e limpa estado local mesmo assim.
-    }
+  const logout = useCallback(
+    async (redirectPath = '/login') => {
+      const safeRedirectPath = resolveLogoutRedirectPath(redirectPath);
+      await requestServerLogout();
 
-    clearAuthState();
-    router.push('/login');
-  }, [clearAuthState, router]);
+      clearAuthState();
+      router.push(safeRedirectPath);
+    },
+    [clearAuthState, router],
+  );
 
   // Logout automático por inatividade (LGPD + segurança)
   useEffect(() => {
@@ -307,8 +305,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const reset = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        void logout();
-        router.push('/login?expired=1');
+        void logout('/login?expired=1');
       }, IDLE_MS);
     };
 
@@ -369,9 +366,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <AuthStateContext.Provider value={authStateValue}>
-      <AuthActionsContext.Provider value={authActionsValue}>
-        {children}
-      </AuthActionsContext.Provider>
+      <AuthActionsContext.Provider value={authActionsValue}>{children}</AuthActionsContext.Provider>
     </AuthStateContext.Provider>
   );
 };

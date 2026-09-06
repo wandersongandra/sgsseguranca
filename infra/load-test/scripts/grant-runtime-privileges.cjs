@@ -1,17 +1,20 @@
-const { Client } = require("/app/node_modules/pg");
+const { assertLoadtestEnvironment: assertTargetEnvironment } = require('./loadtest-target-guard.cjs');
+assertTargetEnvironment({ requireDatabase: true });
 
 const connectionString = process.env.DATABASE_MIGRATION_URL;
-if (!connectionString || !connectionString.includes("/sgs_loadtest")) {
-  throw new Error("load-test grant guard rejected the database URL");
-}
+if (!connectionString) throw new Error('load-test grant guard requires DATABASE_MIGRATION_URL');
 
+const { Client } = require("/app/node_modules/pg");
 const client = new Client({ connectionString });
 
 async function main() {
   await client.connect();
   await client.query("GRANT USAGE ON SCHEMA public TO sgs_app");
   await client.query(
-    "GRANT SELECT, INSERT, UPDATE, DELETE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public TO sgs_app",
+    "REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM sgs_app",
+  );
+  await client.query(
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO sgs_app",
   );
   await client.query(
     "GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO sgs_app",
@@ -19,6 +22,10 @@ async function main() {
   await client.query(
     "REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA public FROM sgs_app",
   );
+  await client.query(`
+    ALTER DEFAULT PRIVILEGES FOR ROLE sgs_migrator IN SCHEMA public
+      REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM sgs_app;
+  `);
   await client.query(`
     DO $$
     BEGIN
@@ -31,11 +38,19 @@ async function main() {
     END $$;
   `);
   await client.query(
-    "ALTER DEFAULT PRIVILEGES FOR ROLE sgs_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE, REFERENCES, TRIGGER ON TABLES TO sgs_app",
+    "ALTER DEFAULT PRIVILEGES FOR ROLE sgs_migrator IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO sgs_app",
   );
   await client.query(
     "ALTER DEFAULT PRIVILEGES FOR ROLE sgs_migrator IN SCHEMA public GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO sgs_app",
   );
+  await client.query(`
+    DO $$
+    BEGIN
+      IF to_regclass('public.migrations') IS NOT NULL THEN
+        EXECUTE 'REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON TABLE public.migrations FROM sgs_app';
+      END IF;
+    END $$;
+  `);
   await client.query(`
     GRANT EXECUTE ON FUNCTION
       public.current_company(),

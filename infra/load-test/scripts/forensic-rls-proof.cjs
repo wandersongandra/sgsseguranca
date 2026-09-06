@@ -1,3 +1,6 @@
+const { assertLoadtestEnvironment } = require('./loadtest-target-guard.cjs');
+assertLoadtestEnvironment({ requireApi: true, requireDatabase: true });
+
 const { Client } = require('/app/node_modules/pg');
 const { randomUUID } = require('node:crypto');
 

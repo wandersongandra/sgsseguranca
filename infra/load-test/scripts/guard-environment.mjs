@@ -35,13 +35,13 @@ const PRODUCTION_MARKERS = [
 ];
 
 const ALLOWED_HOSTS = new Set([
-  "localhost",
-  "127.0.0.1",
   "postgres-loadtest",
   "redis-loadtest",
   "minio-loadtest",
+  "api-loadtest",
   "api-loadtest.sgsseguranca.com.br",
 ]);
+const LOCAL_BINDING_ACK = "sgs-loadtest-local-binding";
 
 function isPrivateIpv4(host) {
   const parts = String(host).split(".").map(Number);
@@ -70,8 +70,14 @@ function hostFrom(value) {
   }
 }
 
-function isAllowedHost(host) {
-  return ALLOWED_HOSTS.has(host) || isPrivateIpv4(host);
+function isAllowedHost(host, env) {
+  if (ALLOWED_HOSTS.has(host)) return true;
+  const localBindingAcknowledged =
+    env?.LOADTEST_LOCAL_BINDING_ACK === LOCAL_BINDING_ACK;
+  return (
+    localBindingAcknowledged &&
+    (host === "localhost" || host === "127.0.0.1" || isPrivateIpv4(host))
+  );
 }
 
 function reject(reason) {
@@ -115,7 +121,7 @@ function assertLoadtestIdentity(env) {
   }
   if (
     env.DATABASE_HOST &&
-    !isAllowedHost(String(env.DATABASE_HOST).toLowerCase())
+    !isAllowedHost(String(env.DATABASE_HOST).toLowerCase(), env)
   ) {
     reject("DATABASE_HOST is outside the load-test allowlist");
   }
@@ -125,12 +131,17 @@ function assertLoadtestNetwork(env) {
   const networkValues = [
     ["DATABASE_URL", env.DATABASE_URL],
     ["DATABASE_MIGRATION_URL", env.DATABASE_MIGRATION_URL],
+    ["DATABASE_PRIVATE_URL", env.DATABASE_PRIVATE_URL],
+    ["DATABASE_PUBLIC_URL", env.DATABASE_PUBLIC_URL],
+    ["DATABASE_DIRECT_URL", env.DATABASE_DIRECT_URL],
+    ["POSTGRES_URL", env.POSTGRES_URL],
     ["REDIS_URL", env.REDIS_URL],
     ["REDIS_AUTH_URL", env.REDIS_AUTH_URL],
     ["REDIS_RATE_LIMIT_URL", env.REDIS_RATE_LIMIT_URL],
     ["REDIS_CACHE_URL", env.REDIS_CACHE_URL],
     ["REDIS_QUEUE_URL", env.REDIS_QUEUE_URL],
     ["AWS_ENDPOINT", env.AWS_ENDPOINT],
+    ["AWS_S3_ENDPOINT", env.AWS_S3_ENDPOINT],
     ["API_PUBLIC_URL", env.API_PUBLIC_URL],
     ["BASE_URL", env.BASE_URL],
   ];
@@ -144,7 +155,7 @@ function assertLoadtestNetwork(env) {
       reject(`${name} contains a production provider or domain marker`);
     }
     const host = hostFrom(raw);
-    if (!host || !isAllowedHost(host)) {
+    if (!host || !isAllowedHost(host, env)) {
       reject(`${name} points outside the load-test host allowlist`);
     }
   }
@@ -183,7 +194,7 @@ function assertLoadtestRedisHosts(env) {
     const value = String(env[name] || "")
       .trim()
       .toLowerCase();
-    if (value && !isAllowedHost(value)) {
+    if (value && !isAllowedHost(value, env)) {
       reject(`${name} points outside the load-test host allowlist`);
     }
   }

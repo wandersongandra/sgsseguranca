@@ -42,10 +42,15 @@ describe('AppModule production environment validation', () => {
   };
 
   const originalEnv = process.env;
+  const inheritedKeysRejectedByTheEnvironmentContract = [
+    'GEMINI_CLI_IDE_AUTH_TOKEN',
+    'GEMINI_CLI_IDE_SERVER_PORT',
+    'GEMINI_CLI_IDE_WORKSPACE_PATH',
+  ];
+  let loadedValidationSchema: ObjectSchema;
 
-  beforeEach(() => {
-    jest.resetModules();
-    process.env = {
+  beforeAll(async () => {
+    const testEnv = {
       ...originalEnv,
       ...Object.fromEntries(
         Object.entries(productionEnv).map(([key, value]) => [
@@ -54,20 +59,19 @@ describe('AppModule production environment validation', () => {
         ]),
       ),
     };
+    for (const key of inheritedKeysRejectedByTheEnvironmentContract) {
+      delete testEnv[key];
+    }
+    process.env = testEnv;
+    loadedValidationSchema = (await import('./app.module')).validationSchema;
   });
 
-  afterEach(() => {
+  afterAll(() => {
     process.env = originalEnv;
-    jest.resetModules();
   });
 
-  async function loadValidationSchema(): Promise<ObjectSchema> {
-    // AppModule monta ConfigModule no import; carregamos depois de preparar env
-    // para que a validação global do módulo também receba valores válidos.
-    const appModule = (await import('./app.module')) as {
-      validationSchema: ObjectSchema;
-    };
-    return appModule.validationSchema;
+  function loadValidationSchema(): Promise<ObjectSchema> {
+    return Promise.resolve(loadedValidationSchema);
   }
 
   async function validate(values: Record<string, unknown>) {

@@ -12,6 +12,7 @@ const valid = {
   DATABASE_MIGRATION_URL: `${["postgres", "ql"].join("")}://sgs_migrator:test@postgres-loadtest:5432/sgs_loadtest`,
   REDIS_URL: `${["red", "is"].join("")}://:test@redis-loadtest:6379`,
   API_PUBLIC_URL: "http://127.0.0.1:8088",
+  LOADTEST_LOCAL_BINDING_ACK: "sgs-loadtest-local-binding",
   AWS_BUCKET_NAME: "sgs-loadtest-documents",
 };
 
@@ -49,6 +50,13 @@ for (const [name, mutation] of [
     "wrong redis",
     {
       REDIS_URL: `${["red", "iss"].join("")}://u:test@production.redis.example:6380`,
+    },
+  ],
+  [
+    "unacknowledged private binding",
+    {
+      API_PUBLIC_URL: "http://192.168.20.10:8088",
+      LOADTEST_LOCAL_BINDING_ACK: undefined,
     },
   ],
   ["missing marker", { APP_ENV: "staging" }],

@@ -51,7 +51,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
 
@@ -166,7 +166,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
 
@@ -178,7 +178,7 @@ jobs:
     name: Generate SBOM
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     strategy:
       matrix:
         directory: ["backend", "frontend"]
@@ -189,7 +189,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
 
