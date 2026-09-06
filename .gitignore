@@ -166,3 +166,6 @@ semgrep-*.json
 # Saídas avulsas de ferramentas e fixtures locais.
 /stdout
 /report-upload.png
+
+# Tarballs de cutover (git archive do repo inteiro, gerados por scripts de migração)
+sgs-cutover-*.tar
