@@ -714,12 +714,7 @@ export class ArrsService {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
     };
-    const date = arr.data
-      ? new Intl.DateTimeFormat('pt-BR', {
-          dateStyle: 'short',
-          timeZone: 'America/Araguaina',
-        }).format(new Date(arr.data))
-      : '—';
+    const date = arr.data ? this.formatDocumentDate(arr.data) : '—';
     const participants = (arr.participants || [])
       .map(
         (participant) =>
@@ -921,5 +916,22 @@ export class ArrsService {
       .toUpperCase();
 
     return `ARR-${year}-${reference || String(Date.now()).slice(-6)}`;
+  }
+
+  private formatDocumentDate(value: string | Date): string {
+    if (typeof value === 'string') {
+      const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (dateOnlyMatch) {
+        return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+      }
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeZone: 'America/Araguaina',
+    }).format(parsed);
   }
 }
