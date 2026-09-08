@@ -715,50 +715,70 @@ export class ArrsService {
         .replace(/'/g, '&#39;');
     };
     const date = arr.data ? this.formatDocumentDate(arr.data) : '—';
+    const company = arr.company?.razao_social || arr.company_id;
+    const site = arr.site?.nome || arr.site_id;
+    const code = arr.document_code || this.buildArrDocumentCode(arr);
     const participants = (arr.participants || [])
       .map(
-        (participant) =>
-          `<li>${escapeHtml(participant.nome || participant.id)}</li>`,
+        (participant, index) =>
+          `<tr><td>${index + 1}</td><td>${escapeHtml(participant.nome || participant.id)}</td><td>${escapeHtml(participant.funcao || '—')}</td></tr>`,
       )
       .join('');
     const field = (label: string, value: unknown) =>
       `<div class="field"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+    const narrative = (label: string, value: unknown) =>
+      `<div class="section-title">${escapeHtml(label)}</div><div class="narrative">${escapeHtml(value)}</div>`;
 
     return `<!doctype html>
 <html lang="pt-BR">
 <head><meta charset="utf-8"><style>${INSTITUTIONAL_PDF_CSS}</style></head>
 <body>
   ${buildInstitutionalHeaderHtml({
-    title: 'Análise de Risco Rápida',
+    title: 'ANÁLISE DE RISCO RÁPIDA',
     subtitle:
-      'Documento oficial operacional de identificação, avaliação e controle de riscos.',
-    code: arr.document_code || this.buildArrDocumentCode(arr),
+      'Registro simplificado para formalização de condição observada, risco e ação imediata em campo.',
+    code,
     status: arr.status,
-    company: arr.company_id,
-    site: arr.site?.nome || arr.site_id,
+    company,
+    site,
     referenceDate: date,
   })}
-  <div class="section-title">Identificação</div><div class="grid">
+  <div class="executive-summary">
+    <h2>Síntese executiva</h2>
+    <p>Registro enxuto para formalizar a condição observada em campo, o risco identificado e o tratamento imediato definido pela equipe.</p>
+    <div class="metrics">
+      <div class="metric"><span class="metric-label">Nível de risco</span><strong class="metric-value">${escapeHtml(arr.nivel_risco)}</strong></div>
+      <div class="metric"><span class="metric-label">Probabilidade</span><strong class="metric-value">${escapeHtml(arr.probabilidade)}</strong></div>
+      <div class="metric"><span class="metric-label">Severidade</span><strong class="metric-value">${escapeHtml(arr.severidade)}</strong></div>
+      <div class="metric"><span class="metric-label">Participantes</span><strong class="metric-value">${arr.participants?.length || 0}</strong></div>
+      <div class="metric"><span class="metric-label">Data do documento</span><strong class="metric-value">${escapeHtml(date)}</strong></div>
+      <div class="metric"><span class="metric-label">Status</span><strong class="metric-value">${escapeHtml(arr.status)}</strong></div>
+    </div>
+  </div>
+  <div class="section-title">Contexto documental</div><div class="grid">
     ${field('Título', arr.titulo)}
+    ${field('Empresa', company)}
+    ${field('Data do documento', date)}
+    ${field('Obra / site', site)}
     ${field('Turno', arr.turno)}
     ${field('Frente de trabalho', arr.frente_trabalho)}
     ${field('Atividade principal', arr.atividade_principal)}
     ${field('Responsável', arr.responsavel?.nome || arr.responsavel_id)}
-    ${field('Obra / site', arr.site?.nome || arr.site_id)}
   </div>
   <div class="section-title">Avaliação de risco</div><div class="grid">
-    ${field('Condição observada', arr.condicao_observada)}
-    ${field('Risco identificado', arr.risco_identificado)}
     ${field('Nível', arr.nivel_risco)}
     ${field('Probabilidade', arr.probabilidade)}
     ${field('Severidade', arr.severidade)}
-    ${field('EPI/EPC aplicáveis', arr.epi_epc_aplicaveis)}
-    ${field('Controles imediatos', arr.controles_imediatos)}
-    ${field('Ação recomendada', arr.acao_recomendada)}
-    ${field('Observações', arr.observacoes)}
   </div>
-  <div class="section-title">Participantes</div><ul>${participants || '<li>Nenhum participante informado</li>'}</ul>
-  <div class="governance"><strong>Documento governado pelo SGS.</strong><br/>O hash, a identidade do tenant/site, a emissão e o acesso são registrados no catálogo documental oficial.</div>
+  ${narrative('Condição observada', arr.condicao_observada)}
+  ${narrative('Risco identificado', arr.risco_identificado)}
+  ${narrative('Controles imediatos', arr.controles_imediatos)}
+  ${narrative('Ação recomendada', arr.acao_recomendada)}
+  ${narrative('EPIs e EPCs aplicáveis', arr.epi_epc_aplicaveis)}
+  ${narrative('Observações', arr.observacoes)}
+  <div class="section-title">Participantes (${arr.participants?.length || 0})</div>
+  <table class="participants-table"><thead><tr><th>#</th><th>Nome</th><th>Função</th></tr></thead><tbody>${participants || '<tr><td colspan="3">Nenhum participante informado</td></tr>'}</tbody></table>
+  <div class="governance"><div class="governance-title">Governança e autenticidade</div>Valide o documento pelo código público: <strong>${escapeHtml(code)}</strong><br/>O hash, a identidade do tenant/site, a emissão e o acesso são registrados no catálogo documental oficial.</div>
 </body></html>`;
   }
 
@@ -920,10 +940,16 @@ export class ArrsService {
 
   private formatDocumentDate(value: string | Date): string {
     if (typeof value === 'string') {
-      const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/);
       if (dateOnlyMatch) {
         return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
       }
+    }
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return `${String(value.getUTCDate()).padStart(2, '0')}/${String(
+        value.getUTCMonth() + 1,
+      ).padStart(2, '0')}/${value.getUTCFullYear()}`;
     }
 
     const parsed = new Date(value);
