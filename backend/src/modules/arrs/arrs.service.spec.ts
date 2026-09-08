@@ -406,6 +406,10 @@ describe('ArrsService', () => {
     expect(capturedUpdates[0].pdf_generated_at).toBeInstanceOf(Date);
   });
 
+  it('preserva a data documental sem deslocamento de fuso horário', () => {
+    expect(service['formatDocumentDate']('2026-08-10')).toBe('10/08/2026');
+  });
+
   it('bloqueia emissao final quando a ARR ainda esta em rascunho', async () => {
     arrRepository.findOne.mockResolvedValue({
       id: 'arr-rascunho',

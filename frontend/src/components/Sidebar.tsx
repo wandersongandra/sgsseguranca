@@ -164,7 +164,7 @@ export function Sidebar({
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--chrome-sidebar-item-active-bg)] text-xs font-bold">{user?.nome?.trim()?.slice(0, 2).toUpperCase() || 'SG'}</div>
               <div className="min-w-0"><p className="truncate text-[13px] font-semibold text-[var(--ds-color-sidebar-text)]">{user?.nome}</p><p className="truncate text-xs text-[var(--ds-color-sidebar-muted)]">{user?.profile?.nome}</p></div>
             </div>
-            <button type="button" onClick={logout} className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-medium text-[var(--ds-color-sidebar-muted)]"><LogOut aria-hidden="true" className="h-4 w-4" />Sair</button>
+            <button type="button" onClick={() => void logout()} className="flex w-full items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-medium text-[var(--ds-color-sidebar-muted)]"><LogOut aria-hidden="true" className="h-4 w-4" />Sair</button>
           </div>
         </div>
       </aside>
