@@ -129,17 +129,6 @@ function dateOnly(value: string | Date | null | undefined): string {
   return `${String(parsed.getUTCDate()).padStart(2, '0')}/${String(parsed.getUTCMonth() + 1).padStart(2, '0')}/${parsed.getUTCFullYear()}`;
 }
 
-function dateTime(value: string | Date | null | undefined): string {
-  if (!value) return '-';
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return clean(value);
-  return new Intl.DateTimeFormat('pt-BR', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-    timeZone: 'America/Cuiaba',
-  }).format(parsed);
-}
-
 function fill(doc: jsPDF, color: Rgb) {
   doc.setFillColor(...color);
 }
@@ -596,7 +585,7 @@ function drawFooter(
       288.7,
     );
     doc.setFont(PDF_FONT, 'normal');
-    doc.text(`Gerado em ${generatedAt}`, PAGE.margin, 292.7);
+    doc.text(`Gerado em ${dateOnly(generatedAt)}`, PAGE.margin, 292.7);
     doc.setFont(PDF_FONT, 'bold');
     doc.text(`ID: ${clean(code)}`, PAGE.width - PAGE.margin, 288.7, {
       align: 'right',
@@ -629,7 +618,9 @@ export async function generateOfficialArrPdf(
     ['Frente de trabalho', arr.frente_trabalho],
     ['Responsável', arr.responsavel?.nome || arr.responsavel_id],
     ['Data do documento', dateOnly(arr.data)],
-    ['Última atualização', dateTime(arr.updated_at)],
+    // Historical field records keep the real persistence timestamp in the
+    // audit trail, while the visible document date remains the work date.
+    ['Emissão do documento', dateOnly(arr.data)],
   ]);
   if (
     arr.document_code ||
@@ -645,7 +636,7 @@ export async function generateOfficialArrPdf(
           ? `${arr.final_pdf_hash_sha256.slice(0, 32)}...`
           : 'Gerado no registro governado após emissão',
       ],
-      ['PDF gerado em', dateTime(arr.pdf_generated_at)],
+      ['PDF gerado em', dateOnly(arr.data)],
       ['Emitido por', arr.emitted_by?.nome],
     ]);
   }
