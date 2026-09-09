@@ -55,8 +55,8 @@ const SEVERITY: Record<string, string> = {
 
 const PDF_FONT = 'LiberationSans';
 const PDF_FONT_PATHS = {
-  normal: '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
-  bold: '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf',
+  normal: '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
+  bold: '/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf',
 } as const;
 
 type PdfContext = { doc: jsPDF; y: number };
