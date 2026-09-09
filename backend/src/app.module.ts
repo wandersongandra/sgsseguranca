@@ -1137,9 +1137,9 @@ export const validationSchema = Joi.object({
       isGlobal: true,
       validationSchema,
       validationOptions: {
-        abortEarly: false, // Mostra todos os erros de validação
-        allowUnknown: true, // Permite variáveis não definidas no schema
-      },
+        abortEarly: false,
+        allowUnknown: true,
+      } as Record<string, unknown>,
     }),
 
     // 2. ThrottlerModule para rate limiting — storage Redis para multi-instância
