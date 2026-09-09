@@ -81,6 +81,8 @@ describe('openPdfForPrint', () => {
 
   it('revoga blob URL depois que a janela de impressão teve tempo de consumi-la', () => {
     jest.useFakeTimers();
+    const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
+    process.env.NEXT_PUBLIC_APP_URL = 'https://app.example.test';
     const revokeObjectURL = jest
       .spyOn(URL, 'revokeObjectURL')
       .mockImplementation(() => undefined);
@@ -92,13 +94,17 @@ describe('openPdfForPrint', () => {
       addEventListener: jest.fn(),
     } as unknown as Window & { location: { href: string } };
 
-    openPdfForPrint('blob:http://localhost:3000/temporary-pdf', undefined, fakeWindow);
+    try {
+      openPdfForPrint('blob:https://app.example.test/temporary-pdf', undefined, fakeWindow);
 
-    jest.advanceTimersByTime(60_000);
+      jest.advanceTimersByTime(60_000);
 
-    expect(revokeObjectURL).toHaveBeenCalledWith(
-      'blob:http://localhost:3000/temporary-pdf',
-    );
+      expect(revokeObjectURL).toHaveBeenCalledWith(
+        'blob:https://app.example.test/temporary-pdf',
+      );
+    } finally {
+      process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
+    }
   });
 });
 
