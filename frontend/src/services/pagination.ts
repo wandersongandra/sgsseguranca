@@ -43,6 +43,7 @@ export class FetchAllPagesMaxPagesExceededError extends Error {
 
 const DEFAULT_FETCH_ALL_PAGES_CACHE_TTL_MS = 30_000;
 const fetchAllPagesCache = new Map<string, FetchAllPagesCacheEntry>();
+let fetchAllPagesCacheGeneration = 0;
 
 function assertNotAborted(signal?: AbortSignal): void {
   if (!signal) {
@@ -78,12 +79,22 @@ function setCachedFetchAllPagesData<T>(
   cacheKey: string | undefined,
   data: T[],
   ttlMs: number,
+  requestGeneration: number,
+  requestScope?: string,
 ): void {
   if (!cacheKey || ttlMs <= 0) {
     return;
   }
 
-  fetchAllPagesCache.set(scopeBrowserCacheKey(cacheKey), {
+  const scopedCacheKey = scopeBrowserCacheKey(cacheKey);
+  if (
+    requestGeneration !== fetchAllPagesCacheGeneration ||
+    (requestScope !== undefined && requestScope !== scopedCacheKey)
+  ) {
+    return;
+  }
+
+  fetchAllPagesCache.set(scopedCacheKey, {
     expiresAt: Date.now() + ttlMs,
     data: [...data],
   });
@@ -102,6 +113,7 @@ function resolveTotalPages<T>(first: PaginatedResponse<T>, limit: number): numbe
 }
 
 export function clearFetchAllPagesCache(cacheKey?: string): void {
+  fetchAllPagesCacheGeneration += 1;
   if (!cacheKey) {
     fetchAllPagesCache.clear();
     return;
@@ -125,6 +137,10 @@ export async function fetchAllPages<T>(opts: {
   cacheTtlMs?: number;
   onProgress?: FetchAllPagesProgressCallback;
 }): Promise<T[]> {
+  const requestGeneration = fetchAllPagesCacheGeneration;
+  const requestScope = opts.cacheKey
+    ? scopeBrowserCacheKey(opts.cacheKey)
+    : undefined;
   const cached = getCachedFetchAllPagesData<T>(opts.cacheKey);
   if (cached) {
     const cachedTotalPages = Math.max(1, Math.ceil(cached.length / (opts.limit ?? 100)));
@@ -156,7 +172,13 @@ export async function fetchAllPages<T>(opts: {
   opts.onProgress?.(loadedPages, pages, all.length);
 
   if (pages <= 1) {
-    setCachedFetchAllPagesData(opts.cacheKey, all, cacheTtlMs);
+    setCachedFetchAllPagesData(
+      opts.cacheKey,
+      all,
+      cacheTtlMs,
+      requestGeneration,
+      requestScope,
+    );
     return all;
   }
 
@@ -182,7 +204,13 @@ export async function fetchAllPages<T>(opts: {
     opts.onProgress?.(loadedPages, pages, all.length);
   }
 
-  setCachedFetchAllPagesData(opts.cacheKey, all, cacheTtlMs);
+  setCachedFetchAllPagesData(
+    opts.cacheKey,
+    all,
+    cacheTtlMs,
+    requestGeneration,
+    requestScope,
+  );
 
   return all;
 }

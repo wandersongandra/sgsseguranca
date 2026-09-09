@@ -47,4 +47,16 @@ describe('selectedTenantStore isolation', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ companyId: 'tenant-b' }));
     unsubscribe();
   });
+
+  it('descarta seleção enfileirada depois de limpar o contexto', async () => {
+    const pending = selectedTenantStore.set({
+      companyId: 'tenant-stale',
+      companyName: 'Empresa stale',
+    });
+
+    selectedTenantStore.clear();
+    await pending;
+
+    expect(selectedTenantStore.get()).toBeNull();
+  });
 });
