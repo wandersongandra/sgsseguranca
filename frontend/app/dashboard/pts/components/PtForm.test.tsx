@@ -160,6 +160,25 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
+function makePtFixture(id: string, companyId: string, siteId: string) {
+  return {
+    id,
+    numero: id.toUpperCase(),
+    titulo: `PT ${id}`,
+    status: 'Pendente',
+    company_id: companyId,
+    site_id: siteId,
+    apr_id: `${id}-apr`,
+    responsavel_id: `${id}-user`,
+    executantes: [],
+    trabalho_altura: false,
+    espaco_confinado: false,
+    trabalho_quente: false,
+    eletricidade: false,
+    escavacao: false,
+  };
+}
+
 jest.mock('@/services/ptsService', () => ({
   ptsService: {
     create: (...args: unknown[]) => createPt(...args),
@@ -611,5 +630,35 @@ describe('PtForm', () => {
     expect(screen.getByText('Obras disponíveis: site-b')).toBeInTheDocument();
     expect(screen.getByText('Usuários disponíveis: user-b')).toBeInTheDocument();
     expect(screen.queryByText(/disponíveis:.*-a/)).not.toBeInTheDocument();
+  });
+
+  it('ignora a PT antiga quando a prop id muda antes do carregamento terminar', async () => {
+    const requestA = deferred<ReturnType<typeof makePtFixture>>();
+    const requestB = deferred<ReturnType<typeof makePtFixture>>();
+    findPt.mockImplementation((ptId: string) =>
+      ptId === 'pt-a' ? requestA.promise : requestB.promise,
+    );
+
+    const rendered = render(<PtForm id="pt-a" />);
+    await waitFor(() => expect(findPt).toHaveBeenCalledWith('pt-a'));
+
+    rendered.rerender(<PtForm id="pt-b" />);
+    await waitFor(() => expect(findPt).toHaveBeenCalledWith('pt-b'));
+
+    await act(async () => {
+      requestB.resolve(makePtFixture('pt-b', 'company-2', 'site-b'));
+      await requestB.promise;
+    });
+    await waitFor(() =>
+      expect(screen.getByText('Empresa atual: company-2')).toBeInTheDocument(),
+    );
+
+    await act(async () => {
+      requestA.resolve(makePtFixture('pt-a', 'company-1', 'site-a'));
+      await requestA.promise;
+    });
+
+    expect(screen.getByText('Empresa atual: company-2')).toBeInTheDocument();
+    expect(screen.queryByText('Empresa atual: company-1')).not.toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { StatusPill } from './ui/status-pill';
 import { safeToLocaleString } from '@/lib/date/safeFormat';
+import { isSafeImagePreviewUrl } from '@/lib/security/is-safe-image-preview-url';
 import {
   ModalBody,
   ModalFooter,
@@ -49,18 +50,40 @@ interface SignaturesPanelProps {
   documentType: string;
 }
 
+export function resolveSafeSignatureImageUrl(
+  rawUrl: string | null | undefined,
+): string | null {
+  const value = String(rawUrl ?? '').trim();
+  if (value.toLowerCase().startsWith('data:image/svg')) {
+    return null;
+  }
+  return isSafeImagePreviewUrl(value) ? value : null;
+}
+
 export function SignaturesPanel({ isOpen, onClose, documentId, documentType }: SignaturesPanelProps) {
   const [signatures, setSignatures] = useState<Signature[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
+    let active = true;
+    setSignatures([]);
     setLoading(true);
     signaturesService
       .findByDocument(documentId, documentType)
-      .then(setSignatures)
-      .catch(() => toast.error('Erro ao carregar assinaturas'))
-      .finally(() => setLoading(false));
+      .then((nextSignatures) => {
+        if (active) setSignatures(nextSignatures);
+      })
+      .catch(() => {
+        if (active) toast.error('Erro ao carregar assinaturas');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [isOpen, documentId, documentType]);
 
   if (!isOpen) return null;
@@ -99,10 +122,10 @@ export function SignaturesPanel({ isOpen, onClose, documentId, documentType }: S
                 return (
                 <div key={sig.id} className="flex items-start gap-4 rounded-xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-elevated)] p-4">
                   {/* Miniature for image-based signatures */}
-                  {isImageType(sig.type) && sig.signature_data && (
+                  {isImageType(sig.type) && resolveSafeSignatureImageUrl(sig.signature_data) && (
                     <div className="relative h-16 w-24 flex-shrink-0 overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-white">
                       <Image
-                        src={sig.signature_data}
+                        src={resolveSafeSignatureImageUrl(sig.signature_data) as string}
                         alt="Assinatura"
                         fill
                         sizes="96px"

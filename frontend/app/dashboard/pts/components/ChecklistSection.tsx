@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { type Path, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { safeExternalArtifactUrl } from '@/lib/security/safe-external-url';
 import type { PtFormData } from './pt-schema-and-data';
 import { StatusPill } from '@/components/ui/status-pill';
 import {
@@ -121,7 +122,12 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
         index,
       );
       if (access.url) {
-        window.open(access.url, '_blank', 'noopener,noreferrer');
+        const safeUrl = safeExternalArtifactUrl(access.url);
+        if (!safeUrl) {
+          toast.error('Anexo bloqueado pela política de segurança.');
+          return;
+        }
+        window.open(safeUrl, '_blank', 'noopener,noreferrer');
       } else {
         toast.error('Anexo registrado, mas indisponível no momento.');
       }

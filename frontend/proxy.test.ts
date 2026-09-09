@@ -16,9 +16,12 @@ jest.mock("next/server", () => ({
 
 jest.mock("@/lib/route-config", () => ({
   isHiddenRoute: jest.fn(() => false),
+  matchesPathSegment: (pathname: string, route: string) =>
+    pathname === route || pathname.startsWith(`${route}/`),
 }));
 
 import { proxy, buildCsp } from "./proxy";
+import { isHiddenRoute } from "@/lib/route-config";
 
 type ProxyResult = ReturnType<typeof proxy> & {
   kind?: "redirect" | "next";
@@ -57,6 +60,10 @@ describe("buildCsp", () => {
 });
 
 describe("proxy auth routing", () => {
+  beforeEach(() => {
+    (isHiddenRoute as jest.Mock).mockImplementation(() => false);
+  });
+
   it("redireciona dashboard sem refresh_csrf para /login sem redirect param", () => {
     const response = proxy(makeRequest("/dashboard")) as ProxyResult;
 
@@ -76,5 +83,16 @@ describe("proxy auth routing", () => {
     ) as ProxyResult;
 
     expect(response.kind).toBe("next");
+  });
+
+  it("não trata prefixo de rota como rota pública", () => {
+    (isHiddenRoute as jest.Mock).mockImplementation(
+      (pathname: string) => pathname === "/login-evil",
+    );
+
+    const response = proxy(makeRequest("/login-evil")) as ProxyResult;
+
+    expect(response.kind).toBe("redirect");
+    expect(response.url).toBe("https://app.sgsseguranca.com.br/dashboard");
   });
 });

@@ -70,6 +70,7 @@ import {
   safeToLocaleDateString,
   toInputDateValue,
 } from "@/lib/date/safeFormat";
+import { isSafeImagePreviewUrl } from "@/lib/security/is-safe-image-preview-url";
 import { RdoEditorModal } from "@/components/rdos/RdoEditorModal";
 import { RdoViewerModal } from "@/components/rdos/RdoViewerModal";
 import { RdoActionModals } from "@/components/rdos/RdoActionModals";
@@ -1325,11 +1326,11 @@ useEffect(() => {
 
   const resolveActivityPhotoSrc = useCallback(
     (photo: string) => {
-      if (!isGovernedActivityPhotoReference(photo)) {
-        return photo;
-      }
+      const resolvedPhoto = isGovernedActivityPhotoReference(photo)
+        ? resolvedActivityPhotoUrls[photo] || ""
+        : photo;
 
-      return resolvedActivityPhotoUrls[photo] || "";
+      return isSafeImagePreviewUrl(resolvedPhoto) ? resolvedPhoto : "";
     },
     [resolvedActivityPhotoUrls],
   );

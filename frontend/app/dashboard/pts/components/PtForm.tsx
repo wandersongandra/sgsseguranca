@@ -1271,6 +1271,8 @@ export function PtForm({ id }: PtFormProps) {
   );
 
   useEffect(() => {
+    let active = true;
+
     async function loadData() {
       try {
         let companySeedId = user?.company_id || '';
@@ -1311,6 +1313,7 @@ export function PtForm({ id }: PtFormProps) {
             }
           }
 
+          if (!active) return;
           setCompanies(dedupeById(nextCompanies));
         };
 
@@ -1321,6 +1324,7 @@ export function PtForm({ id }: PtFormProps) {
             signaturesService.findByDocument(id, 'PT'),
             ptsService.getPreApprovalHistory(id),
           ]);
+          if (!active) return;
           if (ptResult.status !== 'fulfilled') {
             throw ptResult.reason;
           }
@@ -1513,16 +1517,23 @@ export function PtForm({ id }: PtFormProps) {
           }
         }
 
+        if (!active) return;
         await loadCompanies(companySeedId);
       } catch (error) {
+        if (!active) return;
         logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
       } finally {
-        setPreApprovalHistoryLoading(false);
-        setFetching(false);
+        if (active) {
+          setPreApprovalHistoryLoading(false);
+          setFetching(false);
+        }
       }
     }
     loadData();
+    return () => {
+      active = false;
+    };
   }, [draftStorageKey, id, legacyDraftStorageKey, methods, reset, user?.company_id, user?.profile?.nome]);
 
   useEffect(() => {
