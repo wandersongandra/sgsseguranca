@@ -531,8 +531,12 @@ export class ArrsService {
     this.assertReadyForFinalDocument(arr);
 
     const validation = await this.getValidationContext(id);
+    const documentDate =
+      arr.data instanceof Date
+        ? arr.data.toISOString().slice(0, 10)
+        : String(arr.data).slice(0, 10);
     const generatedAt = arr.data
-      ? `${arr.data.toISOString().slice(0, 10)}T12:00:00.000Z`
+      ? `${documentDate}T12:00:00.000Z`
       : new Date().toISOString();
     const buffer = await generateOfficialArrPdf(
       arr,
