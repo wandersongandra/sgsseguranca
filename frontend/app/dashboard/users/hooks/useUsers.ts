@@ -3,10 +3,15 @@ import { usersService, User, UserIdentityType } from '@/services/usersService';
 import { handleApiError } from '@/lib/error-handler';
 import { toast } from 'sonner';
 import { authService } from '@/services/authService';
+import { selectedTenantStore } from '@/lib/selectedTenantStore';
 import { sessionStore } from '@/lib/sessionStore';
 import { useSelectedTenantId } from '@/hooks/useSelectedTenantId';
 
 type PendingDeleteAction = 'gdpr_erasure' | 'hard_delete';
+
+function resolveActiveCompanyId(): string | undefined {
+  return selectedTenantStore.get()?.companyId || sessionStore.get()?.companyId || undefined;
+}
 
 export function useUsers() {
   const [users, setUsers] = useState<User[]>([]);
@@ -24,6 +29,7 @@ export function useUsers() {
   const tenantId = useSelectedTenantId();
   const activeCompanyId = tenantId || sessionStore.get()?.companyId || undefined;
   const requestSeqRef = useRef(0);
+  const destructiveOperationSeqRef = useRef(0);
   const [loadedScope, setLoadedScope] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
@@ -52,11 +58,13 @@ export function useUsers() {
 
   useEffect(() => {
     requestSeqRef.current += 1;
+    destructiveOperationSeqRef.current += 1;
     setUsers([]);
     setTotal(0);
     setLastPage(1);
     setLoadedScope(null);
     setLoading(true);
+    setDeleteLoading(false);
     setPage(1);
     setConfirmDeleteId(null);
     setStepUpValue('');
@@ -78,6 +86,17 @@ export function useUsers() {
 
   const confirmDelete = useCallback(async () => {
     if (!confirmDeleteId) return;
+
+    const operationCompanyId = resolveActiveCompanyId();
+    const targetUserId = confirmDeleteId;
+    const action = pendingDeleteAction;
+    const operationSeq = ++destructiveOperationSeqRef.current;
+
+    if (!operationCompanyId) {
+      toast.error('Operação cancelada porque não há empresa ativa.');
+      return;
+    }
+
     setDeleteLoading(true);
     try {
       const trimmed = stepUpValue.trim();
@@ -86,7 +105,7 @@ export function useUsers() {
         return;
       }
 
-      const reason = pendingDeleteAction === 'hard_delete' ? 'user_delete' : 'user_gdpr_erasure';
+      const reason = action === 'hard_delete' ? 'user_delete' : 'user_gdpr_erasure';
       const stepUp = /^\d{6,8}$/.test(trimmed)
         ? await authService.verifyStepUp({
             reason,
@@ -97,13 +116,21 @@ export function useUsers() {
             password: trimmed,
           });
 
-      if (pendingDeleteAction === 'hard_delete') {
-        await usersService.delete(confirmDeleteId, stepUp.stepUpToken, activeCompanyId);
-        setUsers((prev) => prev.filter((u) => u.id !== confirmDeleteId));
+      if (
+        operationSeq !== destructiveOperationSeqRef.current ||
+        resolveActiveCompanyId() !== operationCompanyId
+      ) {
+        toast.error('Operação cancelada porque a empresa ativa foi alterada.');
+        return;
+      }
+
+      if (action === 'hard_delete') {
+        await usersService.delete(targetUserId, stepUp.stepUpToken, operationCompanyId);
+        setUsers((prev) => prev.filter((u) => u.id !== targetUserId));
         toast.success('Usuário excluído definitivamente.');
       } else {
-        await usersService.gdprErasure(confirmDeleteId, stepUp.stepUpToken, activeCompanyId);
-        setUsers((prev) => prev.filter((u) => u.id !== confirmDeleteId));
+        await usersService.gdprErasure(targetUserId, stepUp.stepUpToken, operationCompanyId);
+        setUsers((prev) => prev.filter((u) => u.id !== targetUserId));
         toast.success('Dados anonimizados e usuário desativado!');
       }
       setConfirmDeleteId(null);
@@ -111,9 +138,11 @@ export function useUsers() {
     } catch (error) {
       handleApiError(error, 'Usuário');
     } finally {
-      setDeleteLoading(false);
+      if (operationSeq === destructiveOperationSeqRef.current) {
+        setDeleteLoading(false);
+      }
     }
-  }, [activeCompanyId, confirmDeleteId, pendingDeleteAction, stepUpValue]);
+  }, [confirmDeleteId, pendingDeleteAction, stepUpValue]);
 
   const scopedUsers = useMemo(
     () => (loadedScope === (activeCompanyId ?? null) ? users : []),

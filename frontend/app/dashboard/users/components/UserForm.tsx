@@ -1,6 +1,6 @@
-﻿'use client';
+'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { usersService, UserIdentityType } from '@/services/usersService';
 import { companiesService, Company } from '@/services/companiesService';
@@ -13,7 +13,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { useFormSubmit } from '@/hooks/useFormSubmit';
+import { useSelectedTenantId } from '@/hooks/useSelectedTenantId';
 import { Button } from '@/components/ui/button';
 import { InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
@@ -74,6 +76,20 @@ interface UserFormProps {
   id?: string;
 }
 
+const EMPTY_USER_FORM: UserFormData = {
+  nome: '',
+  email: '',
+  cpf: '',
+  funcao: '',
+  role: '',
+  company_id: '',
+  site_id: '',
+  site_ids: [],
+  profile_id: '',
+  identity_type: UserIdentityType.SYSTEM_USER,
+  password: '',
+};
+
 export function UserForm({ id }: UserFormProps) {
   const router = useRouter();
   const [fetching, setFetching] = useState(true);
@@ -83,10 +99,30 @@ export function UserForm({ id }: UserFormProps) {
   const { user, isAdminGeral } = useAuth();
   const isAdminGeneral = isAdminGeral || user?.profile?.nome === 'Administrador Geral';
   const canSelectCompany = isAdminGeneral;
+  const selectedTenantId = useSelectedTenantId();
+  const activeCompanyId = isAdminGeneral
+    ? selectedTenantId
+    : selectedTenantId || user?.company_id || null;
+  const activeCompanyIdRef = useRef<string | null>(activeCompanyId);
+  activeCompanyIdRef.current = activeCompanyId;
+  const formTenantRef = useRef<string | null>(null);
+  const formInvalidatedRef = useRef(false);
+  const loadDataSeqRef = useRef(0);
+  const loadSitesSeqRef = useRef(0);
 
   const isEmployeePath =
     typeof window !== 'undefined' && window.location.pathname.includes('/employees');
   const backPath = isEmployeePath ? '/dashboard/employees' : '/dashboard/users';
+
+  const defaultValues = useMemo<UserFormData>(
+    () => ({
+      ...EMPTY_USER_FORM,
+      identity_type: isEmployeePath
+        ? UserIdentityType.EMPLOYEE_SIGNER
+        : UserIdentityType.SYSTEM_USER,
+    }),
+    [isEmployeePath],
+  );
 
   const {
     register,
@@ -97,21 +133,7 @@ export function UserForm({ id }: UserFormProps) {
     formState: { errors },
   } = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
-    defaultValues: {
-      nome: '',
-      email: '',
-      cpf: '',
-      funcao: '',
-      role: '',
-      company_id: '',
-      site_id: '',
-      site_ids: [],
-      profile_id: '',
-      identity_type: isEmployeePath
-        ? UserIdentityType.EMPLOYEE_SIGNER
-        : UserIdentityType.SYSTEM_USER,
-      password: '',
-    },
+    defaultValues,
   });
 
   const selectedCompanyId = useWatch({
@@ -126,7 +148,29 @@ export function UserForm({ id }: UserFormProps) {
   const sessionCompanyId = user?.company_id || companies[0]?.id || '';
   const effectiveCompanyId = selectedCompanyId || sessionCompanyId;
 
-  const { handleSubmit: onSubmit, loading } = useFormSubmit(
+  useEffect(() => {
+    if (!activeCompanyId) return;
+
+    if (formTenantRef.current === null) {
+      formTenantRef.current = activeCompanyId;
+      return;
+    }
+
+    if (formTenantRef.current === activeCompanyId) return;
+
+    formInvalidatedRef.current = true;
+    loadDataSeqRef.current += 1;
+    loadSitesSeqRef.current += 1;
+    setCompanies([]);
+    setProfiles([]);
+    setSites([]);
+    setFetching(true);
+    reset(defaultValues);
+    toast.error('O formulário foi cancelado porque a empresa ativa foi alterada.');
+    router.replace(backPath);
+  }, [activeCompanyId, backPath, defaultValues, reset, router]);
+
+  const { handleSubmit: submitForm, loading } = useFormSubmit(
     async (data: UserFormData) => {
       const payload: Record<string, unknown> = {
         ...data,
@@ -144,7 +188,6 @@ export function UserForm({ id }: UserFormProps) {
         }
       }
 
-      // Cleanup payload
       if (payload.email === '') delete payload.email;
       delete payload.role;
       const selectedSiteIdsPayload = Array.isArray(data.site_ids)
@@ -156,12 +199,6 @@ export function UserForm({ id }: UserFormProps) {
       if (!payload.password) delete payload.password;
 
       if (id) {
-        // O endpoint de detalhes (PATCH /users/:id) usa UpdateUserDetailsDto, que NÃO
-        // aceita profile_id — a troca de perfil tem fluxo próprio protegido por MFA em
-        // PATCH /users/:id/role. Como o ValidationPipe global roda com
-        // forbidNonWhitelisted, enviar profile_id aqui derruba o save inteiro com
-        // 400 "dados inválidos" (inclusive ao apenas adicionar/remover uma obra).
-        // profile_id só é enviado na criação.
         delete payload.profile_id;
         await usersService.update(id, payload);
       } else {
@@ -188,16 +225,57 @@ export function UserForm({ id }: UserFormProps) {
     },
   );
 
+  const onSubmit = async (data: UserFormData) => {
+    const currentTenantId = activeCompanyIdRef.current;
+    const formCompanyId = data.company_id || effectiveCompanyId;
+
+    if (
+      formInvalidatedRef.current ||
+      !currentTenantId ||
+      formTenantRef.current !== currentTenantId ||
+      formCompanyId !== currentTenantId
+    ) {
+      toast.error('Operação cancelada porque o formulário não pertence à empresa ativa.');
+      return;
+    }
+
+    await submitForm(data);
+  };
+
   useEffect(() => {
+    if (!activeCompanyId || formInvalidatedRef.current) {
+      setFetching(true);
+      return;
+    }
+
+    const seq = ++loadDataSeqRef.current;
+    const requestTenantId = activeCompanyId;
+    let active = true;
+    setFetching(true);
+
     async function loadData() {
       try {
         const [profilesData, userData] = await Promise.all([
           profilesService.findAll(),
-          id ? usersService.findOne(id) : Promise.resolve(null),
+          id ? usersService.findOne(id, requestTenantId) : Promise.resolve(null),
         ]);
-        setProfiles(profilesData);
 
-        const selectedCompanyId = userData?.company_id || user?.company_id || '';
+        if (
+          !active ||
+          seq !== loadDataSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
+
+        if (userData && userData.company_id !== requestTenantId) {
+          formInvalidatedRef.current = true;
+          toast.error('O cadastro solicitado não pertence à empresa ativa.');
+          router.replace(backPath);
+          return;
+        }
+
+        const formCompanyId = userData?.company_id || requestTenantId;
         let companiesData: Company[] = [];
 
         if (isAdminGeneral) {
@@ -208,28 +286,35 @@ export function UserForm({ id }: UserFormProps) {
             });
             companiesData = companiesPage.data;
           } catch {
-            // sem permissão para listar todas as empresas — seguir com lista vazia
+            companiesData = [];
           }
-          if (
-            selectedCompanyId &&
-            !companiesData.some((company) => company.id === selectedCompanyId)
-          ) {
+
+          if (formCompanyId && !companiesData.some((company) => company.id === formCompanyId)) {
             try {
-              const selectedCompany = await companiesService.findOne(selectedCompanyId);
+              const selectedCompany = await companiesService.findOne(formCompanyId);
               companiesData = dedupeById([selectedCompany, ...companiesData]);
             } catch {
               companiesData = dedupeById(companiesData);
             }
           }
-        } else if (selectedCompanyId) {
+        } else if (formCompanyId) {
           try {
-            const selectedCompany = await companiesService.findOne(selectedCompanyId);
+            const selectedCompany = await companiesService.findOne(formCompanyId);
             companiesData = [selectedCompany];
           } catch {
             companiesData = [];
           }
         }
 
+        if (
+          !active ||
+          seq !== loadDataSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
+
+        setProfiles(profilesData);
         setCompanies(dedupeById(companiesData));
 
         if (userData) {
@@ -250,31 +335,81 @@ export function UserForm({ id }: UserFormProps) {
             identity_type:
               userData.identity_type ||
               (isEmployeePath ? UserIdentityType.EMPLOYEE_SIGNER : UserIdentityType.SYSTEM_USER),
+            password: '',
+          });
+        } else {
+          reset({
+            ...defaultValues,
+            company_id: requestTenantId,
           });
         }
       } catch (error) {
+        if (
+          !active ||
+          seq !== loadDataSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
         handleApiError(error, 'Formulário');
-        router.push(backPath);
+        router.replace(backPath);
       } finally {
-        setFetching(false);
+        if (
+          active &&
+          seq === loadDataSeqRef.current &&
+          activeCompanyIdRef.current === requestTenantId
+        ) {
+          setFetching(false);
+        }
       }
     }
 
-    loadData();
-  }, [id, reset, router, backPath, isAdminGeneral, isEmployeePath, user?.company_id]);
+    void loadData();
+    return () => {
+      active = false;
+    };
+  }, [
+    activeCompanyId,
+    backPath,
+    defaultValues,
+    id,
+    isAdminGeneral,
+    isEmployeePath,
+    reset,
+    router,
+  ]);
 
   useEffect(() => {
+    const requestTenantId = activeCompanyIdRef.current;
+    if (
+      formInvalidatedRef.current ||
+      !effectiveCompanyId ||
+      !requestTenantId ||
+      effectiveCompanyId !== requestTenantId
+    ) {
+      setSites([]);
+      return;
+    }
+
+    const seq = ++loadSitesSeqRef.current;
+    let active = true;
+
     async function loadSites() {
-      if (!effectiveCompanyId) {
-        setSites([]);
-        return;
-      }
       try {
         const sitesPage = await sitesService.findPaginated({
           page: 1,
           limit: 100,
-          companyId: effectiveCompanyId,
+          companyId: requestTenantId,
         });
+
+        if (
+          !active ||
+          seq !== loadSitesSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
+
         let nextSites = sitesPage.data;
         if (
           selectedSiteIds.length > 0 &&
@@ -286,30 +421,44 @@ export function UserForm({ id }: UserFormProps) {
                 .filter((siteId) => !nextSites.some((site) => site.id === siteId))
                 .map((siteId) => sitesService.findOne(siteId)),
             );
-            nextSites = dedupeById([...selectedSites, ...nextSites]);
+
+            if (
+              !active ||
+              seq !== loadSitesSeqRef.current ||
+              activeCompanyIdRef.current !== requestTenantId
+            ) {
+              return;
+            }
+
+            nextSites = dedupeById([
+              ...selectedSites.filter((site) => site.company_id === requestTenantId),
+              ...nextSites,
+            ]);
           } catch {
             nextSites = dedupeById(nextSites);
           }
         } else {
           nextSites = dedupeById(nextSites);
         }
-        setSites(nextSites);
+        setSites(nextSites.filter((site) => site.company_id === requestTenantId));
       } catch (error) {
+        if (
+          !active ||
+          seq !== loadSitesSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
         handleApiError(error, 'Obras');
         setSites([]);
       }
     }
-    loadSites();
-  }, [effectiveCompanyId, selectedSiteIds]);
 
-  useEffect(() => {
-    if (!id && !selectedCompanyId && sessionCompanyId) {
-      setValue('company_id', sessionCompanyId, {
-        shouldDirty: false,
-        shouldValidate: true,
-      });
-    }
-  }, [id, selectedCompanyId, sessionCompanyId, setValue]);
+    void loadSites();
+    return () => {
+      active = false;
+    };
+  }, [activeCompanyId, effectiveCompanyId, selectedSiteIds]);
 
   return (
     <div className="ds-form-page mx-auto max-w-2xl space-y-6">

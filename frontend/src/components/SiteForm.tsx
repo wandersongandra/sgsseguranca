@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { sitesService } from '@/services/sitesService';
 import { companiesService, Company } from '@/services/companiesService';
@@ -17,6 +17,7 @@ import { PageHeader } from '@/components/layout';
 import { ErrorState, InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
 import { useAuth } from '@/context/AuthContext';
+import { useSelectedTenantId } from '@/hooks/useSelectedTenantId';
 import { Permission } from '@/lib/permissions';
 import { canWriteSites } from '@/lib/role-access';
 
@@ -43,6 +44,14 @@ interface SiteFormProps {
   id?: string;
 }
 
+const EMPTY_SITE_FORM: SiteFormData = {
+  nome: '',
+  endereco: '',
+  cidade: '',
+  estado: '',
+  company_id: '',
+};
+
 export function SiteForm({ id }: SiteFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -50,6 +59,15 @@ export function SiteForm({ id }: SiteFormProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const { user, isAdminGeral, hasPermission, roles } = useAuth();
+  const selectedTenantId = useSelectedTenantId();
+  const activeCompanyId = isAdminGeral
+    ? selectedTenantId
+    : selectedTenantId || user?.company_id || null;
+  const activeCompanyIdRef = useRef<string | null>(activeCompanyId);
+  activeCompanyIdRef.current = activeCompanyId;
+  const formTenantRef = useRef<string | null>(null);
+  const formInvalidatedRef = useRef(false);
+  const requestSeqRef = useRef(0);
   const canManageSite =
     hasPermission(Permission.CAN_MANAGE_SITES) && canWriteSites(roles, isAdminGeral);
 
@@ -64,37 +82,83 @@ export function SiteForm({ id }: SiteFormProps) {
     resolver: zodResolver(siteSchema),
     mode: 'onBlur',
     reValidateMode: 'onBlur',
-    defaultValues: {
-      nome: '',
-      endereco: '',
-      cidade: '',
-      estado: '',
-      company_id: '',
-    },
+    defaultValues: EMPTY_SITE_FORM,
   });
 
   useEffect(() => {
+    if (!activeCompanyId) return;
+
+    if (formTenantRef.current === null) {
+      formTenantRef.current = activeCompanyId;
+      return;
+    }
+
+    if (formTenantRef.current === activeCompanyId) return;
+
+    formInvalidatedRef.current = true;
+    requestSeqRef.current += 1;
+    setCompanies([]);
+    setSubmitError(null);
+    setLoading(false);
+    setFetching(true);
+    reset(EMPTY_SITE_FORM);
+    toast.error('O formulário foi cancelado porque a empresa ativa foi alterada.');
+    router.replace('/dashboard/sites');
+  }, [activeCompanyId, reset, router]);
+
+  useEffect(() => {
     if (!canManageSite) {
+      requestSeqRef.current += 1;
       setFetching(false);
       return;
     }
+
+    if (!activeCompanyId || formInvalidatedRef.current) {
+      setFetching(true);
+      return;
+    }
+
+    const seq = ++requestSeqRef.current;
+    const requestTenantId = activeCompanyId;
+    let active = true;
+    setFetching(true);
 
     async function loadData() {
       try {
         let companiesData: Company[] = [];
         if (isAdminGeral) {
           companiesData = await companiesService.findAll();
-        } else if (user?.company_id) {
-          // Non-admin-geral users can only view their own company
-          // GET /companies requires ADMIN_GERAL; findOne uses can_view_companies
-          const own = await companiesService.findOne(user.company_id);
+        } else {
+          const own = await companiesService.findOne(requestTenantId);
           companiesData = [own];
         }
-        setCompanies(companiesData);
-        const sessionCompanyId = user?.company_id || companiesData[0]?.id || '';
+
+        if (
+          !active ||
+          seq !== requestSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
 
         if (id) {
           const siteData = await sitesService.findOne(id);
+
+          if (
+            !active ||
+            seq !== requestSeqRef.current ||
+            activeCompanyIdRef.current !== requestTenantId
+          ) {
+            return;
+          }
+
+          if (siteData.company_id !== requestTenantId) {
+            formInvalidatedRef.current = true;
+            toast.error('A obra/setor solicitada não pertence à empresa ativa.');
+            router.replace('/dashboard/sites');
+            return;
+          }
+
           reset({
             nome: siteData.nome,
             endereco: siteData.endereco || '',
@@ -102,34 +166,63 @@ export function SiteForm({ id }: SiteFormProps) {
             estado: siteData.estado || '',
             company_id: siteData.company_id,
           });
-        } else if (!isAdminGeral && sessionCompanyId) {
-          setValue('company_id', sessionCompanyId, {
-            shouldDirty: false,
-            shouldValidate: true,
+        } else {
+          reset({
+            ...EMPTY_SITE_FORM,
+            company_id: requestTenantId,
           });
         }
+
+        setCompanies(companiesData);
       } catch (error) {
+        if (
+          !active ||
+          seq !== requestSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
         logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
-        router.push('/dashboard/sites');
+        router.replace('/dashboard/sites');
       } finally {
-        setFetching(false);
+        if (
+          active &&
+          seq === requestSeqRef.current &&
+          activeCompanyIdRef.current === requestTenantId
+        ) {
+          setFetching(false);
+        }
       }
     }
 
-    loadData();
-  }, [canManageSite, id, isAdminGeral, reset, router, setValue, user?.company_id]);
+    void loadData();
+    return () => {
+      active = false;
+    };
+  }, [activeCompanyId, canManageSite, id, isAdminGeral, reset, router]);
 
   async function onSubmit(data: SiteFormData) {
+    const currentTenantId = activeCompanyIdRef.current;
+    if (
+      formInvalidatedRef.current ||
+      !currentTenantId ||
+      formTenantRef.current !== currentTenantId ||
+      data.company_id !== currentTenantId
+    ) {
+      toast.error('Operação cancelada porque o formulário não pertence à empresa ativa.');
+      return;
+    }
+
     try {
       setLoading(true);
       setSubmitError(null);
       const { company_id, ...siteData } = data;
       if (id) {
-        await sitesService.update(id, siteData, company_id || undefined);
+        await sitesService.update(id, siteData, company_id);
         toast.success('Obra/Setor atualizado com sucesso!');
       } else {
-        await sitesService.create(siteData, company_id || undefined);
+        await sitesService.create(siteData, company_id);
         toast.success('Obra/Setor cadastrado com sucesso!');
       }
       router.push('/dashboard/sites');
