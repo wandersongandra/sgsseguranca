@@ -54,6 +54,9 @@ export type AuthLoginResult =
   | AuthMfaChallengeResponse
   | AuthMfaBootstrapResponse;
 
+let refreshInFlight: Promise<RefreshAccessTokenResponse> | null = null;
+let logoutInFlight: Promise<void> | null = null;
+
 export interface RefreshAccessTokenResponse {
   accessToken: string;
 }
@@ -118,17 +121,32 @@ export const authService = {
   },
 
   refreshAccessToken: async (): Promise<RefreshAccessTokenResponse> => {
-    const response =
-      await api.post<RefreshAccessTokenResponse>("/auth/refresh");
-    return response.data;
+    if (!refreshInFlight) {
+      refreshInFlight = api
+        .post<RefreshAccessTokenResponse>("/auth/refresh")
+        .then((response) => response.data)
+        .finally(() => {
+          refreshInFlight = null;
+        });
+    }
+
+    return refreshInFlight;
   },
 
   logout: async (): Promise<void> => {
-    try {
-      await api.post("/auth/logout");
-    } finally {
-      clearAprDraftsOnLogout();
+    if (!logoutInFlight) {
+      logoutInFlight = (async () => {
+        try {
+          await api.post("/auth/logout");
+        } finally {
+          clearAprDraftsOnLogout();
+        }
+      })().finally(() => {
+        logoutInFlight = null;
+      });
     }
+
+    return logoutInFlight;
   },
 
   getCsrfToken: async (): Promise<void> => {

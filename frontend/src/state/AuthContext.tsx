@@ -23,6 +23,7 @@ import {
   AuthLoginResult,
 } from '@/services/authService';
 import { Permission, PermissionPrefix, type AppPermission } from '@/lib/permissions';
+import { logger } from '@/lib/logger';
 
 const REFRESH_CSRF_COOKIE_NAME = 'refresh_csrf';
 export const DEFAULT_IDLE_LOGOUT_MINUTES = 7 * 24 * 60;
@@ -142,17 +143,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      clearAuthenticatedSession();
+      void clearAuthenticatedSession();
     },
     [],
   );
 
   const clearAuthState = useCallback(() => {
-    clearAuthenticatedSession();
     setUser(null);
     setRoles([]);
     setPermissions([]);
     setIsAdminGeral(false);
+    return clearAuthenticatedSession();
   }, []);
 
   useEffect(() => {
@@ -195,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch {
         if (mounted) {
-          clearAuthState();
+          await clearAuthState();
         }
       } finally {
         if (mounted) {
@@ -218,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       turnstileToken?: string,
     ): Promise<AuthLoginResult> => {
       try {
-        clearAuthState();
+        await clearAuthState();
         await authService.getCsrfToken();
         const data = await authService.login(cpf, password, turnstileToken);
 
@@ -249,7 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return data;
       } catch (error) {
         if (process.env.NODE_ENV !== 'production') {
-          console.error('Login error:', error);
+          logger.error('Login error:', error);
         }
         throw error;
       }
@@ -290,7 +291,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Ignora falhas de rede no logout e limpa estado local mesmo assim.
     }
 
-    clearAuthState();
+    await clearAuthState();
     router.push('/login');
   }, [clearAuthState, router]);
 

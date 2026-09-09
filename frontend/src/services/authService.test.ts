@@ -222,6 +222,26 @@ describe('authService', () => {
       expect(api.post).toHaveBeenCalledWith('/auth/refresh');
       expect(result.accessToken).toBe('novo-token-renovado');
     });
+
+    it('compartilha uma única requisição entre refreshes concorrentes', async () => {
+      let resolveRefresh!: (value: { data: { accessToken: string } }) => void;
+      const refreshResponse = new Promise<{ data: { accessToken: string } }>(
+        (resolve) => {
+          resolveRefresh = resolve;
+        },
+      );
+      (api.post as jest.Mock).mockReturnValue(refreshResponse);
+
+      const first = authService.refreshAccessToken();
+      const second = authService.refreshAccessToken();
+      resolveRefresh({ data: { accessToken: 'token-compartilhado' } });
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        { accessToken: 'token-compartilhado' },
+        { accessToken: 'token-compartilhado' },
+      ]);
+      expect(api.post).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('logout', () => {
@@ -231,6 +251,24 @@ describe('authService', () => {
       await authService.logout();
 
       expect(api.post).toHaveBeenCalledWith('/auth/logout');
+    });
+
+    it('compartilha uma única requisição entre logouts concorrentes', async () => {
+      let resolveLogout!: (value: { data: null }) => void;
+      const logoutResponse = new Promise<{ data: null }>((resolve) => {
+        resolveLogout = resolve;
+      });
+      (api.post as jest.Mock).mockReturnValue(logoutResponse);
+
+      const first = authService.logout();
+      const second = authService.logout();
+      resolveLogout({ data: null });
+
+      await expect(Promise.all([first, second])).resolves.toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(api.post).toHaveBeenCalledTimes(1);
     });
   });
 
