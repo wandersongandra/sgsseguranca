@@ -40,6 +40,7 @@ describe('resolveSafeBrowserUrl', () => {
 describe('openPdfForPrint', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+    jest.useRealTimers();
   });
 
   it('não substitui a tela atual quando o pop-up é bloqueado', () => {
@@ -75,6 +76,28 @@ describe('openPdfForPrint', () => {
     expect(openSpy).not.toHaveBeenCalled();
     expect(fakeWindow.location.href).toBe(
       'https://bucket.r2.cloudflarestorage.com/document.pdf',
+    );
+  });
+
+  it('revoga blob URL depois que a janela de impressão teve tempo de consumi-la', () => {
+    jest.useFakeTimers();
+    const revokeObjectURL = jest
+      .spyOn(URL, 'revokeObjectURL')
+      .mockImplementation(() => undefined);
+    const fakeWindow = {
+      opener: {},
+      location: { href: '' },
+      focus: jest.fn(),
+      print: jest.fn(),
+      addEventListener: jest.fn(),
+    } as unknown as Window & { location: { href: string } };
+
+    openPdfForPrint('blob:http://localhost:3000/temporary-pdf', undefined, fakeWindow);
+
+    jest.advanceTimersByTime(60_000);
+
+    expect(revokeObjectURL).toHaveBeenCalledWith(
+      'blob:http://localhost:3000/temporary-pdf',
     );
   });
 });
