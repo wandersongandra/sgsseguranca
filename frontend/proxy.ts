@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isHiddenRoute } from "@/lib/route-config";
+import { isHiddenRoute, matchesPathSegment } from "@/lib/route-config";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -30,7 +30,9 @@ function isDevtoolsRoute(pathname: string): boolean {
 }
 
 function isPublicRoute(pathname: string): boolean {
-  return PUBLIC_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return PUBLIC_ROUTE_PREFIXES.some((prefix) =>
+    matchesPathSegment(pathname, prefix),
+  );
 }
 
 export function buildCsp(

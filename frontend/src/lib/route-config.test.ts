@@ -48,6 +48,10 @@ describe('route-config — rota /dashboard/dds (achado I1)', () => {
       expect(getRoutePermissionException('/dashboard/companies')).toBeUndefined();
     });
 
+    it('não concede exceção por falso prefixo de rota', () => {
+      expect(getRoutePermissionException('/dashboard/dds-extras')).toBeUndefined();
+    });
+
     it('getRoutePermissionException retorna undefined para null', () => {
       expect(getRoutePermissionException(null)).toBeUndefined();
     });
