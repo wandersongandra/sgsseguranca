@@ -144,6 +144,38 @@ function LoginProbe() {
   );
 }
 
+function LogoutProbe() {
+  const { logout } = useAuth();
+
+  return (
+    <button onClick={() => void logout('/login?expired=1')}>
+      sair
+    </button>
+  );
+}
+
+describe("AuthProvider redirecionamento de logout", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    pushMock.mockClear();
+    (authService.logout as jest.Mock).mockResolvedValue(undefined);
+  });
+
+  it("preserva a indicação de sessão expirada no redirecionamento", async () => {
+    render(
+      <AuthProvider>
+        <LogoutProbe />
+      </AuthProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "sair" }));
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/login?expired=1");
+    });
+  });
+});
+
 describe("AuthProvider login com must_change_password", () => {
   beforeEach(() => {
     jest.clearAllMocks();
