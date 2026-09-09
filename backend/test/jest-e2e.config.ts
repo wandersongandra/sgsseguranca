@@ -12,8 +12,19 @@ const config: Config = {
     '<rootDir>/multi-tenancy.e2e-spec.ts',
   ],
   transform: {
-    '^.+\\.(t|j)s$': ['ts-jest', {}],
+    '^.+\\.(t|j)s$': [
+      '<rootDir>/nestjs-esm-transformer.js',
+      { tsconfig: { allowJs: true }, diagnostics: false },
+    ],
   },
+  // @nestjs/* v12 packages are pure ESM ("type":"module"). Jest runs in CJS
+  // mode, so we must transform them (via nestjs-esm-transformer.js, which
+  // additionally rewrites import.meta.* to CJS equivalents) rather than
+  // require() their raw ESM files. See jest.config.js (root) for the same
+  // fix applied to the unit-test config — this is a separate Jest root
+  // (rootDir: e2e's own test/ dir) with its own transform/moduleNameMapper,
+  // so it needs the identical fix independently.
+  transformIgnorePatterns: ['/node_modules/(?!@nestjs/)'],
   // uuid@14 e puppeteer@25+ sao ESM puro. NODE_OPTIONS=--experimental-vm-modules
   // esta ativo para esta config (necessario para pdf-parse/pdfjs-dist), mas
   // essa mesma flag faz o Jest tentar seu proprio require(ESM) sincrono para
