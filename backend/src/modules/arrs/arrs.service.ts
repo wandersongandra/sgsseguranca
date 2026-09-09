@@ -12,7 +12,6 @@ import { In, IsNull, Repository } from 'typeorm';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { PdfService } from '../../shared/services/pdf.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import {
   normalizeOffsetPagination,
@@ -37,11 +36,7 @@ import { Arr, ArrStatus, ARR_ALLOWED_TRANSITIONS } from './entities/arr.entity';
 import { CreateArrDto } from './dto/create-arr.dto';
 import { UpdateArrDto } from './dto/update-arr.dto';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
-import {
-  buildInstitutionalHeaderHtml,
-  INSTITUTIONAL_PDF_CSS,
-  INSTITUTIONAL_PDF_FOOTER_TEMPLATE,
-} from '../../shared/services/pdf-institutional-template';
+import { generateOfficialArrPdf } from './arr-official-pdf';
 
 export type ArrPdfAccessAvailability = GovernedPdfAccessAvailability;
 
@@ -65,7 +60,6 @@ export class ArrsService {
     private readonly documentStorageService: DocumentStorageService,
     private readonly documentGovernanceService: DocumentGovernanceService,
     private readonly publicValidationGrantService: PublicValidationGrantService,
-    private readonly pdfService: PdfService,
   ) {}
 
   /**
@@ -536,15 +530,13 @@ export class ArrsService {
     this.assertFinalDocumentMutable(arr);
     this.assertReadyForFinalDocument(arr);
 
-    const buffer = await this.pdfService.generateFromHtml(
-      this.buildFinalPdfHtml(arr),
-      {
-        format: 'A4',
-        displayHeaderFooter: true,
-        headerTemplate: '<span></span>',
-        footerTemplate: INSTITUTIONAL_PDF_FOOTER_TEMPLATE,
-        margin: { top: '14mm', right: '14mm', bottom: '16mm', left: '14mm' },
-      },
+    const validation = await this.getValidationContext(id);
+    const generatedAt = new Date().toISOString();
+    const buffer = await generateOfficialArrPdf(
+      arr,
+      validation.documentCode,
+      this.buildPublicValidationUrl(validation.documentCode, validation.token),
+      generatedAt,
     );
 
     const originalName = `${this.safePdfName(arr.titulo || arr.id)}.pdf`;
@@ -686,100 +678,6 @@ export class ArrsService {
       .replace(/^\.+|\.+$/g, '')
       .slice(0, 100);
     return `ARR_${normalized || 'documento'}`;
-  }
-
-  private buildFinalPdfHtml(arr: Arr): string {
-    const escapeHtml = (value: unknown): string => {
-      let text: string;
-      if (value === null || value === undefined || value === '') {
-        text = '—';
-      } else if (
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean'
-      ) {
-        text = String(value);
-      } else {
-        try {
-          text = JSON.stringify(value) ?? '—';
-        } catch {
-          text = '—';
-        }
-      }
-
-      return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    };
-    const date = arr.data ? this.formatDocumentDate(arr.data) : '—';
-    const company = arr.company?.razao_social || arr.company_id;
-    const site = arr.site?.nome || arr.site_id;
-    const code = arr.document_code || this.buildArrDocumentCode(arr);
-    const participants = (arr.participants || [])
-      .map(
-        (participant, index) =>
-          `<tr><td>${index + 1}</td><td>${escapeHtml(participant.nome || participant.id)}</td><td>${escapeHtml(participant.funcao || '—')}</td></tr>`,
-      )
-      .join('');
-    const field = (label: string, value: unknown) =>
-      `<div class="field"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-    const narrative = (label: string, value: unknown) =>
-      `<div class="section-title">${escapeHtml(label)}</div><div class="narrative">${escapeHtml(value)}</div>`;
-
-    return `<!doctype html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><style>${INSTITUTIONAL_PDF_CSS}</style></head>
-<body>
-  ${buildInstitutionalHeaderHtml({
-    title: 'ANÁLISE DE RISCO RÁPIDA',
-    subtitle:
-      'Registro simplificado para formalização de condição observada, risco e ação imediata em campo.',
-    code,
-    status: arr.status,
-    company,
-    site,
-    referenceDate: date,
-  })}
-  <div class="executive-summary">
-    <h2>Síntese executiva</h2>
-    <p>Registro enxuto para formalizar a condição observada em campo, o risco identificado e o tratamento imediato definido pela equipe.</p>
-    <div class="metrics">
-      <div class="metric"><span class="metric-label">Nível de risco</span><strong class="metric-value">${escapeHtml(arr.nivel_risco)}</strong></div>
-      <div class="metric"><span class="metric-label">Probabilidade</span><strong class="metric-value">${escapeHtml(arr.probabilidade)}</strong></div>
-      <div class="metric"><span class="metric-label">Severidade</span><strong class="metric-value">${escapeHtml(arr.severidade)}</strong></div>
-      <div class="metric"><span class="metric-label">Participantes</span><strong class="metric-value">${arr.participants?.length || 0}</strong></div>
-      <div class="metric"><span class="metric-label">Data do documento</span><strong class="metric-value">${escapeHtml(date)}</strong></div>
-      <div class="metric"><span class="metric-label">Status</span><strong class="metric-value">${escapeHtml(arr.status)}</strong></div>
-    </div>
-  </div>
-  <div class="section-title">Contexto documental</div><div class="grid">
-    ${field('Título', arr.titulo)}
-    ${field('Empresa', company)}
-    ${field('Data do documento', date)}
-    ${field('Obra / site', site)}
-    ${field('Turno', arr.turno)}
-    ${field('Frente de trabalho', arr.frente_trabalho)}
-    ${field('Atividade principal', arr.atividade_principal)}
-    ${field('Responsável', arr.responsavel?.nome || arr.responsavel_id)}
-  </div>
-  <div class="section-title">Avaliação de risco</div><div class="grid">
-    ${field('Nível', arr.nivel_risco)}
-    ${field('Probabilidade', arr.probabilidade)}
-    ${field('Severidade', arr.severidade)}
-  </div>
-  ${narrative('Condição observada', arr.condicao_observada)}
-  ${narrative('Risco identificado', arr.risco_identificado)}
-  ${narrative('Controles imediatos', arr.controles_imediatos)}
-  ${narrative('Ação recomendada', arr.acao_recomendada)}
-  ${narrative('EPIs e EPCs aplicáveis', arr.epi_epc_aplicaveis)}
-  ${narrative('Observações', arr.observacoes)}
-  <div class="section-title">Participantes (${arr.participants?.length || 0})</div>
-  <table class="participants-table"><thead><tr><th>#</th><th>Nome</th><th>Função</th></tr></thead><tbody>${participants || '<tr><td colspan="3">Nenhum participante informado</td></tr>'}</tbody></table>
-  <div class="governance"><div class="governance-title">Governança e autenticidade</div>Valide o documento pelo código público: <strong>${escapeHtml(code)}</strong><br/>O hash, a identidade do tenant/site, a emissão e o acesso são registrados no catálogo documental oficial.</div>
-</body></html>`;
   }
 
   private assertFinalDocumentMutable(arr: Arr): void {
@@ -936,6 +834,17 @@ export class ArrsService {
       .toUpperCase();
 
     return `ARR-${year}-${reference || String(Date.now()).slice(-6)}`;
+  }
+
+  private buildPublicValidationUrl(code: string, token: string | null): string {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      process.env.PUBLIC_APP_URL?.trim() ||
+      'https://app.sgsseguranca.com.br';
+    const url = new URL(`/validar/${encodeURIComponent(code)}`, baseUrl);
+    if (token?.trim()) url.searchParams.set('token', token.trim());
+    url.searchParams.set('module', 'arr');
+    return url.toString();
   }
 
   private formatDocumentDate(value: string | Date): string {
