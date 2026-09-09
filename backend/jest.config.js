@@ -2,10 +2,20 @@
 module.exports = {
   moduleFileExtensions: ['js', 'json', 'ts'],
   rootDir: '.',
-  testRegex: 'src/.*\\.(spec|smoke-spec)\\.ts$',
+  testRegex:
+    '(src/.*\\.(spec|smoke-spec)\\.ts$)|(test/nestjs-esm-transformer\\.spec\\.ts$)',
   transform: {
-    '^.+\\.(t|j)s$': require.resolve('ts-jest').replace(/\\/g, '/'),
+    '^.+\\.(t|j)s$': [
+      require.resolve('./test/nestjs-esm-transformer.js').replace(/\\/g, '/'),
+      {
+        tsconfig: { allowJs: true },
+        diagnostics: false,
+      },
+    ],
   },
+  // @nestjs/* v12 packages are pure ESM ("type":"module"). Jest runs in CJS
+  // mode, so we must transform them rather than require() their raw ESM files.
+  transformIgnorePatterns: ['/node_modules/(?!@nestjs/)'],
   // uuid >=14 is pure ESM and cannot be loaded by Jest's CJS transform.
   // This CJS shim mirrors the full uuid API using Node's built-in crypto.
   // Production runtime uses uuid@14 directly (override in package.json).

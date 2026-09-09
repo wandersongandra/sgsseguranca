@@ -354,7 +354,7 @@ const validationSchema = Joi.object({
       validationOptions: {
         abortEarly: false,
         allowUnknown: true,
-      },
+      } as Record<string, unknown>,
     }),
     ScheduleModule.forRoot(),
     DiscoveryModule,

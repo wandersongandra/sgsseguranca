@@ -136,7 +136,7 @@ export class HealthController {
   }
 
   private async withDependencyTimeout<T>(
-    operation: Promise<T>,
+    operation: PromiseLike<T>,
     name: string,
   ): Promise<T> {
     let timer: NodeJS.Timeout | undefined;
