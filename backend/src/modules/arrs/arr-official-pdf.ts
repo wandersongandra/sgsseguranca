@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import QRCode from 'qrcode';
+import { readFileSync } from 'node:fs';
 import { ArrStatus, type Arr } from './entities/arr.entity';
 
 type Rgb = [number, number, number];
@@ -52,8 +53,27 @@ const SEVERITY: Record<string, string> = {
   critica: 'Crítica',
 };
 
+const PDF_FONT = 'LiberationSans';
+const PDF_FONT_PATHS = {
+  normal: '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
+  bold: '/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf',
+} as const;
+
 type PdfContext = { doc: jsPDF; y: number };
 type AutoTableDocument = jsPDF & { lastAutoTable?: { finalY?: number } };
+
+function registerPdfFonts(doc: jsPDF): void {
+  try {
+    const normal = readFileSync(PDF_FONT_PATHS.normal).toString('base64');
+    const bold = readFileSync(PDF_FONT_PATHS.bold).toString('base64');
+    doc.addFileToVFS('LiberationSans-Regular.ttf', normal);
+    doc.addFileToVFS('LiberationSans-Bold.ttf', bold);
+    doc.addFont('LiberationSans-Regular.ttf', PDF_FONT, 'normal');
+    doc.addFont('LiberationSans-Bold.ttf', PDF_FONT, 'bold');
+  } catch {
+    // Local unit tests may not have the production font package installed.
+  }
+}
 
 function clean(value: unknown): string {
   if (value === undefined || value === null || value === '') return '-';
@@ -165,11 +185,11 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
   fill(doc, TONE.brandStrong);
   doc.rect(0, topH - 1.4, PAGE.width, 1.4, 'F');
 
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(15.2);
   text(doc, [255, 255, 255]);
   doc.text('ANÁLISE DE RISCO RÁPIDA', margin, 10.2);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(8.3);
   text(doc, [223, 231, 239]);
   doc.text(
@@ -185,14 +205,14 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
   rounded(doc, codeX, 5.5, codeW, 20, 'S');
   fill(doc, TONE.info);
   rounded(doc, codeX + 1.8, 7.1, codeW - 3.6, 4.2, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(7);
   text(doc, [255, 255, 255]);
   doc.text('IDENTIFICADOR', codeX + codeW / 2, 10, { align: 'center' });
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
   doc.text(clean(code), codeX + codeW / 2, 16.4, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(7);
   text(doc, TONE.textSecondary);
   doc.text(
@@ -218,7 +238,7 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
     rounded(doc, x, y, cardW, 15, 'FD');
     fill(doc, TONE.brand);
     doc.rect(x, y, 2.2, 15, 'F');
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
     doc.text(label.toUpperCase(), x + 4.5, y + 4.7);
@@ -258,7 +278,7 @@ function drawIdentity(ctx: PdfContext, arr: Arr) {
       index === 0 ? 124 : index === 1 ? 20 : 62,
     ]);
     rounded(doc, x + 1.6, ctx.y + 1.4, cardW - 3.2, 3.2, 'F');
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
     doc.text(label.toUpperCase(), x + 3.4, ctx.y + 9);
@@ -316,11 +336,11 @@ function drawExecutiveSummary(ctx: PdfContext, arr: Arr) {
   rounded(doc, margin, ctx.y, width, height, 'FD');
   fill(doc, TONE.brand);
   rounded(doc, margin + 1.8, ctx.y + 1.6, 30, 3.1, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(11.6);
   text(doc, TONE.textPrimary);
   doc.text('Síntese executiva', margin + 4, ctx.y + 8.2);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(8.3);
   text(doc, TONE.textSecondary);
   doc.text(
@@ -341,7 +361,7 @@ function drawExecutiveSummary(ctx: PdfContext, arr: Arr) {
     rounded(doc, x, y, cardW, 18, 'FD');
     fill(doc, tone);
     rounded(doc, x + 1.4, y + 1.3, cardW - 2.8, 3.1, 'F');
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
     doc.text(label.toUpperCase(), x + 2.6, y + 8.4);
@@ -374,7 +394,7 @@ function drawMetadata(
   rounded(doc, margin + 1.2, ctx.y + 1.2, width - 2.4, titleH - 2.4, 'F');
   fill(doc, TONE.brand);
   doc.rect(margin, ctx.y, 2.4, titleH, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
   doc.text(title, margin + 5, ctx.y + 6.8);
@@ -393,11 +413,11 @@ function drawMetadata(
       doc.setLineWidth(0.2);
       doc.line(margin, y, margin + width, y);
     }
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
     doc.text(label.toUpperCase(), x + 4, y + 4.5);
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.setFontSize(9.2);
     text(doc, TONE.textPrimary);
     doc.text(splitText(doc, value, colW - 10).slice(0, 2), x + 4, y + 9.8);
@@ -429,7 +449,7 @@ function drawNarrative(ctx: PdfContext, title: string, value: unknown) {
     rounded(doc, margin + 1.2, ctx.y + 1.1, width - 2.4, 7.1, 'F');
     fill(doc, TONE.brand);
     doc.rect(margin, ctx.y, 2.5, 10, 'F');
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(9.5);
     text(doc, TONE.textPrimary);
     doc.text(
@@ -437,7 +457,7 @@ function drawNarrative(ctx: PdfContext, title: string, value: unknown) {
       margin + 5,
       ctx.y + 6.2,
     );
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.setFontSize(9.2);
     doc.text(chunk, margin + 4, ctx.y + 14.1);
     ctx.y += height + 9;
@@ -455,7 +475,7 @@ function drawParticipants(ctx: PdfContext, arr: Arr) {
   rounded(doc, margin, ctx.y, PAGE.width - margin * 2, 10, 'FD');
   fill(doc, TONE.brand);
   doc.rect(margin, ctx.y, 2.5, 10, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
   doc.text(
@@ -475,7 +495,7 @@ function drawParticipants(ctx: PdfContext, arr: Arr) {
     ]),
     theme: 'grid',
     styles: {
-      font: 'helvetica',
+      font: PDF_FONT,
       fontSize: 8.5,
       textColor: TONE.textPrimary,
       lineColor: TONE.border,
@@ -512,7 +532,7 @@ async function drawGovernance(
   rounded(doc, margin, ctx.y, width, height, 'FD');
   fill(doc, TONE.brand);
   doc.rect(margin, ctx.y, 2.5, 10, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
   doc.text('Governança e autenticidade', margin + 5, ctx.y + 6.5);
@@ -525,7 +545,7 @@ async function drawGovernance(
     color: { dark: '#0f172a', light: '#ffffff' },
   });
   doc.addImage(qr, 'PNG', margin + 6, ctx.y + 17, 24, 24);
-  doc.setFont('helvetica', 'normal');
+  doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(8.3);
   text(doc, TONE.textSecondary);
   doc.text(
@@ -533,20 +553,20 @@ async function drawGovernance(
     margin + 34,
     ctx.y + 20,
   );
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   text(doc, TONE.brand);
   doc.text('Portal público via QR', margin + 34, ctx.y + 27);
   text(doc, TONE.textPrimary);
   doc.text(`Código: ${clean(code)}`, margin + 34, ctx.y + 34);
   if (hash) {
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
     doc.text(`Hash: ${clean(hash).slice(0, 32)}...`, margin + 34, ctx.y + 40);
   }
   fill(doc, TONE.success);
   rounded(doc, margin + width - 20, ctx.y + height - 10.5, 14, 6.4, 'F');
-  doc.setFont('helvetica', 'bold');
+  doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(7);
   text(doc, [255, 255, 255]);
   doc.text('VÁLIDO', margin + width - 13, ctx.y + height - 6, {
@@ -567,7 +587,7 @@ function drawFooter(
     stroke(doc, TONE.border);
     doc.setLineWidth(0.25);
     doc.line(PAGE.margin, 283.5, PAGE.width - PAGE.margin, 283.5);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textSecondary);
     doc.text(
@@ -575,13 +595,13 @@ function drawFooter(
       PAGE.margin,
       288.7,
     );
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.text(`Gerado em ${generatedAt}`, PAGE.margin, 292.7);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont(PDF_FONT, 'bold');
     doc.text(`ID: ${clean(code)}`, PAGE.width - PAGE.margin, 288.7, {
       align: 'right',
     });
-    doc.setFont('helvetica', 'normal');
+    doc.setFont(PDF_FONT, 'normal');
     doc.text(`Página ${page} de ${pages}`, PAGE.width - PAGE.margin, 292.7, {
       align: 'right',
     });
@@ -595,6 +615,7 @@ export async function generateOfficialArrPdf(
   generatedAt: string,
 ): Promise<Buffer> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  registerPdfFonts(doc);
   const ctx: PdfContext = { doc, y: PAGE.safeTop };
   pageBackground(ctx);
   drawHeader(ctx, arr, code);
