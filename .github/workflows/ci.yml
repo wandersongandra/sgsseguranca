@@ -232,8 +232,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Only postgresql-client (from Ubuntu's own main/universe) is needed here.
+      # `apt-get update` by default also refreshes every third-party repo the
+      # runner image ships pre-configured under sources.list.d/ (Google Chrome,
+      # Microsoft, Docker, ...), none of which this step uses — a transient
+      # hash-mismatch on any of them (observed repeatedly with
+      # dl.google.com/linux/chrome-stable/deb) fails this step even though
+      # Ubuntu's own package index fetched fine. Restricting the update to
+      # Dir::Etc::sourcelist (Ubuntu's sources.list) and skipping
+      # Dir::Etc::sourceparts (sources.list.d/*) keeps hash/signature
+      # verification fully intact — it only narrows *which* repos this one
+      # command consults, scoped to this single invocation via -o flags (no
+      # files on disk are touched, no effect on any other step).
       - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        run: |
+          sudo apt-get \
+            -o Dir::Etc::sourcelist="sources.list" \
+            -o Dir::Etc::sourceparts="-" \
+            -o APT::Get::List-Cleanup="0" \
+            update
+          sudo apt-get install -y postgresql-client
 
       - name: Prepare RLS roles on clean PostgreSQL
         env:
@@ -386,8 +404,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Only postgresql-client (from Ubuntu's own main/universe) is needed here.
+      # `apt-get update` by default also refreshes every third-party repo the
+      # runner image ships pre-configured under sources.list.d/ (Google Chrome,
+      # Microsoft, Docker, ...), none of which this step uses — a transient
+      # hash-mismatch on any of them (observed repeatedly with
+      # dl.google.com/linux/chrome-stable/deb) fails this step even though
+      # Ubuntu's own package index fetched fine. Restricting the update to
+      # Dir::Etc::sourcelist (Ubuntu's sources.list) and skipping
+      # Dir::Etc::sourceparts (sources.list.d/*) keeps hash/signature
+      # verification fully intact — it only narrows *which* repos this one
+      # command consults, scoped to this single invocation via -o flags (no
+      # files on disk are touched, no effect on any other step).
       - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        run: |
+          sudo apt-get \
+            -o Dir::Etc::sourcelist="sources.list" \
+            -o Dir::Etc::sourceparts="-" \
+            -o APT::Get::List-Cleanup="0" \
+            update
+          sudo apt-get install -y postgresql-client
 
       - name: Prepare RLS roles on clean PostgreSQL
         env:
