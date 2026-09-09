@@ -1,7 +1,7 @@
 'use client';
 import { logger } from '@/lib/logger';
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { episService, Epi } from '@/services/episService';
 import { Plus, Pencil, Trash2, Search, AlertCircle, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { safeFormatDate } from '@/lib/date/safeFormat';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { CatalogMobileCard, catalogMobileActionClassName } from '../components/CatalogMobileCard';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 
 const panelClassName =
   'rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]';
@@ -37,6 +38,7 @@ export default function EpisPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -71,18 +73,20 @@ export default function EpisPage() {
 
   async function handleDelete(id: string) {
     if (confirm('Tem certeza que deseja excluir este EPI?')) {
-      try {
-        await episService.delete(id);
-        toast.success('EPI excluído com sucesso!');
-        if (epis.length === 1 && page > 1) {
-          setPage((current) => current - 1);
-          return;
+      await runWithMutationLock(deleteMutationLock, async () => {
+        try {
+          await episService.delete(id);
+          toast.success('EPI excluído com sucesso!');
+          if (epis.length === 1 && page > 1) {
+            setPage((current) => current - 1);
+            return;
+          }
+          void loadEpis();
+        } catch (error) {
+          logger.error('Erro ao excluir EPI:', error);
+          toast.error('Erro ao excluir EPI. Verifique se existem dependências e tente novamente.');
         }
-        void loadEpis();
-      } catch (error) {
-        logger.error('Erro ao excluir EPI:', error);
-        toast.error('Erro ao excluir EPI. Verifique se existem dependências e tente novamente.');
-      }
+      });
     }
   }
 
@@ -260,7 +264,6 @@ export default function EpisPage() {
     </div>
   );
 }
-
 
 
 
