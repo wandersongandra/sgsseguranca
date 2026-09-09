@@ -287,19 +287,54 @@ export class EpiAssignmentsService {
     dto: UpdateEpiAssignmentDto,
     actorId?: string,
   ): Promise<EpiAssignment> {
-    const assignment = await this.findOne(id);
-    if (assignment.status === 'devolvido') {
-      throw new BadRequestException(
-        'Ficha já devolvida. Não é possível edição genérica.',
-      );
-    }
+    const scope = this.getSiteAccessScopeOrThrow();
+    const saved = await this.assignmentsRepository.manager.transaction(
+      async (trx) => {
+        const repo = trx.getRepository(EpiAssignment);
+        let assignment: EpiAssignment | null;
+        try {
+          assignment = await repo.findOne({
+            where: {
+              id,
+              company_id: scope.companyId,
+              ...(!scope.hasCompanyWideAccess ? { site_id: scope.siteId } : {}),
+            },
+            lock: { mode: 'pessimistic_write', onLocked: 'nowait' },
+          });
+        } catch (error) {
+          if ((error as { code?: string })?.code === '55P03') {
+            throw new ConflictException(
+              'Ficha em processamento por outra operação. Tente novamente.',
+            );
+          }
+          throw error;
+        }
 
-    Object.assign(assignment, {
-      ...dto,
-      updated_by_id: actorId,
-    });
+        if (!assignment) {
+          throw new NotFoundException(`Ficha EPI com ID ${id} não encontrada.`);
+        }
+        if (assignment.status === 'devolvido') {
+          throw new BadRequestException(
+            'Ficha já devolvida. Não é possível edição genérica.',
+          );
+        }
+        if (
+          assignment.assinatura_entrega?.signature_hash ||
+          assignment.pdf_file_key
+        ) {
+          throw new ConflictException(
+            'Ficha EPI assinada ou com PDF final não pode ser alterada.',
+          );
+        }
 
-    const saved = await this.assignmentsRepository.save(assignment);
+        Object.assign(assignment, {
+          ...dto,
+          updated_by_id: actorId,
+        });
+
+        return repo.save(assignment);
+      },
+    );
     await this.writeAuditLog(AuditAction.UPDATE, saved, actorId, {
       event: 'epi_assignment_updated',
       companyId: saved.company_id,
@@ -563,7 +598,15 @@ export class EpiAssignmentsService {
           fileBuffer: buffer,
           persistEntityMetadata: async (manager, computedHash) => {
             const result = await manager.getRepository(EpiAssignment).update(
-              { id: assignment.id, pdf_file_key: IsNull() },
+              {
+                id: assignment.id,
+                company_id: assignment.company_id,
+                pdf_file_key: IsNull(),
+                // The PDF is rendered outside the database transaction. Do
+                // not register a stale render if the assignment changed
+                // while Chromium/storage were busy.
+                updated_at: assignment.updated_at,
+              },
               {
                 pdf_file_key: key,
                 pdf_folder_path: folder,
