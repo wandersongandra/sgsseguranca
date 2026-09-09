@@ -5,7 +5,6 @@ import { ArrsService } from './arrs.service';
 import { Arr, ArrStatus } from './entities/arr.entity';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { PdfService } from '../../shared/services/pdf.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { stringContainingMatcher } from '../../../test/helpers/typed-matchers';
 import { markAuthorizedStorageReference } from '../../shared/storage/storage-object-reference';
@@ -28,7 +27,6 @@ describe('ArrsService', () => {
     | 'getSignedUrl'
   >;
   let documentGovernanceService: Partial<DocumentGovernanceService>;
-  let pdfService: Partial<PdfService>;
 
   beforeEach(() => {
     arrRepository = {
@@ -89,10 +87,6 @@ describe('ArrsService', () => {
       removeFinalDocumentReference: jest.fn(),
     };
 
-    pdfService = {
-      generateFromHtml: jest.fn(),
-    };
-
     service = new ArrsService(
       arrRepository,
       tenantService as TenantService,
@@ -101,7 +95,6 @@ describe('ArrsService', () => {
       {
         issueToken: jest.fn().mockResolvedValue('token-mock'),
       } as unknown as import('../../shared/services/public-validation-grant.service').PublicValidationGrantService,
-      pdfService as PdfService,
     );
   });
 
@@ -514,7 +507,7 @@ describe('ArrsService', () => {
     await expect(service.remove('arr-1')).rejects.toThrow('sem PDF final');
   });
 
-  it('gera o PDF final no backend e escapa dados antes do HTML', async () => {
+  it('gera o PDF final oficial usando o contrato visual do SGS', async () => {
     const arr = {
       id: 'arr-generated',
       titulo: '<script>alert(1)</script>',
@@ -538,22 +531,19 @@ describe('ArrsService', () => {
     } as unknown as Arr;
 
     jest.spyOn(service, 'findOne').mockResolvedValue(arr);
-    (pdfService.generateFromHtml as jest.Mock).mockResolvedValue(
-      Buffer.from('%PDF-1.7 generated-arr'),
-    );
     (
       documentGovernanceService.registerFinalDocument as jest.Mock
     ).mockResolvedValue({ hash: 'hash-arr', registryEntry: {} });
 
     const result = await service.generateFinalPdf('arr-generated', 'user-1');
-    const [html] = (pdfService.generateFromHtml as jest.Mock).mock.calls[0] as [
-      string,
-    ];
+    const uploadFileMock =
+      documentStorageService.uploadFileWithCapability as jest.MockedFunction<
+        DocumentStorageService['uploadFileWithCapability']
+      >;
+    const uploadedBuffer = uploadFileMock.mock.calls[0]?.[1] as Buffer;
 
     expect(result.generated).toBe(true);
-    expect(pdfService.generateFromHtml).toHaveBeenCalled();
-    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
-    expect(html).not.toContain('<script>alert(1)</script>');
+    expect(uploadedBuffer.subarray(0, 4).toString()).toBe('%PDF');
     expect(
       documentStorageService.referenceForExistingObject,
     ).toHaveBeenCalledWith(
