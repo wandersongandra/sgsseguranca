@@ -20,9 +20,20 @@ jest.mock('@/lib/sessionStore', () => ({
   },
 }));
 
+let mockTenantListener:
+  ((tenant: { companyId: string; companyName: string } | null) => void) | undefined;
+
 jest.mock('@/lib/selectedTenantStore', () => ({
   selectedTenantStore: {
     get: jest.fn(() => ({ companyId: 'company-x', companyName: 'Empresa X' })),
+    subscribe: jest.fn((listener) => {
+      mockTenantListener = listener;
+      return () => {
+        if (mockTenantListener === listener) {
+          mockTenantListener = undefined;
+        }
+      };
+    }),
   },
 }));
 
@@ -80,7 +91,7 @@ beforeEach(() => {
     lastPage: 1,
   });
   verifyStepUpMock.mockResolvedValue({ stepUpToken: 'token-123' });
-  (UserIdentityType.SYSTEM_USER as string);
+  UserIdentityType.SYSTEM_USER as string;
 });
 
 describe('useUsers', () => {
@@ -162,5 +173,59 @@ describe('useUsers', () => {
     expect(gdprErasureMock).toHaveBeenCalledWith('user-2', 'token-123', 'company-x');
     expect(result.current.users.map((u) => u.id)).toEqual(['user-1']);
     expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('limpa o tenant anterior e envia o novo escopo ao trocar de empresa', async () => {
+    const { result } = renderHook(() => useUsers());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.users.map((user) => user.id)).toEqual(['user-1', 'user-2']);
+
+    act(() => {
+      mockTenantListener?.({ companyId: 'company-y', companyName: 'Empresa Y' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.users).toHaveLength(2);
+    });
+
+    expect(findPaginatedMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ companyId: 'company-y' }),
+    );
+  });
+
+  it('ignora uma resposta antiga quando a empresa muda durante a requisição', async () => {
+    let resolveCompanyX!: (response: unknown) => void;
+    findPaginatedMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveCompanyX = resolve;
+        }),
+    );
+    findPaginatedMock.mockResolvedValueOnce({
+      data: [makeUser({ id: 'user-y', company_id: 'company-y' })],
+      total: 1,
+      lastPage: 1,
+    });
+
+    const { result } = renderHook(() => useUsers());
+    await waitFor(() => expect(findPaginatedMock).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      mockTenantListener?.({ companyId: 'company-y', companyName: 'Empresa Y' });
+    });
+
+    await waitFor(() => expect(result.current.users.map((user) => user.id)).toEqual(['user-y']));
+
+    await act(async () => {
+      resolveCompanyX({
+        data: [makeUser({ id: 'user-x', company_id: 'company-x' })],
+        total: 1,
+        lastPage: 1,
+      });
+      await Promise.resolve();
+    });
+
+    expect(result.current.users.map((user) => user.id)).toEqual(['user-y']);
   });
 });

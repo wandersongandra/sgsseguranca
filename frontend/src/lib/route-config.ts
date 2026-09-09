@@ -43,6 +43,7 @@ export const PERMISSION_ROUTE_EXCEPTIONS: Array<{
   route: string;
   permission: AppPermission;
 }> = [
+  { route: '/dashboard/companies', permission: Permission.CAN_VIEW_COMPANIES },
   { route: '/dashboard/activities', permission: Permission.CAN_VIEW_ACTIVITIES },
   { route: '/dashboard/risks', permission: Permission.CAN_VIEW_RISKS },
   { route: '/dashboard/trainings', permission: Permission.CAN_VIEW_TRAININGS },
@@ -63,8 +64,7 @@ export const PERMISSION_ROUTE_EXCEPTIONS: Array<{
  * Prefixos de rotas temporariamente ocultadas (feature flags de rollout).
  * Redireciona silenciosamente para /dashboard ao tentar acessar.
  */
-export const HIDDEN_ROUTES = [
-] as const;
+export const HIDDEN_ROUTES = [] as const;
 
 export type HiddenRoute = (typeof HIDDEN_ROUTES)[number];
 
@@ -78,18 +78,14 @@ function normalizePath(pathname: string): string {
 export function isAdminRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   const clean = normalizePath(pathname);
-  return ADMIN_ROUTES.some(
-    (route) => clean === route || clean.startsWith(`${route}/`),
-  );
+  return ADMIN_ROUTES.some((route) => clean === route || clean.startsWith(`${route}/`));
 }
 
 /** Retorna true se o pathname está temporariamente oculto. */
 export function isHiddenRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   const clean = normalizePath(pathname);
-  return HIDDEN_ROUTES.some(
-    (prefix) => clean === prefix || clean.startsWith(`${prefix}/`),
-  );
+  return HIDDEN_ROUTES.some((prefix) => clean === prefix || clean.startsWith(`${prefix}/`));
 }
 
 /**
@@ -102,7 +98,5 @@ export function getRoutePermissionException(
 ): AppPermission | undefined {
   if (!pathname) return undefined;
   const clean = normalizePath(pathname);
-  return PERMISSION_ROUTE_EXCEPTIONS.find(({ route }) =>
-    clean.startsWith(route),
-  )?.permission;
+  return PERMISSION_ROUTE_EXCEPTIONS.find(({ route }) => clean.startsWith(route))?.permission;
 }

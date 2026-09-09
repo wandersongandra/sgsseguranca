@@ -28,9 +28,7 @@ describe('route-config — rota /dashboard/dds (achado I1)', () => {
 
   describe('PERMISSION_ROUTE_EXCEPTIONS', () => {
     it('inclui exceção can_view_dds para /dashboard/dds', () => {
-      const exception = PERMISSION_ROUTE_EXCEPTIONS.find(
-        (e) => e.route === '/dashboard/dds',
-      );
+      const exception = PERMISSION_ROUTE_EXCEPTIONS.find((e) => e.route === '/dashboard/dds');
       expect(exception).toBeDefined();
       expect(exception?.permission).toBe(Permission.CAN_VIEW_DDS);
     });
@@ -44,8 +42,10 @@ describe('route-config — rota /dashboard/dds (achado I1)', () => {
       expect(getRoutePermissionException('/dashboard/dds/edit/123')).toBe(Permission.CAN_VIEW_DDS);
     });
 
-    it('getRoutePermissionException retorna undefined para rotas não registradas', () => {
-      expect(getRoutePermissionException('/dashboard/companies')).toBeUndefined();
+    it('getRoutePermissionException retorna can_view_companies para empresas', () => {
+      expect(getRoutePermissionException('/dashboard/companies')).toBe(
+        Permission.CAN_VIEW_COMPANIES,
+      );
     });
 
     it('getRoutePermissionException retorna undefined para null', () => {
@@ -63,6 +63,7 @@ describe('route-config — rota /dashboard/dds (achado I1)', () => {
       { route: '/dashboard/epi-fichas', permission: Permission.CAN_VIEW_EPI_ASSIGNMENTS },
       { route: '/dashboard/tools', permission: Permission.CAN_MANAGE_CATALOGS },
       { route: '/dashboard/machines', permission: Permission.CAN_MANAGE_CATALOGS },
+      { route: '/dashboard/companies', permission: Permission.CAN_VIEW_COMPANIES },
       { route: '/dashboard/sites', permission: Permission.CAN_MANAGE_SITES },
       { route: '/dashboard/users', permission: Permission.CAN_MANAGE_USERS },
       { route: '/dashboard/dds', permission: Permission.CAN_VIEW_DDS },

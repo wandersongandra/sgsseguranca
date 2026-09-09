@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { sitesService } from '@/services/sitesService';
 import { companiesService, Company } from '@/services/companiesService';
@@ -14,16 +14,17 @@ import { toast } from 'sonner';
 import { getFormErrorMessage } from '@/lib/error-handler';
 import { logger } from '@/lib/logger';
 import { PageHeader } from '@/components/layout';
-import { InlineLoadingState } from '@/components/ui/state';
+import { ErrorState, InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
 import { useAuth } from '@/context/AuthContext';
+import { useSelectedTenantId } from '@/hooks/useSelectedTenantId';
+import { Permission } from '@/lib/permissions';
+import { canWriteSites } from '@/lib/role-access';
 
 const fieldClassName =
   'w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-sm text-[var(--ds-color-text-primary)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-action-primary)] focus:outline-none focus:shadow-[var(--ds-shadow-sm)]';
-const errorFieldClassName =
-  'border-[var(--ds-color-danger)] focus:border-[var(--ds-color-danger)]';
-const labelClassName =
-  'text-sm font-medium text-[var(--ds-color-text-secondary)]';
+const errorFieldClassName = 'border-[var(--ds-color-danger)] focus:border-[var(--ds-color-danger)]';
+const labelClassName = 'text-sm font-medium text-[var(--ds-color-text-secondary)]';
 const helperClassName = 'text-xs text-[var(--ds-color-text-muted)]';
 const errorClassName = 'text-xs text-[var(--ds-color-danger)]';
 const sectionCardClassName =
@@ -43,13 +44,32 @@ interface SiteFormProps {
   id?: string;
 }
 
+const EMPTY_SITE_FORM: SiteFormData = {
+  nome: '',
+  endereco: '',
+  cidade: '',
+  estado: '',
+  company_id: '',
+};
+
 export function SiteForm({ id }: SiteFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { user, isAdminGeral } = useAuth();
+  const { user, isAdminGeral, hasPermission, roles } = useAuth();
+  const selectedTenantId = useSelectedTenantId();
+  const activeCompanyId = isAdminGeral
+    ? selectedTenantId
+    : selectedTenantId || user?.company_id || null;
+  const activeCompanyIdRef = useRef<string | null>(activeCompanyId);
+  activeCompanyIdRef.current = activeCompanyId;
+  const formTenantRef = useRef<string | null>(null);
+  const formInvalidatedRef = useRef(false);
+  const requestSeqRef = useRef(0);
+  const canManageSite =
+    hasPermission(Permission.CAN_MANAGE_SITES) && canWriteSites(roles, isAdminGeral);
 
   const {
     register,
@@ -62,32 +82,83 @@ export function SiteForm({ id }: SiteFormProps) {
     resolver: zodResolver(siteSchema),
     mode: 'onBlur',
     reValidateMode: 'onBlur',
-    defaultValues: {
-      nome: '',
-      endereco: '',
-      cidade: '',
-      estado: '',
-      company_id: '',
-    },
+    defaultValues: EMPTY_SITE_FORM,
   });
 
   useEffect(() => {
+    if (!activeCompanyId) return;
+
+    if (formTenantRef.current === null) {
+      formTenantRef.current = activeCompanyId;
+      return;
+    }
+
+    if (formTenantRef.current === activeCompanyId) return;
+
+    formInvalidatedRef.current = true;
+    requestSeqRef.current += 1;
+    setCompanies([]);
+    setSubmitError(null);
+    setLoading(false);
+    setFetching(true);
+    reset(EMPTY_SITE_FORM);
+    toast.error('O formulário foi cancelado porque a empresa ativa foi alterada.');
+    router.replace('/dashboard/sites');
+  }, [activeCompanyId, reset, router]);
+
+  useEffect(() => {
+    if (!canManageSite) {
+      requestSeqRef.current += 1;
+      setFetching(false);
+      return;
+    }
+
+    if (!activeCompanyId || formInvalidatedRef.current) {
+      setFetching(true);
+      return;
+    }
+
+    const seq = ++requestSeqRef.current;
+    const requestTenantId = activeCompanyId;
+    let active = true;
+    setFetching(true);
+
     async function loadData() {
       try {
         let companiesData: Company[] = [];
         if (isAdminGeral) {
           companiesData = await companiesService.findAll();
-        } else if (user?.company_id) {
-          // Non-admin-geral users can only view their own company
-          // GET /companies requires ADMIN_GERAL; findOne uses can_view_companies
-          const own = await companiesService.findOne(user.company_id);
+        } else {
+          const own = await companiesService.findOne(requestTenantId);
           companiesData = [own];
         }
-        setCompanies(companiesData);
-        const sessionCompanyId = user?.company_id || companiesData[0]?.id || '';
+
+        if (
+          !active ||
+          seq !== requestSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
 
         if (id) {
           const siteData = await sitesService.findOne(id);
+
+          if (
+            !active ||
+            seq !== requestSeqRef.current ||
+            activeCompanyIdRef.current !== requestTenantId
+          ) {
+            return;
+          }
+
+          if (siteData.company_id !== requestTenantId) {
+            formInvalidatedRef.current = true;
+            toast.error('A obra/setor solicitada não pertence à empresa ativa.');
+            router.replace('/dashboard/sites');
+            return;
+          }
+
           reset({
             nome: siteData.nome,
             endereco: siteData.endereco || '',
@@ -95,34 +166,63 @@ export function SiteForm({ id }: SiteFormProps) {
             estado: siteData.estado || '',
             company_id: siteData.company_id,
           });
-        } else if (!isAdminGeral && sessionCompanyId) {
-          setValue('company_id', sessionCompanyId, {
-            shouldDirty: false,
-            shouldValidate: true,
+        } else {
+          reset({
+            ...EMPTY_SITE_FORM,
+            company_id: requestTenantId,
           });
         }
+
+        setCompanies(companiesData);
       } catch (error) {
+        if (
+          !active ||
+          seq !== requestSeqRef.current ||
+          activeCompanyIdRef.current !== requestTenantId
+        ) {
+          return;
+        }
         logger.error('Erro ao carregar dados:', error);
         toast.error('Erro ao carregar dados para o formulário.');
-        router.push('/dashboard/sites');
+        router.replace('/dashboard/sites');
       } finally {
-        setFetching(false);
+        if (
+          active &&
+          seq === requestSeqRef.current &&
+          activeCompanyIdRef.current === requestTenantId
+        ) {
+          setFetching(false);
+        }
       }
     }
 
-    loadData();
-  }, [id, isAdminGeral, reset, router, setValue, user?.company_id]);
+    void loadData();
+    return () => {
+      active = false;
+    };
+  }, [activeCompanyId, canManageSite, id, isAdminGeral, reset, router]);
 
   async function onSubmit(data: SiteFormData) {
+    const currentTenantId = activeCompanyIdRef.current;
+    if (
+      formInvalidatedRef.current ||
+      !currentTenantId ||
+      formTenantRef.current !== currentTenantId ||
+      data.company_id !== currentTenantId
+    ) {
+      toast.error('Operação cancelada porque o formulário não pertence à empresa ativa.');
+      return;
+    }
+
     try {
       setLoading(true);
       setSubmitError(null);
       const { company_id, ...siteData } = data;
       if (id) {
-        await sitesService.update(id, siteData, company_id || undefined);
+        await sitesService.update(id, siteData, company_id);
         toast.success('Obra/Setor atualizado com sucesso!');
       } else {
-        await sitesService.create(siteData, company_id || undefined);
+        await sitesService.create(siteData, company_id);
         toast.success('Obra/Setor cadastrado com sucesso!');
       }
       router.push('/dashboard/sites');
@@ -137,9 +237,7 @@ export function SiteForm({ id }: SiteFormProps) {
         fallback: 'Erro ao salvar obra/setor. Tente novamente.',
       });
       setSubmitError(errorMessage);
-      toast.error(
-        'Erro ao salvar obra/setor. Verifique os dados e tente novamente.',
-      );
+      toast.error('Erro ao salvar obra/setor. Verifique os dados e tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -154,13 +252,28 @@ export function SiteForm({ id }: SiteFormProps) {
     toast.error('Revise os campos obrigatórios antes de salvar.');
   };
 
+  if (!canManageSite) {
+    return (
+      <ErrorState
+        title="Sem permissão para alterar obras/setores"
+        description="Sua função não possui permissão para criar ou editar obras/setores."
+        action={
+          <Link
+            href="/dashboard/sites"
+            className="inline-flex min-h-11 items-center rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Voltar para obras/setores
+          </Link>
+        }
+      />
+    );
+  }
+
   return (
     <div className="ds-form-page mx-auto max-w-2xl space-y-6">
       {fetching ? (
         <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]">
-          <InlineLoadingState
-            label={id ? 'Carregando obra/setor' : 'Preparando obra/setor'}
-          />
+          <InlineLoadingState label={id ? 'Carregando obra/setor' : 'Preparando obra/setor'} />
         </div>
       ) : null}
 
@@ -192,12 +305,11 @@ export function SiteForm({ id }: SiteFormProps) {
           Cadastro guiado
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Estruture a obra ou setor com vínculo claro à empresa e localização
-          operacional.
+          Estruture a obra ou setor com vínculo claro à empresa e localização operacional.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Revise empresa, nome da frente e localização antes de salvar para
-          evitar cadastros duplicados.
+          Revise empresa, nome da frente e localização antes de salvar para evitar cadastros
+          duplicados.
         </p>
       </div>
 
@@ -205,20 +317,14 @@ export function SiteForm({ id }: SiteFormProps) {
         onSubmit={handleSubmit(onSubmit, onInvalid)}
         className="space-y-5 rounded-xl border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]"
       >
-        {!isAdminGeral ? (
-          <input type="hidden" {...register('company_id')} />
-        ) : null}
+        {!isAdminGeral ? <input type="hidden" {...register('company_id')} /> : null}
         {submitError && (
           <div
             role="alert"
             className="rounded-lg border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-danger-subtle)] px-4 py-3 text-sm text-[var(--ds-color-danger)]"
           >
-            <p className="font-semibold">
-              Não foi possível salvar a obra/setor
-            </p>
-            <p className="mt-1 text-[color:var(--ds-color-danger)]/90">
-              {submitError}
-            </p>
+            <p className="font-semibold">Não foi possível salvar a obra/setor</p>
+            <p className="mt-1 text-[color:var(--ds-color-danger)]/90">{submitError}</p>
           </div>
         )}
         <section className={sectionCardClassName}>
@@ -227,8 +333,8 @@ export function SiteForm({ id }: SiteFormProps) {
               Contexto operacional
             </p>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-              Defina o vínculo da obra ou setor com a empresa e identifique a
-              frente de forma objetiva.
+              Defina o vínculo da obra ou setor com a empresa e identifique a frente de forma
+              objetiva.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -240,9 +346,7 @@ export function SiteForm({ id }: SiteFormProps) {
                 <select
                   id="company_id"
                   {...register('company_id')}
-                  className={`${fieldClassName} ${
-                    errors.company_id ? errorFieldClassName : ''
-                  }`}
+                  className={`${fieldClassName} ${errors.company_id ? errorFieldClassName : ''}`}
                   aria-invalid={errors.company_id ? 'true' : undefined}
                 >
                   <option value="">Selecione uma empresa</option>
@@ -256,8 +360,7 @@ export function SiteForm({ id }: SiteFormProps) {
                   <p className={errorClassName}>{errors.company_id.message}</p>
                 ) : (
                   <p className={helperClassName}>
-                    A empresa controla o escopo do cadastro e a vinculação
-                    operacional.
+                    A empresa controla o escopo do cadastro e a vinculação operacional.
                   </p>
                 )}
               </div>
@@ -271,9 +374,7 @@ export function SiteForm({ id }: SiteFormProps) {
                 id="nome"
                 type="text"
                 {...register('nome')}
-                className={`${fieldClassName} ${
-                  errors.nome ? errorFieldClassName : ''
-                }`}
+                className={`${fieldClassName} ${errors.nome ? errorFieldClassName : ''}`}
                 aria-invalid={errors.nome ? 'true' : undefined}
                 placeholder="Ex: Obra Centro"
               />
@@ -281,8 +382,7 @@ export function SiteForm({ id }: SiteFormProps) {
                 <p className={errorClassName}>{errors.nome.message}</p>
               ) : (
                 <p className={helperClassName}>
-                  Use um nome curto e inequívoco para facilitar busca e
-                  relatórios.
+                  Use um nome curto e inequívoco para facilitar busca e relatórios.
                 </p>
               )}
             </div>
@@ -295,8 +395,7 @@ export function SiteForm({ id }: SiteFormProps) {
               Localização
             </p>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-              Dados complementares para identificar fisicamente a frente
-              cadastrada.
+              Dados complementares para identificar fisicamente a frente cadastrada.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -312,8 +411,7 @@ export function SiteForm({ id }: SiteFormProps) {
                 placeholder="Rua, Número, Bairro"
               />
               <p className={helperClassName}>
-                Opcional. Ajuda a localizar a frente no mapa operacional e nos
-                relatórios.
+                Opcional. Ajuda a localizar a frente no mapa operacional e nos relatórios.
               </p>
             </div>
 
@@ -321,15 +419,9 @@ export function SiteForm({ id }: SiteFormProps) {
               <label htmlFor="cidade" className={labelClassName}>
                 Cidade
               </label>
-              <input
-                id="cidade"
-                type="text"
-                {...register('cidade')}
-                className={fieldClassName}
-              />
+              <input id="cidade" type="text" {...register('cidade')} className={fieldClassName} />
               <p className={helperClassName}>
-                Opcional. Use a cidade para facilitar filtros administrativos e
-                agrupamentos.
+                Opcional. Use a cidade para facilitar filtros administrativos e agrupamentos.
               </p>
             </div>
 
@@ -346,8 +438,7 @@ export function SiteForm({ id }: SiteFormProps) {
                 placeholder="Ex: MG"
               />
               <p className={helperClassName}>
-                Informe a UF com duas letras para manter o padrão dos
-                relatórios.
+                Informe a UF com duas letras para manter o padrão dos relatórios.
               </p>
             </div>
           </div>

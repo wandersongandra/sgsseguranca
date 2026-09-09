@@ -6,6 +6,8 @@ export interface FormErrorMessages {
   unauthorized?: string;
   forbidden?: string;
   notFound?: string;
+  conflict?: string;
+  rateLimited?: string;
   server?: string;
   fallback?: string;
 }
@@ -27,8 +29,7 @@ function normalizeValidationDetails(value: unknown): string | undefined {
         : undefined;
     const errors = Array.isArray(entry.errors)
       ? entry.errors.filter(
-          (error): error is string =>
-            typeof error === 'string' && error.trim().length > 0,
+          (error): error is string => typeof error === 'string' && error.trim().length > 0,
         )
       : [];
 
@@ -126,10 +127,7 @@ async function normalizeAsyncApiMessage(value: unknown): Promise<string | undefi
   return normalizeUnknownMessage(value);
 }
 
-export function getFormErrorMessage(
-  error: unknown,
-  messages: FormErrorMessages,
-): string {
+export function getFormErrorMessage(error: unknown, messages: FormErrorMessages): string {
   if (!axios.isAxiosError(error)) {
     return messages.fallback || 'Erro inesperado. Tente novamente.';
   }
@@ -147,6 +145,24 @@ export function getFormErrorMessage(
       return messages.forbidden || messages.fallback || 'Sem permissão para esta operação.';
     case 404:
       return messages.notFound || messages.fallback || 'Registro não encontrado.';
+    case 409:
+      return (
+        normalizedMessage ||
+        messages.conflict ||
+        messages.fallback ||
+        'A operação entrou em conflito com o estado atual.'
+      );
+    case 429: {
+      const retryHeader = error.response?.headers?.['retry-after'];
+      const retryAfter = typeof retryHeader === 'string' ? parseInt(retryHeader, 10) : NaN;
+      return (
+        normalizedMessage ||
+        messages.rateLimited ||
+        (!Number.isNaN(retryAfter) && retryAfter > 0
+          ? `Muitas requisições. Tente novamente em ${retryAfter}s.`
+          : 'Muitas requisições. Aguarde alguns instantes e tente novamente.')
+      );
+    }
     case 500:
       return messages.server || messages.fallback || 'Erro interno do servidor.';
     default:
@@ -184,8 +200,7 @@ export async function extractApiErrorMessage(
     case 429: {
       if (normalizedMessage) return normalizedMessage;
       const retryHeader = error.response?.headers?.['retry-after'];
-      const retryAfter =
-        typeof retryHeader === 'string' ? parseInt(retryHeader, 10) : NaN;
+      const retryAfter = typeof retryHeader === 'string' ? parseInt(retryHeader, 10) : NaN;
       return !Number.isNaN(retryAfter) && retryAfter > 0
         ? `Muitas requisições. Tente novamente em ${retryAfter}s.`
         : 'Muitas requisições. Aguarde alguns instantes e tente novamente.';
@@ -195,13 +210,12 @@ export async function extractApiErrorMessage(
     case 502:
     case 503:
     case 504:
-      return normalizedMessage || 'O serviço está temporariamente indisponível. Tente novamente em breve.';
-    default:
       return (
         normalizedMessage ||
-        error.message ||
-        fallback
+        'O serviço está temporariamente indisponível. Tente novamente em breve.'
       );
+    default:
+      return normalizedMessage || error.message || fallback;
   }
 }
 
@@ -217,10 +231,10 @@ export function handleApiError(error: unknown, context: string) {
 
     if (process.env.NODE_ENV !== 'production') {
       console.error(
-        "[API Error] %s: status=%s message=%s",
+        '[API Error] %s: status=%s message=%s',
         context,
-        status ?? "unknown",
-        message || "sem mensagem legível",
+        status ?? 'unknown',
+        message || 'sem mensagem legível',
         {
           status,
           message,
@@ -250,6 +264,12 @@ export function handleApiError(error: unknown, context: string) {
       case 404:
         toast.error(`${context} não encontrado(a).`);
         break;
+      case 409:
+        toast.error(
+          message ||
+            `Não foi possível concluir ${context.toLowerCase()} porque o estado atual mudou.`,
+        );
+        break;
       case 422:
       case 400:
         toast.error(message || 'Dados inválidos. Verifique os campos.');
@@ -257,8 +277,7 @@ export function handleApiError(error: unknown, context: string) {
       case 429: {
         const retryAfterRaw =
           error.response?.headers?.['retry-after'] ??
-          (error.response?.data as Record<string, unknown> | undefined)
-            ?.retryAfter;
+          (error.response?.data as Record<string, unknown> | undefined)?.retryAfter;
         const retryAfter =
           typeof retryAfterRaw === 'number'
             ? retryAfterRaw
@@ -280,7 +299,7 @@ export function handleApiError(error: unknown, context: string) {
     }
   } else {
     if (process.env.NODE_ENV !== 'production') {
-      console.error("[Unexpected Error] %s:", context, error);
+      console.error('[Unexpected Error] %s:', context, error);
     }
     toast.error('Erro de conexão ou erro inesperado. Verifique sua internet.');
   }

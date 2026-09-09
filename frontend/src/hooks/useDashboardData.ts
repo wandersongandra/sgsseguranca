@@ -74,14 +74,8 @@ function buildQueueCacheKey(filters: PendingQueueFilters | undefined): string {
 
 // ─── Hook ──────────────────────────────────────────────────────────────────────
 
-export function useDashboardData(
-  options: UseDashboardDataOptions = {},
-): UseDashboardDataResult {
-  const {
-    queueFilters,
-    includeSummary = true,
-    includeQueue = true,
-  } = options;
+export function useDashboardData(options: UseDashboardDataOptions = {}): UseDashboardDataResult {
+  const { queueFilters, includeSummary = true, includeQueue = true } = options;
   const queueDateFrom = queueFilters?.dateFrom;
   const queueDateTo = queueFilters?.dateTo;
   const queueSiteId = queueFilters?.siteId;
@@ -113,16 +107,28 @@ export function useDashboardData(
 
   // Estado do summary
   const [summaryData, setSummaryData] = useState<DashboardSummaryResponse | null>(null);
+  const [summaryScope, setSummaryScope] = useState<string | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(true);
   const [summaryError, setSummaryError] = useState<Error | null>(null);
 
   // Estado da fila
   const [queueData, setQueueData] = useState<DashboardPendingQueueResponse>(EMPTY_PENDING_QUEUE);
+  const [queueScope, setQueueScope] = useState<string | null>(null);
   const [queueLoading, setQueueLoading] = useState(true);
   const [queueError, setQueueError] = useState<Error | null>(null);
 
   // Timestamp da última atualização bem-sucedida (qualquer fonte)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    setSummaryData(null);
+    setSummaryScope(null);
+    setQueueData(EMPTY_PENDING_QUEUE);
+    setQueueScope(null);
+    setSummaryError(null);
+    setQueueError(null);
+    setLastUpdatedAt(null);
+  }, [tenantScope]);
 
   // ── Caches ──────────────────────────────────────────────────────────────────
 
@@ -130,9 +136,7 @@ export function useDashboardData(
     CACHE_KEYS.dashboardSummary,
     dashboardService.getSummary,
     DASHBOARD_CACHE_TTL_MS,
-    includeSummary
-      ? { revalidateOnFocus: true, revalidateArgs: [] }
-      : { revalidateOnFocus: false },
+    includeSummary ? { revalidateOnFocus: true, revalidateArgs: [] } : { revalidateOnFocus: false },
   );
 
   const getQueueWithFilters = useCallback(
@@ -144,9 +148,7 @@ export function useDashboardData(
     buildQueueCacheKey(resolvedQueueFilters),
     getQueueWithFilters,
     DASHBOARD_CACHE_TTL_MS,
-    includeQueue
-      ? { revalidateOnFocus: true, revalidateArgs: [] }
-      : { revalidateOnFocus: false },
+    includeQueue ? { revalidateOnFocus: true, revalidateArgs: [] } : { revalidateOnFocus: false },
   );
 
   // ── Tokens de refetch ───────────────────────────────────────────────────────
@@ -172,6 +174,7 @@ export function useDashboardData(
         const result = await summaryCache.fetch();
         if (!active) return;
         setSummaryData(result);
+        setSummaryScope(tenantScope);
         setSummaryError(null);
         setLastUpdatedAt(new Date());
       } catch (err) {
@@ -204,6 +207,7 @@ export function useDashboardData(
         const result = await queueCache.fetch();
         if (!active) return;
         setQueueData(result);
+        setQueueScope(tenantScope);
         setQueueError(null);
         setLastUpdatedAt(new Date());
       } catch (err) {
@@ -251,13 +255,23 @@ export function useDashboardData(
   // ── Slices memoizadas (evita recriar ref em cada render) ────────────────────
 
   const summary = useMemo<AsyncSlice<DashboardSummaryResponse | null>>(
-    () => ({ data: summaryData, loading: summaryLoading, error: summaryError, refetch: refetchSummary }),
-    [summaryData, summaryLoading, summaryError, refetchSummary],
+    () => ({
+      data: summaryScope === tenantScope ? summaryData : null,
+      loading: summaryLoading,
+      error: summaryError,
+      refetch: refetchSummary,
+    }),
+    [summaryData, summaryError, summaryLoading, summaryScope, tenantScope, refetchSummary],
   );
 
   const pendingQueue = useMemo<AsyncSlice<DashboardPendingQueueResponse>>(
-    () => ({ data: queueData, loading: queueLoading, error: queueError, refetch: refetchQueue }),
-    [queueData, queueLoading, queueError, refetchQueue],
+    () => ({
+      data: queueScope === tenantScope ? queueData : EMPTY_PENDING_QUEUE,
+      loading: queueLoading,
+      error: queueError,
+      refetch: refetchQueue,
+    }),
+    [queueData, queueError, queueLoading, queueScope, tenantScope, refetchQueue],
   );
 
   return { summary, pendingQueue, lastUpdatedAt, refreshAll };
