@@ -2,6 +2,9 @@
 
 Data: 2026-08-17. Escopo restrito aos três gates finais; sem produção, commit, push ou deploy.
 
+> `HISTORICAL_EVIDENCE`: referências ao ambiente isolado abaixo descrevem uma
+> rodada anterior; não há VPS remota de testes separada autorizada atualmente.
+
 ## Decisão
 
 `NO-GO`: o gate de secrets continua aberto. Os gates de provider externo e accessibility foram executados no ambiente isolado e passaram nesta rodada.

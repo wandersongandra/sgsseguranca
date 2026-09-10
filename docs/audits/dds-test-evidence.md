@@ -2,6 +2,9 @@
 
 Data: 2026-08-17. Fixtures sintéticas; nenhum dado ou segredo real foi usado.
 
+> `HISTORICAL_EVIDENCE`: esta evidência registra execuções anteriores em ambiente
+> isolado. O runtime autorizado atual é `HOSTINGER_CURRENT_VPS` (`PRE_PRODUCTION_QA`).
+
 ## Passing evidence
 
 | Escopo | Resultado |

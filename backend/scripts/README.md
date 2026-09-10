@@ -509,8 +509,8 @@ node scripts/audit-mail-runtime.js --prune-failed --min-age-minutes=0
 - o prune é ignorado quando a `mail-dlq` ainda possui itens pendentes
 - por padrão, o prune exige jobs com pelo menos `1440` minutos de idade
 - a `mail-dlq` continua sendo a fonte operacional para retry manual
-- se o `REDIS_URL` apontar para hostname privado do Vultr/Coolify e o script rodar fora do runtime do serviço, a inspeção de filas é pulada com `warn` em vez de travar
-- para validar filas nesse cenário, rode o script dentro de um one-off job ou sessão SSH do Vultr/Coolify
+- se o `REDIS_URL` apontar para hostname privado do Hostinger/Coolify e o script rodar fora do runtime do serviço, a inspeção de filas é pulada com `warn` em vez de travar
+- para validar filas nesse cenário, rode o script dentro de um one-off job ou sessão SSH da Hostinger/Coolify
 
 ---
 

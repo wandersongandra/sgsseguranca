@@ -1,11 +1,11 @@
 # Infraestrutura atual do SGS
 
-**Fonte de verdade operacional — verificada em 2026-08-15**
+**Fonte de verdade operacional — classificação atual: `PRE_PRODUCTION_QA`**
 
-Este documento separa produção, load test e infraestrutura histórica. Não contém
-tokens, senhas, chaves privadas ou valores de variáveis sensíveis.
+Este documento separa o ambiente operacional atual, harnesses de teste e evidência
+histórica. Não contém tokens, senhas, chaves privadas ou valores de variáveis sensíveis.
 
-## Produção
+## Ambiente operacional atual (`PRE_PRODUCTION_QA`)
 
 | Componente | Plataforma | Estado/contrato |
 |---|---|---|
@@ -33,10 +33,19 @@ Coolify independentes. Deploys devem ser feitos um por vez e só o próximo deve
 ser disparado após o anterior terminar (`finished` ou `failed`). Migrations são
 manuais e não rodam no boot.
 
-## Load test isolado
+## Runtime de testes atual
 
-O ambiente de carga não usa produção, Neon, B2 de produção, Redis de produção ou
-credenciais de produção.
+`CURRENT_TEST_RUNTIME=HOSTINGER_CURRENT_VPS` e `SEPARATE_TEST_VPS=NONE`.
+Os harnesses de carga e os guards continuam versionados para preservar os testes
+do software, mas não existe mais um alvo remoto separado autorizado para execução.
+Não provisionar, acessar ou reutilizar uma VPS de load test separada a partir deste
+documento.
+
+## Referência histórica: load test separado (`LEGACY_TEST_REFERENCE_ONLY`)
+
+Os dados abaixo são somente evidência histórica e não representam o runtime atual.
+O estado remoto não foi comprovado como cancelado nem como vazio; por isso não há
+autorização para decomissioná-lo nesta rodada.
 
 | Item | Valor operacional |
 |---|---|
@@ -62,7 +71,7 @@ O guard `infra/load-test/scripts/guard-environment.mjs` deve continuar bloqueand
 produção, Neon, Upstash, B2 e bancos fora de `sgs_loadtest`. Nunca remover esse
 guard para acelerar uma campanha.
 
-### Evidências de carga já concluídas
+### Evidências históricas de carga já concluídas
 
 Registradas em `docs/auditoria/2026-08-13-loadtest-vs-producao.md`:
 
@@ -76,8 +85,7 @@ com Run ID e resumo oficial do Grafana Cloud.
 
 ## Local e CI
 
-- Runbook da VPS de load test: `infra/load-test/README.md` (manifestos remotos
-  podem existir apenas na VPS).
+- Harness de load test preservado: `infra/load-test/` (sem alvo remoto atual).
 - Compose local/E2E isolado: `ops/test/compose/docker-compose.e2e.yml` e
   `ops/test/compose/docker-compose.storage.override.yml`.
 - CI: `.github/workflows/ci.yml` e `.github/workflows/security-scan.yml`.

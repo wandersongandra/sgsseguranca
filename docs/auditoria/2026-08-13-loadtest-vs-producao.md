@@ -1,5 +1,11 @@
 # Auditoria loadtest versus produção — 2026-08-13
 
+> `HISTORICAL_EVIDENCE`: esta auditoria registra campanhas realizadas na antiga
+> infraestrutura separada de load test. O alvo não é mais o runtime atual; novos
+> testes devem usar `CURRENT_TEST_RUNTIME=HOSTINGER_CURRENT_VPS` e
+> `CURRENT_ENVIRONMENT=PRE_PRODUCTION_QA`. Os resultados históricos abaixo não
+> foram reescritos.
+
 ## Resultado executivo
 
 O timeout observado na campanha anterior foi reproduzido no caminho público do

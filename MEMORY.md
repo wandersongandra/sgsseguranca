@@ -59,12 +59,12 @@ Processo separado (`node dist/worker.js`). 8 workers: Mail, Reports, DocumentImp
 
 ## Deploy e ambientes
 
-- Produção: Hostinger VPS + Coolify; web e worker separados.
+- Ambiente operacional atual: Hostinger VPS + Coolify; web e worker separados; classificação `PRE_PRODUCTION_QA` conforme o escopo vigente.
 - Frontend: Vercel.
 - DB: Neon PostgreSQL direto, sem host `-pooler`.
 - Redis: self-hosted na infraestrutura atual; não assumir Upstash.
 - Storage: Backblaze B2; Cloudflare R2 é histórico e não deve ser usado como provider atual.
-- Testes: sempre começar na VPS isolada de load test/homologação descrita em `docs/deploy/INFRAESTRUTURA-ATUAL.md`.
+- Testes: usar o runtime autorizado na Hostinger atual; os harnesses Jest/Playwright/k6/Compose continuam versionados para execução controlada e dados sintéticos, mas não há uma VPS remota separada de testes autorizada.
 - Processo obrigatório: `docs/OPERACAO-CANONICA-SGS.md`.
 
 ## Padrões de Código

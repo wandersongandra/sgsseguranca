@@ -1,7 +1,8 @@
 # Ambiente de testes isolado
 
-Este diretório concentra a operação do ambiente de testes local/isolado. Ele
-não é usado por produção e não deve receber credenciais, dados pessoais ou
+Este diretório concentra harnesses de testes locais/temporários e portáveis. O
+runtime atual de QA é a VPS Hostinger (`PRE_PRODUCTION_QA`); este código não
+define uma VPS remota separada e não deve receber credenciais, dados pessoais ou
 artefatos gerados de uma execução.
 
 ## Estrutura
@@ -12,8 +13,8 @@ artefatos gerados de uma execução.
 - `storage/`: bootstrap, limpeza e smoke tests do storage S3-compatible de
   teste. O padrão local é MinIO privado; um provider externo só deve ser usado
   com bucket/prefixo de staging isolado e credenciais temporárias.
-- `infra/load-test/`: runbook da VPS isolada; não misture seus manifestos
-  remotos com os Compose portáveis deste diretório.
+- `infra/load-test/`: harness histórico/portátil; não o trate como alvo remoto
+  atual nem misture seus manifestos com os Compose portáveis deste diretório.
 
 ## Comandos principais
 
@@ -29,7 +30,8 @@ Para carga, use `ops/test/load/` e mantenha a massa sintética fora do Git.
 Para storage, configure apenas um arquivo local baseado nos exemplos e rode os
 scripts em `ops/test/storage/`.
 
-Na VPS isolada, antes de subir a API com o override de storage, o operador deve
+Quando o harness for executado em ambiente de QA autorizado, antes de subir a API
+com o override de storage, o operador deve
 executar `ops/test/storage/provision-loadtest-admin.sh`. O script gira uma
 senha sintética para `sgs_admin`, garante somente o membership
 `sgs_admin -> sgs_rls_bypass` e grava `DATABASE_ADMIN_URL` em `.env.admin`

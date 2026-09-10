@@ -1,13 +1,13 @@
-# SGS load-test isolado
+# SGS load-test harness (histórico e portátil)
 
-> Ambiente atual: VPS `83.229.115.37`, projeto remoto `/opt/sgs-loadtest`, domínio
-> `api-loadtest.sgsseguranca.com.br`. Consulte também
+> `CURRENT_TEST_RUNTIME=HOSTINGER_CURRENT_VPS` · `CURRENT_ENVIRONMENT=PRE_PRODUCTION_QA`.
+> Este diretório preserva código de teste, Compose e guards; ele não define nem
+> opera uma VPS remota separada. Consulte também
 > [`docs/deploy/INFRAESTRUTURA-ATUAL.md`](../../docs/deploy/INFRAESTRUTURA-ATUAL.md).
 
-Ambiente exclusivo para testes do SGS. O alvo atual é a VPS `sgs-loadtest`
-(`83.229.115.37`), em Ubuntu 24.04, com 6 vCPU, 16 GB RAM e 60 GB SSD.
-O acesso operacional usa o usuário `sgsops` e a chave local dedicada
-`C:\Users\User\.ssh\sgs-loadtest-vps_ed25519`.
+Os manifestos abaixo podem ser usados somente como harness local/temporário,
+com dados sintéticos e o guard fail-closed. Não há instrução versionada de SSH,
+hostname ou túnel para uma infraestrutura antiga.
 
 ## Arquitetura
 
@@ -20,9 +20,9 @@ O acesso operacional usa o usuário `sgsops` e a chave local dedicada
   heartbeat obrigatório no Redis e sem porta publicada.
 - `proxy-loadtest`: Nginx leve, somente na rede Docker; aplica limites de
   requisição/conexão e encaminha para a API.
-- `edge-loadtest`: Caddy separado para o hostname exclusivo
-  `api-loadtest.sgsseguranca.com.br`, TLS automático e chave
-  `X-Loadtest-Key`. O segredo fica apenas no `.env.loadtest` da VPS.
+- `edge-loadtest`: Caddy opcional para execução local/temporária com hostname
+  sintético e chave `X-Loadtest-Key`. O segredo fica apenas no `.env.loadtest`
+  local; não há publicação nem reativação de endpoint remoto neste perfil.
 
 Frontend, Grafana, Prometheus, Loki, Kubernetes e MinIO não fazem parte do
 runtime P0. O worker só deve ser habilitado depois da medição de RAM com API,
@@ -40,9 +40,9 @@ antes de alterar a política.
 Com `MAIL_ENABLED=false`, a ausência gera apenas o warning de links DDS e não
 habilita envio; nunca apontar esse ambiente para `app.sgsseguranca.com.br`.
 
-`VALIDATION_TOKEN_SECRET` também é obrigatório no load-test. Gere na VPS um
-segredo sintético com pelo menos 32 caracteres e nunca reutilize segredo de
-produção.
+`VALIDATION_TOKEN_SECRET` também é obrigatório no load-test. Gere no ambiente
+local/temporário um segredo sintético com pelo menos 32 caracteres e nunca
+reutilize segredo de produção.
 
 ## Guardas obrigatórios
 
@@ -59,7 +59,7 @@ Os scripts k6 repetem a proteção antes de enviar a primeira requisição. Os
 testes average, stress, spike e soak ficam preparados, mas não devem ser
 executados nesta primeira implantação.
 
-## Operação local/SSH
+## Operação local/temporária
 
 ```powershell
 Copy-Item .env.loadtest.example .env.loadtest
@@ -70,10 +70,7 @@ docker compose --env-file .env.loadtest -f compose.yml up -d
 docker compose --env-file .env.loadtest -f compose.yml ps
 docker stats --no-stream
 
-# Acesso funcional somente por túnel SSH na primeira fase:
-ssh -N -L 8088:127.0.0.1:8088 <usuario>@<ip-da-vps>
-
-# Em outro terminal local:
+# Para uma execução local/temporária, em outro terminal:
 $env:BASE_URL='http://127.0.0.1:8088'
 $env:TEST_USER='<cpf-sintetico>'
 $env:TEST_PASSWORD='<senha-sintetica>'
@@ -120,7 +117,11 @@ O primeiro smoke cobre somente health público, login sintético e `/auth/me`.
 Não usar produção, credenciais reais, dados reais, storage real ou os domínios
 `api.sgsseguranca.com.br`/`app.sgsseguranca.com.br`.
 
-## Publicação controlada
+## Publicação histórica (não usar)
+
+O edge e o hostname público descritos nesta seção pertenciam ao ambiente remoto
+separado de load test. Eles são mantidos apenas para explicar os guards e a
+evidência histórica; não devem ser publicados ou reativados.
 
 O edge público usa somente 80/443 para o hostname exclusivo. HTTP é redirecionado
 para HTTPS; `/health/public` é a única rota sem chave; todas as demais exigem

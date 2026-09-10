@@ -111,9 +111,14 @@ Fluxo recomendado em produção:
 4. Habilitar proteção de startup:
 `REQUIRE_NO_PENDING_MIGRATIONS=true`
 
-## Deploy Vultr / Coolify + Redis Externo + Neon
+## Arquitetura legada (histórico; não usar como runbook)
 
-Modelo operacional aprovado para este projeto:
+O modelo abaixo foi usado antes da consolidação na Hostinger e permanece somente
+como referência histórica. Para o ambiente atual, use
+`docs/deploy/hostinger-coolify-infra-atual.md` e
+`docs/deploy/INFRAESTRUTURA-ATUAL.md`.
+
+Modelo histórico:
 
 - backend continua em NestJS
 - banco em Neon Postgres com URL direta enquanto RLS depender de contexto de sessao
@@ -145,7 +150,7 @@ Variaveis criticas em ambos os servicos:
 - `AWS_S3_BUCKET` / `AWS_BUCKET_NAME`
 - `AWS_S3_ENDPOINT` / `AWS_ENDPOINT` (Backblaze B2 S3 compativel)
 
-Runbooks operacionais:
+Runbook histórico:
 
 - `docs/deploy/coolify-vultr-backend-web-worker.md`
 

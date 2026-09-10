@@ -2,6 +2,9 @@
 
 Status em 2026-08-17. `PASS` significa evidência local e/ou runtime confirmada; `PARTIAL` preserva limites de escopo, provider ou cobertura. Esta matriz é a decisão final dos sete gates de aceitação.
 
+> `HISTORICAL_EVIDENCE`: referências à VPS isolada abaixo descrevem uma rodada
+> anterior. O runtime autorizado atual é `HOSTINGER_CURRENT_VPS` (`PRE_PRODUCTION_QA`).
+
 ## Addendum runtime — VPS isolada
 
 Nesta rodada, o provider S3-compatible de teste foi provisionado exclusivamente na VPS isolada. O fluxo governado de upload/complete, registro e download autorizado passou; ACL privada, tamper, cross-tenant e expiração provider também passaram. O Axe autenticado passou em `390x844`, `430x932` e `1440x900`, com `0` violações `serious/critical`; teclado mobile passou em `2/2`. O gate de secrets continua `BLOCKED` por findings históricos/artifacts sem rotação formal.

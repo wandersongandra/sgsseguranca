@@ -1,8 +1,11 @@
 # DDS — Final Production Acceptance
 
 Data: 2026-08-16
-Ambiente: VPS isolada de testes (`APP_ENV=loadtest`)
+Ambiente histórico: VPS isolada de testes (`APP_ENV=loadtest`)
 Decisão: **NO-GO para produção**
+
+> `HISTORICAL_EVIDENCE`: este documento registra uma execução anterior; o runtime
+> autorizado atual é `HOSTINGER_CURRENT_VPS` (`PRE_PRODUCTION_QA`).
 
 Nenhuma produção, credencial real, CPF real, assinatura real, e-mail real ou objeto real de storage foi usado. Não houve commit, push, deploy ou limpeza destrutiva do worktree.
 

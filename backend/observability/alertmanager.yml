@@ -3,7 +3,7 @@
 #
 # Receivers são configurados via variáveis de ambiente para evitar
 # credenciais hardcoded em VCS. Defina ALERTMANAGER_SLACK_WEBHOOK_URL
-# e ALERTMANAGER_PAGERDUTY_ROUTING_KEY no ambiente de produção (Vultr/Coolify /
+# e ALERTMANAGER_PAGERDUTY_ROUTING_KEY no ambiente de produção (Hostinger/Coolify /
 # Coolify Secrets) antes de habilitar alertas.
 #
 # Para ativar: defina ALERTS_ENABLED=true no backend e certifique-se de

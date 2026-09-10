@@ -4,6 +4,9 @@ Data: 2026-08-16
 Escopo: DDS, assinaturas, aprovação, PDF/storage, tenancy/site, RBAC, migrations e superfícies compartilhadas diretamente consumidas pelo módulo.
 Método: inventário repo-backed, código/migrations, testes focados, typecheck, build, lint e scans locais. Sem produção, dados reais ou segredos.
 
+> `HISTORICAL_EVIDENCE`: referências à VPS isolada abaixo descrevem uma rodada
+> anterior. O runtime autorizado atual é `HOSTINGER_CURRENT_VPS` (`PRE_PRODUCTION_QA`).
+
 ## 1. Executive Summary
 
 ### Addendum de fechamento — 2026-08-17

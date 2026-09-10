@@ -4,6 +4,10 @@ Data da auditoria: 2026-09-06
 
 Repositório: wandersongandra/sgsseguranca
 
+> `HISTORICAL_EVIDENCE`: referências à VPS de teste abaixo pertencem à fotografia
+> de 2026-09-06 e não definem o runtime atual. O ambiente vigente é
+> `HOSTINGER_CURRENT_VPS` (`PRE_PRODUCTION_QA`).
+
 ## Summary
 
 - Main confirmado: ae0127279141af23daa190a08debb6ebdb8aea5f. [CONFIRMED]

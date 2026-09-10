@@ -2,6 +2,9 @@
 
 Data: 2026-08-17. Escopo restrito aos três gates finais de autorização. Sem produção, commit, push ou deploy; nenhum segredo ou dado de produção foi aberto. A retirada administrativa do R2 legado está registrada abaixo.
 
+> `HISTORICAL_EVIDENCE`: referências à VPS isolada abaixo descrevem uma rodada
+> anterior e não autorizam reativação de infraestrutura remota separada.
+
 ## Veredito
 
 **NO-GO.** Os três gates abaixo permanecem sem prova mínima de fechamento.
