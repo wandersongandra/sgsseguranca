@@ -80,3 +80,10 @@ BRANCH: `design/frontend-visual-quality-phase2`
 - **Evidência:** ambos os arquivos reportam `eol: lf` e, após a normalização, `crlf=0`; `git diff --check` não reportou erro. A mudança funcional permaneceu verificável com `npm exec jest -- --runInBand app/verify/page.test.tsx app/dashboard/adminWaveBResponsivePattern.test.ts src/components/ui/confirm-action-provider.test.tsx` — 3 suítes e 33 testes passed.
 - **Classificação:** CONFIRMED / conformidade de EOL; sem alteração funcional adicional.
 - **Ação tomada:** normalizados somente `frontend/app/verify/page.tsx` e `frontend/app/verify/page.test.tsx`, que já estavam no escopo desta fase e violavam `*.tsx text eol=lf`.
+
+## GATE REMOTE_PR_378
+
+- **Comando ou inspeção:** `git fetch origin`; `git push -u origin design/frontend-visual-quality-phase2`; `gh pr view 378`; `gh pr checks 378`.
+- **Evidência:** PR `https://github.com/wandersongandra/sgsseguranca/pull/378`, `base=main`, `base_sha=b6939387bd7ae61fddfc8dd2cf96ed1e8d725546`, `head_sha=b6b843124c3def6cbe9827142fc5d97541a2631f`, `commits=3`, `changed_files=24`, `mergeable=MERGEABLE`, `mergeStateStatus=BLOCKED`. Concluídos verdes: CodeQL JavaScript/TypeScript, Semgrep, Gitleaks, Secret Scanning, Docker Security Scan, Dependency Audit frontend/backend, SBOMs, lockfiles, Secret Guard, Snyk, CodeFactor, repo-smoke, PostgreSQL 17 migrations 0392/0402 e DR Restore. Pendentes no último registro: Frontend Lint/Test/Build, Backend Lint/Test/Build e Backend E2E Critical Flows.
+- **Classificação:** BLOCKED / CI remoto incompleto; não há falha observada, mas não é permitido tratar `pending` como PASS. A validação autenticada de dashboard também continua não verificada.
+- **Ação tomada:** aberta uma única PR; nenhum merge, bypass de proteção ou deploy executado.
