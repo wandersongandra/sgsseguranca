@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, type RefObject } from "react";
 import { toast } from "sonner";
 import { extractApiErrorMessage } from "@/lib/error-handler";
 import { isAiEnabled } from "@/lib/featureFlags";
@@ -23,7 +23,13 @@ import { flushOfflineQueue, getOfflineQueueCount } from "@/lib/offline-sync";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { useRealtimeNotifications } from "@/hooks/useRealtimeNotifications";
 
-export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
+export function Header({
+  onOpenMobileNav,
+  mobileNavTriggerRef,
+}: {
+  onOpenMobileNav?: () => void;
+  mobileNavTriggerRef?: RefObject<HTMLButtonElement | null>;
+}) {
   const { user } = useAuth();
   const aiEnabled = isAiEnabled();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -181,6 +187,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
         <div className="flex min-w-0 items-center gap-3">
           <button
             type="button"
+            ref={mobileNavTriggerRef}
             onClick={onOpenMobileNav}
             className={`${iconButtonClass} xl:hidden`}
             aria-label="Abrir navegação"

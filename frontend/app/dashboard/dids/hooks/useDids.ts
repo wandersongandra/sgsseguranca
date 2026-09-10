@@ -18,12 +18,14 @@ import { buildPdfFilename } from '@/lib/pdf-system/core/format';
 import { getFormErrorMessage } from '@/lib/error-handler';
 import { safeFormatDate } from '@/lib/date/safeFormat';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 
 type UseDidsOptions = {
   canManageDids: boolean;
 };
 
 export function useDids({ canManageDids }: UseDidsOptions) {
+  const { confirmAction } = useConfirmAction();
   const [dids, setDids] = useState<Did[]>([]);
 const timerRef = useRef<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -387,7 +389,12 @@ useEffect(() => {
         return;
       }
 
-      if (!window.confirm('Tem certeza que deseja excluir este registro?')) {
+      const confirmed = await confirmAction({
+        title: 'Excluir registro',
+        description: 'Tem certeza que deseja excluir este registro? Esta ação não pode ser desfeita.',
+        confirmLabel: 'Excluir registro',
+      });
+      if (!confirmed) {
         return;
       }
 
@@ -409,7 +416,7 @@ useEffect(() => {
         }
       });
     },
-    [canManageDids, dids.length, loadDids, page],
+    [canManageDids, confirmAction, dids.length, loadDids, page],
   );
 
   const handleStatusChange = useCallback(

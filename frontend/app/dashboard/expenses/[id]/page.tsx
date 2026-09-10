@@ -16,6 +16,7 @@ import { Permission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { openSafeExternalUrlInNewTab } from '@/lib/security/safe-external-url';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 import {
   expensesService,
   EXPENSE_ADVANCE_METHOD_LABEL,
@@ -51,6 +52,7 @@ function safeDownloadName(value: string) {
 }
 
 export default function ExpenseReportDetailPage() {
+  const { confirmAction } = useConfirmAction();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { hasPermission, isAdminGeral } = useAuth();
@@ -190,7 +192,13 @@ export default function ExpenseReportDetailPage() {
   }
 
   async function handleRemoveItem(itemId: string) {
-    if (!report || !confirm('Remover esta despesa da prestação?')) return;
+    if (!report) return;
+    const confirmed = await confirmAction({
+      title: 'Remover despesa',
+      description: 'Tem certeza que deseja remover esta despesa da prestação? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Remover despesa',
+    });
+    if (!confirmed) return;
     await runWithMutationLock(destructiveMutationLock, async () => {
       try {
         const next = await expensesService.removeItem(report.id, itemId);
@@ -231,7 +239,13 @@ export default function ExpenseReportDetailPage() {
   }
 
   async function handleClose() {
-    if (!report || !confirm('Fechar prestação? Após o fechamento não será possível alterar despesas ou adiantamentos.')) {
+    if (!report) return;
+    const confirmed = await confirmAction({
+      title: 'Fechar prestação',
+      description: 'Após o fechamento não será possível alterar despesas ou adiantamentos. Deseja continuar?',
+      confirmLabel: 'Fechar prestação',
+    });
+    if (!confirmed) {
       return;
     }
     await runWithMutationLock(destructiveMutationLock, async () => {

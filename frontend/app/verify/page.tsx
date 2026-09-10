@@ -330,7 +330,11 @@ export default function PublicHashVerifyPage() {
 
         <Card>
           <CardHeader className="space-y-3">
-            <div className="flex flex-wrap gap-2">
+            <div
+              className="flex flex-wrap gap-2"
+              role="group"
+              aria-label="Tipo de validação"
+            >
               {(["evidence", "signature", "code"] as VerifyMode[]).map(
                 (item) => (
                   <Button
@@ -338,6 +342,7 @@ export default function PublicHashVerifyPage() {
                     type="button"
                     variant={mode === item ? "default" : "secondary"}
                     size="sm"
+                    aria-pressed={mode === item}
                     onClick={() => {
                       setMode(item);
                       resetResults();
