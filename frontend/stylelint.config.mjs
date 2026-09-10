@@ -25,6 +25,8 @@ const config = {
         'styles/theme-light.css',
         'app/globals.css',
         'app/legal-pages.module.css',
+        'app/termos/termos.module.css',
+        'app/privacidade/privacidade.module.css',
       ],
       rules: {
         'color-no-hex': null,
