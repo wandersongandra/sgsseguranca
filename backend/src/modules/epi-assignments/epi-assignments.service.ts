@@ -293,6 +293,14 @@ export class EpiAssignmentsService {
         'Ficha já devolvida. Não é possível edição genérica.',
       );
     }
+    if (
+      assignment.assinatura_entrega?.signature_hash ||
+      assignment.pdf_file_key
+    ) {
+      throw new ConflictException(
+        'Ficha EPI assinada ou com PDF final anexado. A edição genérica está bloqueada; use o fluxo formal de devolução ou substituição.',
+      );
+    }
 
     Object.assign(assignment, {
       ...dto,

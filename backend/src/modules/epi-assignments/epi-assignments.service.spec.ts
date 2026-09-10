@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { EpiAssignment } from './entities/epi-assignment.entity';
@@ -242,6 +246,46 @@ describe('EpiAssignmentsService', () => {
       const result = await service.findOne('assign-1');
 
       expect(result.id).toBe('assign-1');
+    });
+  });
+
+  describe('update()', () => {
+    it('blocks generic edits after delivery signature is recorded', async () => {
+      const service = makeService({
+        assignmentsRepository: {
+          findOne: jest.fn().mockResolvedValue({
+            id: 'assign-1',
+            company_id: 'company-1',
+            status: 'entregue',
+            assinatura_entrega: { signature_hash: 'signed-hash' },
+            pdf_file_key: null,
+          }),
+          save: jest.fn(),
+        },
+      });
+
+      await expect(
+        service.update('assign-1', { quantidade: 2 }, 'actor-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('blocks generic edits after the final PDF is recorded', async () => {
+      const service = makeService({
+        assignmentsRepository: {
+          findOne: jest.fn().mockResolvedValue({
+            id: 'assign-1',
+            company_id: 'company-1',
+            status: 'entregue',
+            assinatura_entrega: { signature_hash: '' },
+            pdf_file_key: 'documents/epi/final.pdf',
+          }),
+          save: jest.fn(),
+        },
+      });
+
+      await expect(
+        service.update('assign-1', { observacoes: 'alteração' }, 'actor-1'),
+      ).rejects.toThrow(ConflictException);
     });
   });
 
