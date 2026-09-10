@@ -1,0 +1,741 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Política de Privacidade — layout editorial tipográfico, sem cards
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* ─── Tokens ─────────────────────────────────────────────────────────────── */
+
+.page {
+  --l-bg:            #ffffff;
+  --l-surface:       #fafafa;
+  --l-heading:       #0a0a0a;
+  --l-text:          #111111;
+  --l-text-2:        #3a3a3a;
+  --l-text-muted:    #6b6b6b;
+  --l-text-faint:    #a3a3a3;
+  --l-border:        #e2e2e2;
+  --l-border-subtle: #ebebeb;
+  --l-accent:        #1d5b8d;
+  --l-accent-hover:  #174a73;
+  --l-amber:         #92400e;
+  --l-amber-bg:      #fef3c7;
+  --l-amber-border:  #d97706;
+
+  background: var(--l-bg);
+  color: var(--l-text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Shell ──────────────────────────────────────────────────────────────── */
+
+.shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 40px 96px;
+}
+
+/* ─── Back link ──────────────────────────────────────────────────────────── */
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--l-text-muted);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: color 140ms ease;
+}
+
+.backLink:hover {
+  color: var(--l-text);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ─── Document header ────────────────────────────────────────────────────── */
+
+.docHeader {
+  margin-top: 40px;
+  padding-bottom: 36px;
+  border-bottom: 1px solid var(--l-border);
+}
+
+.docEyebrow {
+  margin: 0 0 14px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--l-accent);
+}
+
+.docTitle {
+  margin: 0 0 14px;
+  font-size: clamp(1.875rem, 3.5vw, 2.625rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--l-heading);
+}
+
+.docSubtitle {
+  margin: 0 0 22px;
+  max-width: 62ch;
+  font-size: 1rem;
+  line-height: 1.72;
+  font-weight: 400;
+  color: var(--l-text-2);
+}
+
+/* Linha de metadados */
+.docMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0;
+  margin: 0 0 20px;
+}
+
+.docMetaItem {
+  font-size: 0.8125rem;
+  color: var(--l-text-muted);
+  line-height: 1;
+}
+
+.docMetaSep {
+  margin: 0 10px;
+  color: var(--l-border);
+  font-weight: 300;
+  user-select: none;
+}
+
+.docPolicyLinks {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 0;
+}
+
+.docPolicyLabel {
+  font-size: 0.8125rem;
+  color: var(--l-text-faint);
+  margin-right: 10px;
+}
+
+.docPolicyLink {
+  font-size: 0.8125rem;
+  color: var(--l-accent);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 140ms ease;
+  margin-right: 16px;
+}
+
+.docPolicyLink:hover {
+  color: var(--l-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+.docPolicyLink:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ─── Incomplete notice ──────────────────────────────────────────────────── */
+
+.incompleteNotice {
+  margin-top: 24px;
+  padding: 14px 16px;
+  border-left: 2px solid var(--l-amber-border);
+  background: var(--l-amber-bg);
+  color: var(--l-amber);
+}
+
+.incompleteNotice strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.incompleteNotice p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+/* ─── Two-column layout ──────────────────────────────────────────────────── */
+
+.layout {
+  display: grid;
+  grid-template-columns: 228px 1fr;
+  gap: 0 68px;
+  margin-top: 52px;
+  align-items: start;
+}
+
+/* ─── TOC — Desktop ──────────────────────────────────────────────────────── */
+
+.toc {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--l-border) transparent;
+}
+
+.tocTitle {
+  margin: 0 0 12px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--l-text-faint);
+}
+
+.tocList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.tocLink {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 4px 0 4px 10px;
+  text-decoration: none;
+  color: var(--l-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  border-left: 2px solid transparent;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.tocLink:hover {
+  color: var(--l-text);
+}
+
+.tocLink:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.tocLinkActive {
+  color: var(--l-accent);
+  border-left-color: var(--l-accent);
+  font-weight: 500;
+}
+
+.tocNum {
+  flex-shrink: 0;
+  font-size: 0.625rem;
+  color: var(--l-text-faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 16px;
+  letter-spacing: 0.03em;
+}
+
+/* ─── Mobile TOC (details/summary) ──────────────────────────────────────── */
+
+.mobileToc {
+  display: none;
+  margin-top: 28px;
+  border: 1px solid var(--l-border);
+  background: var(--l-surface);
+}
+
+.mobileTocSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--l-text);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  letter-spacing: 0.01em;
+}
+
+.mobileTocSummary::-webkit-details-marker {
+  display: none;
+}
+
+.mobileTocSummary:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: -2px;
+}
+
+.mobileTocChevron {
+  color: var(--l-text-muted);
+  transition: transform 180ms ease;
+  flex-shrink: 0;
+}
+
+.mobileToc[open] .mobileTocChevron {
+  transform: rotate(180deg);
+}
+
+.mobileTocNav {
+  padding: 6px 16px 12px;
+  border-top: 1px solid var(--l-border-subtle);
+  background: var(--l-bg);
+}
+
+.mobileTocNav .tocList {
+  gap: 0;
+}
+
+.mobileTocNav .tocLink {
+  border-left: none;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--l-border-subtle);
+  color: var(--l-text-2);
+}
+
+.mobileTocNav li:last-child .tocLink {
+  border-bottom: none;
+}
+
+.mobileTocNav .tocLink:hover {
+  color: var(--l-accent);
+}
+
+/* ─── Document content ───────────────────────────────────────────────────── */
+
+.content {
+  min-width: 0;
+}
+
+/* ─── Intro ──────────────────────────────────────────────────────────────── */
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 68ch;
+}
+
+.introText {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  color: var(--l-text-2);
+}
+
+/* ─── Callout ────────────────────────────────────────────────────────────── */
+
+.callout {
+  padding: 14px 16px;
+  border-left: 2px solid var(--l-accent);
+  background: color-mix(in srgb, var(--l-accent) 6%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.76;
+  color: var(--l-text-2);
+  max-width: 68ch;
+}
+
+/* ─── Section ────────────────────────────────────────────────────────────── */
+
+.section {
+  padding-top: 48px;
+  border-top: 1px solid var(--l-border-subtle);
+  scroll-margin-top: 96px;
+  max-width: 72ch;
+}
+
+.section:first-of-type {
+  margin-top: 48px;
+}
+
+/* For sections containing wide tables, override max-width */
+.section.wide {
+  max-width: none;
+}
+
+.sectionNum {
+  margin: 0 0 6px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--l-text-faint);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionHeading {
+  margin: 0 0 22px;
+  font-size: 1.1875rem;
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: -0.01em;
+  color: var(--l-heading);
+}
+
+.section p {
+  margin: 0 0 13px;
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  color: var(--l-text-2);
+}
+
+.section p:last-child {
+  margin-bottom: 0;
+}
+
+.section strong {
+  font-weight: 700;
+  color: var(--l-text);
+}
+
+/* Defined term */
+.term {
+  font-weight: 600;
+  color: var(--l-text);
+  font-style: normal;
+}
+
+/* Role block: Controlador / Operador */
+.roleBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 16px 0;
+  max-width: 68ch;
+}
+
+.roleItem {
+  padding: 14px 16px;
+  border-left: 2px solid var(--l-border);
+  background: var(--l-surface);
+}
+
+.roleItem strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--l-heading);
+}
+
+.roleItem p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.72;
+  color: var(--l-text-2);
+}
+
+/* ─── Bullet list ────────────────────────────────────────────────────────── */
+
+.bulletList {
+  margin: 12px 0;
+  padding: 0 0 0 20px;
+  list-style: disc;
+  color: var(--l-text-2);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.bulletList li {
+  font-size: 0.9375rem;
+  line-height: 1.76;
+  padding-left: 3px;
+}
+
+/* ─── Data table ─────────────────────────────────────────────────────────── */
+
+.tableWrap {
+  margin: 18px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.dataTable {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--l-text-2);
+}
+
+.dataTable thead tr {
+  border-bottom: 2px solid var(--l-border);
+}
+
+.dataTable th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--l-text-faint);
+  white-space: nowrap;
+}
+
+.dataTable td {
+  padding: 11px 14px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--l-border-subtle);
+  color: var(--l-text-2);
+}
+
+.dataTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dataTable code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.8125rem;
+  background: var(--l-surface);
+  padding: 2px 5px;
+  border: 1px solid var(--l-border-subtle);
+  color: var(--l-text);
+}
+
+/* Status badge in table */
+.statusActive   { color: #166534; }
+.statusCond     { color: var(--l-amber); }
+.statusOptional { color: var(--l-text-muted); }
+.statusPending  { color: #9a3412; }
+
+/* ─── Inline link ────────────────────────────────────────────────────────── */
+
+.inlineLink {
+  color: var(--l-accent);
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px solid color-mix(in srgb, var(--l-accent) 35%, transparent);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.inlineLink:hover {
+  color: var(--l-accent-hover);
+  border-bottom-color: var(--l-accent-hover);
+}
+
+.inlineLink:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+
+.footer {
+  margin-top: 80px;
+  padding-top: 24px;
+  border-top: 1px solid var(--l-border);
+}
+
+.footerNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-bottom: 12px;
+}
+
+.footerNav a {
+  font-size: 0.8125rem;
+  color: var(--l-text-muted);
+  text-decoration: none;
+  transition: color 140ms ease;
+}
+
+.footerNav a:hover {
+  color: var(--l-text);
+}
+
+.footerNav a:focus-visible {
+  outline: 2px solid var(--l-accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.footerMeta {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  color: var(--l-text-faint);
+  line-height: 1.6;
+}
+
+.footerCopy {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--l-text-faint);
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1024px) {
+  .shell {
+    padding: 24px 32px 80px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 0;
+    margin-top: 0;
+  }
+
+  .toc {
+    display: none;
+  }
+
+  .mobileToc {
+    display: block;
+  }
+
+  .content {
+    margin-top: 36px;
+  }
+
+  .section {
+    max-width: none;
+  }
+
+  .callout {
+    max-width: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .shell {
+    padding: 20px 18px 64px;
+  }
+
+  .docTitle {
+    font-size: 1.75rem;
+    letter-spacing: -0.02em;
+  }
+
+  .docSubtitle {
+    font-size: 0.9375rem;
+  }
+
+  .docMetaRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .docMetaSep {
+    display: none;
+  }
+
+  .section {
+    padding-top: 36px;
+    scroll-margin-top: 72px;
+  }
+
+  .sectionHeading {
+    font-size: 1.0625rem;
+    margin-bottom: 18px;
+  }
+
+  .footer {
+    margin-top: 56px;
+  }
+}
+
+@media (max-width: 375px) {
+  .shell {
+    padding: 18px 14px 52px;
+  }
+
+  .docTitle {
+    font-size: 1.5625rem;
+  }
+
+  .footerNav {
+    gap: 4px 14px;
+  }
+}
+
+/* ─── Print ──────────────────────────────────────────────────────────────── */
+
+@media print {
+  .page {
+    background: #fff;
+    color: #000;
+  }
+
+  .shell {
+    max-width: none;
+    padding: 0;
+  }
+
+  .backLink,
+  .mobileToc,
+  .footer .footerNav {
+    display: none;
+  }
+
+  .layout {
+    display: block;
+  }
+
+  .toc {
+    display: none;
+  }
+
+  .content {
+    margin: 0;
+  }
+
+  .docHeader {
+    margin-top: 0;
+    padding-bottom: 20pt;
+    border-bottom: 1pt solid #000;
+  }
+
+  .docTitle {
+    font-size: 22pt;
+    color: #000;
+  }
+
+  .section {
+    padding-top: 18pt;
+    page-break-inside: avoid;
+    scroll-margin-top: 0;
+  }
+
+  .callout {
+    border-left: 2pt solid #000;
+    background: none;
+  }
+
+  .dataTable {
+    font-size: 8pt;
+  }
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .backLink,
+  .docPolicyLink,
+  .tocLink,
+  .inlineLink,
+  .footerNav a,
+  .mobileTocChevron {
+    transition: none;
+  }
+}
