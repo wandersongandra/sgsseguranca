@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ChevronDown, LogOut, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { isAiEnabled } from '@/lib/featureFlags';
@@ -36,10 +36,12 @@ export function Sidebar({
   isOpen = false,
   onClose,
   onModalChange,
+  restoreFocusRef,
 }: {
   isOpen?: boolean;
   onClose?: () => void;
   onModalChange?: (modal: boolean) => void;
+  restoreFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const pathname = usePathname();
   const { logout, user, hasPermission, isAdminGeral } = useAuth();
@@ -47,7 +49,7 @@ export function Sidebar({
   const isDesktop = useDesktopSidebar();
   const isModal = isOpen && !isDesktop;
   const isHiddenMobileDrawer = !isOpen && !isDesktop;
-  useFocusTrap(drawerRef, isModal, onClose);
+  useFocusTrap(drawerRef, isModal, onClose, restoreFocusRef);
 
   useEffect(() => {
     onModalChange?.(isModal);

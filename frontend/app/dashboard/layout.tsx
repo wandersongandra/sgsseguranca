@@ -12,7 +12,7 @@ import { StaleCacheBanner } from '@/components/StaleCacheBanner';
 import { ResponsiveToaster } from '@/components/ResponsiveToaster';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { selectedTenantStore } from '@/lib/selectedTenantStore';
 import { siteStore } from '@/lib/siteStore';
 import { Company } from '@/services/companiesService';
@@ -70,6 +70,7 @@ function DashboardShell({
   const [selectedSite, setSelectedSite] = useState(() => siteStore.get());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarModal, setSidebarModal] = useState(false);
+  const sidebarTriggerRef = useRef<HTMLButtonElement>(null);
   const [isMounted, setIsMounted] = useState(false);
   const openSidebar = useCallback(() => setSidebarOpen(true), []);
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -215,13 +216,17 @@ function DashboardShell({
         isOpen={sidebarOpen}
         onClose={closeSidebar}
         onModalChange={setSidebarModal}
+        restoreFocusRef={sidebarTriggerRef}
       />
       <div
         className="flex flex-1 flex-col overflow-hidden"
         inert={sidebarModal ? true : undefined}
         aria-hidden={sidebarModal ? true : undefined}
       >
-        <Header onOpenMobileNav={openSidebar} />
+        <Header
+          onOpenMobileNav={openSidebar}
+          mobileNavTriggerRef={sidebarTriggerRef}
+        />
         {isAdminGeral && (
           <div className="sticky top-0 z-40 flex min-h-12 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-3">
             <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
