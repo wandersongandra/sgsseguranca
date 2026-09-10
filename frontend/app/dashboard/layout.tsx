@@ -24,6 +24,7 @@ import {
   getRoutePermissionException,
 } from '@/lib/route-config';
 import { cn } from '@/lib/utils';
+import { ConfirmActionProvider } from '@/components/ui/confirm-action-provider';
 
 const CompanySelectorModal = dynamic(
   () => import('@/components/CompanySelectorModal'),
@@ -347,11 +348,13 @@ export default function DashboardLayout({
   return (
     <AppErrorBoundary resetKey={pathname}>
       <AuthProvider>
-        <SentryUserContext />
-        <StaleCacheBanner />
-        <PwaBootstrap />
-        <DashboardShell>{children}</DashboardShell>
-        <ResponsiveToaster />
+        <ConfirmActionProvider>
+          <SentryUserContext />
+          <StaleCacheBanner />
+          <PwaBootstrap />
+          <DashboardShell>{children}</DashboardShell>
+          <ResponsiveToaster />
+        </ConfirmActionProvider>
       </AuthProvider>
     </AppErrorBoundary>
   );

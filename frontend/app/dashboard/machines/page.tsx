@@ -16,8 +16,10 @@ import { cn } from '@/lib/utils';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { CatalogMobileCard, catalogMobileActionClassName } from '../components/CatalogMobileCard';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 
 export default function MachinesPage() {
+  const { confirmAction } = useConfirmAction();
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -62,7 +64,12 @@ export default function MachinesPage() {
   }, [loadMachines]);
 
   async function handleDelete(id: string) {
-    if (!confirm('Tem certeza que deseja excluir esta maquina?')) {
+    const confirmed = await confirmAction({
+      title: 'Excluir máquina',
+      description: 'Tem certeza que deseja excluir esta máquina? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir máquina',
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -283,6 +290,5 @@ export default function MachinesPage() {
     </ListPageLayout>
   );
 }
-
 
 

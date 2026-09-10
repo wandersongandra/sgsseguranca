@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils';
 import { safeToLocaleDateString } from '@/lib/date/safeFormat';
 import { isUserVisibleForSite } from '@/lib/site-scoped-user-visibility';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 import {
   ModalBody,
   ModalFooter,
@@ -106,6 +107,7 @@ function getOrderStatusTone(status: string): StatusTone {
 }
 
 export default function ServiceOrdersPage() {
+  const { confirmAction } = useConfirmAction();
   const [orders, setOrders] = useState<ServiceOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -322,7 +324,12 @@ export default function ServiceOrdersPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Excluir esta Ordem de Servico?')) return;
+    const confirmed = await confirmAction({
+      title: 'Excluir ordem de serviço',
+      description: 'Tem certeza que deseja excluir esta ordem de serviço? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir ordem de serviço',
+    });
+    if (!confirmed) return;
     await runWithMutationLock(deleteMutationLock, async () => {
       try {
         await serviceOrdersService.delete(id);
@@ -729,6 +736,5 @@ export default function ServiceOrdersPage() {
 function dedupeById<T extends { id: string }>(items: T[]) {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
 }
-
 
 

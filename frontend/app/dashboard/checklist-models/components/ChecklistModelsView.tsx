@@ -39,6 +39,7 @@ import { ResponsiveDataList } from "@/components/ui/responsive-data-list";
 import { useAuth } from "@/context/AuthContext";
 import { Permission } from "@/lib/permissions";
 import { runWithMutationLock } from "@/lib/mutation-lock";
+import { useConfirmAction } from "@/components/ui/confirm-action-provider";
 
 const SendMailModal = dynamic(
   () =>
@@ -60,6 +61,7 @@ export function ChecklistModelsView({
   area,
   showBootstrapAction = false,
 }: ChecklistModelsViewProps) {
+  const { confirmAction } = useConfirmAction();
   const { hasPermission } = useAuth();
   const canViewChecklists = hasPermission(Permission.CAN_VIEW_CHECKLISTS);
   const canManageChecklists = hasPermission(Permission.CAN_MANAGE_CHECKLISTS);
@@ -119,7 +121,12 @@ export function ChecklistModelsView({
   }, [loadModels, canViewChecklists, canManageChecklists]);
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir este modelo?")) {
+    const confirmed = await confirmAction({
+      title: "Excluir modelo de checklist",
+      description: "Tem certeza que deseja excluir este modelo? Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir modelo",
+    });
+    if (!confirmed) {
       return;
     }
 
