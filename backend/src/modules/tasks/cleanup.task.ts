@@ -1,11 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
-import { Repository, LessThan } from 'typeorm';
 import type { Queue } from 'bullmq';
-import { AuditLog } from '../audit-trail/entities/audit-log.entity';
-import { AprMetric } from '../aprs/entities/apr-metric.entity';
 import { CompaniesService } from '../companies/companies.service';
 import { isApiCronDisabled } from '../../shared/utils/scheduler.util';
 import * as uploadUtils from '../../shared/interceptors/file-upload.interceptor';
@@ -51,10 +47,6 @@ export class CleanupTask {
   );
 
   constructor(
-    @InjectRepository(AuditLog)
-    private auditLogRepo: Repository<AuditLog>,
-    @InjectRepository(AprMetric)
-    private aprMetricRepo: Repository<AprMetric>,
     @InjectQueue('sla-escalation') private readonly slaQueue: Queue,
     @InjectQueue('expiry-notifications') private readonly expiryQueue: Queue,
     @InjectQueue('pdf-generation-dlq') private readonly pdfDlq: Queue,
@@ -82,22 +74,6 @@ export class CleanupTask {
     const { eligible, deleted } = await this.purgeExpiredWithRlsBypass({
       target: 'audit_logs',
       cutoff,
-      ormFallback: (manager) => {
-        const repo = manager.getRepository(AuditLog);
-        return {
-          count: () => repo.count({ where: { timestamp: LessThan(cutoff) } }),
-          deleteBatch: async (limit) => {
-            const rows = await repo.find({
-              where: { timestamp: LessThan(cutoff) },
-              select: ['id'],
-              take: limit,
-            });
-            if (rows.length === 0) return 0;
-            const result = await repo.delete(rows.map((r) => r.id));
-            return result.affected ?? rows.length;
-          },
-        };
-      },
     });
 
     this.reportPurgeResult('audit_logs', eligible, deleted, retentionDays);
@@ -125,28 +101,12 @@ export class CleanupTask {
     // é suficiente (contra 365 de audit_logs). Mas por escrever MUITO mais
     // (toda visualização, não só ações) o volume elegível por execução pode
     // ficar bem maior que audit_logs — apaga em lotes (cada um com seu
-    // próprio commit no caminho privilegiado) para não segurar uma
-    // transação longa/lock demorado numa tabela de alto tráfego.
+    // próprio commit) para não segurar uma transação longa/lock demorado
+    // numa tabela de alto tráfego.
     const { eligible, deleted } = await this.purgeExpiredWithRlsBypass({
       target: 'apr_metrics',
       cutoff,
       batchSize: 5000,
-      ormFallback: (manager) => {
-        const repo = manager.getRepository(AprMetric);
-        return {
-          count: () => repo.count({ where: { occurredAt: LessThan(cutoff) } }),
-          deleteBatch: async (limit) => {
-            const rows = await repo.find({
-              where: { occurredAt: LessThan(cutoff) },
-              select: ['id'],
-              take: limit,
-            });
-            if (rows.length === 0) return 0;
-            const result = await repo.delete(rows.map((r) => r.id));
-            return result.affected ?? rows.length;
-          },
-        };
-      },
     });
 
     this.reportPurgeResult('apr_metrics', eligible, deleted, retentionDays);
@@ -182,22 +142,33 @@ export class CleanupTask {
    * Reaproveitado por cleanupOldLogs()/cleanupOldAprMetrics(): ambas as
    * tabelas têm RLS ativo e este cron roda fora de requisição HTTP, sem
    * contexto de tenant — a limpeza é intencionalmente global (todos os
-   * tenants), então exige bypass de RLS. `target` só aceita chaves de
-   * PURGE_TARGETS (nunca string livre vinda de fora desta classe).
+   * tenants), então exige a conexão privilegiada dedicada (role
+   * `sgs_admin`, via `DATABASE_ADMIN_URL`).
+   *
+   * SEM FALLBACK para a conexão de runtime. Desde a migration 361,
+   * `sgs_app` (a conexão comum) não é mais membro de `sgs_rls_bypass` — um
+   * `SET LOCAL app.is_super_admin` nessa conexão não concede nada, então
+   * SELECT/DELETE "funcionam" mas afetam 0 linhas sem erro nenhum (ver o
+   * aviso em cabeçalho de `PrivilegedDbService`). Um `else` que caísse
+   * nessa conexão reportaria `{ eligible: 0, deleted: 0 }` como se a
+   * limpeza tivesse rodado com sucesso — exatamente o defeito silencioso
+   * que essa classe existe para evitar. Por isso aqui usamos
+   * `withRequiredPrivilegedClient`, que falha FECHADO (503) quando
+   * `DATABASE_ADMIN_URL` não está configurada, em vez de tentar um
+   * caminho alternativo que apenas parece funcionar (achado de revisão
+   * da PR).
+   *
+   * `target` só aceita chaves de PURGE_TARGETS (nunca string livre vinda
+   * de fora desta classe) — `table`/`column` são sempre literais fixos.
    */
   private async purgeExpiredWithRlsBypass(options: {
     target: PurgeTargetKey;
     cutoff: Date;
     batchSize?: number;
-    ormFallback: (manager: import('typeorm').EntityManager) => {
-      count: () => Promise<number>;
-      deleteBatch: (limit: number) => Promise<number>;
-    };
   }): Promise<{ eligible: number; deleted: number }> {
-    const { target, cutoff, batchSize, ormFallback } = options;
+    const { target, cutoff, batchSize } = options;
     const meta = PURGE_TARGETS[target];
     const { table, column, ctidBatchSafe } = meta;
-    const label = table;
 
     if (batchSize && batchSize > 0 && !ctidBatchSafe) {
       // Trava de segurança, não só documentação: tabelas particionadas (ex.:
@@ -206,126 +177,96 @@ export class CleanupTask {
       // de PURGE_TARGETS.
       throw new Error(
         `CleanupTask: purge em lote por ctid não é seguro em "${table}" (ctidBatchSafe=false) — ` +
-          'remova batchSize ou use a chave primária via ormFallback.deleteBatch em ambos os caminhos.',
+          'remova batchSize ou implemente paginação por chave primária para este alvo.',
       );
     }
 
-    if (!this.privilegedDb.isEnabled()) {
-      // auditLogRepo/aprMetricRepo são injetados sem connection name
-      // explícito — ambos compartilham a mesma conexão/manager default, por
-      // isso usar auditLogRepo.manager aqui serve para as duas tabelas.
-      return this.auditLogRepo.manager.transaction(async (manager) => {
-        const roleCheck = (await manager.query<{ has_role: boolean }[]>(
+    return this.privilegedDb.withRequiredPrivilegedClient(
+      `cleanup_${target}`,
+      async (client) => {
+        // Defesa em profundidade: mesmo com DATABASE_ADMIN_URL configurada,
+        // confirma que a role sgs_admin não perdeu a membership em
+        // sgs_rls_bypass (drift de configuração no banco). Falha FECHADO
+        // (lança, nunca retorna 0/0) — "0 linhas" jamais deve ser lido como
+        // "limpeza concluída com sucesso".
+        const roleCheck = await client.query<{ has_role: boolean }>(
           `SELECT pg_has_role(current_user, 'sgs_rls_bypass', 'member') AS has_role`,
-        )) as Array<{ has_role: boolean }>;
-        if (!roleCheck[0]?.has_role) {
-          this.logger.error(
-            `CleanupTask: papel de runtime não possui sgs_rls_bypass — ` +
-              `limpeza de ${label} abortada para evitar exclusão parcial com RLS ativo.`,
-          );
-          return { eligible: 0, deleted: 0 };
+        );
+        if (!roleCheck.rows[0]?.has_role) {
+          const message =
+            `CleanupTask: conexão privilegiada (sgs_admin) sem sgs_rls_bypass — ` +
+            `limpeza de ${table} abortada para evitar exclusão parcial com RLS ativo.`;
+          this.logger.error(message);
+          throw new Error(message);
         }
 
-        await manager.query(`SET LOCAL app.is_super_admin = 'true'`);
-        const fallback = ormFallback(manager);
-        const eligibleCount = await fallback.count();
+        // A contagem também precisa do bypass ativo (SET LOCAL só vale
+        // dentro da própria transação) — sem isso a RLS filtraria a
+        // contagem por tenant e "eligible" ficaria incorreto (tipicamente
+        // 0), mascarando justamente a divergência que reportPurgeResult()
+        // existe pra pegar.
+        let eligibleCount: number;
+        await client.query('BEGIN');
+        try {
+          await client.query("SET LOCAL app.is_super_admin = 'true'");
+          const countResult = await client.query<{ cnt: number }>(
+            `SELECT count(*)::int AS cnt FROM ${table} WHERE ${column} < $1`,
+            [cutoff],
+          );
+          eligibleCount = countResult.rows[0]?.cnt ?? 0;
+          await client.query('COMMIT');
+        } catch (err) {
+          await client.query('ROLLBACK');
+          throw err;
+        }
 
-        // Caminho de fallback (sem PrivilegedDbService habilitado): ainda
-        // roda tudo numa única transação — não tem o benefício de commits
-        // por lote que o caminho privilegiado abaixo tem — mas ao menos
-        // respeita batchSize em vez de ignorá-lo silenciosamente (achado da
-        // auditoria v2), apagando por chave primária em páginas.
-        const pageSize = batchSize && batchSize > 0 ? batchSize : Infinity;
         let deletedCount = 0;
-        for (;;) {
-          const batchDeleted = await fallback.deleteBatch(
-            Number.isFinite(pageSize) ? pageSize : 100_000,
-          );
-          deletedCount += batchDeleted;
-          if (!Number.isFinite(pageSize) || batchDeleted < pageSize) break;
-        }
-        return { eligible: eligibleCount, deleted: deletedCount };
-      });
-    }
-
-    return this.privilegedDb.withPrivilegedClient(async (client) => {
-      // Verificação prévia: falha rápida se o papel de runtime perdeu sgs_rls_bypass.
-      // Sem isso, SET LOCAL is_super_admin continua sendo emitido mas a policy
-      // RESTRICTIVE ainda filtra por tenant, tornando o DELETE inócuo (apaga 0
-      // linhas) e o alerta pós-delete o único sinal do problema.
-      const roleCheck = await client.query<{ has_role: boolean }>(
-        `SELECT pg_has_role(current_user, 'sgs_rls_bypass', 'member') AS has_role`,
-      );
-      if (!roleCheck.rows[0]?.has_role) {
-        this.logger.error(
-          `CleanupTask: papel de runtime não possui sgs_rls_bypass — ` +
-            `limpeza de ${label} abortada para evitar exclusão parcial com RLS ativo.`,
-        );
-        return { eligible: 0, deleted: 0 };
-      }
-
-      // A contagem também precisa do bypass ativo (SET LOCAL só vale dentro
-      // da própria transação) — sem isso a RLS filtraria a contagem por
-      // tenant e "eligible" ficaria incorreto (tipicamente 0), mascarando
-      // justamente a divergência que reportPurgeResult() existe pra pegar.
-      let eligibleCount: number;
-      await client.query('BEGIN');
-      try {
-        await client.query("SET LOCAL app.is_super_admin = 'true'");
-        const countResult = await client.query<{ cnt: number }>(
-          `SELECT count(*)::int AS cnt FROM ${table} WHERE ${column} < $1`,
-          [cutoff],
-        );
-        eligibleCount = countResult.rows[0]?.cnt ?? 0;
-        await client.query('COMMIT');
-      } catch (err) {
-        await client.query('ROLLBACK');
-        throw err;
-      }
-
-      let deletedCount = 0;
-      if (batchSize && batchSize > 0) {
-        // Cada lote é sua própria transação curta (BEGIN/SET LOCAL/COMMIT) —
-        // diferente de fazer tudo numa transação só, isso evita segurar locks
-        // por todo o tempo de uma exclusão potencialmente grande. Seguro por
-        // ctid aqui porque ctidBatchSafe já foi checado acima.
-        for (;;) {
+        if (batchSize && batchSize > 0) {
+          // Cada lote é sua própria transação curta (BEGIN/SET LOCAL/COMMIT)
+          // — diferente de fazer tudo numa transação só, isso evita segurar
+          // locks por todo o tempo de uma exclusão potencialmente grande.
+          // Seguro por ctid aqui porque ctidBatchSafe já foi checado acima.
+          // O loop só termina quando um lote apagar MENOS que batchSize —
+          // nunca por um teto arbitrário — então continua até esgotar todos
+          // os registros elegíveis, por maior que seja o volume.
+          for (;;) {
+            await client.query('BEGIN');
+            try {
+              await client.query("SET LOCAL app.is_super_admin = 'true'");
+              const batchResult = await client.query(
+                `DELETE FROM ${table} WHERE ctid IN (
+                   SELECT ctid FROM ${table} WHERE ${column} < $1 LIMIT $2
+                 )`,
+                [cutoff, batchSize],
+              );
+              await client.query('COMMIT');
+              const batchDeleted = batchResult.rowCount ?? 0;
+              deletedCount += batchDeleted;
+              if (batchDeleted < batchSize) break;
+            } catch (err) {
+              await client.query('ROLLBACK');
+              throw err;
+            }
+          }
+        } else {
           await client.query('BEGIN');
           try {
             await client.query("SET LOCAL app.is_super_admin = 'true'");
-            const batchResult = await client.query(
-              `DELETE FROM ${table} WHERE ctid IN (
-                 SELECT ctid FROM ${table} WHERE ${column} < $1 LIMIT $2
-               )`,
-              [cutoff, batchSize],
+            const deleteResult = await client.query(
+              `DELETE FROM ${table} WHERE ${column} < $1`,
+              [cutoff],
             );
             await client.query('COMMIT');
-            const batchDeleted = batchResult.rowCount ?? 0;
-            deletedCount += batchDeleted;
-            if (batchDeleted < batchSize) break;
+            deletedCount = deleteResult.rowCount ?? 0;
           } catch (err) {
             await client.query('ROLLBACK');
             throw err;
           }
         }
-      } else {
-        await client.query('BEGIN');
-        try {
-          await client.query("SET LOCAL app.is_super_admin = 'true'");
-          const deleteResult = await client.query(
-            `DELETE FROM ${table} WHERE ${column} < $1`,
-            [cutoff],
-          );
-          await client.query('COMMIT');
-          deletedCount = deleteResult.rowCount ?? 0;
-        } catch (err) {
-          await client.query('ROLLBACK');
-          throw err;
-        }
-      }
 
-      return { eligible: eligibleCount, deleted: deletedCount };
-    });
+        return { eligible: eligibleCount, deleted: deletedCount };
+      },
+    );
   }
 
   private reportPurgeResult(
