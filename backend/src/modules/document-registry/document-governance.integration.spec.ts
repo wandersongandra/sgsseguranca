@@ -10,7 +10,6 @@ import { AprsPdfService } from '../aprs/services/aprs-pdf.service';
 import type { AprExcelService } from '../aprs/apr-excel.service';
 import type { AprRiskMatrixService } from '../aprs/apr-risk-matrix.service';
 import { Apr, AprStatus } from '../aprs/entities/apr.entity';
-import { AprApprovalRecord } from '../aprs/entities/apr-approval-record.entity';
 import { AprLog } from '../aprs/entities/apr-log.entity';
 import { AprRiskEvidence } from '../aprs/entities/apr-risk-evidence.entity';
 import { AprRiskItem } from '../aprs/entities/apr-risk-item.entity';
@@ -325,7 +324,6 @@ describe('Document governance integration', () => {
     const aprWorkflowService = new AprWorkflowService(
       dataSource.getRepository(Apr),
       dataSource.getRepository(AprLog),
-      dataSource.getRepository(AprApprovalRecord),
       tenantService,
       forensicTrailService,
       {

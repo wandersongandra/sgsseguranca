@@ -105,9 +105,6 @@ export class AprListItemDto {
   };
 
   @Expose()
-  itens_risco?: Array<Record<string, string>> | null;
-
-  @Expose()
   participant_count?: number;
 
   @Expose()

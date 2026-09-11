@@ -42,10 +42,10 @@ type PdfAccessBody = {
 //   "REPROVADA"  no enunciado → AprStatus.CANCELADA ('Cancelada') no código
 //
 // Transições permitidas:
-//   PENDENTE  → APROVADA  (PATCH /aprs/:id/approve; POST legado compatível)
-//   PENDENTE  → CANCELADA (PATCH /aprs/:id/reject; POST legado compatível)
-//   APROVADA  → ENCERRADA (PATCH /aprs/:id/finalize; POST legado compatível)
-//   APROVADA  → CANCELADA (POST /aprs/:id/reject)
+//   PENDENTE  → APROVADA  (PATCH /aprs/:id/approve)
+//   PENDENTE  → CANCELADA (PATCH /aprs/:id/reject)
+//   APROVADA  → ENCERRADA (PATCH /aprs/:id/finalize)
+//   APROVADA  → CANCELADA (PATCH /aprs/:id/reject)
 //   CANCELADA → (nenhuma — terminal)
 //   ENCERRADA → (nenhuma — terminal)
 //

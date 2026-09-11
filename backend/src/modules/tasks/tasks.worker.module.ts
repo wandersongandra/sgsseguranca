@@ -6,6 +6,7 @@ import { DocumentRetentionScheduler } from './document-retention.scheduler';
 import { GdprRetentionCleanupScheduler } from './gdpr-retention-cleanup.scheduler';
 import { TrialLifecycleScheduler } from './trial-lifecycle.scheduler';
 import { AuditLog } from '../audit-trail/entities/audit-log.entity';
+import { AprMetric } from '../aprs/entities/apr-metric.entity';
 import { AdminModule } from '../admin/admin.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { QueueServicesModule } from '../../infra/queue/queue-services.module';
@@ -22,7 +23,7 @@ import { MailModule } from '../../infra/mail/mail.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AuditLog]),
+    TypeOrmModule.forFeature([AuditLog, AprMetric]),
     BullModule.registerQueue(
       { name: 'sla-escalation' },
       { name: 'expiry-notifications' },

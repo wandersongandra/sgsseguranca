@@ -15,6 +15,7 @@ describe('CleanupTask', () => {
   it('nao tenta enfileirar notificacoes quando REDIS_DISABLED=true', async () => {
     process.env.REDIS_DISABLED = 'true';
     const auditLogRepository = { delete: jest.fn() };
+    const aprMetricRepository = { delete: jest.fn() };
     const slaQueue = { add: jest.fn() };
     const expiryQueue = { add: jest.fn() };
     const companiesService = { findAllActive: jest.fn() };
@@ -22,6 +23,7 @@ describe('CleanupTask', () => {
     const pdfDlq = { getWaitingCount: jest.fn().mockResolvedValue(0) };
     const task = new CleanupTask(
       auditLogRepository as never,
+      aprMetricRepository as never,
       slaQueue as never,
       expiryQueue as never,
       pdfDlq as never,
@@ -42,6 +44,7 @@ describe('CleanupTask', () => {
       .spyOn(uploadUtils, 'runTempUploadCleanupBestEffort')
       .mockResolvedValue(null);
     const auditLogRepository = { delete: jest.fn() };
+    const aprMetricRepository = { delete: jest.fn() };
     const slaQueue = { add: jest.fn() };
     const expiryQueue = { add: jest.fn() };
     const companiesService = { findAllActive: jest.fn() };
@@ -49,6 +52,7 @@ describe('CleanupTask', () => {
     const pdfDlq = { getWaitingCount: jest.fn().mockResolvedValue(0) };
     const task = new CleanupTask(
       auditLogRepository as never,
+      aprMetricRepository as never,
       slaQueue as never,
       expiryQueue as never,
       pdfDlq as never,
@@ -68,6 +72,7 @@ describe('CleanupTask', () => {
       'runTempUploadCleanupBestEffort',
     );
     const auditLogRepository = { delete: jest.fn() };
+    const aprMetricRepository = { delete: jest.fn() };
     const slaQueue = { add: jest.fn() };
     const expiryQueue = { add: jest.fn() };
     const companiesService = { findAllActive: jest.fn() };
@@ -75,6 +80,7 @@ describe('CleanupTask', () => {
     const pdfDlq = { getWaitingCount: jest.fn().mockResolvedValue(0) };
     const task = new CleanupTask(
       auditLogRepository as never,
+      aprMetricRepository as never,
       slaQueue as never,
       expiryQueue as never,
       pdfDlq as never,
@@ -83,12 +89,14 @@ describe('CleanupTask', () => {
     );
 
     await task.cleanupOldLogs();
+    await task.cleanupOldAprMetrics();
     task.generateWeeklyReports();
     await task.cleanupStaleTempUploads();
     await task.runExpiryNotifications();
     await task.runCorrectiveActionsSlaEscalation();
 
     expect(auditLogRepository.delete).not.toHaveBeenCalled();
+    expect(aprMetricRepository.delete).not.toHaveBeenCalled();
     expect(cleanupSpy).not.toHaveBeenCalled();
     expect(companiesService.findAllActive).not.toHaveBeenCalled();
     expect(expiryQueue.add).not.toHaveBeenCalled();
@@ -98,6 +106,7 @@ describe('CleanupTask', () => {
   it('enfileira jobs por tenant com jobId determinístico para evitar duplicidade', async () => {
     process.env.REDIS_DISABLED = 'false';
     const auditLogRepository = { delete: jest.fn() };
+    const aprMetricRepository = { delete: jest.fn() };
     const slaQueue = { add: jest.fn().mockResolvedValue({ id: 'sla' }) };
     const expiryQueue = { add: jest.fn().mockResolvedValue({ id: 'expiry' }) };
     const companiesService = {
@@ -106,6 +115,7 @@ describe('CleanupTask', () => {
     const pdfDlq = { getWaitingCount: jest.fn().mockResolvedValue(0) };
     const task = new CleanupTask(
       auditLogRepository as never,
+      aprMetricRepository as never,
       slaQueue as never,
       expiryQueue as never,
       pdfDlq as never,
