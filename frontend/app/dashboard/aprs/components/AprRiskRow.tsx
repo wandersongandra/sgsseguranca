@@ -193,18 +193,23 @@ function getActionStatusPresentation(status?: string) {
 
 function FieldShell({
   label,
+  htmlFor,
   support,
   className,
   children,
 }: {
   label: string;
+  htmlFor?: string;
   support?: string;
   className?: string;
   children: React.ReactNode;
 }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+      <label
+        htmlFor={htmlFor}
+        className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]"
+      >
         {label}
       </label>
       {children}
@@ -604,8 +609,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
               />
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
-                <FieldShell label="Atividade / processo">
+                <FieldShell
+                  label="Atividade / processo"
+                  htmlFor={`risk-${fieldId}-atividade`}
+                >
                   <input
+                    id={`risk-${fieldId}-atividade`}
                     {...register(`itens_risco.${index}.atividade_processo`)}
                     className={compactFieldClass}
                     placeholder="Descreva a atividade ou etapa"
@@ -614,8 +623,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="Etapa da atividade">
+                <FieldShell label="Etapa da atividade" htmlFor={`risk-${fieldId}-etapa`}>
                   <input
+                    id={`risk-${fieldId}-etapa`}
                     {...register(`itens_risco.${index}.etapa`)}
                     className={compactFieldClass}
                     placeholder="Ex.: preparação, execução, fechamento"
@@ -624,8 +634,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="Agente ambiental">
+                <FieldShell
+                  label="Agente ambiental"
+                  htmlFor={`risk-${fieldId}-agente-ambiental`}
+                >
                   <input
+                    id={`risk-${fieldId}-agente-ambiental`}
                     {...register(`itens_risco.${index}.agente_ambiental`)}
                     className={compactFieldClass}
                     placeholder="Agente ou exposição dominante"
@@ -634,8 +648,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="Condição perigosa">
+                <FieldShell
+                  label="Condição perigosa"
+                  htmlFor={`risk-${fieldId}-condicao-perigosa`}
+                >
                   <input
+                    id={`risk-${fieldId}-condicao-perigosa`}
                     {...register(`itens_risco.${index}.condicao_perigosa`)}
                     className={compactFieldClass}
                     placeholder="Condição perigosa observada"
@@ -644,8 +662,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="Fontes / circunstâncias">
+                <FieldShell
+                  label="Fontes / circunstâncias"
+                  htmlFor={`risk-${fieldId}-fontes-circunstancias`}
+                >
                   <input
+                    id={`risk-${fieldId}-fontes-circunstancias`}
                     {...register(`itens_risco.${index}.fontes_circunstancias`)}
                     className={compactFieldClass}
                     placeholder="Origem, condição ou circunstância"
@@ -656,9 +678,11 @@ export const AprRiskRow = React.memo(function AprRiskRow({
 
                 <FieldShell
                   label="Possíveis lesões"
+                  htmlFor={`risk-${fieldId}-possiveis-lesoes`}
                   className="lg:col-span-2 2xl:col-span-2"
                 >
                   <input
+                    id={`risk-${fieldId}-possiveis-lesoes`}
                     {...register(`itens_risco.${index}.possiveis_lesoes`)}
                     className={compactFieldClass}
                     placeholder="Consequências esperadas em caso de exposição"
@@ -687,8 +711,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
               />
 
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <FieldShell label="Probabilidade">
+                <FieldShell label="Probabilidade" htmlFor={`risk-${fieldId}-probabilidade`}>
                   <select
+                    id={`risk-${fieldId}-probabilidade`}
                     {...register(`itens_risco.${index}.probabilidade`)}
                     onChange={(event) => handleProbabilityChange(event.target.value)}
                     className={compactFieldClass}
@@ -704,8 +729,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   </select>
                 </FieldShell>
 
-                <FieldShell label="Severidade">
+                <FieldShell label="Severidade" htmlFor={`risk-${fieldId}-severidade`}>
                   <select
+                    id={`risk-${fieldId}-severidade`}
                     {...register(`itens_risco.${index}.severidade`)}
                     onChange={(event) => handleSeverityChange(event.target.value)}
                     className={compactFieldClass}
@@ -774,9 +800,11 @@ export const AprRiskRow = React.memo(function AprRiskRow({
               <div className="mt-4">
                 <FieldShell
                   label="Plano preventivo"
+                  htmlFor={`risk-${fieldId}-medidas-prevencao`}
                   support="Descreva as medidas de forma acionável e verificável."
                 >
                   <textarea
+                    id={`risk-${fieldId}-medidas-prevencao`}
                     {...register(`itens_risco.${index}.medidas_prevencao`)}
                     rows={compactMode ? 5 : 6}
                     className={compactTextAreaClass}
@@ -787,8 +815,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
               </div>
 
               <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                <FieldShell label="EPC">
+                <FieldShell label="EPC" htmlFor={`risk-${fieldId}-epc`}>
                   <input
+                    id={`risk-${fieldId}-epc`}
                     {...register(`itens_risco.${index}.epc`)}
                     className={compactFieldClass}
                     placeholder="Guarda-corpo, barreira, exaustão, enclausuramento..."
@@ -797,8 +826,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="EPI">
+                <FieldShell label="EPI" htmlFor={`risk-${fieldId}-epi`}>
                   <input
+                    id={`risk-${fieldId}-epi`}
                     {...register(`itens_risco.${index}.epi`)}
                     className={compactFieldClass}
                     placeholder="Capacete, luva, respirador, cinto..."
@@ -807,8 +837,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="Permissão de trabalho">
+                <FieldShell
+                  label="Permissão de trabalho"
+                  htmlFor={`risk-${fieldId}-permissao-trabalho`}
+                >
                   <input
+                    id={`risk-${fieldId}-permissao-trabalho`}
                     {...register(`itens_risco.${index}.permissao_trabalho`)}
                     className={compactFieldClass}
                     placeholder="PT a quente, espaço confinado, elétrica..."
@@ -817,8 +851,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   />
                 </FieldShell>
 
-                <FieldShell label="NRs / normas relacionadas">
+                <FieldShell
+                  label="NRs / normas relacionadas"
+                  htmlFor={`risk-${fieldId}-normas-relacionadas`}
+                >
                   <input
+                    id={`risk-${fieldId}-normas-relacionadas`}
                     {...register(`itens_risco.${index}.normas_relacionadas`)}
                     className={compactFieldClass}
                     placeholder="NR-10, NR-12, NR-33, NR-35..."
@@ -826,8 +864,12 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                     onKeyDown={handleAdvanceKeyDown}
                   />
                 </FieldShell>
-                <FieldShell label="Hierarquia de controle">
+                <FieldShell
+                  label="Hierarquia de controle"
+                  htmlFor={`risk-${fieldId}-hierarquia-controle`}
+                >
                   <select
+                    id={`risk-${fieldId}-hierarquia-controle`}
                     {...register(`itens_risco.${index}.hierarquia_controle`)}
                     className={compactFieldClass}
                     data-apr-nav="risk-grid"
@@ -874,8 +916,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_152px]">
-                    <FieldShell label="Responsável">
+                    <FieldShell label="Responsável" htmlFor={`risk-${fieldId}-responsavel`}>
                       <input
+                        id={`risk-${fieldId}-responsavel`}
                         {...register(`itens_risco.${index}.responsavel`)}
                         className={compactFieldClass}
                         placeholder="Responsável pela ação"
@@ -884,8 +927,9 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                       />
                     </FieldShell>
 
-                    <FieldShell label="Prazo">
+                    <FieldShell label="Prazo" htmlFor={`risk-${fieldId}-prazo`}>
                       <input
+                        id={`risk-${fieldId}-prazo`}
                         type="date"
                         {...register(`itens_risco.${index}.prazo`)}
                         className={compactFieldClass}
@@ -897,9 +941,11 @@ export const AprRiskRow = React.memo(function AprRiskRow({
 
                   <FieldShell
                     label="Status da ação"
+                    htmlFor={`risk-${fieldId}-status-acao`}
                     support="Selecione o estado atual desta ação corretiva ou preventiva."
                   >
                     <select
+                      id={`risk-${fieldId}-status-acao`}
                       {...register(`itens_risco.${index}.status_acao`)}
                       className={compactFieldClass}
                       data-apr-nav="risk-grid"

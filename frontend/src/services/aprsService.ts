@@ -143,12 +143,15 @@ export interface Apr {
   final_pdf_hash_sha256?: string | null;
   verification_code?: string | null;
   pdf_generated_at?: string | null;
-  workflowConfigId?: string | null;
   versao?: number;
   parent_apr_id?: string;
   aprovado_por_id?: string;
   aprovado_por?: User;
   aprovado_em?: string;
+  reprovado_por_id?: string;
+  reprovado_por?: User;
+  reprovado_em?: string;
+  reprovado_motivo?: string;
   classificacao_resumo?: {
     total: number;
     aceitavel: number;
@@ -838,49 +841,6 @@ export const aprsService = {
 
   delete: async (id: string) => {
     await api.delete(`/aprs/${id}`);
-  },
-
-  getWorkflowStatus: async (id: string) => {
-    const response = await api.get<{
-      currentStep: {
-        stepOrder: number;
-        roleName: string;
-        isRequired: boolean;
-      } | null;
-      nextStep: { stepOrder: number; roleName: string } | null;
-      history: Array<{
-        id: string;
-        aprId: string;
-        stepOrder: number;
-        roleName: string;
-        approverId: string;
-        action: "APROVADO" | "REPROVADO" | "REABERTO" | "DELEGADO";
-        reason: string | null;
-        occurredAt: string;
-        metadata?: Record<string, unknown> | null;
-      }>;
-      canEdit: boolean;
-      canApprove: boolean;
-    }>(`/aprs/${id}/workflow-status`);
-    return response.data;
-  },
-
-  workflowApprove: async (id: string, reason?: string) => {
-    const response = await api.post<Apr>(`/aprs/${id}/submit`, { reason });
-    return response.data;
-  },
-
-  workflowReject: async (id: string, reason: string) => {
-    const response = await api.patch<Apr>(`/aprs/${id}/reject`, { reason });
-    return response.data;
-  },
-
-  workflowReopen: async (id: string, reason: string) => {
-    const response = await api.post<{ id: string; status: string }>(
-      `/aprs/${id}/reopen`,
-      { reason },
-    );
-    return response.data;
   },
 
   validateCompliance: async (id: string) => {

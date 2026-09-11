@@ -1,11 +1,9 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { CleanupTask } from './cleanup.task';
 import { DocumentRetentionScheduler } from './document-retention.scheduler';
 import { GdprRetentionCleanupScheduler } from './gdpr-retention-cleanup.scheduler';
 import { TrialLifecycleScheduler } from './trial-lifecycle.scheduler';
-import { AuditLog } from '../audit-trail/entities/audit-log.entity';
 import { AdminModule } from '../admin/admin.module';
 import { CompaniesModule } from '../companies/companies.module';
 import { QueueServicesModule } from '../../infra/queue/queue-services.module';
@@ -22,7 +20,6 @@ import { MailModule } from '../../infra/mail/mail.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([AuditLog]),
     BullModule.registerQueue(
       { name: 'sla-escalation' },
       { name: 'expiry-notifications' },

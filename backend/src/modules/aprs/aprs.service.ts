@@ -88,6 +88,7 @@ const APR_OVERVIEW_CACHE_PREFIX = 'apr:overview';
 const APR_OVERVIEW_CACHE_TTL_DEFAULT_SECONDS = 30;
 const APR_OVERVIEW_CACHE_TTL_MIN_SECONDS = 10;
 const APR_OVERVIEW_CACHE_TTL_MAX_SECONDS = 300;
+const APR_RISK_MATRIX_CACHE_PREFIX = 'apr:risk-matrix';
 import {
   APR_ACTIVITY_TEMPLATES,
   AprActivityTemplate,
@@ -1518,7 +1519,6 @@ export class AprsService {
         'apr.pdf_file_key',
         'apr.pdf_original_name',
         'apr.classificacao_resumo',
-        'apr.itens_risco',
         'apr.created_at',
         'apr.updated_at',
         'company.id',
@@ -1791,6 +1791,11 @@ export class AprsService {
   async findOne(id: string): Promise<Apr> {
     const apr = await this.aprsRepository.findOne({
       where: this.buildAprWhere(id),
+      // relationLoadStrategy 'query': o default 'join' faria LEFT JOIN único
+      // para as 8 relações (várias *-to-many), gerando produto cartesiano das
+      // cardinalidades neste hot path (rota mais visitada do módulo). 'query'
+      // emite uma query IN(...) separada por relação, evitando a explosão.
+      relationLoadStrategy: 'query',
       relations: [
         'company',
         'site',
@@ -1820,22 +1825,6 @@ export class AprsService {
     const apr = await this.aprsRepository.findOne({
       where: this.buildAprWhere(id),
       relations: ['approval_steps'],
-    });
-    if (!apr) {
-      throw new NotFoundException(`APR com ID ${id} não encontrada`);
-    }
-    return apr;
-  }
-
-  /**
-   * Carrega somente o necessário para a decisão de aprovação.
-   * Mantém o write path explícito e evita depender do findOne() genérico
-   * com eager-load amplo de relações não usadas no fluxo crítico.
-   */
-  private async findOneForApproval(id: string): Promise<Apr> {
-    const apr = await this.aprsRepository.findOne({
-      where: this.buildAprWhere(id),
-      relations: ['participants', 'risk_items'],
     });
     if (!apr) {
       throw new NotFoundException(`APR com ID ${id} não encontrada`);
@@ -1936,10 +1925,36 @@ export class AprsService {
       null;
 
     await this.aprsRepository.manager.transaction(async (manager) => {
+      // !== undefined (não ??): um payload explícito de site_id: null
+      // precisa ser tratado como "mudou" — com ??, cairia silenciosamente
+      // no valor antigo e a checagem abaixo nunca revalidaria participantes
+      // mesmo com Object.assign gravando null logo depois (achado da
+      // auditoria v2). Mesmo padrão já usado por auditadoPorId abaixo.
+      const effectiveSiteId =
+        next.site_id !== undefined ? next.site_id : apr.site_id;
+      let participantsForScopeCheck = participants;
+      if (effectiveSiteId !== apr.site_id && participants === undefined) {
+        // Troca de obra sem payload de participantes: sem isto, os
+        // participantes atuais ficam vinculados à obra antiga sem
+        // reconferência. Carrega os ids atuais para que
+        // assertUsersScopedToSite valide também o novo site_id contra eles
+        // — mesmo tenant, não é vazamento cross-tenant, é consistência de
+        // escopo operacional.
+        const currentParticipants = await manager.getRepository(Apr).findOne({
+          where: { id: apr.id },
+          relations: ['participants'],
+        });
+        participantsForScopeCheck = (currentParticipants?.participants ?? [])
+          .map((participant) => participant.id)
+          .filter((participantId): participantId is string =>
+            Boolean(participantId),
+          );
+      }
+
       await this.validateRelatedEntityScope({
         manager,
         companyId: apr.company_id,
-        siteId: next.site_id ?? apr.site_id,
+        siteId: effectiveSiteId,
         elaboradorId: next.elaborador_id ?? apr.elaborador_id,
         auditadoPorId:
           next.auditado_por_id !== undefined
@@ -1950,7 +1965,7 @@ export class AprsService {
         epis,
         tools,
         machines,
-        participants,
+        participants: participantsForScopeCheck,
       });
 
       Object.assign(apr, {
@@ -2171,6 +2186,37 @@ export class AprsService {
     return this.aprRulesEngine.validate(apr);
   }
 
+  /**
+   * `APR_RULES_ENGINE` é uma validação ADICIONAL opcional, não um gate de
+   * segurança — diferente do AprFeatureFlagGuard (que fecha em erro pra
+   * rotas atrás de @AprFeatureFlag), aqui uma oscilação transitória de
+   * banco não pode derrubar submit()/approve() com 500 não tratado (achado
+   * da auditoria v2: isEnabled() não captura suas próprias exceções e as
+   * duas chamadas diretas subiam a exceção crua). Falha ao consultar a
+   * flag = trata como desabilitada e segue o fluxo normal sem a validação
+   * extra, só registrando um warning.
+   */
+  private async isAprRulesEngineEnabledSafe(
+    tenantId: string | undefined,
+  ): Promise<boolean> {
+    if (!this.aprFeatureFlagService || !this.aprRulesEngine) {
+      return false;
+    }
+    try {
+      return await this.aprFeatureFlagService.isEnabled(
+        'APR_RULES_ENGINE',
+        tenantId,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Falha ao consultar a feature flag APR_RULES_ENGINE (tratando como desabilitada): ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      return false;
+    }
+  }
+
   async submit(
     id: string,
     userId: string,
@@ -2182,13 +2228,7 @@ export class AprsService {
     },
   ): Promise<Apr> {
     const tenantId = this.tenantService.getTenantId();
-    const engineEnabled =
-      this.aprFeatureFlagService && this.aprRulesEngine
-        ? await this.aprFeatureFlagService.isEnabled(
-            'APR_RULES_ENGINE',
-            tenantId,
-          )
-        : false;
+    const engineEnabled = await this.isAprRulesEngineEnabledSafe(tenantId);
 
     if (engineEnabled && this.aprRulesEngine) {
       const apr = await this.findOneWithRiskItems(id);
@@ -2209,15 +2249,22 @@ export class AprsService {
         });
       }
 
+      const { companyId } = this.getTenantContextOrThrow();
       await this.aprsRepository
         .createQueryBuilder()
         .update(Apr)
         .set({
-          rulesSnapshot: () =>
-            `'${result.appliedRuleSnapshot.replace(/'/g, "''")}'::jsonb`,
+          // Parâmetro em vez de interpolação manual com escape de aspas —
+          // elimina o vetor de injeção mesmo que o escape de ''/'' falhe
+          // para algum caractere de borda no JSON serializado.
+          rulesSnapshot: () => 'CAST(:snapshot AS jsonb)',
           complianceScore: result.score,
         })
-        .where('id = :id', { id })
+        .setParameter('snapshot', result.appliedRuleSnapshot)
+        .where('id = :id AND company_id = :companyId AND deleted_at IS NULL', {
+          id,
+          companyId,
+        })
         .execute();
     }
 
@@ -2225,9 +2272,9 @@ export class AprsService {
   }
 
   private async findOneWithRiskItems(id: string): Promise<Apr> {
-    const tenantId = this.tenantService.getTenantId();
+    const { companyId } = this.getTenantContextOrThrow();
     return this.aprsRepository.findOneOrFail({
-      where: { id, company_id: tenantId },
+      where: { id, company_id: companyId },
       relations: ['risk_items'],
     });
   }
@@ -2245,13 +2292,7 @@ export class AprsService {
     },
   ): Promise<Apr> {
     const tenantId = this.tenantService.getTenantId();
-    const engineEnabled =
-      this.aprFeatureFlagService && this.aprRulesEngine
-        ? await this.aprFeatureFlagService.isEnabled(
-            'APR_RULES_ENGINE',
-            tenantId,
-          )
-        : false;
+    const engineEnabled = await this.isAprRulesEngineEnabledSafe(tenantId);
 
     if (engineEnabled && this.aprRulesEngine) {
       const aprForValidation = await this.findOneWithRiskItems(id);
@@ -2522,30 +2563,41 @@ export class AprsService {
       })),
     });
 
-    const saved = await this.aprsRepository.save(novo);
-    await this.syncRiskItems(
-      this.aprsRepository.manager,
-      saved.id,
-      normalizedRiskItems,
+    // As 3 escritas (save da nova versão + sincronização dos itens de risco +
+    // criação das etapas de aprovação padrão) precisam ser atômicas: se
+    // syncRiskItems falhar no meio, a versão nova não pode ficar persistida
+    // órfã (sem risk_items completos, sem approval_steps). Mesmo padrão de
+    // transação usado em create()/update() neste arquivo.
+    const savedId = await this.aprsRepository.manager.transaction(
+      async (manager) => {
+        const aprRepository = manager.getRepository(Apr);
+        const saved = await aprRepository.save(novo);
+        await this.syncRiskItems(manager, saved.id, normalizedRiskItems);
+        await this.ensureDefaultApprovalSteps(manager, saved.id);
+        return saved.id;
+      },
     );
-    await this.ensureDefaultApprovalSteps(
-      this.aprsRepository.manager,
-      saved.id,
-    );
+
     await this.addLog(id, userId, APR_LOG_ACTIONS.NEW_VERSION_GENERATED, {
-      novaAprId: saved.id,
+      novaAprId: savedId,
       versao: nextVersion,
       sourceAprId: id,
     });
-    await this.addLog(saved.id, userId, APR_LOG_ACTIONS.CREATED_FROM_VERSION, {
-      ...this.buildAprTraceMetadata(saved),
-      sourceAprId: id,
-      versao: nextVersion,
-    });
+    const savedApr = await this.findOne(savedId);
+    await this.addLog(
+      savedApr.id,
+      userId,
+      APR_LOG_ACTIONS.CREATED_FROM_VERSION,
+      {
+        ...this.buildAprTraceMetadata(savedApr),
+        sourceAprId: id,
+        versao: nextVersion,
+      },
+    );
     this.logger.log({
       event: 'apr_new_version',
       originalId: id,
-      newId: saved.id,
+      newId: savedId,
       versao: nextVersion,
     });
 
@@ -2559,8 +2611,8 @@ export class AprsService {
         ),
       );
 
-    void this.invalidateAprOverviewCache(saved.company_id);
-    return this.findOne(saved.id);
+    void this.invalidateAprOverviewCache(original.company_id);
+    return savedApr;
   }
 
   // ─── PDF Storage ─────────────────────────────────────────────────────────────
@@ -3094,41 +3146,64 @@ export class AprsService {
   }> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    const qb = this.aprsRepository
-      .createQueryBuilder('apr')
-      .innerJoin('apr.risk_items', 'ri')
-      .select('ri.categoria_risco', 'categoria')
-      .addSelect('ri.probabilidade', 'prob')
-      .addSelect('ri.severidade', 'sev')
-      .addSelect('COUNT(*)', 'count')
-      .where('ri.deleted_at IS NULL')
-      .andWhere('ri.probabilidade IS NOT NULL')
-      .andWhere('ri.severidade IS NOT NULL')
-      .groupBy('ri.categoria_risco')
-      .addGroupBy('ri.probabilidade')
-      .addGroupBy('ri.severidade');
 
-    if (companyId) qb.andWhere('apr.company_id = :companyId', { companyId });
-    if (!isSuperAdmin && siteScope !== 'all') {
-      qb.andWhere('apr.site_id IN (:...siteIds)', { siteIds });
-    } else if (siteId) {
-      qb.andWhere('apr.site_id = :siteId', { siteId });
-    }
+    // Cache key inclui companyId + escopo de site + o siteId de filtro:
+    // widget de dashboard, TTL curto já basta (sem invalidação explícita).
+    const cacheKey = [
+      APR_RISK_MATRIX_CACHE_PREFIX,
+      companyId,
+      isSuperAdmin ? 'super' : siteScope,
+      siteScope === 'all'
+        ? (siteId ?? 'all')
+        : siteIds.slice().sort().join(','),
+    ].join(':');
 
-    const raw = await qb.getRawMany<{
-      categoria: string;
-      prob: string | number;
-      sev: string | number;
-      count: string | number;
-    }>();
-    return {
-      matrix: raw.map((r) => ({
-        categoria: r.categoria,
-        prob: Number(r.prob),
-        sev: Number(r.sev),
-        count: Number(r.count),
-      })),
-    };
+    return this.cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        const qb = this.aprsRepository
+          .createQueryBuilder('apr')
+          .innerJoin('apr.risk_items', 'ri')
+          .select('ri.categoria_risco', 'categoria')
+          .addSelect('ri.probabilidade', 'prob')
+          .addSelect('ri.severidade', 'sev')
+          .addSelect('COUNT(*)', 'count')
+          .where('ri.deleted_at IS NULL')
+          // createQueryBuilder não aplica @DeleteDateColumn automaticamente —
+          // sem isto, APRs soft-deletadas (inclusive por LGPD) vazam nos
+          // agregados da matriz de risco.
+          .andWhere('apr.deleted_at IS NULL')
+          .andWhere('ri.probabilidade IS NOT NULL')
+          .andWhere('ri.severidade IS NOT NULL')
+          .groupBy('ri.categoria_risco')
+          .addGroupBy('ri.probabilidade')
+          .addGroupBy('ri.severidade');
+
+        if (companyId)
+          qb.andWhere('apr.company_id = :companyId', { companyId });
+        if (!isSuperAdmin && siteScope !== 'all') {
+          qb.andWhere('apr.site_id IN (:...siteIds)', { siteIds });
+        } else if (siteId) {
+          qb.andWhere('apr.site_id = :siteId', { siteId });
+        }
+
+        const raw = await qb.getRawMany<{
+          categoria: string;
+          prob: string | number;
+          sev: string | number;
+          count: string | number;
+        }>();
+        return {
+          matrix: raw.map((r) => ({
+            categoria: r.categoria,
+            prob: Number(r.prob),
+            sev: Number(r.sev),
+            count: Number(r.count),
+          })),
+        };
+      },
+      this.getAprOverviewCacheTtlSeconds(),
+    );
   }
 
   getControlSuggestions(payload: {

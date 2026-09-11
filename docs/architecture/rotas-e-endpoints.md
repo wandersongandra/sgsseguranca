@@ -318,9 +318,9 @@ Observacao:
 |-- GET    /aprs/:id/evidence
 |-- POST   /aprs/:id/risk-items/:riskItemId/evidence
 |-- POST   /aprs/:id/file
-|-- POST   /aprs/:id/approve
-|-- POST   /aprs/:id/reject
-|-- POST   /aprs/:id/finalize
+|-- PATCH  /aprs/:id/approve
+|-- PATCH  /aprs/:id/reject
+|-- PATCH  /aprs/:id/finalize
 |-- POST   /aprs/:id/new-version
 |-- PATCH  /aprs/:id
 `-- DELETE /aprs/:id

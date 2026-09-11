@@ -18,7 +18,6 @@ import { signaturesService } from "@/services/signaturesService";
 import { toast } from "sonner";
 import { AprListingRow } from "./AprListingRow";
 import { AprListingDensity, AprListingRecord } from "./aprListingUtils";
-import { ResponsiveDataList } from "@/components/ui/responsive-data-list";
 
 const SignatureModal = dynamic(
   () => import("@/components/SignatureModal").then((module) => module.SignatureModal),
@@ -108,11 +107,6 @@ export function AprListingTable({
 
   return (
     <>
-      <ResponsiveDataList
-        items={aprs}
-        getKey={(apr) => apr.id}
-        mobileClassName="grid min-w-0 gap-3 p-3"
-        desktop={() => (
       <Table className="min-w-[1280px]" aria-label="APRs em tabela">
         <TableHeader>
           <TableRow className="hover:bg-transparent">
@@ -162,26 +156,6 @@ export function AprListingTable({
           </TableBody>
         )}
       </Table>
-        )}
-        mobile={(apr) => (
-          <AprListingRow
-            apr={apr}
-            density={density}
-            mobile
-            onDelete={onDelete}
-            onPrint={onPrint}
-            onSendEmail={onSendEmail}
-            onDownloadPdf={onDownloadPdf}
-            onApprove={onApprove}
-            onFinalize={onFinalize}
-            onReject={onReject}
-            onCreateNewVersion={onCreateNewVersion}
-            isPending={Boolean(pendingActionById[apr.id])}
-            onOpenSignature={setSignatureTarget}
-            onOpenSignatures={setSignaturesTarget}
-          />
-        )}
-      />
 
       <SignatureModal
         isOpen={Boolean(signatureTarget)}

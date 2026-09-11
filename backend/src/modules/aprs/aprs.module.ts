@@ -12,10 +12,8 @@ import { AprMetric } from './entities/apr-metric.entity';
 import { AprWorkflowConfig } from './entities/apr-workflow-config.entity';
 import { AprWorkflowStep } from './entities/apr-workflow-step.entity';
 import { AprApprovalRecord } from './entities/apr-approval-record.entity';
-import { AprWorkflowResolverService } from './services/apr-workflow-resolver.service';
 import { AprRule } from './entities/apr-rule.entity';
 import { AprRulesEngineService } from './services/apr-rules-engine.service';
-import { AprWorkflowConfigsController } from './controllers/apr-workflow-configs.controller';
 import { CommonModule } from '../../shared/common.module';
 import { AuthModule } from '../auth/auth.module';
 import { Company } from '../companies/entities/company.entity';
@@ -66,7 +64,6 @@ import { AprMetricsInterceptor } from './interceptors/apr-metrics.interceptor';
     AprsController,
     PublicAprEvidenceController,
     PublicAprVerificationController,
-    AprWorkflowConfigsController,
   ],
   providers: [
     AprsService,
@@ -79,7 +76,6 @@ import { AprMetricsInterceptor } from './interceptors/apr-metrics.interceptor';
     AprMetricsService,
     AprFeatureFlagGuard,
     AprMetricsInterceptor,
-    AprWorkflowResolverService,
     AprRulesEngineService,
   ],
   exports: [

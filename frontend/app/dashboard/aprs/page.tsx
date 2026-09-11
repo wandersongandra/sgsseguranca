@@ -21,6 +21,7 @@ import {
   getAprResponsibleMeta,
 } from "./components/aprListingUtils";
 import { aprsService } from "@/services/aprsService";
+import { signaturesService } from "@/services/signaturesService";
 import { useAuth } from "@/context/AuthContext";
 import { Permission } from '@/lib/permissions';
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -31,10 +32,21 @@ import {
 } from "@/components/ui/state";
 import { ListPageLayout } from "@/components/layout";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const SendMailModal = dynamic(
   () =>
     import("@/components/SendMailModal").then((module) => module.SendMailModal),
+  { ssr: false },
+);
+const SignatureModal = dynamic(
+  () =>
+    import("@/components/SignatureModal").then((module) => module.SignatureModal),
+  { ssr: false },
+);
+const SignaturesPanel = dynamic(
+  () =>
+    import("@/components/SignaturesPanel").then((module) => module.SignaturesPanel),
   { ssr: false },
 );
 const StoredFilesPanel = dynamic(
@@ -51,8 +63,32 @@ const StoredFilesPanel = dynamic(
 );
 
 export default function AprsPage() {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const canCreate = hasPermission(Permission.CAN_CREATE_APR);
+  const [signatureTarget, setSignatureTarget] = useState<AprListingRecord | null>(null);
+  const [signaturesTarget, setSignaturesTarget] = useState<AprListingRecord | null>(null);
+
+  const handleSignSave = useCallback(
+    async (signatureData: string, type: string) => {
+      if (!signatureTarget) return;
+
+      try {
+        await signaturesService.create({
+          document_id: signatureTarget.id,
+          document_type: "APR",
+          signature_data: signatureData,
+          type,
+          user_id: user?.id,
+          company_id: signatureTarget.company_id,
+        });
+        toast.success("Assinatura registrada com sucesso.");
+        setSignatureTarget(null);
+      } catch {
+        toast.error("Erro ao registrar assinatura.");
+      }
+    },
+    [signatureTarget, user?.id],
+  );
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -537,9 +573,25 @@ export default function AprsPage() {
                   onFinalize={handleFinalize}
                   onReject={handleReject}
                   onCreateNewVersion={handleCreateNewVersion}
+                  onOpenSignature={setSignatureTarget}
+                  onOpenSignatures={setSignaturesTarget}
                 />
               ))}
             </div>
+
+            <SignatureModal
+              isOpen={Boolean(signatureTarget)}
+              onClose={() => setSignatureTarget(null)}
+              onSave={handleSignSave}
+              userName={user?.nome ?? "Usuário"}
+            />
+
+            <SignaturesPanel
+              isOpen={Boolean(signaturesTarget)}
+              onClose={() => setSignaturesTarget(null)}
+              documentId={signaturesTarget?.id ?? ""}
+              documentType="APR"
+            />
           </div>
         )}
       </ListPageLayout>

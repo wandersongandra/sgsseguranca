@@ -26,8 +26,15 @@ export function AprListingPagination({
   const rangeEnd = total === 0 ? 0 : Math.min(page * limit, total);
 
   return (
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="text-sm text-[var(--ds-color-text-secondary)]">
+    <nav
+      aria-label="Paginação de APRs"
+      className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
+    >
+      <div
+        className="text-sm text-[var(--ds-color-text-secondary)]"
+        aria-live="polite"
+        aria-atomic="true"
+      >
         Mostrando{" "}
         <span className="font-semibold text-[var(--ds-color-text-primary)]">
           {rangeStart}-{rangeEnd}
@@ -49,7 +56,10 @@ export function AprListingPagination({
         >
           Anterior
         </Button>
-        <span className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-xs font-semibold text-[var(--ds-color-text-secondary)]">
+        <span
+          aria-current="page"
+          className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-xs font-semibold text-[var(--ds-color-text-secondary)]"
+        >
           Página {page} de {lastPage}
         </span>
         <Button
@@ -67,6 +77,6 @@ export function AprListingPagination({
       <div className="text-sm text-[var(--ds-color-text-secondary)]">
         {limit} por página
       </div>
-    </div>
+    </nav>
   );
 }

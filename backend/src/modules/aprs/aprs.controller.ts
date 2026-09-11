@@ -23,10 +23,8 @@ import {
 } from '@nestjs/common';
 import { AprFeatureFlag } from './decorators/apr-feature-flag.decorator';
 import { AprMetricsInterceptor } from './interceptors/apr-metrics.interceptor';
-import { AprWorkflowService } from './aprs-workflow.service';
-import { WorkflowReopenDto } from './dto/apr-workflow-config.dto';
 import { AprEvidenceUploadDto } from './dto/apr-evidence-upload.dto';
-import { ApprovalRecordAction } from './entities/apr-approval-record.entity';
+import { AprControlSuggestionsDto } from './dto/apr-control-suggestions.dto';
 import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AprsService } from './aprs.service';
@@ -69,7 +67,6 @@ import {
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { getRequestIp } from '../../shared/utils/request-ip.util';
 
-const LEGACY_TRANSITION_SUNSET = 'Tue, 30 Jun 2026 00:00:00 GMT';
 const APR_LIST_SORT_OPTIONS = [
   'priority',
   'updated-desc',
@@ -103,6 +100,47 @@ const APR_LIST_USER_THROTTLE_LIMIT = parseRateLimit(
   120,
 );
 
+// PDF final (Puppeteer) — rota cara em CPU/memória, compartilha o mesmo
+// Chromium da VPS que hospeda API+Worker+Redis+ClamAV. Teto dedicado evita
+// que um usuário em loop sature o processo de renderização.
+const APR_PDF_USER_THROTTLE_LIMIT = parseRateLimit(
+  process.env.APR_PDF_USER_THROTTLE_LIMIT,
+  5,
+);
+const APR_PDF_TENANT_THROTTLE_LIMIT = parseRateLimit(
+  process.env.APR_PDF_TENANT_THROTTLE_LIMIT,
+  20,
+);
+// Teto horário FIXO via parseRateLimit (NÃO resolveHourlyRateLimit, que
+// derivaria perMinute*60 = 1200/h) — achado da auditoria v2:
+// @TenantThrottle cria um bucket DEDICADO por rota — ele não soma ao bucket
+// global do plano, substitui. Se o teto horário caísse no default derivado,
+// o teto por hora desta rota Puppeteer ficaria mais solto que o orçamento
+// horário global do tenant, na prática afrouxando a proteção que este
+// throttle existe para dar.
+const APR_PDF_TENANT_THROTTLE_HOUR_LIMIT = parseRateLimit(
+  process.env.APR_PDF_TENANT_THROTTLE_HOUR_LIMIT,
+  60,
+);
+
+// Bundle semanal (Puppeteer) — reconstrói o pacote inteiro a cada chamada,
+// sem cache. Teto mais apertado que o do PDF individual.
+const APR_BUNDLE_USER_THROTTLE_LIMIT = parseRateLimit(
+  process.env.APR_BUNDLE_USER_THROTTLE_LIMIT,
+  2,
+);
+const APR_BUNDLE_TENANT_THROTTLE_LIMIT = parseRateLimit(
+  process.env.APR_BUNDLE_TENANT_THROTTLE_LIMIT,
+  6,
+);
+// Teto horário FIXO via parseRateLimit — mesmo motivo do APR_PDF acima
+// (achado da auditoria v2): resolveHourlyRateLimit derivaria 6*60=360/h,
+// bem mais solto que o orçamento horário global do tenant.
+const APR_BUNDLE_TENANT_THROTTLE_HOUR_LIMIT = parseRateLimit(
+  process.env.APR_BUNDLE_TENANT_THROTTLE_HOUR_LIMIT,
+  20,
+);
+
 type AprListSortOption = (typeof APR_LIST_SORT_OPTIONS)[number];
 
 const resolveAprFinalPdfRequestTimeoutMs = (): number => {
@@ -119,26 +157,6 @@ const resolveAprFinalPdfRequestTimeoutMs = (): number => {
   }
   return 180_000;
 };
-
-function buildLegacyTransitionWarning(
-  action: 'approve' | 'reject' | 'finalize',
-): string {
-  return `299 - "POST /aprs/:id/${action} is deprecated; use PATCH /aprs/:id/${action}"`;
-}
-
-const LEGACY_TRANSITION_SUNSET_MS = new Date(
-  LEGACY_TRANSITION_SUNSET,
-).getTime();
-
-function assertLegacyEndpointNotSunset(
-  action: 'approve' | 'reject' | 'finalize',
-): void {
-  if (Date.now() > LEGACY_TRANSITION_SUNSET_MS) {
-    throw new GoneException(
-      `POST /aprs/:id/${action} foi removido em ${LEGACY_TRANSITION_SUNSET}. Use PATCH /aprs/:id/${action}.`,
-    );
-  }
-}
 
 @ApiTags('aprs')
 @ApiBearerAuth('access-token')
@@ -215,7 +233,6 @@ export class AprsController {
     private readonly aprsService: AprsService,
     private readonly pdfRateLimitService: PdfRateLimitService,
     private readonly fileInspectionService: FileInspectionService,
-    private readonly aprWorkflowService: AprWorkflowService,
   ) {}
 
   @Post()
@@ -362,6 +379,11 @@ export class AprsController {
   @Get('files/weekly-bundle')
   @Authorize(APR_PERMISSIONS.VIEW)
   @PdfRequestTimeout()
+  @UserThrottle({ requestsPerMinute: APR_BUNDLE_USER_THROTTLE_LIMIT })
+  @TenantThrottle({
+    requestsPerMinute: APR_BUNDLE_TENANT_THROTTLE_LIMIT,
+    requestsPerHour: APR_BUNDLE_TENANT_THROTTLE_HOUR_LIMIT,
+  })
   async getWeeklyBundle(
     @Query('year') year?: string,
     @Query('week') week?: string,
@@ -378,6 +400,7 @@ export class AprsController {
 
   @Get('export/excel')
   @Authorize(APR_PERMISSIONS.VIEW)
+  @UserThrottle({ requestsPerMinute: 10 })
   @Header(
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -433,6 +456,7 @@ export class AprsController {
   /** Lista todos os tipos de atividade com templates de risco disponíveis */
   @Get('activity-templates')
   @Authorize(APR_PERMISSIONS.VIEW)
+  @HttpCache({ maxAge: 86400, visibility: 'private' })
   listActivityTemplates() {
     return this.aprsService.listActivityTemplates();
   }
@@ -440,28 +464,26 @@ export class AprsController {
   /** Retorna o template de itens de risco para um tipo de atividade */
   @Get('activity-templates/:tipoAtividade')
   @Authorize(APR_PERMISSIONS.VIEW)
+  @HttpCache({ maxAge: 86400, visibility: 'private' })
   getActivityTemplate(@Param('tipoAtividade') tipoAtividade: string) {
     return this.aprsService.getActivityTemplate(tipoAtividade);
   }
 
   @Get('risks/matrix')
   @Authorize(APR_PERMISSIONS.VIEW)
-  getRiskMatrix(@Query('site_id') siteId?: string) {
+  getRiskMatrix(
+    // ParseUUIDPipe (achado da auditoria v2): sem isso, um site_id
+    // arbitrário (ex.: contendo ':') entra sem validação na chave de cache
+    // Redis do getRiskMatrix() e só falha depois, ao virar WHERE ... = :siteId
+    // sobre coluna uuid (erro 22P02 → 500) — defesa acidental, não desenhada.
+    @Query('site_id', new ParseUUIDPipe({ optional: true })) siteId?: string,
+  ) {
     return this.aprsService.getRiskMatrix(siteId || undefined);
   }
 
   @Post('risk-controls/suggestions')
   @Authorize(APR_PERMISSIONS.VIEW)
-  getControlSuggestions(
-    @Body()
-    payload: {
-      probability?: number;
-      severity?: number;
-      exposure?: number;
-      activity?: string;
-      condition?: string;
-    },
-  ) {
+  getControlSuggestions(@Body() payload: AprControlSuggestionsDto) {
     return this.aprsService.getControlSuggestions(payload);
   }
 
@@ -481,6 +503,7 @@ export class AprsController {
 
   @Get(':id/export/excel')
   @Authorize(APR_PERMISSIONS.VIEW)
+  @UserThrottle({ requestsPerMinute: 10 })
   @Header(
     'Content-Type',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -538,64 +561,6 @@ export class AprsController {
       ipAddress: this.getRequestIp(req),
     });
     return toAprResponseDto(apr);
-  }
-
-  @Get(':id/workflow-status')
-  @Authorize(APR_PERMISSIONS.VIEW)
-  async getWorkflowStatus(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Req()
-    req: Request & {
-      user?: {
-        id?: string;
-        userId?: string;
-        sub?: string;
-        profile?: { nome?: string | null };
-      };
-    },
-  ) {
-    const apr = await this.aprsService.findOne(id);
-    return this.aprWorkflowService.getWorkflowStatus(
-      apr,
-      this.getRequestUserId(req) ?? '',
-      this.getRequestRoleName(req),
-    );
-  }
-
-  @Post(':id/reopen')
-  @HttpCode(200)
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
-  @Authorize(APR_PERMISSIONS.UPDATE)
-  @AprFeatureFlag('APR_WORKFLOW_CONFIGURAVEL')
-  async reopenApr(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: WorkflowReopenDto,
-    @Req()
-    req: Request & {
-      user?: {
-        id?: string;
-        userId?: string;
-        sub?: string;
-        profile?: { nome?: string | null };
-        roles?: string[];
-      };
-    },
-  ) {
-    const userId = this.getRequestUserId(req);
-    if (!userId) throw new UnauthorizedException('Usuário não identificado');
-    if (!body.reason?.trim())
-      throw new BadRequestException('Motivo obrigatório para reabrir.');
-    const apr = await this.aprsService.findOne(id);
-    await this.aprWorkflowService.processApproval(
-      apr,
-      userId,
-      this.getRequestRoleSignals(req),
-      ApprovalRecordAction.REABERTO,
-      body.reason,
-    );
-    return this.aprsService
-      .findOne(id)
-      .then((updated) => ({ id: updated.id, status: updated.status }));
   }
 
   /** Retorna URL assinada (S3) ou null do PDF armazenado */
@@ -713,6 +678,11 @@ export class AprsController {
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize(APR_PERMISSIONS.GENERATE_PDF)
   @RequestTimeout(resolveAprFinalPdfRequestTimeoutMs())
+  @UserThrottle({ requestsPerMinute: APR_PDF_USER_THROTTLE_LIMIT })
+  @TenantThrottle({
+    requestsPerMinute: APR_PDF_TENANT_THROTTLE_LIMIT,
+    requestsPerHour: APR_PDF_TENANT_THROTTLE_HOUR_LIMIT,
+  })
   async generateFinalPdf(
     @Param('id', new ParseUUIDPipe()) id: string,
     @Req()
@@ -723,31 +693,7 @@ export class AprsController {
     return this.aprsService.generateFinalPdf(id, this.getRequestUserId(req));
   }
 
-  /**
-   * Aprova a APR — Pendente → Aprovada.
-   * PATCH é a rota canônica; POST permanece apenas como alias compatível,
-   * mas passa exatamente pela mesma trilha forense.
-   */
-  @Post(':id/approve')
-  @HttpCode(200)
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
-  @Authorize(APR_PERMISSIONS.APPROVE)
-  @Header('Deprecation', 'true')
-  @Header('Sunset', LEGACY_TRANSITION_SUNSET)
-  @Header('Warning', buildLegacyTransitionWarning('approve'))
-  @ForensicAuditAction('approve', 'apr')
-  async approveLegacyAlias(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: ApproveAprDto,
-    @Req()
-    req: Request & {
-      user?: { id?: string; userId?: string; sub?: string };
-    },
-  ): Promise<AprResponseDto> {
-    assertLegacyEndpointNotSunset('approve');
-    return this.executeApprove(id, body.reason, req);
-  }
-
+  /** Aprova a APR — Pendente → Aprovada. */
   @Patch(':id/approve')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize(APR_PERMISSIONS.APPROVE)
@@ -763,32 +709,7 @@ export class AprsController {
     return this.executeApprove(id, body.reason, req);
   }
 
-  /** Reprova/Cancela a APR — Pendente → Cancelada */
-  @Post(':id/reject')
-  @HttpCode(200)
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
-  @Authorize(APR_PERMISSIONS.REJECT)
-  @Header('Deprecation', 'true')
-  @Header('Sunset', LEGACY_TRANSITION_SUNSET)
-  @Header('Warning', buildLegacyTransitionWarning('reject'))
-  @ForensicAuditAction('reject', 'apr')
-  async rejectLegacyAlias(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() body: RejectAprDto,
-    @Req()
-    req: Request & {
-      user?: { id?: string; userId?: string; sub?: string };
-    },
-  ): Promise<AprResponseDto> {
-    assertLegacyEndpointNotSunset('reject');
-    return this.executeReject(id, body.reason, req);
-  }
-
-  /**
-   * Reprova/Cancela a APR — Pendente/Aprovada → Cancelada.
-   * PATCH é a rota canônica; POST permanece apenas como alias compatível,
-   * mas passa exatamente pela mesma trilha forense.
-   */
+  /** Reprova/Cancela a APR — Pendente/Aprovada → Cancelada. */
   @Patch(':id/reject')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize(APR_PERMISSIONS.REJECT)
@@ -804,30 +725,7 @@ export class AprsController {
     return this.executeReject(id, body.reason, req);
   }
 
-  /**
-   * Encerra a APR — Aprovada → Encerrada.
-   * PATCH é a rota canônica; POST permanece apenas como alias compatível,
-   * mas passa exatamente pela mesma trilha forense.
-   */
-  @Post(':id/finalize')
-  @HttpCode(200)
-  @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
-  @Authorize(APR_PERMISSIONS.FINALIZE)
-  @Header('Deprecation', 'true')
-  @Header('Sunset', LEGACY_TRANSITION_SUNSET)
-  @Header('Warning', buildLegacyTransitionWarning('finalize'))
-  @ForensicAuditAction('finalize', 'apr')
-  async finalizeLegacyAlias(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Req()
-    req: Request & {
-      user?: { id?: string; userId?: string; sub?: string };
-    },
-  ): Promise<AprResponseDto> {
-    assertLegacyEndpointNotSunset('finalize');
-    return this.executeFinalize(id, req);
-  }
-
+  /** Encerra a APR — Aprovada → Encerrada. */
   @Patch(':id/finalize')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize(APR_PERMISSIONS.FINALIZE)

@@ -33,14 +33,24 @@ Coolify independentes. Deploys devem ser feitos um por vez e só o próximo deve
 ser disparado após o anterior terminar (`finished` ou `failed`). Migrations são
 manuais e não rodam no boot.
 
-## Load test isolado
+## Load test — histórico (VPS dedicada desativada)
 
-O ambiente de carga não usa produção, Neon, B2 de produção, Redis de produção ou
-credenciais de produção.
+**Desde set/2026, a VPS de load-test isolada (`83.229.115.37`, `sgs-loadtest`)
+foi desligada pelo dono do produto (custo).** Não existe mais um ambiente
+separado de produção para testes de carga. Enquanto não houver uma VPS de
+produção dedicada (compra planejada para depois da validação módulo a módulo),
+os testes pesados rodam **direto na VPS de produção atual** (`179.198.107.5`),
+com autorização explícita do dono do produto — hoje sem cliente real
+dependendo do uptime. Ver runbook de execução em `backend/test/load/` e o
+relatório de cada campanha em `docs/auditoria/`.
 
-| Item | Valor operacional |
+A tabela e os detalhes de containers abaixo descrevem o ambiente **desativado**,
+mantidos como referência de arquitetura (guard de ambiente, separação de
+containers) caso uma VPS dedicada volte a existir no futuro:
+
+| Item | Valor operacional (histórico) |
 |---|---|
-| VPS | `83.229.115.37` (`sgs-loadtest`) |
+| VPS | `83.229.115.37` (`sgs-loadtest`) — **desligada** |
 | Usuário SSH | `sgsops` |
 | Chave local | `C:\Users\User\.ssh\sgs-loadtest-vps_ed25519` |
 | Projeto remoto | `/opt/sgs-loadtest` |
@@ -50,7 +60,7 @@ credenciais de produção.
 | Tenant sintético | `00000000-0000-4000-8000-000000000001` |
 | Proteção de borda | `X-Loadtest-Key`, somente via secret local da VPS/Grafana |
 
-Containers esperados:
+Containers que existiam (histórico):
 
 - `postgres-loadtest`
 - `redis-loadtest`
@@ -58,21 +68,22 @@ Containers esperados:
 - `proxy-loadtest`
 - `edge-loadtest`
 
-O guard `infra/load-test/scripts/guard-environment.mjs` deve continuar bloqueando
-produção, Neon, Upstash, B2 e bancos fora de `sgs_loadtest`. Nunca remover esse
-guard para acelerar uma campanha.
+O guard `infra/load-test/scripts/guard-environment.mjs` segue no repositório
+como referência de padrão — não roda mais contra nada, já que a VPS-alvo não
+existe.
 
-### Evidências de carga já concluídas
+### Evidências de carga já concluídas (ambiente antigo, desativado)
 
-Registradas em `docs/auditoria/2026-08-13-loadtest-vs-producao.md`:
+Registradas em `docs/auditoria/2026-08-13-loadtest-vs-producao.md` (marcado
+como histórico):
 
 - spike: 25 VUs por 60 segundos, aprovado;
 - stress: 20 VUs por 3 minutos, aprovado;
 - soak: 5 VUs por 10 minutos, aprovado.
 
 A campanha autenticada Grafana de 10 VUs possui script preparado em
-`tests/load/grafana/03-auth-load-10vus.js`, mas só deve ser considerada concluída
-com Run ID e resumo oficial do Grafana Cloud.
+`tests/load/grafana/03-auth-load-10vus.js`, mas ficou incompleta (sem Run ID
+nem resumo oficial do Grafana Cloud) antes da VPS ser desativada.
 
 ## Local e CI
 

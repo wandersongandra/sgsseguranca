@@ -62,7 +62,8 @@ import { signaturesService } from "@/services/signaturesService";
 import { useFormSubmit } from "@/hooks/useFormSubmit";
 import { siteStore } from "@/lib/siteStore";
 import { AuditSection } from "@/components/AuditSection";
-import { InlineLoadingState } from "@/components/ui/state";
+import { ErrorState, InlineLoadingState } from "@/components/ui/state";
+import { buttonVariants } from "@/components/ui/button";
 import { MobileActionBar } from "@/components/ui/mobile-action-bar";
 import { StatusPill } from "@/components/ui/status-pill";
 import { cn } from "@/lib/utils";
@@ -90,7 +91,6 @@ import {
   createAprDraftMetadata,
 } from "./aprDraftStorage";
 import { trackAprOfflineTelemetry } from "./aprOfflineTelemetry";
-import { AprApprovalPanel } from "./AprApprovalPanel";
 import { AprCompliancePanel } from "./AprCompliancePanel";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import type { AprValidationResult } from "@/services/aprsService";
@@ -1940,7 +1940,7 @@ export function AprForm({ id }: AprFormProps) {
     setFinalizing,
   });
 
-  useAprInitialData({
+  const { loadFailed } = useAprInitialData({
     id,
     user,
     canViewSignatures,
@@ -2631,10 +2631,27 @@ export function AprForm({ id }: AprFormProps) {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
+  // Todos os campos com validação automática do zod (aprForm.schema.ts)
+  // pertencem ao Step 1 — os demais steps só têm validação manual própria
+  // (ex.: itens_risco em nextStep()). Por isso, quando handleSubmit falha
+  // por erro de schema, navegar para o Step 1 sempre acerta o campo. Sem
+  // isso, salvar a partir do Step 2/3 com um campo do Step 1 inválido
+  // falhava em silêncio — o Step 1 fica desmontado, então nenhuma mensagem
+  // de erro aparece e o clique parece não fazer nada (achado da auditoria
+  // v2, exposto pelos 4 campos que M1 tornou obrigatórios).
+  const handleValidationError = useCallback(() => {
+    setCurrentStep(1);
+    setVisitedSteps((vs) => new Set([...vs, 1]));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast.error(
+      "Corrija os campos obrigatórios destacados no Passo 1 antes de salvar.",
+    );
+  }, []);
+
   const handleHeaderSave = useCallback(() => {
     submitIntentRef.current = "save";
-    void handleSubmit(onSubmit)();
-  }, [handleSubmit, onSubmit]);
+    void handleSubmit(onSubmit, handleValidationError)();
+  }, [handleSubmit, handleValidationError, onSubmit]);
 
   const handleHeaderPdfAction = useCallback(() => {
     if (hasFinalPdf) {
@@ -2648,11 +2665,12 @@ export function AprForm({ id }: AprFormProps) {
     }
 
     submitIntentRef.current = "save_and_print";
-    void handleSubmit(onSubmit)();
+    void handleSubmit(onSubmit, handleValidationError)();
   }, [
     handleEmitGovernedPdf,
     handleOpenGovernedPdf,
     handleSubmit,
+    handleValidationError,
     hasFinalPdf,
     isApproved,
     onSubmit,
@@ -2667,6 +2685,23 @@ export function AprForm({ id }: AprFormProps) {
 
     historyElement.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
+
+  if (id && loadFailed) {
+    return (
+      <ErrorState
+        title="Não foi possível carregar esta APR"
+        description="O registro pode ter sido removido ou você não tem mais acesso a ele."
+        action={
+          <Link
+            href="/dashboard/aprs"
+            className={cn(buttonVariants(), "inline-flex items-center")}
+          >
+            Voltar para APRs
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <div
@@ -2843,18 +2878,31 @@ export function AprForm({ id }: AprFormProps) {
         </div>
       )}
 
+      {id && currentApr?.status === "Cancelada" && currentApr.reprovado_motivo && (
+        <div
+          role="alert"
+          className="rounded-lg border border-[var(--ds-color-danger-border)] bg-[color:var(--ds-color-danger-subtle)] px-4 py-3 text-sm text-[var(--color-danger)]"
+        >
+          <p className="font-semibold">
+            APR reprovada
+            {currentApr.reprovado_por?.nome
+              ? ` por ${currentApr.reprovado_por.nome}`
+              : ""}
+            {currentApr.reprovado_em
+              ? ` em ${safeToLocaleString(currentApr.reprovado_em, "pt-BR", undefined, "data indisponível")}`
+              : ""}
+          </p>
+          <p className="mt-1 text-[var(--color-danger)]/90">
+            Motivo: {currentApr.reprovado_motivo}
+          </p>
+        </div>
+      )}
+
       {id && (
         <div id="apr-history" className="sst-card scroll-mt-24 p-4">
           <h2 className={aprSectionTitleClass}>Timeline da APR</h2>
           <AprTimeline logs={aprLogs} loading={loadingTimeline} />
         </div>
-      )}
-
-      {id && approvalProgressStarted && (
-        <AprApprovalPanel
-          aprId={id}
-          onStatusChange={() => reloadAprWorkflowContext(id)}
-        />
       )}
 
       {id && !isReadOnly && (
@@ -2872,8 +2920,14 @@ export function AprForm({ id }: AprFormProps) {
           <h2 className={aprSectionTitleClass}>Comparação entre versões</h2>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
-              <label className={aprLabelCompactClass}>Comparar com</label>
+              <label
+                htmlFor="apr-compare-target"
+                className={aprLabelCompactClass}
+              >
+                Comparar com
+              </label>
               <select
+                id="apr-compare-target"
                 value={compareTargetId}
                 onChange={(e) => setCompareTargetId(e.target.value)}
                 className={aprFieldClass}
@@ -2929,8 +2983,14 @@ export function AprForm({ id }: AprFormProps) {
           </h2>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <label className={aprLabelCompactClass}>Item de risco</label>
+              <label
+                htmlFor="apr-evidence-risk-item"
+                className={aprLabelCompactClass}
+              >
+                Item de risco
+              </label>
               <select
+                id="apr-evidence-risk-item"
                 value={selectedRiskItemEvidence}
                 onChange={(e) => setSelectedRiskItemEvidence(e.target.value)}
                 disabled={isReadOnly}
@@ -3021,6 +3081,16 @@ export function AprForm({ id }: AprFormProps) {
               </button>
             </div>
           </div>
+
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-2 text-xs text-[var(--ds-color-text-secondary)]"
+          >
+            {gpsReady
+              ? `Localização capturada: ${evidenceLatitude}, ${evidenceLongitude} (±${evidenceAccuracy} m)`
+              : "Localização ainda não capturada."}
+          </p>
 
           <div className="mt-3">
             <button
@@ -3302,6 +3372,12 @@ export function AprForm({ id }: AprFormProps) {
                       key={step.id}
                       type="button"
                       aria-current={isActive ? "step" : undefined}
+                      aria-disabled={!canNavigate}
+                      title={
+                        !canNavigate
+                          ? "Complete a etapa atual antes de avançar"
+                          : undefined
+                      }
                       onClick={() => {
                         if (canNavigate) {
                           setCurrentStep(step.id);
@@ -3979,6 +4055,7 @@ export function AprForm({ id }: AprFormProps) {
                     <input
                       id="apr-numero"
                       type="text"
+                      aria-required="true"
                       {...register("numero")}
                       className={cn(
                         aprFieldClass,
@@ -4000,6 +4077,7 @@ export function AprForm({ id }: AprFormProps) {
                     <input
                       id="apr-titulo"
                       type="text"
+                      aria-required="true"
                       {...register("titulo")}
                       className={cn(
                         aprFieldClass,
@@ -4037,6 +4115,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <select
                       id="apr-tipo-atividade"
+                      aria-required="true"
                       {...register("tipo_atividade")}
                       className={cn(
                         aprFieldClass,
@@ -4066,6 +4145,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <select
                       id="apr-turno"
+                      aria-required="true"
                       {...register("turno")}
                       className={cn(
                         aprFieldClass,
@@ -4164,6 +4244,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <textarea
                       id="apr-local-detalhado"
+                      aria-required="true"
                       {...register("local_execucao_detalhado")}
                       rows={2}
                       className={cn(
@@ -4188,6 +4269,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <input
                       id="apr-responsavel-tecnico"
+                      aria-required="true"
                       {...register("responsavel_tecnico_nome")}
                       className={cn(
                         aprFieldClass,
@@ -4281,6 +4363,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <select
                       id="apr-company"
+                      aria-required="true"
                       {...register("company_id")}
                       className={cn(
                         aprFieldClass,
@@ -4327,6 +4410,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <select
                       id="apr-site"
+                      aria-required="true"
                       {...register("site_id")}
                       disabled={!selectedCompanyId}
                       className={cn(
@@ -4359,6 +4443,7 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <select
                       id="apr-elaborador"
+                      aria-required="true"
                       {...register("elaborador_id")}
                       disabled={!selectedCompanyId}
                       className={cn(
@@ -4417,6 +4502,7 @@ export function AprForm({ id }: AprFormProps) {
                     <input
                       id="apr-data-inicio"
                       type="date"
+                      aria-required="true"
                       {...register("data_inicio")}
                       className={cn(
                         aprFieldClass,
@@ -4437,6 +4523,7 @@ export function AprForm({ id }: AprFormProps) {
                     <input
                       id="apr-data-fim"
                       type="date"
+                      aria-required="true"
                       {...register("data_fim")}
                       min={dataInicioApr || undefined}
                       className={cn(
@@ -5386,7 +5473,7 @@ export function AprForm({ id }: AprFormProps) {
                       type="button"
                       onClick={() => {
                         submitIntentRef.current = "save_and_print";
-                        void handleSubmit(onSubmit)();
+                        void handleSubmit(onSubmit, handleValidationError)();
                       }}
                       disabled={
                         !canWriteApr ||
