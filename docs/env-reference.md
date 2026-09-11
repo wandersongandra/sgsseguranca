@@ -106,6 +106,27 @@
 
 ---
 
+## APR (Análise Preliminar de Risco)
+
+| Variável | Default | Descrição |
+|----------|---------|-----------|
+| `APR_CREATE_USER_THROTTLE_LIMIT` | `20` | /min por usuário — `POST /aprs` |
+| `APR_CREATE_TENANT_THROTTLE_LIMIT` | `60` | /min por tenant — `POST /aprs` |
+| `APR_CREATE_TENANT_THROTTLE_HOUR_LIMIT` | derivado | /hora por tenant — `POST /aprs` |
+| `APR_LIST_USER_THROTTLE_LIMIT` | `120` | /min por usuário — `GET /aprs` |
+| `APR_LIST_TENANT_THROTTLE_LIMIT` | `240` | /min por tenant — `GET /aprs` |
+| `APR_LIST_TENANT_THROTTLE_HOUR_LIMIT` | derivado | /hora por tenant — `GET /aprs` |
+| `APR_PDF_USER_THROTTLE_LIMIT` | `5` | /min por usuário — `POST /aprs/:id/generate-final-pdf` (Puppeteer) |
+| `APR_PDF_TENANT_THROTTLE_LIMIT` | `20` | /min por tenant — idem |
+| `APR_PDF_TENANT_THROTTLE_HOUR_LIMIT` | derivado | /hora por tenant — idem |
+| `APR_BUNDLE_USER_THROTTLE_LIMIT` | `2` | /min por usuário — `GET /aprs/files/weekly-bundle` (Puppeteer, sem cache) |
+| `APR_BUNDLE_TENANT_THROTTLE_LIMIT` | `6` | /min por tenant — idem |
+| `APR_BUNDLE_TENANT_THROTTLE_HOUR_LIMIT` | derivado | /hora por tenant — idem |
+| `APR_OVERVIEW_CACHE_TTL_SECONDS` | `30` | TTL do cache (Redis) de `analytics/overview` e `risks/matrix`. Clamp entre 10 e 300s |
+| `APR_METRICS_RETENTION_DAYS` | `90` | Retenção de `apr_metrics` (observabilidade operacional — 1 linha por `GET /aprs/:id` + eventos de mutação). Limpeza diária às 04:15 no worker |
+
+---
+
 ## CSRF
 
 | Variável | Obrigatório | Default |

@@ -1,5 +1,12 @@
 # Auditoria loadtest versus produção — 2026-08-13
 
+> **HISTÓRICO — infraestrutura desativada.** A VPS de load-test isolada
+> (`83.229.115.37`, `sgs-loadtest`) descrita neste documento foi desligada
+> pelo dono do produto em set/2026 (custo). Os números abaixo continuam
+> válidos como evidência do que já foi validado naquele ambiente, mas não
+> descrevem infraestrutura ativa. Testes de carga atuais rodam direto na VPS
+> de produção (`179.198.107.5`) — ver `docs/deploy/INFRAESTRUTURA-ATUAL.md`.
+
 ## Resultado executivo
 
 O timeout observado na campanha anterior foi reproduzido no caminho público do
