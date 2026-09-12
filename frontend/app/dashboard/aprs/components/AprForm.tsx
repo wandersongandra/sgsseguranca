@@ -2233,6 +2233,7 @@ export function AprForm({ id }: AprFormProps) {
     setMachines,
     setSites,
     setUsers,
+    setCompanies,
   });
 
   useEffect(() => {

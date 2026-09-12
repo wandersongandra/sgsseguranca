@@ -18,6 +18,7 @@ import {
 } from "@/services/machinesService";
 import { sitesService, type Site } from "@/services/sitesService";
 import { usersService, type User } from "@/services/usersService";
+import { companiesService, type Company } from "@/services/companiesService";
 
 import type { AprFormData } from "../components/aprForm.schema";
 import { dedupeById, isUuidLike } from "../components/aprFormUtils";
@@ -41,6 +42,7 @@ interface UseAprCatalogsOptions {
   setMachines: Dispatch<SetStateAction<Machine[]>>;
   setSites: Dispatch<SetStateAction<Site[]>>;
   setUsers: Dispatch<SetStateAction<User[]>>;
+  setCompanies: Dispatch<SetStateAction<Company[]>>;
 }
 
 function mergeTenantCatalog<T extends { id: string; company_id: string }>(
@@ -77,7 +79,40 @@ export function useAprCatalogs({
   setMachines,
   setSites,
   setUsers,
+  setCompanies,
 }: UseAprCatalogsOptions) {
+  // Achado real (auditoria): o estado `companies` no AprForm nunca era
+  // populado em lugar nenhum do fluxo — o <select> "Empresa" ficava com
+  // apenas o placeholder. Como um <select> nativo não consegue refletir um
+  // valor via setValue() sem uma <option> correspondente, isso travava
+  // silenciosamente o formulário no passo 1 para QUALQUER usuário (não só
+  // fora do admin_geral): company_id ficava permanentemente vazio no DOM,
+  // mesmo com o fallback de sessionStore/user.company_id funcionando.
+  // companiesService.findAll() já trata corretamente usuário comum
+  // (sintetiza a própria empresa a partir da sessão) vs admin_geral (lista
+  // completa) — só faltava ser chamado aqui.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadCompanies() {
+      try {
+        const result = await companiesService.findAll();
+        if (cancelled) return;
+        setCompanies(result);
+      } catch (error) {
+        if (cancelled) return;
+        logger.error("Erro ao carregar empresas para a APR:", error);
+        toast.error("Não foi possível carregar a lista de empresas.");
+      }
+    }
+
+    void loadCompanies();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [setCompanies]);
+
   useEffect(() => {
     let cancelled = false;
 
