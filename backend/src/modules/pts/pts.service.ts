@@ -1,6 +1,7 @@
 ﻿import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   Logger,
@@ -15,6 +16,7 @@ import {
   In,
   IsNull,
   LessThan,
+  MoreThan,
   QueryFailedError,
   Repository,
 } from 'typeorm';
@@ -41,6 +43,7 @@ import { User } from '../users/entities/user.entity';
 import { Company } from '../companies/entities/company.entity';
 import { Site } from '../sites/entities/site.entity';
 import { Apr } from '../aprs/entities/apr.entity';
+import { Signature } from '../signatures/entities/signature.entity';
 import { RiskCalculationService } from '../../shared/services/risk-calculation.service';
 import { AuditService } from '../audit-trail/audit.service';
 import { AuditAction } from '../audit-trail/enums/audit-action.enum';
@@ -48,6 +51,8 @@ import { AuditLog } from '../audit-trail/entities/audit-log.entity';
 import { RequestContext } from '../../shared/middleware/request-context.middleware';
 import { WorkerOperationalStatusService } from '../users/worker-operational-status.service';
 import { UpdatePtApprovalRulesDto } from './dto/update-pt-approval-rules.dto';
+import { ReplacePtSignaturesDto } from './dto/replace-pt-signatures.dto';
+import { CreatePtSignatureDto } from './dto/create-pt-signature.dto';
 import {
   normalizeOffsetPagination,
   OffsetPage,
@@ -62,6 +67,7 @@ import {
 import { WeeklyBundleFilters } from '../../shared/services/document-bundle.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
+import type { StorageObjectReference } from '../../shared/storage/storage-object-reference';
 import { SignaturesService } from '../signatures/signatures.service';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
 import { ForensicTrailService } from '../forensic-trail/forensic-trail.service';
@@ -104,6 +110,8 @@ const isStringArray = (value: unknown): value is string[] =>
 // devolvemos um 409 amigável em vez do erro cru do Postgres (500).
 const POSTGRES_LOCK_NOT_AVAILABLE_CODE = '55P03';
 const PT_ROW_LOCK_RETRY_DELAYS_MS = [50, 100, 200] as const;
+const PT_ALLOWED_ID_BATCH_SIZE = 1000;
+const PT_EXPORT_PAGE_SIZE = 5000;
 
 const PT_FINAL_PDF_ALLOWED_STATUSES = new Set<PtStatus>([
   PtStatus.APROVADA,
@@ -485,12 +493,13 @@ export class PtsService {
     companyId: string,
     id: string | null | undefined,
     label: string,
+    manager?: EntityManager,
   ): Promise<void> {
     if (!id) {
       return;
     }
 
-    const exists = await this.ptsRepository.manager
+    const exists = await (manager ?? this.ptsRepository.manager)
       .getRepository(entity)
       .exist({
         where: { id, company_id: companyId } as never,
@@ -503,6 +512,29 @@ export class PtsService {
     }
   }
 
+  private async assertAprScopedToSite(
+    companyId: string,
+    siteId: string | null | undefined,
+    aprId: string | null | undefined,
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (!siteId || !aprId) {
+      return;
+    }
+
+    const exists = await (manager ?? this.ptsRepository.manager)
+      .getRepository(Apr)
+      .exist({
+        where: { id: aprId, company_id: companyId, site_id: siteId },
+      });
+
+    if (!exists) {
+      throw new BadRequestException(
+        'APR vinculada inválida para a obra/setor selecionada.',
+      );
+    }
+  }
+
   private async assertCompanyScopedEntityIds<
     T extends { id: string; company_id: string },
   >(
@@ -510,6 +542,7 @@ export class PtsService {
     companyId: string,
     ids: string[] | undefined,
     label: string,
+    manager?: EntityManager,
   ): Promise<void> {
     const uniqueIds = Array.from(
       new Set(
@@ -523,9 +556,11 @@ export class PtsService {
       return;
     }
 
-    const count = await this.ptsRepository.manager.getRepository(entity).count({
-      where: { id: In(uniqueIds), company_id: companyId } as never,
-    });
+    const count = await (manager ?? this.ptsRepository.manager)
+      .getRepository(entity)
+      .count({
+        where: { id: In(uniqueIds), company_id: companyId } as never,
+      });
 
     if (count !== uniqueIds.length) {
       throw new BadRequestException(
@@ -539,6 +574,7 @@ export class PtsService {
     siteId: string | null | undefined,
     ids: Array<string | null | undefined>,
     label: string,
+    manager?: EntityManager,
   ): Promise<void> {
     if (!siteId) {
       return;
@@ -553,20 +589,22 @@ export class PtsService {
       return;
     }
 
-    const count = await this.ptsRepository.manager.getRepository(User).count({
-      where: [
-        {
-          id: In(uniqueIds),
-          company_id: companyId,
-          site_id: siteId,
-        },
-        {
-          id: In(uniqueIds),
-          company_id: companyId,
-          site_id: IsNull(),
-        },
-      ] as never,
-    });
+    const count = await (manager ?? this.ptsRepository.manager)
+      .getRepository(User)
+      .count({
+        where: [
+          {
+            id: In(uniqueIds),
+            company_id: companyId,
+            site_id: siteId,
+          },
+          {
+            id: In(uniqueIds),
+            company_id: companyId,
+            site_id: IsNull(),
+          },
+        ] as never,
+      });
 
     if (count !== uniqueIds.length) {
       throw new BadRequestException(
@@ -575,45 +613,53 @@ export class PtsService {
     }
   }
 
-  private async validateRelatedEntityScope(input: {
-    companyId: string;
-    siteId?: string | null;
-    aprId?: string | null;
-    responsavelId?: string | null;
-    auditadoPorId?: string | null;
-    executantes?: string[];
-    vigiaUserId?: string | null;
-  }): Promise<void> {
+  private async validateRelatedEntityScope(
+    input: {
+      companyId: string;
+      siteId?: string | null;
+      aprId?: string | null;
+      responsavelId?: string | null;
+      auditadoPorId?: string | null;
+      executantes?: string[];
+      vigiaUserId?: string | null;
+    },
+    manager?: EntityManager,
+  ): Promise<void> {
     await Promise.all([
       this.assertCompanyScopedEntityId(
         Site,
         input.companyId,
         input.siteId,
         'Site',
+        manager,
       ),
       this.assertCompanyScopedEntityId(
         Apr,
         input.companyId,
         input.aprId,
         'APR vinculada',
+        manager,
       ),
       this.assertCompanyScopedEntityId(
         User,
         input.companyId,
         input.responsavelId,
         'Responsável',
+        manager,
       ),
       this.assertCompanyScopedEntityId(
         User,
         input.companyId,
         input.auditadoPorId,
         'Auditado por',
+        manager,
       ),
       this.assertCompanyScopedEntityIds(
         User,
         input.companyId,
         input.executantes,
         'Executantes',
+        manager,
       ),
       // Valida vigia designado contra o tenant — impede cross-tenant (SGS-PT-SEC-007).
       this.assertCompanyScopedEntityId(
@@ -621,14 +667,28 @@ export class PtsService {
         input.companyId,
         input.vigiaUserId,
         'Vigia designado',
+        manager,
       ),
     ]);
+
+    await this.assertAprScopedToSite(
+      input.companyId,
+      input.siteId,
+      input.aprId,
+      manager,
+    );
 
     await this.assertUsersScopedToSite(
       input.companyId,
       input.siteId,
-      [input.responsavelId, input.auditadoPorId, ...(input.executantes ?? [])],
+      [
+        input.responsavelId,
+        input.auditadoPorId,
+        ...(input.executantes ?? []),
+        input.vigiaUserId,
+      ],
       'Usuários da PT',
+      manager,
     );
   }
 
@@ -699,21 +759,41 @@ export class PtsService {
       return null;
     }
 
-    // Teto de segurança: lista de IDs permitidos usada só como allow-list em
-    // memória para filtrar documentos (document_registry não tem site_id).
-    // Não deveria ser atingido na prática — mesma técnica de
-    // ProfilesService.findAll / findAllForExport.
-    const scopedPts = await this.ptsRepository.find({
-      select: ['id'],
-      where: {
-        company_id: companyId,
-        site_id: In(siteIds),
-        deleted_at: IsNull(),
-      },
-      take: 50000,
-    });
+    // document_registry não possui site_id. Paginar a allow-list evita que
+    // documentos autorizados desapareçam quando a empresa ultrapassa um
+    // limite arbitrário de IDs carregados em memória.
+    const allowedIds = new Set<string>();
+    let lastId: string | undefined;
 
-    return new Set(scopedPts.map((pt) => pt.id));
+    while (true) {
+      const scopedPts = await this.ptsRepository.find({
+        select: ['id'],
+        where: {
+          company_id: companyId,
+          site_id: In(siteIds),
+          deleted_at: IsNull(),
+          ...(lastId ? { id: MoreThan(lastId) } : {}),
+        },
+        order: { id: 'ASC' },
+        take: PT_ALLOWED_ID_BATCH_SIZE,
+      });
+
+      for (const pt of scopedPts) {
+        allowedIds.add(pt.id);
+      }
+
+      if (scopedPts.length < PT_ALLOWED_ID_BATCH_SIZE) {
+        break;
+      }
+
+      const nextLastId = scopedPts[scopedPts.length - 1]?.id;
+      if (!nextLastId || nextLastId === lastId) {
+        break;
+      }
+      lastId = nextLastId;
+    }
+
+    return allowedIds;
   }
 
   async create(createPtDto: CreatePtDto): Promise<Pt> {
@@ -727,10 +807,8 @@ export class PtsService {
         'A data/hora de término deve ser posterior à data/hora de início.',
       );
     }
-    const { companyId, siteId, siteIds, siteScope, isSuperAdmin } =
+    const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    const effectiveSiteId =
-      !isSuperAdmin && siteScope !== 'all' ? siteId : createPtDto.site_id;
 
     if (
       !isSuperAdmin &&
@@ -741,6 +819,10 @@ export class PtsService {
         'PT deve ser criada na obra atual do tenant.',
       );
     }
+
+    // A allow-list acima autoriza qualquer obra atribuída ao usuário; não
+    // substitua a obra selecionada pela primeira obra do contexto.
+    const effectiveSiteId = createPtDto.site_id;
 
     await this.validateRelatedEntityScope({
       companyId,
@@ -862,7 +944,8 @@ export class PtsService {
   }
 
   // Carrega todos os registros para uso interno (exportações, relatórios).
-  // Sem relações; apenas campos essenciais; take: 5000 como teto de segurança.
+  // Sem relações e em páginas keyset para não truncar o resultado nem usar
+  // offsets crescentes em empresas com grande volume histórico.
   async findAllForExport(): Promise<Pt[]> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
@@ -872,30 +955,61 @@ export class PtsService {
         error: err instanceof Error ? err.message : String(err),
       }),
     );
-    const qb = this.ptsRepository
-      .createQueryBuilder('pt')
-      .select([
-        'pt.id',
-        'pt.numero',
-        'pt.titulo',
-        'pt.status',
-        'pt.data_hora_inicio',
-        'pt.data_hora_fim',
-        'pt.company_id',
-        'pt.created_at',
-      ])
-      .where('pt.deleted_at IS NULL')
-      .orderBy('pt.created_at', 'DESC')
-      .take(5000);
+    const exported: Pt[] = [];
+    let cursorCreatedAt: Date | undefined;
+    let cursorId: string | undefined;
 
-    if (companyId) {
-      qb.andWhere('pt.company_id = :companyId', { companyId });
-    }
-    if (!isSuperAdmin && siteScope !== 'all') {
-      qb.andWhere('pt.site_id IN (:...siteIds)', { siteIds });
+    while (true) {
+      const qb = this.ptsRepository
+        .createQueryBuilder('pt')
+        .select([
+          'pt.id',
+          'pt.numero',
+          'pt.titulo',
+          'pt.status',
+          'pt.data_hora_inicio',
+          'pt.data_hora_fim',
+          'pt.company_id',
+          'pt.created_at',
+        ])
+        .where('pt.deleted_at IS NULL')
+        .orderBy('pt.created_at', 'DESC')
+        .addOrderBy('pt.id', 'DESC')
+        .take(PT_EXPORT_PAGE_SIZE);
+
+      if (companyId) {
+        qb.andWhere('pt.company_id = :companyId', { companyId });
+      }
+      if (!isSuperAdmin && siteScope !== 'all') {
+        qb.andWhere('pt.site_id IN (:...siteIds)', { siteIds });
+      }
+      if (cursorCreatedAt && cursorId) {
+        qb.andWhere(
+          '(pt.created_at < :exportCursorCreatedAt OR (pt.created_at = :exportCursorCreatedAt AND pt.id < :exportCursorId))',
+          {
+            exportCursorCreatedAt: cursorCreatedAt,
+            exportCursorId: cursorId,
+          },
+        );
+      }
+
+      const page = await qb.getMany();
+      exported.push(...page);
+      if (page.length < PT_EXPORT_PAGE_SIZE) {
+        break;
+      }
+
+      const last = page[page.length - 1];
+      if (!last?.created_at || !last.id) {
+        throw new Error(
+          'Exportação de PT interrompida: cursor de paginação ausente.',
+        );
+      }
+      cursorCreatedAt = last.created_at;
+      cursorId = last.id;
     }
 
-    return qb.getMany();
+    return exported;
   }
 
   async findPaginated(opts?: {
@@ -1076,89 +1190,116 @@ export class PtsService {
   }
 
   async update(id: string, updatePtDto: UpdatePtDto): Promise<Pt> {
-    const pt = await this.findOne(id);
-    this.assertPtEditableStatus(pt.status);
-    this.assertPtDocumentMutable(pt);
-    const { executantes, status, ...rest } = updatePtDto;
-    this.preservePersistedChecklistAnexoRefs(pt, rest);
+    let before: Pt | null = null;
+    const saved = await this.executePtWorkflowTransition(
+      id,
+      async (lockedRow, manager) => {
+        const pt = await manager.getRepository(Pt).findOne({
+          where: { id, company_id: lockedRow.company_id },
+          relations: [
+            'site',
+            'apr',
+            'responsavel',
+            'executantes',
+            'auditado_por',
+            'vigia',
+            'encerrado_por',
+          ],
+        });
+        if (!pt) {
+          throw new NotFoundException(`PT com ID ${id} não encontrada`);
+        }
 
-    // SGS-PT-SEC-004: mirror the site-scope guard from create() — the RLS
-    // WITH CHECK would also reject the write, but as a 500 (Postgres error)
-    // instead of the expected 400 with an actionable message.
-    if (rest.site_id !== undefined && rest.site_id !== pt.site_id) {
-      const { siteIds, siteScope, isSuperAdmin } =
-        this.getTenantContextOrThrow();
-      if (
-        !isSuperAdmin &&
-        siteScope !== 'all' &&
-        !siteIds.includes(rest.site_id)
-      ) {
-        throw new BadRequestException(
-          'PT deve permanecer na obra atual do tenant. A obra só pode ser alterada por um administrador com acesso global.',
+        this.assertPtEditableStatus(pt.status);
+        this.assertPtDocumentMutable(pt);
+        const { executantes, status, ...rest } = updatePtDto;
+        this.preservePersistedChecklistAnexoRefs(pt, rest);
+
+        // SGS-PT-SEC-004: mirror the site-scope guard from create() — the RLS
+        // WITH CHECK would also reject the write, but as a 500 (Postgres error)
+        // instead of the expected 400 with an actionable message.
+        if (rest.site_id !== undefined && rest.site_id !== pt.site_id) {
+          const { siteIds, siteScope, isSuperAdmin } =
+            this.getTenantContextOrThrow();
+          if (
+            !isSuperAdmin &&
+            siteScope !== 'all' &&
+            !siteIds.includes(rest.site_id)
+          ) {
+            throw new BadRequestException(
+              'PT deve permanecer na obra atual do tenant. A obra só pode ser alterada por um administrador com acesso global.',
+            );
+          }
+        }
+
+        const effectiveInicio = rest.data_hora_inicio ?? pt.data_hora_inicio;
+        const effectiveFim = rest.data_hora_fim ?? pt.data_hora_fim;
+        if (
+          effectiveFim &&
+          effectiveInicio &&
+          new Date(effectiveFim) <= new Date(effectiveInicio)
+        ) {
+          throw new BadRequestException(
+            'A data/hora de término deve ser posterior à data/hora de início.',
+          );
+        }
+        before = { ...pt };
+
+        await this.validateRelatedEntityScope(
+          {
+            companyId: pt.company_id,
+            siteId: rest.site_id ?? pt.site_id,
+            aprId: rest.apr_id !== undefined ? rest.apr_id : pt.apr_id,
+            responsavelId: rest.responsavel_id ?? pt.responsavel_id,
+            auditadoPorId:
+              rest.auditado_por_id !== undefined
+                ? rest.auditado_por_id
+                : pt.auditado_por_id,
+            executantes:
+              executantes ??
+              (Array.isArray(pt.executantes)
+                ? pt.executantes.map((executante) => executante.id)
+                : []),
+            vigiaUserId:
+              rest.vigia_user_id !== undefined
+                ? rest.vigia_user_id
+                : pt.vigia_user_id,
+          },
+          manager,
         );
-      }
-    }
 
-    const effectiveInicio = rest.data_hora_inicio ?? pt.data_hora_inicio;
-    const effectiveFim = rest.data_hora_fim ?? pt.data_hora_fim;
-    if (
-      effectiveFim &&
-      effectiveInicio &&
-      new Date(effectiveFim) <= new Date(effectiveInicio)
-    ) {
-      throw new BadRequestException(
-        'A data/hora de término deve ser posterior à data/hora de início.',
-      );
-    }
-    const before = { ...pt };
+        const initialRisk = this.riskCalculationService.calculateScore(
+          rest.probability ?? pt.probability,
+          rest.severity ?? pt.severity,
+          rest.exposure ?? pt.exposure,
+        );
+        const residualRisk =
+          rest.residual_risk ||
+          this.riskCalculationService.classifyByScore(initialRisk) ||
+          pt.residual_risk ||
+          null;
 
-    await this.validateRelatedEntityScope({
-      companyId: pt.company_id,
-      siteId: rest.site_id ?? pt.site_id,
-      aprId: rest.apr_id !== undefined ? rest.apr_id : pt.apr_id,
-      responsavelId: rest.responsavel_id ?? pt.responsavel_id,
-      auditadoPorId:
-        rest.auditado_por_id !== undefined
-          ? rest.auditado_por_id
-          : pt.auditado_por_id,
-      executantes:
-        executantes ??
-        (Array.isArray(pt.executantes)
-          ? pt.executantes.map((executante) => executante.id)
-          : []),
-      vigiaUserId:
-        rest.vigia_user_id !== undefined
-          ? rest.vigia_user_id
-          : pt.vigia_user_id,
-    });
+        Object.assign(pt, {
+          ...rest,
+          status: this.resolveStatusForGenericUpdate(pt.status, status),
+          initial_risk: initialRisk,
+          residual_risk: residualRisk,
+          control_evidence:
+            rest.control_evidence !== undefined
+              ? Boolean(rest.control_evidence)
+              : Boolean(pt.control_evidence),
+        });
 
-    const initialRisk = this.riskCalculationService.calculateScore(
-      rest.probability ?? pt.probability,
-      rest.severity ?? pt.severity,
-      rest.exposure ?? pt.exposure,
+        if (executantes) {
+          pt.executantes = executantes.map(
+            (userId) => ({ id: userId }) as unknown as User,
+          );
+        }
+
+        const savedPt = await manager.getRepository(Pt).save(pt);
+        return savedPt;
+      },
     );
-    const residualRisk =
-      rest.residual_risk ||
-      this.riskCalculationService.classifyByScore(initialRisk) ||
-      pt.residual_risk ||
-      null;
-
-    Object.assign(pt, {
-      ...rest,
-      status: this.resolveStatusForGenericUpdate(pt.status, status),
-      initial_risk: initialRisk,
-      residual_risk: residualRisk,
-      control_evidence:
-        rest.control_evidence !== undefined
-          ? Boolean(rest.control_evidence)
-          : Boolean(pt.control_evidence),
-    });
-
-    if (executantes) {
-      pt.executantes = executantes.map((id) => ({ id }) as unknown as User);
-    }
-
-    const saved = await this.ptsRepository.save(pt);
     await this.logAudit({
       action: AuditAction.UPDATE,
       entityId: saved.id,
@@ -1193,51 +1334,67 @@ export class PtsService {
       file.originalname,
       { folderSegments: ['sites', pt.site_id] },
     );
-    const uploadedReference =
-      await this.documentStorageService.uploadFileWithCapability(
-        this.documentStorageService.referenceForExistingObject(
-          key,
-          { resourceType: 'pt', resourceId: pt.id },
-          'p1-document-storage-uploadFile',
-        ),
-        file.buffer,
-        file.mimetype,
-      );
-    const uploadedToStorage = true;
-
     const folder = key.split('/').slice(0, -1).join('/');
+    const createdBy = userId || RequestContext.getUserId() || undefined;
+    let uploadedReference: StorageObjectReference | undefined;
     try {
-      await this.documentGovernanceService.registerFinalDocument({
-        companyId: pt.company_id,
-        module: 'pt',
-        entityId: pt.id,
-        title: pt.titulo || pt.numero || 'PT',
-        documentDate: pt.data_hora_inicio || pt.created_at,
-        documentCode: this.buildPtDocumentCode(pt),
-        fileKey: key,
-        folderPath: folder,
-        originalName: file.originalname,
-        mimeType: file.mimetype,
-        createdBy: userId || RequestContext.getUserId() || undefined,
-        fileBuffer: file.buffer,
-        persistEntityMetadata: async (manager, hash) => {
-          await this.persistFinalPdfMetadata(
-            manager,
-            pt,
-            {
-              key,
-              folderPath: folder,
-              originalName: file.originalname,
-            },
-            hash,
+      await this.executePtWorkflowTransition(id, async (lockedPt, manager) => {
+        this.assertPtReadyForFinalPdf(lockedPt);
+        if (
+          lockedPt.company_id !== pt.company_id ||
+          lockedPt.site_id !== pt.site_id
+        ) {
+          throw new ConflictException(
+            'A obra da PT mudou durante o anexo do PDF. Tente novamente.',
           );
-        },
+        }
+
+        uploadedReference =
+          await this.documentStorageService.uploadFileWithCapability(
+            this.documentStorageService.referenceForExistingObject(
+              key,
+              { resourceType: 'pt', resourceId: lockedPt.id },
+              'p1-document-storage-uploadFile',
+            ),
+            file.buffer,
+            file.mimetype,
+          );
+
+        await this.documentGovernanceService.registerFinalDocument({
+          companyId: lockedPt.company_id,
+          module: 'pt',
+          entityId: lockedPt.id,
+          title: lockedPt.titulo || lockedPt.numero || 'PT',
+          documentDate: lockedPt.data_hora_inicio || lockedPt.created_at,
+          documentCode: this.buildPtDocumentCode(lockedPt),
+          fileKey: key,
+          folderPath: folder,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          createdBy,
+          fileBuffer: file.buffer,
+          transactionManager: manager,
+          persistEntityMetadata: async (metadataManager, hash) => {
+            await this.persistFinalPdfMetadata(
+              metadataManager,
+              lockedPt,
+              {
+                key,
+                folderPath: folder,
+                originalName: file.originalname,
+              },
+              hash,
+            );
+          },
+        });
+        return lockedPt;
       });
     } catch (error) {
-      if (uploadedToStorage) {
+      const reference = uploadedReference;
+      if (reference) {
         await cleanupUploadedFile(this.logger, `pt:${pt.id}`, key, (fileKey) =>
-          uploadedReference.key === fileKey
-            ? this.documentStorageService.deleteFile(uploadedReference)
+          reference.key === fileKey
+            ? this.documentStorageService.deleteFile(reference)
             : Promise.resolve(),
         );
       }
@@ -1386,7 +1543,18 @@ export class PtsService {
             throw new NotFoundException(`PT com ID ${id} não encontrada`);
           }
 
-          const pt = manager.getRepository(Pt).create(rows[0]);
+          const pt = manager.getRepository(Pt).create({ ...rows[0] });
+          const executanteRows: unknown = await manager.query(
+            'SELECT "user_id" FROM "pt_executantes" WHERE "pt_id" = $1',
+            [pt.id],
+          );
+          pt.executantes = Array.isArray(executanteRows)
+            ? executanteRows.flatMap((row: unknown) =>
+                isRecord(row) && typeof row.user_id === 'string'
+                  ? [{ id: row.user_id } as User]
+                  : [],
+              )
+            : [];
           return fn(pt, manager);
         });
       } catch (error: unknown) {
@@ -1428,10 +1596,11 @@ export class PtsService {
     approvedByUserId: string,
     reason?: string,
   ): Promise<Pt> {
-    const before = await this.findOne(id);
+    let before: Pt | null = null;
     const saved = await this.executePtWorkflowTransition(
       id,
       async (pt, manager) => {
+        before = { ...pt };
         this.assertPtDocumentMutable(pt);
         const allowed = PT_ALLOWED_TRANSITIONS[pt.status as PtStatus];
         if (!allowed?.includes(PtStatus.APROVADA)) {
@@ -1448,7 +1617,7 @@ export class PtsService {
             'PT com janela de validade encerrada não pode ser aprovada. Emita uma nova PT.',
           );
         }
-        await this.assertCanApprove(pt, pt.company_id);
+        await this.assertCanApprove(pt, pt.company_id, manager);
         pt.status = PtStatus.APROVADA;
         pt.aprovado_por_id = approvedByUserId;
         pt.aprovado_em = new Date();
@@ -1480,10 +1649,11 @@ export class PtsService {
     rejectedByUserId: string,
     reason: string,
   ): Promise<Pt> {
-    const before = await this.findOne(id);
+    let before: Pt | null = null;
     const saved = await this.executePtWorkflowTransition(
       id,
       async (pt, manager) => {
+        before = { ...pt };
         this.assertPtDocumentMutable(pt);
         const allowed = PT_ALLOWED_TRANSITIONS[pt.status as PtStatus];
         if (!allowed?.includes(PtStatus.CANCELADA)) {
@@ -1536,10 +1706,11 @@ export class PtsService {
     finalizedByUserId: string,
     closure: FinalizePtDto,
   ): Promise<Pt> {
-    const before = await this.findOne(id);
+    let before: Pt | null = null;
     const saved = await this.executePtWorkflowTransition(
       id,
       async (pt, manager) => {
+        before = { ...pt };
         const allowed = PT_ALLOWED_TRANSITIONS[pt.status as PtStatus];
         if (!allowed?.includes(PtStatus.ENCERRADA)) {
           throw new BadRequestException(
@@ -1602,52 +1773,57 @@ export class PtsService {
     legenda?: string;
     photo: { originalName: string; mimeType: string };
   }> {
-    const pt = await this.findOne(id);
-    this.assertPtEvidenceMutable(pt);
-
-    const fileKey = this.documentStorageService.generateDocumentKey(
-      pt.company_id,
-      'pt-photos',
-      pt.id,
-      originalName,
-      { folderSegments: ['sites', pt.site_id] },
-    );
-    const uploadedReference =
-      await this.documentStorageService.uploadFileWithCapability(
-        this.documentStorageService.referenceForExistingObject(
-          fileKey,
-          { resourceType: 'pt-photo', resourceId: pt.id },
-          'p1-document-storage-uploadFile',
-        ),
-        buffer,
-        mimeType,
-      );
-
-    const photoReference = this.buildGovernedPtFileReference({
-      v: 1,
-      kind: 'governed-storage',
-      scope: 'evidence',
-      fileKey,
-      originalName,
-      mimeType,
-      uploadedAt: new Date().toISOString(),
-      sizeBytes: buffer.byteLength,
-    });
-
-    const photo: PtEvidencePhoto = {
-      ref: photoReference,
-      legenda: meta.legenda?.trim() || undefined,
-      fase: meta.fase,
-      uploaded_by_id: userId || RequestContext.getUserId() || undefined,
-      uploaded_at: new Date().toISOString(),
-    };
-
+    let fileKey = '';
+    let uploadedReference: StorageObjectReference | undefined;
+    let photoReference = '';
+    let photo: PtEvidencePhoto | undefined;
     let saved: Pt;
     try {
       saved = await this.executePtWorkflowTransition(
         id,
         async (lockedPt, manager) => {
           this.assertPtEvidenceMutable(lockedPt);
+          if (!lockedPt.site_id) {
+            throw new BadRequestException(
+              'PT sem obra/setor vinculado não pode receber evidência fotográfica.',
+            );
+          }
+
+          fileKey = this.documentStorageService.generateDocumentKey(
+            lockedPt.company_id,
+            'pt-photos',
+            lockedPt.id,
+            originalName,
+            { folderSegments: ['sites', lockedPt.site_id] },
+          );
+          uploadedReference =
+            await this.documentStorageService.uploadFileWithCapability(
+              this.documentStorageService.referenceForExistingObject(
+                fileKey,
+                { resourceType: 'pt-photo', resourceId: lockedPt.id },
+                'p1-document-storage-uploadFile',
+              ),
+              buffer,
+              mimeType,
+            );
+
+          photoReference = this.buildGovernedPtFileReference({
+            v: 1,
+            kind: 'governed-storage',
+            scope: 'evidence',
+            fileKey,
+            originalName,
+            mimeType,
+            uploadedAt: new Date().toISOString(),
+            sizeBytes: buffer.byteLength,
+          });
+          photo = {
+            ref: photoReference,
+            legenda: meta.legenda?.trim() || undefined,
+            fase: meta.fase,
+            uploaded_by_id: userId || RequestContext.getUserId() || undefined,
+            uploaded_at: new Date().toISOString(),
+          };
           lockedPt.fotos_evidencia = [
             ...(lockedPt.fotos_evidencia ?? []),
             photo,
@@ -1656,16 +1832,24 @@ export class PtsService {
         },
       );
     } catch (error) {
-      await cleanupUploadedFile(
-        this.logger,
-        `pt-photo:${pt.id}`,
-        fileKey,
-        (key) =>
-          uploadedReference.key === key
-            ? this.documentStorageService.deleteFile(uploadedReference)
-            : Promise.resolve(),
-      );
+      if (uploadedReference && fileKey) {
+        await cleanupUploadedFile(
+          this.logger,
+          `pt-photo:${id}`,
+          fileKey,
+          (key) =>
+            uploadedReference?.key === key
+              ? this.documentStorageService.deleteFile(uploadedReference)
+              : Promise.resolve(),
+        );
+      }
       throw error;
+    }
+
+    if (!photo) {
+      throw new Error(
+        'Evidência fotográfica não foi preparada para persistência.',
+      );
     }
 
     await this.logAudit({
@@ -1751,6 +1935,7 @@ export class PtsService {
     photoIndex: number,
     userId?: string,
   ): Promise<{ entityId: string; removed: true; remaining: number }> {
+    let removedFileKey: string | undefined;
     const saved = await this.executePtWorkflowTransition(
       id,
       async (pt, manager) => {
@@ -1765,29 +1950,31 @@ export class PtsService {
           photo.ref,
           'evidence',
         );
-        if (payload) {
-          await cleanupUploadedFile(
-            this.logger,
-            `pt-photo-remove:${pt.id}`,
-            payload.fileKey,
-            (key) =>
-              this.documentStorageService.deleteFile(
-                this.documentStorageService.referenceForExistingObject(
-                  key,
-                  {
-                    resourceType: 'pt-photo',
-                    resourceId: pt.id,
-                  },
-                  'p1-document-storage-deleteFile',
-                ),
-              ),
-          );
-        }
+        removedFileKey = payload?.fileKey;
 
         pt.fotos_evidencia = photos.filter((_, index) => index !== photoIndex);
         return manager.getRepository(Pt).save(pt);
       },
     );
+
+    if (removedFileKey) {
+      await cleanupUploadedFile(
+        this.logger,
+        `pt-photo-remove:${saved.id}`,
+        removedFileKey,
+        (key) =>
+          this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              key,
+              {
+                resourceType: 'pt-photo',
+                resourceId: saved.id,
+              },
+              'p1-document-storage-deleteFile',
+            ),
+          ),
+      );
+    }
 
     this.logger.log({
       event: 'pt_evidence_photo_removed',
@@ -1824,43 +2011,10 @@ export class PtsService {
       throw new BadRequestException('Checklist inválido para anexo.');
     }
 
-    const pt = await this.findOne(id);
-    this.assertPtEditableStatus(pt.status);
-    this.assertPtDocumentMutable(pt);
-    const existingItem = pt[checklistField]?.[itemIndex];
-    if (!existingItem) {
-      throw new NotFoundException('Item de checklist não encontrado.');
-    }
-
-    const fileKey = this.documentStorageService.generateDocumentKey(
-      pt.company_id,
-      'pt-checklist-anexos',
-      pt.id,
-      originalName,
-      { folderSegments: ['sites', pt.site_id] },
-    );
-    const uploadedReference =
-      await this.documentStorageService.uploadFileWithCapability(
-        this.documentStorageService.referenceForExistingObject(
-          fileKey,
-          { resourceType: 'pt-checklist-attachment', resourceId: pt.id },
-          'p1-document-storage-uploadFile',
-        ),
-        buffer,
-        mimeType,
-      );
-
-    const anexoReference = this.buildGovernedPtFileReference({
-      v: 1,
-      kind: 'governed-storage',
-      scope: 'checklist-anexo',
-      fileKey,
-      originalName,
-      mimeType,
-      uploadedAt: new Date().toISOString(),
-      sizeBytes: buffer.byteLength,
-    });
-
+    let fileKey = '';
+    let uploadedReference: StorageObjectReference | undefined;
+    let anexoReference = '';
+    let previousFileKey: string | undefined;
     let saved: Pt;
     try {
       saved = await this.executePtWorkflowTransition(
@@ -1868,34 +2022,54 @@ export class PtsService {
         async (lockedPt, manager) => {
           this.assertPtEditableStatus(lockedPt.status);
           this.assertPtDocumentMutable(lockedPt);
+          if (!lockedPt.site_id) {
+            throw new BadRequestException(
+              'PT sem obra/setor vinculado não pode receber anexo de checklist.',
+            );
+          }
           const items = lockedPt[checklistField] ?? [];
           const item = items[itemIndex];
           if (!item) {
             throw new NotFoundException('Item de checklist não encontrado.');
           }
 
+          fileKey = this.documentStorageService.generateDocumentKey(
+            lockedPt.company_id,
+            'pt-checklist-anexos',
+            lockedPt.id,
+            originalName,
+            { folderSegments: ['sites', lockedPt.site_id] },
+          );
+          uploadedReference =
+            await this.documentStorageService.uploadFileWithCapability(
+              this.documentStorageService.referenceForExistingObject(
+                fileKey,
+                {
+                  resourceType: 'pt-checklist-attachment',
+                  resourceId: lockedPt.id,
+                },
+                'p1-document-storage-uploadFile',
+              ),
+              buffer,
+              mimeType,
+            );
+
+          anexoReference = this.buildGovernedPtFileReference({
+            v: 1,
+            kind: 'governed-storage',
+            scope: 'checklist-anexo',
+            fileKey,
+            originalName,
+            mimeType,
+            uploadedAt: new Date().toISOString(),
+            sizeBytes: buffer.byteLength,
+          });
+
           const previousRef = this.parseGovernedPtFileReference(
             item.anexo_ref,
             'checklist-anexo',
           );
-          if (previousRef) {
-            await cleanupUploadedFile(
-              this.logger,
-              `pt-checklist-anexo-replace:${lockedPt.id}`,
-              previousRef.fileKey,
-              (key) =>
-                this.documentStorageService.deleteFile(
-                  this.documentStorageService.referenceForExistingObject(
-                    key,
-                    {
-                      resourceType: 'pt-checklist-attachment',
-                      resourceId: lockedPt.id,
-                    },
-                    'p1-document-storage-deleteFile',
-                  ),
-                ),
-            );
-          }
+          previousFileKey = previousRef?.fileKey;
 
           item.anexo_ref = anexoReference;
           item.anexo_nome = originalName;
@@ -1904,16 +2078,43 @@ export class PtsService {
         },
       );
     } catch (error) {
+      if (uploadedReference && fileKey) {
+        await cleanupUploadedFile(
+          this.logger,
+          `pt-checklist-anexo:${id}`,
+          fileKey,
+          (key) =>
+            uploadedReference?.key === key
+              ? this.documentStorageService.deleteFile(uploadedReference)
+              : Promise.resolve(),
+        );
+      }
+      throw error;
+    }
+
+    if (!uploadedReference || !fileKey || !anexoReference) {
+      throw new Error(
+        'Anexo de checklist não foi preparado para persistência.',
+      );
+    }
+
+    if (previousFileKey) {
       await cleanupUploadedFile(
         this.logger,
-        `pt-checklist-anexo:${pt.id}`,
-        fileKey,
+        `pt-checklist-anexo-replace:${saved.id}`,
+        previousFileKey,
         (key) =>
-          uploadedReference.key === key
-            ? this.documentStorageService.deleteFile(uploadedReference)
-            : Promise.resolve(),
+          this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              key,
+              {
+                resourceType: 'pt-checklist-attachment',
+                resourceId: saved.id,
+              },
+              'p1-document-storage-deleteFile',
+            ),
+          ),
       );
-      throw error;
     }
 
     this.logger.log({
@@ -2127,53 +2328,289 @@ export class PtsService {
     });
   }
 
+  async replaceSignatures(
+    id: string,
+    dto: ReplacePtSignaturesDto,
+    authenticatedUserId: string,
+  ): Promise<{ entityId: string; replaced: number }> {
+    let replaced = 0;
+    let replacedSignatureFiles: Array<{
+      id: string;
+      signature_data_key: string | null;
+    }> = [];
+    let createdSignatureFiles: Array<{
+      id: string;
+      signature_data_key: string | null;
+    }> = [];
+
+    try {
+      await this.executePtWorkflowTransition(id, async (pt, manager) => {
+        this.assertPtDocumentMutable(pt);
+
+        const executanteRows: unknown = await manager.query(
+          'SELECT "user_id" FROM "pt_executantes" WHERE "pt_id" = $1',
+          [pt.id],
+        );
+        const allowedSignerIds = new Set(
+          Array.isArray(executanteRows)
+            ? executanteRows.flatMap((row: unknown) =>
+                isRecord(row) && typeof row.user_id === 'string'
+                  ? [row.user_id]
+                  : [],
+              )
+            : [],
+        );
+        const signerIds = dto.signatures.map((signature) => signature.user_id);
+        if (new Set(signerIds).size !== signerIds.length) {
+          throw new BadRequestException(
+            'Cada executante pode possuir somente uma assinatura ativa na PT.',
+          );
+        }
+        if (signerIds.some((userId) => !allowedSignerIds.has(userId))) {
+          throw new ForbiddenException(
+            'Somente executantes vinculados à PT podem assinar este documento.',
+          );
+        }
+
+        const signatureRepository = manager.getRepository(Signature);
+        replacedSignatureFiles = await signatureRepository.find({
+          where: {
+            document_id: pt.id,
+            document_type: 'PT',
+            company_id: pt.company_id,
+            deleted_at: IsNull(),
+          },
+          select: ['id', 'signature_data_key'],
+        });
+        await signatureRepository.softDelete({
+          document_id: pt.id,
+          document_type: 'PT',
+          company_id: pt.company_id,
+          deleted_at: IsNull(),
+        });
+
+        const persisted: Signature[] = [];
+        createdSignatureFiles = persisted;
+        for (const signature of dto.signatures) {
+          const saved = await this.signaturesService.createWithManager(
+            {
+              user_id: signature.user_id,
+              signer_user_id: signature.user_id,
+              signature_data:
+                signature.type === 'hmac'
+                  ? 'HMAC_PENDING'
+                  : signature.signature_data,
+              type: signature.type,
+              pin:
+                signature.type === 'hmac'
+                  ? (signature.pin ?? signature.signature_data)
+                  : undefined,
+              company_id: pt.company_id,
+              document_id: pt.id,
+              document_type: 'PT',
+            },
+            authenticatedUserId,
+            manager,
+            signature.user_id,
+          );
+          persisted.push(saved);
+        }
+        replaced = persisted.length;
+        return pt;
+      });
+    } catch (error) {
+      await this.cleanupPtSignatureEvidenceFiles(
+        createdSignatureFiles,
+        `pt-signatures-replace-rollback:${id}`,
+      );
+      throw error;
+    }
+
+    // The shared signature service cannot know when this PT's outer workflow
+    // transaction commits. Cleanup is therefore deliberately deferred until
+    // executePtWorkflowTransition has returned successfully.
+    await this.cleanupPtSignatureEvidenceFiles(
+      replacedSignatureFiles,
+      `pt-signatures-replace:${id}`,
+    );
+
+    return { entityId: id, replaced };
+  }
+
+  async createSignature(
+    id: string,
+    dto: CreatePtSignatureDto,
+    authenticatedUserId: string,
+  ): Promise<{ entityId: string; created: true }> {
+    let createdSignatureFiles: Array<{
+      id: string;
+      signature_data_key: string | null;
+    }> = [];
+
+    try {
+      await this.executePtWorkflowTransition(id, async (pt, manager) => {
+        this.assertPtDocumentMutable(pt);
+
+        const executanteRows: unknown = await manager.query(
+          'SELECT "user_id" FROM "pt_executantes" WHERE "pt_id" = $1',
+          [pt.id],
+        );
+        const isExecutante =
+          Array.isArray(executanteRows) &&
+          executanteRows.some(
+            (row: unknown) =>
+              isRecord(row) && row.user_id === authenticatedUserId,
+          );
+        if (!isExecutante) {
+          throw new ForbiddenException(
+            'Somente executantes vinculados à PT podem assiná-la.',
+          );
+        }
+
+        const signatureRepository = manager.getRepository(Signature);
+        const activeSignature = await signatureRepository.findOne({
+          where: {
+            document_id: pt.id,
+            document_type: 'PT',
+            company_id: pt.company_id,
+            user_id: authenticatedUserId,
+            deleted_at: IsNull(),
+          },
+        });
+        if (activeSignature) {
+          throw new ConflictException(
+            'Usuário já possui uma assinatura ativa para esta PT.',
+          );
+        }
+
+        const persisted = await this.signaturesService.createWithManager(
+          {
+            user_id: authenticatedUserId,
+            signer_user_id: authenticatedUserId,
+            signature_data: dto.signature_data,
+            type: dto.type,
+            pin: dto.pin,
+            company_id: pt.company_id,
+            document_id: pt.id,
+            document_type: 'PT',
+          },
+          authenticatedUserId,
+          manager,
+          authenticatedUserId,
+        );
+        createdSignatureFiles = [persisted];
+        return pt;
+      });
+    } catch (error) {
+      await this.cleanupPtSignatureEvidenceFiles(
+        createdSignatureFiles,
+        `pt-signature-create-rollback:${id}`,
+      );
+      throw error;
+    }
+
+    return { entityId: id, created: true };
+  }
+
+  private async cleanupPtSignatureEvidenceFiles(
+    signatures: Array<{
+      id: string;
+      signature_data_key: string | null;
+    }>,
+    context: string,
+  ): Promise<void> {
+    await Promise.all(
+      signatures.map(async (signature) => {
+        if (!signature.signature_data_key) {
+          return;
+        }
+
+        await cleanupUploadedFile(
+          this.logger,
+          `${context}:${signature.id}`,
+          signature.signature_data_key,
+          (key) =>
+            this.documentStorageService.deleteFile(
+              this.documentStorageService.referenceForExistingObject(
+                key,
+                { resourceType: 'signature', resourceId: signature.id },
+                'p1-document-storage-deleteFile',
+              ),
+            ),
+        );
+      }),
+    );
+  }
+
   async remove(id: string): Promise<void> {
-    const pt = await this.findOne(id);
-    if (pt.pdf_file_key) {
-      throw new BadRequestException(
-        'Somente PTs sem PDF final podem ser removidas. Use os fluxos formais de cancelamento/encerramento para registros já emitidos.',
-      );
-    }
-    // SGS-PT-SM-008: PTs in terminal/active states must not be silently removed
-    // even when they lack a PDF — Aprovada/Encerrada represent safety authorizations
-    // and Cancelada/Expirada carry audit value.
-    const nonRemovableStatuses: string[] = [
-      PtStatus.APROVADA,
-      PtStatus.ENCERRADA,
-      PtStatus.CANCELADA,
-      PtStatus.EXPIRADA,
-    ];
-    if (nonRemovableStatuses.includes(pt.status)) {
-      throw new BadRequestException(
-        `PT com status '${pt.status}' não pode ser removida. Somente PTs em rascunho ou pendentes sem PDF final podem ser excluídas.`,
-      );
-    }
-    await this.documentGovernanceService.removeFinalDocumentReference({
-      companyId: pt.company_id,
-      module: 'pt',
-      entityId: pt.id,
-      trailEventType: FORENSIC_EVENT_TYPES.FINAL_DOCUMENT_REMOVED,
-      trailMetadata: {
-        removalMode: 'soft_delete',
-      },
-      removeEntityState: async (manager) => {
-        await manager.getRepository(Pt).softDelete(id);
-      },
-      cleanupStoredFile: (fileKey) =>
-        this.documentStorageService.deleteFile(
-          this.documentStorageService.referenceForExistingObject(
-            fileKey,
-            { resourceType: 'pt', resourceId: pt.id },
-            'p1-document-storage-deleteFile',
-          ),
-        ),
+    let removedFileKey: string | undefined;
+    await this.executePtWorkflowTransition(id, async (pt, manager) => {
+      if (pt.pdf_file_key) {
+        throw new BadRequestException(
+          'Somente PTs sem PDF final podem ser removidas. Use os fluxos formais de cancelamento/encerramento para registros já emitidos.',
+        );
+      }
+      // SGS-PT-SM-008: PTs in terminal/active states must not be silently removed
+      // even when they lack a PDF — Aprovada/Encerrada represent safety authorizations
+      // and Cancelada/Expirada carry audit value.
+      const nonRemovableStatuses: string[] = [
+        PtStatus.APROVADA,
+        PtStatus.ENCERRADA,
+        PtStatus.CANCELADA,
+        PtStatus.EXPIRADA,
+      ];
+      if (nonRemovableStatuses.includes(pt.status)) {
+        throw new BadRequestException(
+          `PT com status '${pt.status}' não pode ser removida. Somente PTs em rascunho ou pendentes sem PDF final podem ser excluídas.`,
+        );
+      }
+
+      await this.documentGovernanceService.removeFinalDocumentReference({
+        companyId: pt.company_id,
+        module: 'pt',
+        entityId: pt.id,
+        trailEventType: FORENSIC_EVENT_TYPES.FINAL_DOCUMENT_REMOVED,
+        trailMetadata: {
+          removalMode: 'soft_delete',
+        },
+        removeEntityState: async (transactionManager) => {
+          await transactionManager.getRepository(Pt).softDelete(id);
+        },
+        // O callback ocorre antes do commit quando transactionManager é usado.
+        // Apenas capturamos a chave e removemos o objeto após o commit externo.
+        cleanupStoredFile: (fileKey) => {
+          removedFileKey = fileKey;
+          return Promise.resolve();
+        },
+        transactionManager: manager,
+      });
+
+      return pt;
     });
+
+    if (removedFileKey) {
+      await cleanupUploadedFile(
+        this.logger,
+        `pt-remove:${id}`,
+        removedFileKey,
+        (fileKey) =>
+          this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              fileKey,
+              { resourceType: 'pt', resourceId: id },
+              'p1-document-storage-deleteFile',
+            ),
+          ),
+      );
+    }
     this.logger.log({ event: 'pt_soft_deleted', ptId: id });
   }
 
   async count(options?: FindManyOptions<Pt>): Promise<number> {
-    // Sempre aplica filtro de tenant e soft-delete — impede cross-tenant leak (SGS-PT-SEC-013).
-    const { companyId } = this.getTenantContextOrThrow();
+    // Sempre aplica tenant, obra e soft-delete — impede que alertas/contagens
+    // revelem PTs fora do escopo multi-site atual (SGS-PT-SEC-013).
+    const { companyId, siteIds, siteScope, isSuperAdmin } =
+      this.getTenantContextOrThrow();
     const raw = options?.where;
     const whereArr: FindOptionsWhere<Pt>[] = Array.isArray(raw)
       ? raw
@@ -2183,6 +2620,9 @@ export class PtsService {
       where: whereArr.map((w) => ({
         ...w,
         company_id: companyId,
+        ...(!isSuperAdmin && siteScope !== 'all'
+          ? { site_id: In(siteIds) }
+          : {}),
         deleted_at: IsNull(),
       })),
     });
@@ -2270,15 +2710,18 @@ export class PtsService {
   }> {
     const { companyId, siteIds, siteScope, isSuperAdmin } =
       this.getTenantContextOrThrow();
-    this.refreshExpiredStatuses(companyId).catch((err: unknown) =>
+    try {
+      await this.refreshExpiredStatuses(companyId);
+    } catch (err: unknown) {
       this.logger.warn({
         event: 'pt_expire_refresh_error',
         error: err instanceof Error ? err.message : String(err),
-      }),
-    );
+      });
+    }
 
     const baseWhere: FindOptionsWhere<Pt> = {
       company_id: companyId,
+      deleted_at: IsNull(),
       ...(!isSuperAdmin && siteScope !== 'all' ? { site_id: In(siteIds) } : {}),
     };
 
@@ -2316,19 +2759,42 @@ export class PtsService {
   }
 
   async updateApprovalRules(payload: UpdatePtApprovalRulesDto) {
-    const company = await this.findCurrentCompanyOrFail();
-    const merged = this.normalizeApprovalRules({
-      ...(company.pt_approval_rules || {}),
-      ...payload,
+    const { companyId } = this.getTenantContextOrThrow();
+    if (!companyId) {
+      throw new BadRequestException(
+        'Contexto de empresa não identificado para configurar regras da PT.',
+      );
+    }
+
+    return this.ptsRepository.manager.transaction(async (manager) => {
+      const companyRepository = manager.getRepository(Company);
+      const company = await companyRepository.findOne({
+        where: { id: companyId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!company) {
+        throw new NotFoundException(
+          'Empresa não encontrada para configurar regras.',
+        );
+      }
+
+      const merged = this.normalizeApprovalRules({
+        ...(company.pt_approval_rules || {}),
+        ...payload,
+      });
+      company.pt_approval_rules = merged;
+      await companyRepository.save(company);
+      return merged;
     });
-    company.pt_approval_rules = merged;
-    await this.companiesRepository.save(company);
-    return merged;
   }
 
-  private async assertCanApprove(pt: Pt, companyId: string): Promise<void> {
+  private async assertCanApprove(
+    pt: Pt,
+    companyId: string,
+    manager?: EntityManager,
+  ): Promise<void> {
     const reasons: string[] = [];
-    const rules = await this.getApprovalRulesForCompany(companyId);
+    const rules = await this.getApprovalRulesForCompany(companyId, manager);
 
     if (
       rules.blockCriticalRiskWithoutEvidence &&
@@ -2505,10 +2971,16 @@ export class PtsService {
     return company;
   }
 
-  private async getApprovalRulesForCompany(companyId: string) {
-    const company = await this.companiesRepository.findOne({
+  private async getApprovalRulesForCompany(
+    companyId: string,
+    manager?: EntityManager,
+  ) {
+    const repository =
+      manager?.getRepository(Company) ?? this.companiesRepository;
+    const company = await repository.findOne({
       where: { id: companyId },
       select: { id: true, pt_approval_rules: true },
+      ...(manager ? { lock: { mode: 'pessimistic_read' as const } } : {}),
     });
     return this.normalizeApprovalRules(company?.pt_approval_rules || undefined);
   }

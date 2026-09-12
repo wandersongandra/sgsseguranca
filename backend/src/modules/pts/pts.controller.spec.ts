@@ -30,6 +30,8 @@ describe('PtsController (http)', () => {
     getWeeklyBundle: jest.fn(),
     findOne: jest.fn(),
     getPdfAccess: jest.fn(),
+    replaceSignatures: jest.fn(),
+    createSignature: jest.fn(),
   };
   const pdfRateLimitService = {
     checkDownloadLimit: jest.fn(),
@@ -42,6 +44,8 @@ describe('PtsController (http)', () => {
     ptsService.getWeeklyBundle.mockReset();
     ptsService.findOne.mockReset();
     ptsService.getPdfAccess.mockReset();
+    ptsService.replaceSignatures.mockReset();
+    ptsService.createSignature.mockReset();
     pdfRateLimitService.checkDownloadLimit.mockReset();
   });
 
@@ -238,6 +242,28 @@ describe('PtsController (http)', () => {
     });
   });
 
+  it('rejeita filtros de ano e semana inválidos nas rotas de arquivos', async () => {
+    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(httpServer)
+      .get('/pts/files/list')
+      .query({ year: 'abc', week: '99' })
+      .expect(400);
+
+    expect(ptsService.listStoredFiles).not.toHaveBeenCalled();
+  });
+
+  it('rejeita semana ISO fora do intervalo permitido', async () => {
+    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
+
+    await request(httpServer)
+      .get('/pts/files/list')
+      .query({ year: '2026', week: '99' })
+      .expect(400);
+
+    expect(ptsService.listStoredFiles).not.toHaveBeenCalled();
+  });
+
   it('ignora company_id do client no bundle semanal da PT', async () => {
     const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
     ptsService.getWeeklyBundle.mockResolvedValue({
@@ -258,5 +284,63 @@ describe('PtsController (http)', () => {
       year: 2026,
       week: 17,
     });
+  });
+
+  it('encaminha a substituição atômica de assinaturas com o usuário autenticado', async () => {
+    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
+    ptsService.replaceSignatures.mockResolvedValue({
+      entityId: ptId,
+      replaced: 1,
+    });
+
+    await request(httpServer)
+      .put(`/pts/${ptId}/signatures`)
+      .send({
+        signatures: [
+          {
+            user_id: '22222222-2222-4222-8222-222222222222',
+            signature_data: 'data:image/png;base64,signature',
+            type: 'drawn',
+          },
+        ],
+      })
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toEqual({ entityId: ptId, replaced: 1 });
+      });
+
+    expect(ptsService.replaceSignatures).toHaveBeenCalledWith(
+      ptId,
+      expect.objectContaining({ signatures: expect.any(Array) as unknown }),
+      'user-1',
+    );
+  });
+
+  it('encaminha assinatura avulsa pela rota PT com o usuário autenticado', async () => {
+    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
+    ptsService.createSignature.mockResolvedValue({
+      entityId: ptId,
+      created: true,
+    });
+
+    await request(httpServer)
+      .post(`/pts/${ptId}/signatures`)
+      .send({
+        signature_data: 'data:image/png;base64,signature',
+        type: 'drawn',
+      })
+      .expect(201)
+      .expect(({ body }) => {
+        expect(body).toEqual({ entityId: ptId, created: true });
+      });
+
+    expect(ptsService.createSignature).toHaveBeenCalledWith(
+      ptId,
+      expect.objectContaining({
+        signature_data: 'data:image/png;base64,signature',
+        type: 'drawn',
+      }),
+      'user-1',
+    );
   });
 });

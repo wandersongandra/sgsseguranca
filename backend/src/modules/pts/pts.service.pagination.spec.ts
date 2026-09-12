@@ -26,6 +26,7 @@ function makeMockQueryBuilder(overrides: Record<string, jest.Mock> = {}) {
     where: jest.fn(),
     andWhere: jest.fn(),
     orderBy: jest.fn(),
+    addOrderBy: jest.fn(),
     skip: jest.fn(),
     take: jest.fn(),
     getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
@@ -221,6 +222,34 @@ describe('PtsService — findAllForExport()', () => {
     await service.findAllForExport();
 
     expect(mockQb.take).toHaveBeenCalledWith(5000);
+  });
+
+  it('deve continuar a exportação depois da primeira página', async () => {
+    const firstPage = Array.from({ length: 5000 }, (_, index) => ({
+      id: `pt-${index}`,
+      created_at: new Date('2026-09-10T12:00:00.000Z'),
+    }));
+    const secondPage = [
+      {
+        id: 'pt-5000',
+        created_at: new Date('2026-09-10T11:59:00.000Z'),
+      },
+    ];
+    mockQb.getMany
+      .mockResolvedValueOnce(firstPage)
+      .mockResolvedValueOnce(secondPage);
+
+    const result = await service.findAllForExport();
+
+    expect(result).toHaveLength(5001);
+    expect(mockRepository.createQueryBuilder).toHaveBeenCalledTimes(2);
+    expect(mockQb.andWhere).toHaveBeenCalledWith(
+      '(pt.created_at < :exportCursorCreatedAt OR (pt.created_at = :exportCursorCreatedAt AND pt.id < :exportCursorId))',
+      {
+        exportCursorCreatedAt: firstPage.at(-1)?.created_at,
+        exportCursorId: 'pt-4999',
+      },
+    );
   });
 
   it('deve aplicar filtro de tenant', async () => {

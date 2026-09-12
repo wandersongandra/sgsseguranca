@@ -154,3 +154,28 @@ describe('Migration 1709000000343 — pts campos operacionais/normativos', () =>
     expect(drops).toBe(12);
   });
 });
+
+describe('Migration 1709000000405 — current_site_scope fail-closed', () => {
+  let content: string;
+
+  beforeAll(() => {
+    const file = path.join(
+      MIGRATIONS_DIR,
+      '1709000000405-harden-site-scope-fail-closed.ts',
+    );
+    content = fs.readFileSync(file, 'utf8');
+  });
+
+  it('não transforma contexto de obra ausente ou inválido em escopo global', () => {
+    expect(content).toContain("RETURN 'single'");
+    expect(content).toContain("IF scope_value = 'all' THEN");
+    expect(content).toMatch(/IF scope_value = 'all' THEN[\s\S]*?RETURN 'all'/);
+    expect(content).not.toMatch(
+      /IF\s+scope_value\s+IS NULL[\s\S]*?RETURN 'all'/,
+    );
+    expect(content).toContain(
+      "current_setting('app.current_site_scope', true)",
+    );
+    expect(content).toContain('SET search_path = public');
+  });
+});
