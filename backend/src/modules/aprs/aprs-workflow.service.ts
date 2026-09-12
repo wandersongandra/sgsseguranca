@@ -509,7 +509,21 @@ export class AprWorkflowService {
          COUNT(*) FILTER (WHERE COALESCE(TRIM("agente_ambiental"), '') = '' AND
                                 COALESCE(TRIM("condicao_perigosa"), '')  = '' AND
                                 COALESCE(TRIM("fonte_circunstancia"), '') = '')::text AS sem_agente,
-         COUNT(*) FILTER (WHERE COALESCE(TRIM("medidas_prevencao"), '') = '')::text   AS sem_medidas,
+         COUNT(*) FILTER (
+           WHERE NOT (
+             "categoria_risco" = 'Aceitável'
+             OR (
+               "probabilidade" IS NOT NULL AND "severidade" IS NOT NULL
+               AND ("probabilidade" * "severidade") <= 3
+             )
+           )
+           AND COALESCE(TRIM("medidas_prevencao"), '') = ''
+           AND COALESCE(TRIM("epc"), '') = ''
+           AND COALESCE(TRIM("epi"), '') = ''
+           AND COALESCE(TRIM("permissao_trabalho"), '') = ''
+           AND COALESCE(TRIM("normas_relacionadas"), '') = ''
+           AND COALESCE(TRIM("hierarquia_controle"), '') = ''
+         )::text                                                                 AS sem_medidas,
          COUNT(*) FILTER (WHERE COALESCE(TRIM("responsavel"), '') = '')::text         AS sem_responsavel
        FROM "apr_risk_items"
        WHERE "apr_id" = $1 AND "deleted_at" IS NULL`,

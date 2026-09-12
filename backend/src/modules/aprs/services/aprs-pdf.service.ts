@@ -21,6 +21,7 @@ import { DocumentGovernanceService } from '../../document-registry/document-gove
 import { SignaturesService } from '../../signatures/signatures.service';
 import type { Signature } from '../../signatures/entities/signature.entity';
 import { PublicValidationGrantService } from '../../../shared/services/public-validation-grant.service';
+import { AprWorkflowLockService } from './apr-workflow-lock.service';
 import { AprLog } from '../entities/apr-log.entity';
 import { AprRiskEvidence } from '../entities/apr-risk-evidence.entity';
 import { Apr, AprStatus } from '../entities/apr.entity';
@@ -65,6 +66,7 @@ export class AprsPdfService {
     @Inject(forwardRef(() => SignaturesService))
     private readonly signaturesService: SignaturesService,
     private readonly publicValidationGrantService: PublicValidationGrantService,
+    private readonly workflowLock: AprWorkflowLockService,
   ) {}
 
   private ensureAprStatus(status: string): AprStatus {
@@ -2460,6 +2462,20 @@ export class AprsPdfService {
   }
 
   async generateFinalPdf(
+    id: string,
+    userId?: string,
+  ): Promise<AprPdfAccessResponse & { generated: boolean }> {
+    // Lock distribuído (achado da auditoria v2): sem isso, dois cliques em
+    // "gerar PDF final" chegando quase juntos passavam ambos pelo check de
+    // hasFinalPdf antes de qualquer um persistir, disparando dois renders
+    // Puppeteer simultâneos e deixando um objeto órfão no storage. O recheck
+    // de hasFinalPdf abaixo agora roda DENTRO da seção exclusiva.
+    return this.workflowLock.runExclusive(id, () =>
+      this.generateFinalPdfLocked(id, userId),
+    );
+  }
+
+  private async generateFinalPdfLocked(
     id: string,
     userId?: string,
   ): Promise<AprPdfAccessResponse & { generated: boolean }> {

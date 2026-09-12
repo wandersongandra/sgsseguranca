@@ -26,6 +26,7 @@ import { AprRiskMatrixService } from './apr-risk-matrix.service';
 import { AprExcelService } from './apr-excel.service';
 import { ForensicTrailModule } from '../forensic-trail/forensic-trail.module';
 import { AprsPdfService } from './services/aprs-pdf.service';
+import { AprWorkflowLockService } from './services/apr-workflow-lock.service';
 import { AprsEvidenceService } from './services/aprs-evidence.service';
 import { AprWorkflowService } from './aprs-workflow.service';
 import { FileInspectionModule } from '../../shared/security/file-inspection.module';
@@ -70,6 +71,7 @@ import { AprMetricsInterceptor } from './interceptors/apr-metrics.interceptor';
     AprRiskMatrixService,
     AprExcelService,
     AprsPdfService,
+    AprWorkflowLockService,
     AprsEvidenceService,
     AprWorkflowService,
     AprFeatureFlagService,
