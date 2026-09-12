@@ -1,6 +1,43 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PtForm } from './PtForm';
 import { initialChecklists } from './pt-schema-and-data';
+
+jest.mock('next/dynamic', () => ({
+  __esModule: true,
+  default: (loader: () => Promise<unknown>) => {
+    const React = require('react') as typeof import('react');
+    const LazyComponent = React.lazy(async () => {
+      const loaded = (await loader()) as { default?: unknown } | unknown;
+      return {
+        default:
+          loaded && typeof loaded === 'object' && 'default' in loaded
+            ? loaded.default
+            : loaded,
+      } as { default: React.ComponentType<unknown> };
+    });
+    return ({
+      photos,
+      onPhotosChanged,
+      ...props
+    }: {
+      photos?: Array<unknown>;
+      onPhotosChanged?: () => void;
+      [key: string]: unknown;
+    }) =>
+      Array.isArray(photos) && onPhotosChanged ? (
+        <div>
+          <div>Fotos atuais: {photos.length}</div>
+          <button type="button" onClick={onPhotosChanged}>
+            Recarregar PT por evidência
+          </button>
+        </div>
+      ) : (
+        <React.Suspense fallback={null}>
+          <LazyComponent {...props} />
+        </React.Suspense>
+      );
+  },
+}));
 
 const searchParamsGet = jest.fn();
 const push = jest.fn();
@@ -34,6 +71,7 @@ jest.mock('@/context/AuthContext', () => ({
       id: 'user-1',
       nome: 'Tecnico',
       company_id: 'company-1',
+      site_id: 'site-1',
       profile: { nome: 'Técnico de Segurança' },
     },
     hasPermission: () => true,
@@ -67,11 +105,13 @@ jest.mock('./BasicInfoSection', () => ({
     filteredSites,
     filteredUsers,
     onCompanyChange,
+    onAprChange,
   }: {
     filteredAprs: Array<{ id: string }>;
     filteredSites: Array<{ id: string }>;
     filteredUsers: Array<{ id: string }>;
     onCompanyChange: (companyId: string) => void;
+    onAprChange?: (aprId: string) => void;
   }) => {
     const { useFormContext } = jest.requireActual('react-hook-form');
     const { setValue, watch } = useFormContext();
@@ -82,6 +122,7 @@ jest.mock('./BasicInfoSection', () => ({
         <div>Obra atual: {watch('site_id') || ''}</div>
         <div>Responsável atual: {watch('responsavel_id') || ''}</div>
         <div>APR atual: {watch('apr_id') || ''}</div>
+        <div>Altura atual: {String(Boolean(watch('trabalho_altura')))}</div>
         <div>APRs disponíveis: {filteredAprs.map((item) => item.id).join(',')}</div>
         <div>Obras disponíveis: {filteredSites.map((item) => item.id).join(',')}</div>
         <div>Usuários disponíveis: {filteredUsers.map((item) => item.id).join(',')}</div>
@@ -93,6 +134,18 @@ jest.mock('./BasicInfoSection', () => ({
           }}
         >
           Trocar para empresa 2
+        </button>
+        <button type="button" onClick={() => onAprChange?.('apr-old')}>
+          Carregar APR antiga
+        </button>
+        <button type="button" onClick={() => onAprChange?.('apr-new')}>
+          Carregar APR nova
+        </button>
+        <button
+          type="button"
+          onClick={() => setValue('site_id', 'site-b', { shouldDirty: true, shouldValidate: true })}
+        >
+          Selecionar obra 2
         </button>
       </div>
     );
@@ -120,6 +173,28 @@ jest.mock('./PtPreApprovalHistoryPanel', () => ({
   PtPreApprovalHistoryPanel: () => <div>Pre Approval History</div>,
 }));
 
+jest.mock('./PtEvidencePhotosSection', () => {
+  const MockPtEvidencePhotosSection = ({
+    photos,
+    onPhotosChanged,
+  }: {
+    photos: Array<unknown>;
+    onPhotosChanged: () => void;
+  }) => (
+    <div>
+      <div>Fotos atuais: {photos.length}</div>
+      <button type="button" onClick={onPhotosChanged}>
+        Recarregar PT por evidência
+      </button>
+    </div>
+  );
+  return {
+    __esModule: true,
+    PtEvidencePhotosSection: MockPtEvidencePhotosSection,
+    default: MockPtEvidencePhotosSection,
+  };
+});
+
 jest.mock('./PtReadinessPanel', () => ({
   PtReadinessPanel: ({
     readyForRelease,
@@ -143,6 +218,8 @@ const findUsersPaginated = jest.fn();
 const findUser = jest.fn();
 const findSignatures = jest.fn();
 const createSignature = jest.fn();
+const replaceSignatures = jest.fn();
+const mockGeneratePtPdf = jest.fn();
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -176,6 +253,11 @@ function makePtFixture(id: string, companyId: string, siteId: string) {
     trabalho_quente: false,
     eletricidade: false,
     escavacao: false,
+    fotos_evidencia: [] as Array<{
+      ref: string;
+      fase: string;
+      uploaded_at: string;
+    }>,
   };
 }
 
@@ -186,6 +268,7 @@ jest.mock('@/services/ptsService', () => ({
     attachFile: (...args: unknown[]) => attachPtFile(...args),
     findOne: (...args: unknown[]) => findPt(...args),
     getPreApprovalHistory: (...args: unknown[]) => getPreApprovalHistory(...args),
+    replaceSignatures: (...args: unknown[]) => replaceSignatures(...args),
   },
 }));
 
@@ -236,6 +319,10 @@ jest.mock('@/services/aiService', () => ({
   },
 }));
 
+jest.mock('@/lib/pdf/ptGenerator', () => ({
+  generatePtPdf: (...args: unknown[]) => mockGeneratePtPdf(...args),
+}));
+
 describe('PtForm', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -265,11 +352,97 @@ describe('PtForm', () => {
     findUser.mockResolvedValue({ id: 'user-1', nome: 'Responsável', company_id: 'company-1' });
     findSignatures.mockResolvedValue([]);
     createSignature.mockResolvedValue(undefined);
+    replaceSignatures.mockResolvedValue({ entityId: 'pt-1', replaced: 0 });
+    mockGeneratePtPdf.mockResolvedValue({
+      base64: 'JVBERi0xLjQ=',
+      filename: 'pt-final.pdf',
+    });
+  });
+
+  it('mantém o papel de botão nas etapas do wizard para navegação assistiva', async () => {
+    render(<PtForm />);
+
+    const stepList = await screen.findByRole('list');
+    const stepItems = within(stepList).getAllByRole('listitem');
+    expect(stepItems).toHaveLength(3);
+    const firstStep = stepItems[0];
+    expect(firstStep).toBeDefined();
+    if (!firstStep) throw new Error('A primeira etapa do wizard não foi renderizada.');
+    expect(within(firstStep).getByRole('button', { name: /Etapa 1/ })).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+  });
+
+  it('ignora um destino de foco inválido vindo da URL', async () => {
+    searchParamsGet.mockImplementation((key: string) =>
+      key === 'focus' ? '"]' : null,
+    );
+
+    render(<PtForm />);
+
+    expect(await screen.findByText('Etapa 1 de 3')).toBeInTheDocument();
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+    });
+  });
+
+  it('aguarda a obra antes de consultar APRs com escopo', async () => {
+    searchParamsGet.mockImplementation((key: string) =>
+      key === 'company_id' ? 'company-1' : null,
+    );
+    localStorage.setItem(
+      'gst.pt.wizard.draft.company-1.user-1',
+      JSON.stringify({
+        step: 1,
+        values: { company_id: 'company-1' },
+        metadata: {},
+      }),
+    );
+
+    render(<PtForm />);
+
+    await waitFor(() => expect(findSitesPaginated).toHaveBeenCalled());
+    expect(findAprsPaginated).not.toHaveBeenCalled();
+  });
+
+  it('não restaura rascunho compartilhado apenas pela empresa', async () => {
+    localStorage.setItem(
+      'gst.pt.wizard.draft.company-1',
+      JSON.stringify({
+        step: 1,
+        values: {
+          company_id: 'company-1',
+          titulo: 'Rascunho de outro usuário',
+        },
+        metadata: {},
+      }),
+    );
+    localStorage.setItem(
+      'compliancex.pt.wizard.draft.company-1',
+      JSON.stringify({
+        step: 1,
+        values: {
+          company_id: 'company-1',
+          titulo: 'Rascunho legado de outro usuário',
+        },
+        metadata: {},
+      }),
+    );
+
+    render(<PtForm />);
+
+    expect(await screen.findByText('Etapa 1 de 3')).toBeInTheDocument();
+    expect(screen.queryByText('Rascunho de outro usuário')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rascunho legado de outro usuário')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rascunho restaurado')).not.toBeInTheDocument();
+    expect(localStorage.getItem('gst.pt.wizard.draft.company-1')).toBeNull();
+    expect(localStorage.getItem('compliancex.pt.wizard.draft.company-1')).toBeNull();
   });
 
   it('switches sidebar context when a restored draft opens directly in step 2', async () => {
     localStorage.setItem(
-      'gst.pt.wizard.draft.company-1',
+      'gst.pt.wizard.draft.company-1.user-1',
       JSON.stringify({
         step: 2,
         values: {
@@ -296,7 +469,7 @@ describe('PtForm', () => {
 
   it('normalizes legacy draft status before the PT generic flow is restored', async () => {
     localStorage.setItem(
-      'gst.pt.wizard.draft.company-1',
+      'gst.pt.wizard.draft.company-1.user-1',
       JSON.stringify({
         step: 1,
         values: {
@@ -333,7 +506,7 @@ describe('PtForm', () => {
     });
 
     localStorage.setItem(
-      'gst.pt.wizard.draft.company-1',
+      'gst.pt.wizard.draft.company-1.user-1',
       JSON.stringify({
         step: 1,
         values: {
@@ -355,7 +528,7 @@ describe('PtForm', () => {
 
   it('hides the SOPHIE helper block when the restored draft opens in the final step', async () => {
     localStorage.setItem(
-      'gst.pt.wizard.draft.company-1',
+      'gst.pt.wizard.draft.company-1.user-1',
       JSON.stringify({
         step: 3,
         values: {
@@ -384,7 +557,7 @@ describe('PtForm', () => {
 
   it('does not count unanswered optional excavation items as pending blockers', async () => {
     localStorage.setItem(
-      'gst.pt.wizard.draft.company-1',
+      'gst.pt.wizard.draft.company-1.user-1',
       JSON.stringify({
         step: 2,
         values: {
@@ -460,6 +633,11 @@ describe('PtForm', () => {
   });
 
   it('shows tenant A, then clears it while tenant B is still pending', async () => {
+    searchParamsGet.mockImplementation((key: string) => {
+      if (key === 'company_id') return 'company-1';
+      if (key === 'site_id') return 'site-a';
+      return null;
+    });
     const aprB = deferred<{ data: Array<{ id: string; company_id: string }> }>();
     const siteB = deferred<{ data: Array<{ id: string; company_id: string }> }>();
     const usersB = deferred<{ data: Array<{ id: string; nome: string; company_id: string }> }>();
@@ -486,6 +664,7 @@ describe('PtForm', () => {
     expect(await screen.findByText('Usuários disponíveis: user-a')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Trocar para empresa 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar obra 2' }));
 
     expect(screen.getByText('APRs disponíveis:')).toBeInTheDocument();
     expect(screen.getByText('Obras disponíveis:')).toBeInTheDocument();
@@ -537,6 +716,7 @@ describe('PtForm', () => {
       );
     });
     fireEvent.click(screen.getByRole('button', { name: 'Trocar para empresa 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar obra 2' }));
     expect(await screen.findByText('APRs disponíveis: apr-b')).toBeInTheDocument();
     expect(await screen.findByText('Obras disponíveis: site-b')).toBeInTheDocument();
     expect(await screen.findByText('Usuários disponíveis: user-b')).toBeInTheDocument();
@@ -559,7 +739,7 @@ describe('PtForm', () => {
     const staleSiteFallback = deferred<{ id: string; company_id: string }>();
     const staleUserFallback = deferred<{ id: string; nome: string; company_id: string }>();
     localStorage.setItem(
-      'gst.pt.wizard.draft.company-1',
+      'gst.pt.wizard.draft.company-1.user-1',
       JSON.stringify({
         step: 1,
         values: {
@@ -603,6 +783,11 @@ describe('PtForm', () => {
     findUser.mockImplementation((userId: string) =>
       userId === 'user-a' ? staleUserFallback.promise : Promise.resolve(null),
     );
+    searchParamsGet.mockImplementation((key: string) => {
+      if (key === 'company_id') return 'company-1';
+      if (key === 'site_id') return 'site-a';
+      return null;
+    });
 
     render(<PtForm />);
     await waitFor(() => {
@@ -611,6 +796,7 @@ describe('PtForm', () => {
       expect(findUser).toHaveBeenCalledWith('user-a');
     });
     fireEvent.click(screen.getByRole('button', { name: 'Trocar para empresa 2' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Selecionar obra 2' }));
     expect(await screen.findByText('APRs disponíveis: apr-b')).toBeInTheDocument();
     expect(await screen.findByText('Obras disponíveis: site-b')).toBeInTheDocument();
     expect(await screen.findByText('Usuários disponíveis: user-b')).toBeInTheDocument();
@@ -660,5 +846,123 @@ describe('PtForm', () => {
 
     expect(screen.getByText('Empresa atual: company-2')).toBeInTheDocument();
     expect(screen.queryByText('Empresa atual: company-1')).not.toBeInTheDocument();
+  });
+
+  it('ignora o contexto de APR que chega depois de uma seleção mais recente', async () => {
+    const staleApr = deferred<{
+      id: string;
+      company_id: string;
+      site_id: string;
+      titulo: string;
+      descricao: string;
+    }>();
+    findAprsPaginated.mockResolvedValue({ data: [] });
+    findApr.mockImplementation((aprId: string) =>
+      aprId === 'apr-old'
+        ? staleApr.promise
+        : Promise.resolve({
+            id: 'apr-new',
+            company_id: 'company-1',
+            site_id: 'site-new',
+            titulo: 'APR nova geral',
+          descricao: 'Atividade geral sem risco adicional.',
+        }),
+    );
+    searchParamsGet.mockImplementation((key: string) =>
+      key === 'company_id' ? 'company-1' : null,
+    );
+
+    render(<PtForm />);
+    await screen.findByText('Empresa atual: company-1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Carregar APR antiga' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Carregar APR nova' }));
+
+    await waitFor(() => expect(screen.getByText('Obra atual: site-new')).toBeInTheDocument());
+    expect(screen.getByText('Altura atual: false')).toBeInTheDocument();
+
+    await act(async () => {
+      staleApr.resolve({
+        id: 'apr-old',
+        company_id: 'company-1',
+        site_id: 'site-old',
+        titulo: 'APR antiga trabalho em altura',
+        descricao: 'Trabalho em altura com risco elevado.',
+      });
+      await staleApr.promise;
+    });
+
+    expect(screen.getByText('Obra atual: site-new')).toBeInTheDocument();
+    expect(screen.getByText('Altura atual: false')).toBeInTheDocument();
+  });
+
+  it('mantém a resposta mais recente ao revalidar a PT após mutações concorrentes', async () => {
+    const firstRefresh = deferred<ReturnType<typeof makePtFixture>>();
+    const secondRefresh = deferred<ReturnType<typeof makePtFixture>>();
+    const initialPt = {
+      ...makePtFixture('pt-a', 'company-1', 'site-a'),
+      fotos_evidencia: [],
+    };
+    let findPtCalls = 0;
+    findPt.mockImplementation(() => {
+      findPtCalls += 1;
+      if (findPtCalls === 1) return Promise.resolve(initialPt);
+      if (findPtCalls === 2) return firstRefresh.promise;
+      return secondRefresh.promise;
+    });
+
+    searchParamsGet.mockImplementation((key: string) =>
+      key === 'focus' ? 'team' : null,
+    );
+    render(<PtForm id="pt-a" />);
+    await screen.findByText('Etapa 3 de 3');
+    expect(await screen.findByText('Fotos atuais: 0')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Recarregar PT por evidência' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Recarregar PT por evidência' }));
+
+    await act(async () => {
+      secondRefresh.resolve({
+        ...initialPt,
+        fotos_evidencia: [{ ref: 'gst:pt-photo:new', fase: 'depois', uploaded_at: '2026-09-10' }],
+      });
+      await secondRefresh.promise;
+    });
+    await waitFor(() => expect(screen.getByText('Fotos atuais: 1')).toBeInTheDocument());
+
+    await act(async () => {
+      firstRefresh.resolve({
+        ...initialPt,
+        fotos_evidencia: [],
+      });
+      await firstRefresh.promise;
+    });
+
+    expect(screen.getByText('Fotos atuais: 1')).toBeInTheDocument();
+  });
+
+  it('bloqueia duplo clique síncrono na emissão do PDF final', async () => {
+    const attachment = deferred<void>();
+    findPt.mockResolvedValue({
+      ...makePtFixture('pt-a', 'company-1', 'site-a'),
+      status: 'Aprovada',
+      pdf_file_key: null,
+    });
+    attachPtFile.mockReturnValue(attachment.promise);
+
+    render(<PtForm id="pt-a" />);
+    const emitButton = await screen.findByRole('button', { name: 'Emitir PDF final' });
+
+    await act(async () => {
+      fireEvent.click(emitButton);
+      fireEvent.click(emitButton);
+    });
+
+    expect(attachPtFile).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      attachment.resolve();
+      await attachment.promise;
+    });
   });
 });

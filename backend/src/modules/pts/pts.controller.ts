@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Body,
   Patch,
   Param,
@@ -34,6 +35,8 @@ import { FinalizePtDto } from './dto/finalize-pt.dto';
 import { AttachPtEvidencePhotoDto } from './dto/attach-pt-photo.dto';
 import { LogPreApprovalReviewDto } from './dto/log-pre-approval-review.dto';
 import { UpdatePtApprovalRulesDto } from './dto/update-pt-approval-rules.dto';
+import { ReplacePtSignaturesDto } from './dto/replace-pt-signatures.dto';
+import { CreatePtSignatureDto } from './dto/create-pt-signature.dto';
 import { ApprovePtDto } from './dto/approve-pt.dto';
 import { RejectPtDto } from './dto/reject-pt.dto';
 import { PtResponseDto, toPtResponseDto } from './dto/pt-response.dto';
@@ -53,6 +56,38 @@ import { FileInspectionService } from '../../shared/security/file-inspection.ser
 import { getRequestIp } from '../../shared/utils/request-ip.util';
 import { UserThrottle } from '../../shared/decorators/user-throttle.decorator';
 import { TenantThrottle } from '../../shared/decorators/tenant-throttle.decorator';
+
+const parseOptionalNumberParam = (
+  value: string | undefined,
+  label: string,
+): number | undefined => {
+  if (!value) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    throw new BadRequestException(`${label} deve ser um número inteiro.`);
+  }
+
+  return parsed;
+};
+
+const parseOptionalYear = (value?: string) => {
+  const year = parseOptionalNumberParam(value, 'Ano');
+  if (year !== undefined && (year < 2000 || year > 2100)) {
+    throw new BadRequestException('Ano fora do intervalo permitido.');
+  }
+  return year;
+};
+
+const parseOptionalIsoWeek = (value?: string) => {
+  const week = parseOptionalNumberParam(value, 'Semana');
+  if (week !== undefined && (week < 1 || week > 53)) {
+    throw new BadRequestException('Semana ISO fora do intervalo permitido.');
+  }
+  return week;
+};
 
 @Controller('pts')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
@@ -144,6 +179,56 @@ export class PtsController {
     return this.ptsService.getPreApprovalHistory(id);
   }
 
+  @Put(':id/signatures')
+  @Roles(
+    Role.ADMIN_GERAL,
+    Role.ADMIN_EMPRESA,
+    Role.TST,
+    Role.SUPERVISOR,
+    Role.COLABORADOR,
+  )
+  @Authorize('can_manage_pt', 'can_manage_signatures')
+  @ForensicAuditAction('update', 'pt_signatures')
+  replaceSignatures(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: ReplacePtSignaturesDto,
+    @Req()
+    req: Request & {
+      user?: { id?: string; userId?: string; sub?: string };
+    },
+  ) {
+    const userId = this.getRequestUserId(req);
+    if (!userId) {
+      throw new BadRequestException('Usuário autenticado inválido');
+    }
+    return this.ptsService.replaceSignatures(id, dto, userId);
+  }
+
+  @Post(':id/signatures')
+  @Roles(
+    Role.ADMIN_GERAL,
+    Role.ADMIN_EMPRESA,
+    Role.TST,
+    Role.SUPERVISOR,
+    Role.COLABORADOR,
+  )
+  @Authorize('can_manage_pt', 'can_manage_signatures')
+  @ForensicAuditAction('create', 'pt_signature')
+  createSignature(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Body() dto: CreatePtSignatureDto,
+    @Req()
+    req: Request & {
+      user?: { id?: string; userId?: string; sub?: string };
+    },
+  ) {
+    const userId = this.getRequestUserId(req);
+    if (!userId) {
+      throw new BadRequestException('Usuário autenticado inválido');
+    }
+    return this.ptsService.createSignature(id, dto, userId);
+  }
+
   @Post(':id/reject')
   @Roles(Role.ADMIN_GERAL, Role.ADMIN_EMPRESA, Role.TST, Role.SUPERVISOR)
   @Authorize('can_approve_pt')
@@ -198,8 +283,8 @@ export class PtsController {
   @Authorize('can_view_pt')
   listStoredFiles(@Query('year') year?: string, @Query('week') week?: string) {
     return this.ptsService.listStoredFiles({
-      year: year ? Number(year) : undefined,
-      week: week ? Number(week) : undefined,
+      year: parseOptionalYear(year),
+      week: parseOptionalIsoWeek(week),
     });
   }
 
@@ -210,8 +295,8 @@ export class PtsController {
     @Query('week') week?: string,
   ): Promise<StreamableFile> {
     const { buffer, fileName } = await this.ptsService.getWeeklyBundle({
-      year: year ? Number(year) : undefined,
-      week: week ? Number(week) : undefined,
+      year: parseOptionalYear(year),
+      week: parseOptionalIsoWeek(week),
     });
 
     return new StreamableFile(buffer, {

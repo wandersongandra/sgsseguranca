@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
+import { safeExternalArtifactUrl } from '@/lib/security/safe-external-url';
 import {
   PT_EVIDENCE_FASE_LABELS,
   ptsService,
@@ -41,16 +43,20 @@ export const PtEvidencePhotosSection = ({
   const [legenda, setLegenda] = useState('');
   const [uploading, setUploading] = useState(false);
   const [removingIndex, setRemovingIndex] = useState<number | null>(null);
+  const [confirmRemoveIndex, setConfirmRemoveIndex] = useState<number | null>(null);
   const [thumbnails, setThumbnails] = useState<Record<number, string | null>>(
     {},
   );
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const thumbnailGenerationRef = useRef(0);
+  const mutationLockRef = useRef<string | null>(null);
 
   useEffect(() => {
     setFase(defaultFaseForStatus(ptStatus));
   }, [ptStatus]);
 
   const loadThumbnails = useCallback(async () => {
+    const generation = ++thumbnailGenerationRef.current;
     if (!ptId || photos.length === 0) {
       setThumbnails({});
       return;
@@ -59,25 +65,31 @@ export const PtEvidencePhotosSection = ({
       photos.map(async (_, index) => {
         try {
           const access = await ptsService.getEvidencePhotoAccess(ptId, index);
-          return [index, access.url] as const;
+          return [index, access.url ? safeExternalArtifactUrl(access.url) : null] as const;
         } catch {
           return [index, null] as const;
         }
       }),
     );
+    if (generation !== thumbnailGenerationRef.current) return;
     setThumbnails(Object.fromEntries(entries));
   }, [ptId, photos]);
 
   useEffect(() => {
     void loadThumbnails();
+    return () => {
+      thumbnailGenerationRef.current += 1;
+    };
   }, [loadThumbnails]);
 
   const handleUpload = async (file: File) => {
     if (!ptId) return;
+    if (mutationLockRef.current) return;
     if (file.size > MAX_PHOTO_SIZE_MB * 1024 * 1024) {
       toast.error(`A foto deve ter no máximo ${MAX_PHOTO_SIZE_MB}MB.`);
       return;
     }
+    mutationLockRef.current = 'upload';
     setUploading(true);
     try {
       await ptsService.attachEvidencePhoto(ptId, file, {
@@ -93,6 +105,9 @@ export const PtEvidencePhotosSection = ({
           ?.data?.message || 'Erro ao enviar a foto.';
       toast.error(message);
     } finally {
+      if (mutationLockRef.current === 'upload') {
+        mutationLockRef.current = null;
+      }
       setUploading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -100,7 +115,16 @@ export const PtEvidencePhotosSection = ({
     }
   };
 
-  const handleRemove = async (index: number) => {
+  const requestRemove = (index: number) => {
+    if (!ptId || mutationLockRef.current) return;
+    setConfirmRemoveIndex(index);
+  };
+
+  const confirmRemove = async () => {
+    const index = confirmRemoveIndex;
+    if (!ptId || index === null || mutationLockRef.current) return;
+    mutationLockRef.current = `remove:${index}`;
+    setConfirmRemoveIndex(null);
     if (!ptId) return;
     setRemovingIndex(index);
     try {
@@ -113,6 +137,9 @@ export const PtEvidencePhotosSection = ({
           ?.data?.message || 'Erro ao remover a foto.';
       toast.error(message);
     } finally {
+      if (mutationLockRef.current === `remove:${index}`) {
+        mutationLockRef.current = null;
+      }
       setRemovingIndex(null);
     }
   };
@@ -138,10 +165,11 @@ export const PtEvidencePhotosSection = ({
           {canUploadPhotos && (
             <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
+                <label htmlFor="pt-evidence-photo-phase" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                   Fase
                 </label>
                 <select
+                  id="pt-evidence-photo-phase"
                   value={fase}
                   onChange={(event) =>
                     setFase(event.target.value as PtEvidencePhotoFase)
@@ -160,10 +188,11 @@ export const PtEvidencePhotosSection = ({
                 </select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
+                <label htmlFor="pt-evidence-photo-caption" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                   Legenda (opcional)
                 </label>
                 <input
+                  id="pt-evidence-photo-caption"
                   value={legenda}
                   onChange={(event) => setLegenda(event.target.value)}
                   maxLength={300}
@@ -172,11 +201,12 @@ export const PtEvidencePhotosSection = ({
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
+                <label htmlFor="pt-evidence-photo-file" className="mb-1 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                   Foto (JPG, PNG ou WebP até {MAX_PHOTO_SIZE_MB}MB)
                 </label>
                 <input
                   ref={fileInputRef}
+                  id="pt-evidence-photo-file"
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   disabled={uploading}
@@ -242,8 +272,9 @@ export const PtEvidencePhotosSection = ({
                     {canUploadPhotos && (
                       <button
                         type="button"
-                        onClick={() => void handleRemove(index)}
+                        onClick={() => requestRemove(index)}
                         disabled={removingIndex === index}
+                        aria-label={`Remover foto ${index + 1}`}
                         className="text-xs font-semibold text-[var(--ds-color-danger)] hover:underline disabled:opacity-50"
                       >
                         {removingIndex === index ? 'Removendo...' : 'Remover'}
@@ -256,6 +287,17 @@ export const PtEvidencePhotosSection = ({
           )}
         </>
       )}
+      <ConfirmModal
+        open={confirmRemoveIndex !== null}
+        onClose={() => {
+          if (removingIndex === null) setConfirmRemoveIndex(null);
+        }}
+        onConfirm={() => void confirmRemove()}
+        title="Remover foto de evidência"
+        description="A foto será removida da PT e do conjunto de evidências desta etapa. Esta ação não pode ser desfeita."
+        confirmLabel="Remover foto"
+        loading={removingIndex !== null}
+      />
     </div>
   );
 };

@@ -186,6 +186,7 @@ export class SignaturesService {
     const documentType = this.normalizeLegacyReadDocumentType(
       createSignatureDto.document_type,
     );
+    this.assertPtMutationsUseDedicatedEndpoint(documentType);
     this.assertDocumentTypeAllowedForNewSignatures(documentType);
     const documentScope = await this.assertDocumentSiteVisibleForCurrentScope({
       documentId: createSignatureDto.document_id,
@@ -290,6 +291,7 @@ export class SignaturesService {
     const documentType = this.normalizeLegacyReadDocumentType(
       input.document_type,
     );
+    this.assertPtMutationsUseDedicatedEndpoint(documentType);
     this.assertDocumentTypeAllowedForNewSignatures(documentType);
 
     const documentScope = await this.assertDocumentSiteVisibleForCurrentScope({
@@ -695,6 +697,8 @@ export class SignaturesService {
       throw new NotFoundException('Assinatura não encontrada.');
     }
 
+    this.assertPtMutationsUseDedicatedEndpoint(signature.document_type);
+
     await this.assertDocumentSiteVisibleForCurrentScope({
       documentId: signature.document_id,
       documentType: signature.document_type,
@@ -729,6 +733,7 @@ export class SignaturesService {
     requesterId: string,
     requesterRole?: string | null,
   ): Promise<void> {
+    this.assertPtMutationsUseDedicatedEndpoint(document_type);
     const tenantId = this.tenantService.getTenantId();
     await this.assertDocumentSiteVisibleForCurrentScope({
       documentId: document_id,
@@ -2038,6 +2043,19 @@ export class SignaturesService {
     if (!ACTIVE_SIGNATURE_DOCUMENT_TYPES.has(normalized)) {
       throw new BadRequestException(
         'document_type inválido para criação de assinatura.',
+      );
+    }
+  }
+
+  private assertPtMutationsUseDedicatedEndpoint(documentType: string): void {
+    const normalized = this.normalizeLegacyReadDocumentType(documentType)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+
+    if (normalized === 'pt') {
+      throw new BadRequestException(
+        'Assinaturas de PT devem usar o endpoint específico da PT.',
       );
     }
   }

@@ -79,6 +79,7 @@ export const EmergencyRescueSection = ({
           <input
             {...register('contato_emergencia')}
             id="pt-contato_emergencia"
+            maxLength={200}
             aria-required={espacoConfinado}
             placeholder="Ex: Brigada interna — (11) 99999-0000 / ramal 220"
             className={inputClassName(Boolean(fieldError('contato_emergencia')))}
@@ -97,6 +98,7 @@ export const EmergencyRescueSection = ({
           <input
             {...register('ponto_encontro')}
             id="pt-ponto_encontro"
+            maxLength={300}
             placeholder="Ex: Portaria principal — área de concentração"
             className={inputClassName(false)}
           />
@@ -112,6 +114,7 @@ export const EmergencyRescueSection = ({
           <textarea
             {...register('plano_resgate')}
             id="pt-plano_resgate"
+            maxLength={2000}
             aria-required={espacoConfinado}
             rows={3}
             placeholder="Descreva o plano/equipe de resgate, equipamentos disponíveis e tempo de resposta."
@@ -172,6 +175,7 @@ export const EmergencyRescueSection = ({
                     setValue('vigia_user_id', '', { shouldValidate: true });
                   }
                 }}
+                maxLength={200}
                 placeholder="Nome completo do vigia"
                 className={inputClassName(Boolean(fieldError('vigia_nome')))}
               />

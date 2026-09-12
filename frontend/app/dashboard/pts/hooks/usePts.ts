@@ -19,6 +19,8 @@ import { handleApiError } from '@/lib/error-handler';
 import { openPdfForPrint, openUrlInNewTab } from '@/lib/print-utils';
 import { isAiEnabled } from '@/lib/featureFlags';
 import { base64ToPdfBlob } from '@/lib/pdf/pdfFile';
+import { selectedTenantStore } from '@/lib/selectedTenantStore';
+import { siteStore } from '@/lib/siteStore';
 import type {
   PtApprovalChecklistState,
   PtApprovalReview,
@@ -81,6 +83,20 @@ async function loadPtPdfGenerator() {
 export function usePts() {
   const [pts, setPts] = useState<Pt[]>([]);
   const timerRef = useRef<number | undefined>(undefined);
+  const listRequestGenerationRef = useRef(0);
+  const scopeGenerationRef = useRef(0);
+  const [scopeRevision, setScopeRevision] = useState(0);
+  const mutationLocksRef = useRef(new Set<string>());
+  const acquireMutation = useCallback((key: string) => {
+    if (mutationLocksRef.current.has(key)) {
+      return false;
+    }
+    mutationLocksRef.current.add(key);
+    return true;
+  }, []);
+  const releaseMutation = useCallback((key: string) => {
+    mutationLocksRef.current.delete(key);
+  }, []);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -126,6 +142,57 @@ export function usePts() {
     };
   } | null>(null);
 
+  useEffect(() => {
+    const getScopeKey = () => {
+      const tenant = selectedTenantStore.get();
+      const site = siteStore.get();
+      return [tenant?.companyId || '', site?.companyId || '', site?.siteId || ''].join(':');
+    };
+
+    let previousScopeKey = getScopeKey();
+    const invalidateScope = () => {
+      const nextScopeKey = getScopeKey();
+      if (nextScopeKey === previousScopeKey) return;
+
+      previousScopeKey = nextScopeKey;
+      scopeGenerationRef.current += 1;
+      listRequestGenerationRef.current += 1;
+      setPts([]);
+      setTotal(0);
+      setLastPage(1);
+      setLoading(true);
+      setLoadError(null);
+      setInsights([]);
+      setApprovalRules(null);
+      setOverviewMetrics(null);
+      setApprovalIssuesById({});
+      setApprovalReviewById({});
+      setApprovalChecklistById({});
+      setApprovalReviewLoadingId(null);
+      setApprovalRulesLoading(true);
+      setApprovingId(null);
+      setRejectingId(null);
+      setRejectTargetId(null);
+      setFinalizingId(null);
+      setClosingPt(null);
+      setConfirmDeleteId(null);
+      setDeleteLoading(false);
+      setEmittingPdfId(null);
+      setIsMailModalOpen(false);
+      setSelectedDoc(null);
+      setPage(1);
+      setScopeRevision((current) => current + 1);
+    };
+
+    const unsubscribeTenant = selectedTenantStore.subscribe(invalidateScope);
+    const unsubscribeSite = siteStore.subscribe(invalidateScope);
+
+    return () => {
+      unsubscribeTenant();
+      unsubscribeSite();
+    };
+  }, []);
+
   const buildPtFilename = useCallback(
     (pt: Pt) => `PT_${String(pt.numero || pt.titulo || pt.id).replace(/\s+/g, '_')}.pdf`,
     [],
@@ -141,6 +208,8 @@ export function usePts() {
   );
 
   const loadPts = useCallback(async () => {
+    const requestGeneration = ++listRequestGenerationRef.current;
+
     try {
       setLoading(true);
       setLoadError(null);
@@ -151,22 +220,29 @@ export function usePts() {
         status: statusFilter || undefined,
       });
 
+      if (requestGeneration !== listRequestGenerationRef.current) return;
       setPts(pageResult.data);
       setTotal(pageResult.total);
       setLastPage(pageResult.lastPage);
     } catch (error) {
+      if (requestGeneration !== listRequestGenerationRef.current) return;
       setLoadError('Nao foi possivel carregar a lista de PTs.');
       handleApiError(error, 'PTs');
     } finally {
-      setLoading(false);
+      if (requestGeneration === listRequestGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [page, limit, deferredSearchTerm, statusFilter]);
 
   const loadOverview = useCallback(async () => {
+    const scopeGeneration = scopeGenerationRef.current;
     try {
       const overview = await ptsService.getAnalyticsOverview();
+      if (scopeGeneration !== scopeGenerationRef.current) return;
       setOverviewMetrics(overview);
     } catch (error) {
+      if (scopeGeneration !== scopeGenerationRef.current) return;
       logger.error('Erro ao carregar overview analítico de PTs:', error);
       setOverviewMetrics(null);
     }
@@ -174,8 +250,10 @@ export function usePts() {
 
   const loadInsights = useCallback(async () => {
     if (!isAiEnabled()) return;
+    const scopeGeneration = scopeGenerationRef.current;
     try {
       const result = await aiService.getInsights();
+      if (scopeGeneration !== scopeGenerationRef.current) return;
       const ptInsights = result.insights.filter(
         (i: Insight) =>
           i.action.includes('/pts') ||
@@ -184,20 +262,26 @@ export function usePts() {
       );
       setInsights(ptInsights);
     } catch (error) {
+      if (scopeGeneration !== scopeGenerationRef.current) return;
       logger.error('Erro ao carregar insights:', error);
     }
   }, []);
 
   const loadApprovalRules = useCallback(async () => {
+    const scopeGeneration = scopeGenerationRef.current;
     try {
       setApprovalRulesLoading(true);
       const rules = await ptsService.getApprovalRules();
+      if (scopeGeneration !== scopeGenerationRef.current) return;
       setApprovalRules(rules);
     } catch (error) {
+      if (scopeGeneration !== scopeGenerationRef.current) return;
       logger.error('Erro ao carregar regras de aprovação da PT:', error);
       setApprovalRules(null);
     } finally {
-      setApprovalRulesLoading(false);
+      if (scopeGeneration === scopeGenerationRef.current) {
+        setApprovalRulesLoading(false);
+      }
     }
   }, []);
 
@@ -218,19 +302,19 @@ export function usePts() {
 
   useEffect(() => {
     loadPts();
-  }, [loadPts]);
+  }, [loadPts, scopeRevision]);
 
   useEffect(() => {
     loadOverview();
-  }, [loadOverview]);
+  }, [loadOverview, scopeRevision]);
 
   useEffect(() => {
     loadInsights();
-  }, [loadInsights]);
+  }, [loadInsights, scopeRevision]);
 
   useEffect(() => {
     loadApprovalRules();
-  }, [loadApprovalRules]);
+  }, [loadApprovalRules, scopeRevision]);
 
   const handleDelete = useCallback((id: string) => {
     setConfirmDeleteId(id);
@@ -238,6 +322,8 @@ export function usePts() {
 
   const confirmDelete = useCallback(async () => {
     if (!confirmDeleteId) return;
+    const mutationKey = `delete:${confirmDeleteId}`;
+    if (!acquireMutation(mutationKey)) return;
     setDeleteLoading(true);
     try {
       await ptsService.delete(confirmDeleteId);
@@ -248,9 +334,10 @@ export function usePts() {
     } catch (error) {
       handleApiError(error, 'PTs');
     } finally {
+      releaseMutation(mutationKey);
       setDeleteLoading(false);
     }
-  }, [confirmDeleteId, loadOverview, loadPts]);
+  }, [acquireMutation, confirmDeleteId, loadOverview, loadPts, releaseMutation]);
 
   const dismissApprovalIssue = useCallback((id: string) => {
     setApprovalIssuesById((current) => {
@@ -490,6 +577,8 @@ export function usePts() {
 
   const handlePrepareApproval = useCallback(
     async (id: string) => {
+      const mutationKey = `approval-review:${id}`;
+      if (!acquireMutation(mutationKey)) return;
       setApprovalReviewLoadingId(id);
       dismissApprovalIssue(id);
 
@@ -520,10 +609,11 @@ export function usePts() {
       } catch (error) {
         handleApiError(error, 'Pré-liberação da PT');
       } finally {
+        releaseMutation(mutationKey);
         setApprovalReviewLoadingId((current) => (current === id ? null : current));
       }
     },
-    [buildApprovalReview, dismissApprovalIssue],
+    [acquireMutation, buildApprovalReview, dismissApprovalIssue, releaseMutation],
   );
 
   const generatePtPdfPayload = useCallback(async (pt: Pt, draftWatermark: boolean) => {
@@ -541,6 +631,8 @@ export function usePts() {
 
   const handleEmitGovernedPdf = useCallback(
     async (id: string) => {
+      const mutationKey = `emit-pdf:${id}`;
+      if (!acquireMutation(mutationKey)) return;
       setEmittingPdfId(id);
       try {
         const pt = pts.find((item) => item.id === id) || (await ptsService.findOne(id));
@@ -554,10 +646,11 @@ export function usePts() {
       } catch (error) {
         handleApiError(error, 'Emissão do PDF final da PT');
       } finally {
+        releaseMutation(mutationKey);
         setEmittingPdfId(null);
       }
     },
-    [generatePtPdfPayload, loadPts, pts],
+    [acquireMutation, generatePtPdfPayload, loadPts, pts, releaseMutation],
   );
 
   const handleDownloadPdf = useCallback(
@@ -691,6 +784,7 @@ export function usePts() {
           openPdfForPrint(fileURL, () => {
             toast.info('Pop-up bloqueado. Abrimos o PDF na mesma aba para impressão.');
           });
+          setTimeout(() => URL.revokeObjectURL(fileURL), 60_000);
         }
       } catch (error) {
         handleApiError(error, 'Impressão');
@@ -719,6 +813,8 @@ export function usePts() {
         return;
       }
 
+      const mutationKey = `approve:${id}`;
+      if (!acquireMutation(mutationKey)) return;
       setApprovingId(id);
       dismissApprovalIssue(id);
 
@@ -746,16 +842,19 @@ export function usePts() {
 
         handleApiError(error, 'PT');
       } finally {
+        releaseMutation(mutationKey);
         setApprovingId((current) => (current === id ? null : current));
       }
     },
     [
       approvalChecklistById,
       approvalReviewById,
+      acquireMutation,
       dismissApprovalIssue,
       dismissApprovalReview,
       loadOverview,
       loadPts,
+      releaseMutation,
     ],
   );
 
@@ -769,6 +868,8 @@ export function usePts() {
       const normalizedReason = reason.trim();
       if (!id || !normalizedReason) return;
 
+      const mutationKey = `reject:${id}`;
+      if (!acquireMutation(mutationKey)) return;
       setRejectingId(id);
       dismissApprovalIssue(id);
 
@@ -782,10 +883,19 @@ export function usePts() {
       } catch (error) {
         handleApiError(error, 'PT');
       } finally {
+        releaseMutation(mutationKey);
         setRejectingId((current) => (current === id ? null : current));
       }
     },
-    [dismissApprovalIssue, dismissApprovalReview, loadOverview, loadPts, rejectTargetId],
+    [
+      acquireMutation,
+      dismissApprovalIssue,
+      dismissApprovalReview,
+      loadOverview,
+      loadPts,
+      rejectTargetId,
+      releaseMutation,
+    ],
   );
 
   const handleFinalize = useCallback(
@@ -809,6 +919,8 @@ export function usePts() {
       const target = closingPt;
       if (!target) return;
 
+      const mutationKey = `finalize:${target.id}`;
+      if (!acquireMutation(mutationKey)) return;
       setFinalizingId(target.id);
       try {
         await ptsService.finalize(target.id, payload);
@@ -821,10 +933,19 @@ export function usePts() {
       } catch (error) {
         handleApiError(error, 'PT');
       } finally {
+        releaseMutation(mutationKey);
         setFinalizingId((current) => (current === target.id ? null : current));
       }
     },
-    [closingPt, dismissApprovalIssue, dismissApprovalReview, loadOverview, loadPts],
+    [
+      acquireMutation,
+      closingPt,
+      dismissApprovalIssue,
+      dismissApprovalReview,
+      loadOverview,
+      loadPts,
+      releaseMutation,
+    ],
   );
 
   // Filtering is now server-side — pts already contains the filtered page

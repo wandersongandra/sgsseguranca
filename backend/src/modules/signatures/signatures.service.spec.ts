@@ -314,6 +314,55 @@ describe('SignaturesService', () => {
     );
   });
 
+  it('recusa assinatura de PT pelo endpoint genérico', async () => {
+    await expect(
+      service.create(
+        {
+          document_id: 'pt-1',
+          document_type: 'PT',
+          user_id: 'user-1',
+          signature_data: 'data:image/png;base64,AAAA',
+          type: 'drawn',
+        },
+        'user-1',
+      ),
+    ).rejects.toThrow(
+      'Assinaturas de PT devem usar o endpoint específico da PT.',
+    );
+    expect(repository.manager.transaction).not.toHaveBeenCalled();
+  });
+
+  it('recusa remoção genérica de assinatura de PT', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'signature-pt-1',
+      document_id: 'pt-1',
+      document_type: 'PT',
+      company_id: 'company-1',
+      user_id: 'user-1',
+      signature_data_key: null,
+    });
+
+    await expect(service.remove('signature-pt-1', 'user-1')).rejects.toThrow(
+      'Assinaturas de PT devem usar o endpoint específico da PT.',
+    );
+    expect(repository.softDelete).not.toHaveBeenCalled();
+  });
+
+  it('recusa substituição genérica de assinaturas de PT', async () => {
+    await expect(
+      service.replaceDocumentSignatures({
+        document_id: 'pt-1',
+        document_type: 'PT',
+        company_id: 'company-1',
+        authenticated_user_id: 'user-1',
+        signatures: [],
+      }),
+    ).rejects.toThrow(
+      'Assinaturas de PT devem usar o endpoint específico da PT.',
+    );
+    expect(repository.manager.transaction).not.toHaveBeenCalled();
+  });
+
   it('rejeita replay de assinatura DDS direta para o mesmo participante', async () => {
     dataSource.query.mockResolvedValue([{ user_id: 'user-1' }] as never);
     transactionalRepository.findOne

@@ -88,13 +88,13 @@ describe('migration history compatibility', () => {
     expect(unknownDrift).toEqual([]);
   });
 
-  it('reports only 0391-0401 and the post-cutover migrations as pending', () => {
+  it('reports only the post-cutover migrations as pending', () => {
     const pending = filterPendingMigrations(
       readMigrationManifest().entries,
       executedNames,
     ).map((migration) => migration.name);
 
-    expect(pending).toHaveLength(14);
+    expect(pending).toHaveLength(15);
     expect(pending).toEqual([
       'CreateDurableIdempotencyRecords1709000000391',
       'HardenSecurityDefinerFunctions1709000000392',
@@ -110,6 +110,7 @@ describe('migration history compatibility', () => {
       'AddSignatureKeyVersioning1709000000402',
       'DropRedundantAprCompositeIndexes1709000000403',
       'AddMissingAprWorkflowForeignKeys1709000000404',
+      'HardenSiteScopeFailClosed1709000000405',
     ]);
   });
 

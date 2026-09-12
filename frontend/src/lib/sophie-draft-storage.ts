@@ -58,8 +58,19 @@ function getDraftStorage(): Storage | null {
   return window.sessionStorage;
 }
 
-function persistDraft(key: string, draft: SophieWizardDraft) {
-  const storage = getDraftStorage();
+function getLocalDraftStorage(): Storage | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  return window.localStorage;
+}
+
+function persistDraft(
+  key: string,
+  draft: SophieWizardDraft,
+  storage: Storage | null = getDraftStorage(),
+) {
   if (!storage) {
     return;
   }
@@ -91,15 +102,21 @@ export function storeSophieAprDraft(
 
 export function storeSophiePtDraft(
   companyId: string | null | undefined,
+  userId: string | null | undefined,
   draft: SophieWizardDraft,
   metadata?: SophieWizardDraftMetadata,
 ) {
+  if (!companyId || !userId) {
+    return;
+  }
+
   persistDraft(
-    `gst.pt.wizard.draft.${resolveCompanyStorageKey(companyId)}`,
+    `gst.pt.wizard.draft.${resolveCompanyStorageKey(companyId)}.${userId}`,
     {
       ...draft,
       metadata: metadata || draft.metadata,
     },
+    getLocalDraftStorage(),
   );
 }
 

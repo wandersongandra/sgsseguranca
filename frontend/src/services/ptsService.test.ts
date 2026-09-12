@@ -153,6 +153,40 @@ describe("ptsService", () => {
     expect(result).toEqual(updated);
   });
 
+  it("substitui assinaturas da PT pela rota atômica do módulo", async () => {
+    const resultPayload = { entityId: "pt-1", replaced: 1 };
+    (api.put as jest.Mock).mockResolvedValue({ data: resultPayload });
+    const signatures = [
+      {
+        user_id: "user-1",
+        signature_data: "data:image/png;base64,signature",
+        type: "drawn",
+      },
+    ];
+
+    await expect(ptsService.replaceSignatures("pt-1", signatures)).resolves.toEqual(
+      resultPayload,
+    );
+    expect(api.put).toHaveBeenCalledWith("/pts/pt-1/signatures", { signatures });
+  });
+
+  it("cria assinatura avulsa pela rota PT restrita ao executante", async () => {
+    const resultPayload = { entityId: "pt-1", created: true as const };
+    (api.post as jest.Mock).mockResolvedValue({ data: resultPayload });
+
+    await expect(
+      ptsService.createSignature("pt-1", {
+        signature_data: "data:image/png;base64,signature",
+        type: "drawn",
+      }),
+    ).resolves.toEqual(resultPayload);
+
+    expect(api.post).toHaveBeenCalledWith("/pts/pt-1/signatures", {
+      signature_data: "data:image/png;base64,signature",
+      type: "drawn",
+    });
+  });
+
   it("lança PT_OFFLINE_SIGNATURES_NOT_SUPPORTED ao atualizar PT offline com allowOfflineQueue=false", async () => {
     (api.patch as jest.Mock).mockRejectedValue({ code: "ERR_NETWORK" });
 
