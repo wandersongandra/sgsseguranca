@@ -1,10 +1,10 @@
 # SGS — plano de hardening do módulo PT
 
-**Data:** 2026-09-10  
-**Repositório:** `wandersongandra/sgsseguranca`  
-**Worktree:** `C:\Users\User\Documents\trae_projects\sgs-pt-hardening-20260910`  
-**Branch:** `audit/pt-module-hardening-20260910`  
-**Base:** `origin/main` em `5a5ae66ae8eb6410ade8a4b0e68dbd3105fc6219`  
+**Data:** 2026-09-10
+**Repositório:** `wandersongandra/sgsseguranca`
+**Worktree:** `C:\Users\User\Documents\trae_projects\sgs-pt-hardening-20260910`
+**Branch:** `audit/pt-module-hardening-20260910`
+**Base:** `origin/main` em `5a5ae66ae8eb6410ade8a4b0e68dbd3105fc6219`
 **Escopo:** somente o módulo PT, seus contratos diretos, testes e documentação desta auditoria.
 
 ## Objetivo

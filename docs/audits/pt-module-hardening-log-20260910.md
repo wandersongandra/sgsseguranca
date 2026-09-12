@@ -1,7 +1,7 @@
 # SGS — log de execução do hardening do módulo PT
 
-**Worktree:** `C:\Users\User\Documents\trae_projects\sgs-pt-hardening-20260910`  
-**Branch:** `audit/pt-module-hardening-20260910`  
+**Worktree:** `C:\Users\User\Documents\trae_projects\sgs-pt-hardening-20260910`
+**Branch:** `audit/pt-module-hardening-20260910`
 **Base:** `5a5ae66ae8eb6410ade8a4b0e68dbd3105fc6219`
 
 ## GATE 0 — SETUP / BASELINE
