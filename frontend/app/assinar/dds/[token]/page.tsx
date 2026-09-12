@@ -27,6 +27,10 @@ import {
   publicDdsSignatureService,
 } from "@/services/publicDdsSignatureService";
 import { logger } from "@/lib/logger";
+import {
+  decodeDdsSignatureToken,
+  resolveDdsSignatureToken,
+} from "./token-utils";
 
 declare global {
   interface Window {
@@ -80,21 +84,6 @@ function clearSessionToken() {
   } catch {
     // silent
   }
-}
-
-export function decodeDdsSignatureToken(rawToken: string): string {
-  try {
-    return decodeURIComponent(rawToken);
-  } catch {
-    return "";
-  }
-}
-
-export function resolveDdsSignatureToken(
-  urlToken: string,
-  sessionToken: string | null,
-): string | null {
-  return urlToken || sessionToken || null;
 }
 
 export default function PublicDdsSignaturePage() {

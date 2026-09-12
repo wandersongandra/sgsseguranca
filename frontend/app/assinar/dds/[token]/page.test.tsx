@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import PublicDdsSignaturePage, {
+import PublicDdsSignaturePage from "./page";
+import {
   decodeDdsSignatureToken,
   resolveDdsSignatureToken,
-} from "./page";
+} from "./token-utils";
 import { publicDdsSignatureService } from "@/services/publicDdsSignatureService";
 
 jest.mock("next/navigation", () => ({ useParams: () => ({ token: "token-a11y" }) }));
