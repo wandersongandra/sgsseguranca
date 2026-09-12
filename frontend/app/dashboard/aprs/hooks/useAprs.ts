@@ -14,7 +14,22 @@ import { base64ToPdfBlob } from "@/lib/pdf/pdfFile";
 import { AprDueFilter, AprSortOption } from "../components/aprListingUtils";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
 import { siteStore } from "@/lib/siteStore";
+import { sessionStore } from "@/lib/sessionStore";
 import { queryKeys } from "@/lib/query-keys";
+
+// selectedTenantStore só é populado quando um admin_geral escolhe uma empresa
+// no seletor de tenant; para um usuário comum (escopo de empresa única), ele
+// fica sempre vazio (persistAuthenticatedSession limpa no login) e o tenant
+// real vem do JWT via sessionStore. Sem este fallback, loadAprs() nunca
+// dispara o fetch para nenhum usuário fora do admin_geral (mesmo padrão já
+// corrigido em app/dashboard/users/hooks/useUsers.ts).
+function resolveActiveCompanyId(): string | undefined {
+  return (
+    selectedTenantStore.get()?.companyId ||
+    sessionStore.get()?.companyId ||
+    undefined
+  );
+}
 
 type AprContextFilter = "minhas" | "vence-hoje" | "preciso-assinar" | "";
 
@@ -119,7 +134,7 @@ export function useAprs(options?: UseAprsOptions) {
     options?.initialResponsibleFilter || "",
   );
   const [tenantContext, setTenantContext] = useState(() => ({
-    companyId: selectedTenantStore.get()?.companyId || undefined,
+    companyId: resolveActiveCompanyId(),
     siteId: siteStore.get()?.siteId || undefined,
   }));
   const activeCompanyId = tenantContext.companyId;
@@ -230,7 +245,7 @@ export function useAprs(options?: UseAprsOptions) {
       if (
         requestId !== activeRequestIdRef.current ||
         controller.signal.aborted ||
-        selectedTenantStore.get()?.companyId !== companyId ||
+        resolveActiveCompanyId() !== companyId ||
         siteStore.get()?.siteId !== siteId ||
         lastAppliedContextRef.current?.key === latestContext.key
       ) {
@@ -319,7 +334,7 @@ useEffect(() => {
 
   useEffect(() => {
     const unsubscribeTenant = selectedTenantStore.subscribe((tenant) => {
-      const nextCompanyId = tenant?.companyId || undefined;
+      const nextCompanyId = tenant?.companyId || resolveActiveCompanyId();
       const nextSiteId = siteStore.get()?.siteId || undefined;
       setTenantContext({ companyId: nextCompanyId, siteId: nextSiteId });
       activeControllerRef.current?.abort();
@@ -337,7 +352,7 @@ useEffect(() => {
     });
 
     const unsubscribeSite = siteStore.subscribe((site) => {
-      const nextCompanyId = selectedTenantStore.get()?.companyId || undefined;
+      const nextCompanyId = resolveActiveCompanyId();
       const nextSiteId = site?.siteId || undefined;
       setTenantContext({ companyId: nextCompanyId, siteId: nextSiteId });
       activeControllerRef.current?.abort();
