@@ -2239,6 +2239,50 @@ export function AprForm({ id }: AprFormProps) {
     users,
   });
 
+  // Reconciliação de <select>s nativos (achado da auditoria v2): existem
+  // TRÊS caminhos independentes que podem definir company_id/site_id/
+  // elaborador_id antes de `companies`/`sites`/`users` terminarem de
+  // carregar — auto-preenchimento de Nova APR (useAprCatalogs), restauração
+  // de rascunho salvo (useAprInitialData → reset()) e o carregamento da APR
+  // em modo edição. Em todos os casos, um <select> nativo ignora
+  // silenciosamente um valor sem <option> correspondente no momento exato
+  // da chamada, e nada reaplica o valor depois que a opção aparece — mesmo
+  // com o valor certo já presente no estado interno do react-hook-form (só
+  // o DOM do <select> fica com o valor visualmente vazio). Este efeito
+  // corrige de forma central, sem depender de qual caminho definiu o valor:
+  // toda vez que a lista de opções correspondente terminar de carregar,
+  // reaplica o valor atual do formulário para aquele campo — reaplicar o
+  // mesmo valor é inofensivo (setValue é idempotente para o próprio field).
+  useEffect(() => {
+    if (companies.length === 0) return;
+    const currentCompanyId = getValues("company_id");
+    if (
+      currentCompanyId &&
+      companies.some((company) => company.id === currentCompanyId)
+    ) {
+      setValue("company_id", currentCompanyId);
+    }
+  }, [companies, getValues, setValue]);
+
+  useEffect(() => {
+    if (sites.length === 0) return;
+    const currentSiteId = getValues("site_id");
+    if (currentSiteId && sites.some((site) => site.id === currentSiteId)) {
+      setValue("site_id", currentSiteId);
+    }
+  }, [sites, getValues, setValue]);
+
+  useEffect(() => {
+    if (users.length === 0) return;
+    const currentElaboradorId = getValues("elaborador_id");
+    if (
+      currentElaboradorId &&
+      users.some((candidate) => candidate.id === currentElaboradorId)
+    ) {
+      setValue("elaborador_id", currentElaboradorId);
+    }
+  }, [users, getValues, setValue]);
+
   useEffect(() => {
     if (isReadOnly) return;
     if (fetching) return;
