@@ -14,22 +14,8 @@ import { base64ToPdfBlob } from "@/lib/pdf/pdfFile";
 import { AprDueFilter, AprSortOption } from "../components/aprListingUtils";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
 import { siteStore } from "@/lib/siteStore";
-import { sessionStore } from "@/lib/sessionStore";
+import { resolveActiveCompanyId } from "@/lib/tenant-context";
 import { queryKeys } from "@/lib/query-keys";
-
-// selectedTenantStore só é populado quando um admin_geral escolhe uma empresa
-// no seletor de tenant; para um usuário comum (escopo de empresa única), ele
-// fica sempre vazio (persistAuthenticatedSession limpa no login) e o tenant
-// real vem do JWT via sessionStore. Sem este fallback, loadAprs() nunca
-// dispara o fetch para nenhum usuário fora do admin_geral (mesmo padrão já
-// corrigido em app/dashboard/users/hooks/useUsers.ts).
-function resolveActiveCompanyId(): string | undefined {
-  return (
-    selectedTenantStore.get()?.companyId ||
-    sessionStore.get()?.companyId ||
-    undefined
-  );
-}
 
 type AprContextFilter = "minhas" | "vence-hoje" | "preciso-assinar" | "";
 
