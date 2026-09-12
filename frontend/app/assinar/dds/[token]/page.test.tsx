@@ -1,5 +1,8 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import PublicDdsSignaturePage from "./page";
+import PublicDdsSignaturePage, {
+  decodeDdsSignatureToken,
+  resolveDdsSignatureToken,
+} from "./page";
 import { publicDdsSignatureService } from "@/services/publicDdsSignatureService";
 
 jest.mock("next/navigation", () => ({ useParams: () => ({ token: "token-a11y" }) }));
@@ -87,6 +90,15 @@ describe("PublicDdsSignaturePage accessibility", () => {
   });
 
   afterEach(() => jest.restoreAllMocks());
+
+  it("prioriza o token da URL e falha fechado para encoding inválido", () => {
+    expect(resolveDdsSignatureToken("token-novo", "token-antigo")).toBe(
+      "token-novo",
+    );
+    expect(resolveDdsSignatureToken("", "token-antigo")).toBe("token-antigo");
+    expect(decodeDdsSignatureToken("token%20valido")).toBe("token valido");
+    expect(decodeDdsSignatureToken("%E0%A4%A")).toBe("");
+  });
 
   it("oferece assinatura digitada por teclado e envia PNG compatível com a API", async () => {
     render(<PublicDdsSignaturePage />);

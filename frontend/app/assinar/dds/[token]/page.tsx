@@ -82,9 +82,24 @@ function clearSessionToken() {
   }
 }
 
+export function decodeDdsSignatureToken(rawToken: string): string {
+  try {
+    return decodeURIComponent(rawToken);
+  } catch {
+    return "";
+  }
+}
+
+export function resolveDdsSignatureToken(
+  urlToken: string,
+  sessionToken: string | null,
+): string | null {
+  return urlToken || sessionToken || null;
+}
+
 export default function PublicDdsSignaturePage() {
   const params = useParams<{ token: string }>();
-  const urlToken = decodeURIComponent(params.token || "");
+  const urlToken = decodeDdsSignatureToken(params.token || "");
   const [resolvedToken, setResolvedToken] = useState<string | null>(null);
   const signatureRef = useRef<SignatureCanvas>(null);
   const [context, setContext] = useState<PublicDdsSignatureContext | null>(
@@ -150,7 +165,7 @@ export default function PublicDdsSignaturePage() {
     setError(null);
 
     const sessionToken = getSessionToken();
-    const effectiveToken = sessionToken || urlToken;
+    const effectiveToken = resolveDdsSignatureToken(urlToken, sessionToken);
 
     if (!effectiveToken) {
       setError("Link de assinatura inválido.");

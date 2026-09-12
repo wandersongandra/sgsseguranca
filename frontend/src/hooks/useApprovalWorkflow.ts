@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { handleApiError } from '@/lib/error-handler';
 
 export type WorkflowAction = 'approve' | 'reject' | 'reopen';
@@ -18,18 +18,21 @@ const DEFAULT_LABELS: Record<WorkflowAction, string> = {
 
 export function useApprovalWorkflow(): UseApprovalWorkflowReturn {
   const [acting, setActing] = useState<WorkflowAction | null>(null);
+  const actingRef = useRef(false);
 
   const execute = useCallback(async (action: WorkflowAction, fn: () => Promise<void>, label?: string) => {
-    if (acting) return;
+    if (actingRef.current) return;
+    actingRef.current = true;
     setActing(action);
     try {
       await fn();
     } catch (err) {
       handleApiError(err, label ?? DEFAULT_LABELS[action]);
     } finally {
+      actingRef.current = false;
       setActing(null);
     }
-  }, [acting]);
+  }, []);
 
   return { acting, execute };
 }

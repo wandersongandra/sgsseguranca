@@ -79,6 +79,7 @@ import { safeFormatDate } from "@/lib/date/safeFormat";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { ResponsiveDataList } from "@/components/ui/responsive-data-list";
 import { getDdsActionPolicy } from "../components/documentActionPolicy";
+import { useSingleFlightGuard } from "@/hooks/useSingleFlightGuard";
 const SendMailModal = dynamic(
   () =>
     import("@/components/SendMailModal").then((module) => module.SendMailModal),
@@ -109,6 +110,7 @@ function parseYearFilter(value: string) {
   }
   return parsed;
 }
+
 
 function parseWeekFilter(value: string) {
   if (!value || !/^\d{1,2}$/.test(value)) return undefined;
@@ -251,6 +253,11 @@ export default function DdsPage() {
   const [issuingSignatureLinksId, setIssuingSignatureLinksId] = useState<
     string | null
   >(null);
+  const deleteGuard = useSingleFlightGuard();
+  const operationalizeGuard = useSingleFlightGuard();
+  const statusChangeGuard = useSingleFlightGuard();
+  const signatureLinksGuard = useSingleFlightGuard();
+  const observabilityDispatchGuard = useSingleFlightGuard();
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -481,7 +488,7 @@ useEffect(() => {
   }
 
   async function confirmDelete() {
-    if (!confirmDeleteId) return;
+    if (!confirmDeleteId || !deleteGuard.tryStart()) return;
     setDeleteLoading(true);
     try {
       await ddsService.delete(confirmDeleteId);
@@ -500,6 +507,7 @@ useEffect(() => {
         "Erro ao excluir DDS. Verifique dependências e tente novamente.",
       );
     } finally {
+      deleteGuard.finish();
       setDeleteLoading(false);
     }
   }
@@ -721,7 +729,7 @@ useEffect(() => {
   };
 
   const confirmOperationalize = async () => {
-    if (!operationalizeTarget) return;
+    if (!operationalizeTarget || !operationalizeGuard.tryStart()) return;
     const dds = operationalizeTarget;
     setOperationalizeTarget(null);
 
@@ -737,6 +745,8 @@ useEffect(() => {
       toast.error(
         "Erro ao operacionalizar modelo. Verifique se o modelo está válido.",
       );
+    } finally {
+      operationalizeGuard.finish();
     }
   };
 
@@ -807,6 +817,7 @@ useEffect(() => {
       toast.error("Você não tem permissão para alterar o status do DDS.");
       return;
     }
+    if (!statusChangeGuard.tryStart()) return;
     try {
       const updated = await ddsService.updateStatus(dds.id, newStatus);
       setDdsList((prev) =>
@@ -821,6 +832,8 @@ useEffect(() => {
       toast.error(
         getApiErrorMessage(error) || "Não foi possível atualizar o status.",
       );
+    } finally {
+      statusChangeGuard.finish();
     }
   };
 
@@ -922,6 +935,7 @@ useEffect(() => {
       );
       return;
     }
+    if (!signatureLinksGuard.tryStart()) return;
 
     try {
       setIssuingSignatureLinksId(dds.id);
@@ -967,11 +981,13 @@ useEffect(() => {
       );
       toast.error(message);
     } finally {
+      signatureLinksGuard.finish();
       setIssuingSignatureLinksId(null);
     }
   };
 
   const handleDispatchObservabilityAlerts = async () => {
+    if (!observabilityDispatchGuard.tryStart()) return;
     try {
       setObservabilityAlertsDispatching(true);
       const result = await ddsService.dispatchObservabilityAlerts();
@@ -991,6 +1007,7 @@ useEffect(() => {
       logger.error("Erro ao disparar alertas DDS:", error);
       toast.error("Não foi possível disparar os alertas operacionais DDS.");
     } finally {
+      observabilityDispatchGuard.finish();
       setObservabilityAlertsDispatching(false);
     }
   };
@@ -2420,5 +2437,3 @@ useEffect(() => {
     </div>
   );
 }
-
-

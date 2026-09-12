@@ -609,4 +609,17 @@ describe('DdsSignatureInviteService', () => {
       expect(findIdx).toBeLessThan(exitIdx);
     });
   });
+
+  describe('submitPublicSignature', () => {
+    it('rejeita payload PNG vazio ou com base64 inválido antes de validar o token', async () => {
+      await expect(
+        service.submitPublicSignature('token-inválido', {
+          acceptedTerms: true,
+          signatureData: 'data:image/png;base64,***',
+        }),
+      ).rejects.toMatchObject({
+        status: 400,
+      });
+    });
+  });
 });
