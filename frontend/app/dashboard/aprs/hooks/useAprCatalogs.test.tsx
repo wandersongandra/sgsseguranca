@@ -55,8 +55,9 @@ jest.mock('@/services/machinesService', () => ({
 jest.mock('@/services/sitesService', () => ({
   sitesService: { findAll: jest.fn().mockResolvedValue([]) },
 }));
+const findAllUsersMock = jest.fn().mockResolvedValue([]);
 jest.mock('@/services/usersService', () => ({
-  usersService: { findAll: jest.fn().mockResolvedValue([]) },
+  usersService: { findAll: (...args: unknown[]) => findAllUsersMock(...args) },
 }));
 
 import { useAprCatalogs } from './useAprCatalogs';
@@ -198,6 +199,57 @@ describe('useAprCatalogs', () => {
       expect(options.setValue).toHaveBeenCalledWith('site_id', SITE_ID);
       expect(options.setValue).toHaveBeenCalledWith('elaborador_id', USER_ID);
       expect(options.setValue).toHaveBeenCalledWith('participants', [USER_ID]);
+    });
+  });
+
+  describe('carregamento de usuários (Elaborador) para uma obra', () => {
+    const COMPANY_ID = '11111111-1111-4111-8111-111111111111';
+    const SITE_ID = '22222222-2222-4222-8222-222222222222';
+
+    it('usa o site_id do FORMULÁRIO, não o siteStore global ("obra ativa"), para carregar usuários', async () => {
+      // Achado real (confirmado ao vivo em produção): ao criar uma APR nova
+      // e escolher a obra manualmente no formulário, a lista de
+      // Elaboradores nunca carregava — o efeito usava siteStore.get() (a
+      // "obra ativa" do dashboard, selecionada num fluxo totalmente
+      // separado) em vez do site_id que o usuário acabou de escolher na
+      // própria APR. Sem "obra ativa" setada no dashboard (comum — é
+      // opcional), o campo Elaborador ficava vazio mesmo com a obra certa
+      // já definida no formulário.
+      currentSiteStoreValue = null; // nenhuma "obra ativa" selecionada no dashboard
+      findAllUsersMock.mockResolvedValueOnce([{ id: 'user-1', nome: 'Fulano' }]);
+
+      const options = {
+        ...baseOptions(),
+        selectedCompanyId: COMPANY_ID,
+        selectedSiteId: SITE_ID, // escolhido manualmente no formulário
+      };
+
+      renderHook(() => useAprCatalogs(options));
+
+      await waitFor(() =>
+        expect(findAllUsersMock).toHaveBeenCalledWith(COMPANY_ID, SITE_ID),
+      );
+      await waitFor(() =>
+        expect(options.setUsers).toHaveBeenCalledWith([
+          { id: 'user-1', nome: 'Fulano' },
+        ]),
+      );
+    });
+
+    it('cai para o siteStore global quando o formulário ainda não tem site_id (ex.: edição carregando)', async () => {
+      currentSiteStoreValue = { siteId: SITE_ID };
+      findAllUsersMock.mockResolvedValueOnce([]);
+      const options = {
+        ...baseOptions(),
+        selectedCompanyId: COMPANY_ID,
+        selectedSiteId: undefined,
+      };
+
+      renderHook(() => useAprCatalogs(options));
+
+      await waitFor(() =>
+        expect(findAllUsersMock).toHaveBeenCalledWith(COMPANY_ID, SITE_ID),
+      );
     });
   });
 });

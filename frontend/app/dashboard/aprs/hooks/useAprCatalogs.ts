@@ -297,7 +297,15 @@ export function useAprCatalogs({
   useEffect(() => {
     let cancelled = false;
     const activeCompanyId = selectedTenantStore.get()?.companyId || selectedCompanyId;
-    const activeSiteId = siteStore.get()?.siteId;
+    // O site_id do FORMULÁRIO (a obra que esta APR é para) precisa vir
+    // primeiro — não o siteStore global ("obra ativa" do dashboard, um
+    // conceito diferente: qual obra o usuário está navegando nos widgets).
+    // Antes, ao criar uma APR nova e escolher a obra manualmente no
+    // formulário, o site_id do form era ignorado aqui: sem "obra ativa"
+    // selecionada no dashboard (comum — é opcional), a lista de
+    // Elaboradores nunca carregava, mesmo com a obra certa já escolhida na
+    // APR (achado da auditoria v2, confirmado ao vivo em produção).
+    const activeSiteId = selectedSiteId || siteStore.get()?.siteId;
 
     async function loadUsersForSite() {
       if (!activeCompanyId || !activeSiteId) {
