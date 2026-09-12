@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import {
   ConflictException,
   ForbiddenException,
@@ -388,11 +388,6 @@ describe('AprsService', () => {
     const aprWorkflowService = new AprWorkflowService(
       aprRepository as unknown as Repository<Apr>,
       aprLogsRepository as unknown as Repository<AprLog>,
-      {
-        find: jest.fn().mockResolvedValue([]),
-        save: jest.fn(),
-        create: jest.fn((p) => p),
-      } as never,
       tenantService as TenantService,
       forensicTrailService as ForensicTrailService,
       {

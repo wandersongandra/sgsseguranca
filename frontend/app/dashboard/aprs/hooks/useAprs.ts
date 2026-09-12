@@ -578,10 +578,7 @@ useEffect(() => {
           setAprs((prev) => prev.filter((item) => item.id !== aprId));
           toast.success("APR excluída com sucesso!");
         } else if (action === "approve") {
-          const aprObj = aprs.find((item) => item.id === aprId);
-          const updated = aprObj?.workflowConfigId
-            ? await aprsService.workflowApprove(aprId)
-            : await aprsService.approve(aprId);
+          const updated = await aprsService.approve(aprId);
           setAprs((prev) =>
             prev.map((item) => (item.id === updated.id ? updated : item)),
           );
@@ -604,10 +601,7 @@ useEffect(() => {
             );
             return;
           }
-          const aprObj = aprs.find((item) => item.id === aprId);
-          const updated = aprObj?.workflowConfigId
-            ? await aprsService.workflowReject(aprId, rejectReason)
-            : await aprsService.reject(aprId, rejectReason);
+          const updated = await aprsService.reject(aprId, rejectReason);
           setAprs((prev) =>
             prev.map((item) => (item.id === updated.id ? updated : item)),
           );
@@ -635,7 +629,7 @@ useEffect(() => {
         });
       }
     },
-    [actionModal, aprs, loadAprs],
+    [actionModal, loadAprs],
   );
 
   const handleDelete = useCallback(

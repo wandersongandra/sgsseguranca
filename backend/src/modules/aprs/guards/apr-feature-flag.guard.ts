@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { APR_FEATURE_FLAG_KEY } from '../decorators/apr-feature-flag.decorator';
@@ -36,10 +37,16 @@ export class AprFeatureFlagGuard implements CanActivate {
     try {
       enabled = await this.featureFlagService.isEnabled(key, tenantId);
     } catch (err) {
-      this.logger.warn(
-        `Falha ao verificar feature flag "${key}" para tenant "${tenantId}"; permitindo acesso por padrão. Erro: ${err instanceof Error ? err.message : String(err)}`,
+      // Postura fail-closed (CLAUDE.md): uma oscilação transitória do banco
+      // não deve liberar acesso a uma funcionalidade não contratada. O
+      // caminho normal do AprFeatureFlagService já é fail-closed (retorna
+      // false sem lançar) — só o erro transitório mudava de comportamento.
+      this.logger.error(
+        `Falha ao verificar feature flag "${key}" para tenant "${tenantId}": ${err instanceof Error ? err.message : String(err)}`,
       );
-      return true;
+      throw new ServiceUnavailableException(
+        'Não foi possível verificar a disponibilidade da funcionalidade. Tente novamente.',
+      );
     }
 
     if (!enabled) {

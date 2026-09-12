@@ -178,6 +178,35 @@ describe('AprsEvidenceService', () => {
     expect(result.hashSha256).toHaveLength(64);
   });
 
+  it('uploadRiskEvidence rejeita arquivo cujo conteúdo real não é JPEG/PNG (polyglot)', async () => {
+    aprRepository.findOne.mockResolvedValue(makeApr());
+    riskItemRepository.findOne.mockResolvedValue({
+      id: 'risk-1',
+      apr_id: 'apr-1',
+    });
+
+    // Header do cliente diz image/jpeg, mas o conteúdo real é HTML — o mime
+    // gravado deve vir dos magic bytes, não do header, e este caso deve ser
+    // recusado por não ser image/jpeg nem image/png.
+    const file = makeFile({
+      buffer: Buffer.from('<html><script>alert(1)</script></html>'),
+    });
+
+    await expect(
+      service.uploadRiskEvidence(
+        'apr-1',
+        'risk-1',
+        file,
+        {},
+        'user-1',
+        '127.0.0.1',
+      ),
+    ).rejects.toThrow('Tipo de arquivo não permitido para evidência de APR.');
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).not.toHaveBeenCalled();
+  });
+
   // ─── uploadRiskEvidence — permissões ─────────────────────────────────────
 
   it('uploadRiskEvidence lança ForbiddenException para usuário sem vínculo com APR', async () => {
