@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import type { Dds } from "@/services/ddsService";
 import { ddsService } from "@/services/ddsService";
-import { DdsForm } from "./DdsForm";
+import { DdsForm, resolveSafeDdsImageUrl } from "./DdsForm";
 
 jest.mock("sonner", () => ({
   toast: {
@@ -332,4 +332,95 @@ describe("DdsForm", () => {
       });
     }
   });
+
+  it("não deixa o carregamento de um DDS antigo sobrescrever o registro atual", async () => {
+    let resolveOldDds!: (dds: Dds) => void;
+    let resolveCurrentDds!: (dds: Dds) => void;
+    const oldDdsPromise = new Promise<Dds>((resolve) => {
+      resolveOldDds = resolve;
+    });
+    const currentDdsPromise = new Promise<Dds>((resolve) => {
+      resolveCurrentDds = resolve;
+    });
+    (ddsService.findOne as jest.Mock)
+      .mockImplementationOnce(() => oldDdsPromise)
+      .mockImplementationOnce(() => currentDdsPromise);
+
+    const { rerender } = render(<DdsForm id="dds-old" />);
+    await waitFor(() => {
+      expect(ddsService.findOne).toHaveBeenCalledWith("dds-old");
+    });
+    rerender(<DdsForm id="dds-current" />);
+    await waitFor(() => {
+      expect(ddsService.findOne).toHaveBeenCalledWith("dds-current");
+    });
+    expect((ddsService.findOne as jest.Mock).mock.results[1]?.value).toBe(
+      currentDdsPromise,
+    );
+
+    resolveCurrentDds({
+      ...mockDds,
+      id: "dds-current",
+      tema: "DDS atual",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("DDS atual")).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      resolveOldDds({
+        ...mockDds,
+        id: "dds-old",
+        tema: "DDS antigo atrasado",
+      });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("DDS atual")).toBeInTheDocument();
+      expect(
+        screen.queryByDisplayValue("DDS antigo atrasado"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("não renderiza imagem SVG ou protocolo executável vindo de assinatura do DDS", () => {
+    expect(
+      resolveSafeDdsImageUrl("data:image/svg+xml;base64,PHN2Zy8+"),
+    ).toBeNull();
+    expect(resolveSafeDdsImageUrl("javascript:alert(1)")).toBeNull();
+    expect(
+      resolveSafeDdsImageUrl("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ=="),
+    ).toBe("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==");
+  });
+
+  it("desabilita a confirmação enquanto invalida assinaturas do DDS", async () => {
+    let resolveUpdate!: (dds: Dds) => void;
+    const updatePromise = new Promise<Dds>((resolve) => {
+      resolveUpdate = resolve;
+    });
+    (ddsService.update as jest.Mock).mockImplementation(() => updatePromise);
+
+    render(<DdsForm id={mockDds.id} />);
+
+    const themeInput = await screen.findByDisplayValue(mockDds.tema);
+    fireEvent.change(themeInput, { target: { value: "Novo tema operacional" } });
+    fireEvent.click(screen.getByRole("button", { name: /salvar DDS/i }));
+
+    const confirmButton = await screen.findByRole("button", {
+      name: "Confirmar e continuar",
+    });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(confirmButton).toBeDisabled();
+    });
+
+    await act(async () => {
+      resolveUpdate({ ...mockDds, tema: "Novo tema operacional" });
+      await Promise.resolve();
+    });
+  });
+
 });

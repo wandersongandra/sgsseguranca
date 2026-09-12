@@ -1147,7 +1147,36 @@ describe('DdsService', () => {
 
     const result = await service.updateStatus('dds-1', DdsStatus.PUBLICADO);
     expect(result.status).toBe(DdsStatus.PUBLICADO);
-    expect(repository.save).toHaveBeenCalled();
+    expect(transactionalDdsRepository.save).toHaveBeenCalled();
+  });
+
+  it('updateStatus: bloqueia a linha antes de persistir a transição', async () => {
+    const lockBuilder = {
+      setLock: jest.fn().mockReturnThis(),
+      whereInIds: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue({
+        id: 'dds-1',
+        company_id: 'company-1',
+        status: DdsStatus.RASCUNHO,
+        version: 1,
+      }),
+    };
+    transactionalDdsRepository.createQueryBuilder.mockReturnValue(lockBuilder);
+    repository.findOne.mockResolvedValue({
+      id: 'dds-1',
+      company_id: 'company-1',
+      status: DdsStatus.RASCUNHO,
+      is_modelo: false,
+      version: 1,
+    });
+
+    await service.updateStatus('dds-1', DdsStatus.PUBLICADO);
+
+    expect(lockBuilder.setLock).toHaveBeenCalledWith('pessimistic_write');
+    expect(transactionalDdsRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({ status: DdsStatus.PUBLICADO }),
+    );
   });
 
   it('updateStatus: rejeita transicao invalida', async () => {
@@ -1249,6 +1278,28 @@ describe('DdsService', () => {
     ).rejects.toThrow(
       'O DDS precisa ter participantes definidos antes das assinaturas.',
     );
+    expect(signaturesService.replaceDocumentSignatures).not.toHaveBeenCalled();
+  });
+
+  it('replaceSignatures: rejeita payload sem assinaturas de participantes', async () => {
+    repository.findOne.mockResolvedValue({
+      id: 'dds-1',
+      company_id: 'company-1',
+      facilitador_id: 'facilitador-1',
+      participants: [{ id: 'user-1' }],
+      is_modelo: false,
+    });
+
+    await expect(
+      service.replaceSignatures(
+        'dds-1',
+        { participant_signatures: [], team_photos: [] },
+        'operador-1',
+      ),
+    ).rejects.toThrow(
+      'Assinaturas parciais não são permitidas: assine todos os participantes selecionados.',
+    );
+
     expect(signaturesService.replaceDocumentSignatures).not.toHaveBeenCalled();
   });
 

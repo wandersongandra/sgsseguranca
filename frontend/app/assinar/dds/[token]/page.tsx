@@ -27,6 +27,10 @@ import {
   publicDdsSignatureService,
 } from "@/services/publicDdsSignatureService";
 import { logger } from "@/lib/logger";
+import {
+  decodeDdsSignatureToken,
+  resolveDdsSignatureToken,
+} from "./token-utils";
 
 declare global {
   interface Window {
@@ -84,7 +88,7 @@ function clearSessionToken() {
 
 export default function PublicDdsSignaturePage() {
   const params = useParams<{ token: string }>();
-  const urlToken = decodeURIComponent(params.token || "");
+  const urlToken = decodeDdsSignatureToken(params.token || "");
   const [resolvedToken, setResolvedToken] = useState<string | null>(null);
   const signatureRef = useRef<SignatureCanvas>(null);
   const [context, setContext] = useState<PublicDdsSignatureContext | null>(
@@ -150,7 +154,7 @@ export default function PublicDdsSignaturePage() {
     setError(null);
 
     const sessionToken = getSessionToken();
-    const effectiveToken = sessionToken || urlToken;
+    const effectiveToken = resolveDdsSignatureToken(urlToken, sessionToken);
 
     if (!effectiveToken) {
       setError("Link de assinatura inválido.");

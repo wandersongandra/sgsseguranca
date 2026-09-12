@@ -699,6 +699,38 @@ export class DdsService {
     return dds;
   }
 
+  private async lockDdsForMutation(
+    manager: EntityManager,
+    dds: Dds,
+  ): Promise<Dds> {
+    const lockedDds = await manager
+      .getRepository(Dds)
+      .createQueryBuilder('dds')
+      .whereInIds(dds.id)
+      .andWhere('dds.company_id = :companyId', {
+        companyId: dds.company_id,
+      })
+      .andWhere('dds.deleted_at IS NULL')
+      .setLock('pessimistic_write')
+      .getOne();
+
+    if (!lockedDds) {
+      throw new NotFoundException(`DDS com ID ${dds.id} não encontrado`);
+    }
+
+    if (
+      lockedDds.version !== undefined &&
+      dds.version !== undefined &&
+      lockedDds.version !== dds.version
+    ) {
+      throw new ConflictException(
+        'O DDS foi modificado por outra operação simultânea. Atualize e tente novamente.',
+      );
+    }
+
+    return lockedDds;
+  }
+
   async updateStatus(id: string, status: DdsStatus): Promise<Dds> {
     const dds = await this.findOne(id);
     this.assertFinalDocumentMutable(dds);
@@ -735,10 +767,15 @@ export class DdsService {
       }
     }
     const previousStatus = dds.status;
-    dds.status = status;
     let saved: Dds;
     try {
-      saved = await this.ddsRepository.save(dds);
+      saved = await this.ddsRepository.manager.transaction(
+        async (manager: EntityManager) => {
+          const lockedDds = await this.lockDdsForMutation(manager, dds);
+          lockedDds.status = status;
+          return manager.getRepository(Dds).save(lockedDds);
+        },
+      );
     } catch (error) {
       if (error instanceof OptimisticLockVersionMismatchError) {
         throw new ConflictException(
@@ -1070,9 +1107,7 @@ export class DdsService {
         signature,
       ]),
     );
-    const hasAnyParticipantSignature = uniqueParticipantSignatures.size > 0;
-
-    if (hasAnyParticipantSignature) {
+    if (uniqueParticipantSignatures.size > 0) {
       const invalidParticipant = Array.from(
         uniqueParticipantSignatures.keys(),
       ).find((userId) => !participantIds.includes(userId));
@@ -1081,12 +1116,12 @@ export class DdsService {
           'Assinatura recebida para um participante que nao pertence a este DDS.',
         );
       }
+    }
 
-      if (uniqueParticipantSignatures.size !== participantIds.length) {
-        throw new BadRequestException(
-          'Assinaturas parciais não são permitidas: assine todos os participantes selecionados.',
-        );
-      }
+    if (uniqueParticipantSignatures.size !== participantIds.length) {
+      throw new BadRequestException(
+        'Assinaturas parciais não são permitidas: assine todos os participantes selecionados.',
+      );
     }
 
     const teamPhotos = dto.team_photos || [];
@@ -1322,19 +1357,19 @@ export class DdsService {
       });
     }
 
-    Object.assign(dds, rest);
-    dds.participants = participantIds.map(
-      (participantId) => ({ id: participantId }) as User,
-    );
-
     const saved = await this.ddsRepository.manager.transaction(
       async (manager: EntityManager) => {
-        const persistedDds = await manager.getRepository(Dds).save(dds);
+        const lockedDds = await this.lockDdsForMutation(manager, dds);
+        Object.assign(lockedDds, rest);
+        lockedDds.participants = participantIds.map(
+          (participantId) => ({ id: participantId }) as User,
+        );
+        const persistedDds = await manager.getRepository(Dds).save(lockedDds);
         if (signatureResetReasons.length > 0) {
           await manager.getRepository(Signature).delete({
             document_id: id,
             document_type: 'DDS',
-            company_id: dds.company_id,
+            company_id: lockedDds.company_id || dds.company_id,
           });
         }
         return persistedDds;
@@ -1461,15 +1496,35 @@ export class DdsService {
       participantIds: this.getParticipantIds(dds),
       auditorId: dto.auditado_por_id,
     });
-    Object.assign(dds, {
-      auditado_por_id: dto.auditado_por_id,
-      data_auditoria: dto.data_auditoria,
-      resultado_auditoria: dto.resultado_auditoria,
-      notas_auditoria: dto.notas_auditoria ?? dds.notas_auditoria,
-    });
     let saved: Dds;
     try {
-      saved = await this.ddsRepository.save(dds);
+      saved = await this.ddsRepository.manager.transaction(
+        async (manager: EntityManager) => {
+          const lockedDds = await this.lockDdsForMutation(manager, dds);
+          if (lockedDds.pdf_file_key) {
+            throw new BadRequestException(
+              'DDS com PDF final emitido não pode ter auditoria alterada. Gere um novo DDS para reabrir o fluxo.',
+            );
+          }
+          if (lockedDds.status === DdsStatus.AUDITADO) {
+            throw new BadRequestException(
+              'DDS auditado não pode ter auditoria alterada. Gere um novo DDS para um novo ciclo de revisão.',
+            );
+          }
+          if (lockedDds.status === DdsStatus.ARQUIVADO) {
+            throw new BadRequestException(
+              'DDS arquivado não pode ter campos de auditoria alterados.',
+            );
+          }
+          Object.assign(lockedDds, {
+            auditado_por_id: dto.auditado_por_id,
+            data_auditoria: dto.data_auditoria,
+            resultado_auditoria: dto.resultado_auditoria,
+            notas_auditoria: dto.notas_auditoria ?? lockedDds.notas_auditoria,
+          });
+          return manager.getRepository(Dds).save(lockedDds);
+        },
+      );
     } catch (error) {
       if (error instanceof OptimisticLockVersionMismatchError) {
         throw new ConflictException(

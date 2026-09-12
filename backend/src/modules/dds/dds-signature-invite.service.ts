@@ -941,7 +941,13 @@ export class DdsSignatureInviteService implements OnModuleInit {
     if (trimmed.length > SIGNATURE_DATA_MAX_LENGTH) {
       throw new BadRequestException('Assinatura excede o tamanho permitido.');
     }
-    if (!trimmed.startsWith('data:image/png;base64,')) {
+    const prefix = 'data:image/png;base64,';
+    const encodedPayload = trimmed.slice(prefix.length);
+    if (
+      !trimmed.startsWith(prefix) ||
+      !encodedPayload ||
+      !/^[A-Za-z0-9+/]+={0,2}$/.test(encodedPayload)
+    ) {
       throw new BadRequestException(
         'Assinatura pública deve ser uma imagem PNG em base64.',
       );
