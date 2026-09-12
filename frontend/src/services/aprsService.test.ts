@@ -86,13 +86,42 @@ describe("aprsService", () => {
     );
   });
 
-  it("exige companyId e siteId para listar APRs", async () => {
+  it("exige companyId para listar APRs", async () => {
     await expect(
       aprsService.findPaginated({
         page: 1,
         limit: 20,
       }),
-    ).rejects.toThrow("companyId e siteId são obrigatórios para listar APRs.");
+    ).rejects.toThrow("companyId é obrigatório para listar APRs.");
+  });
+
+  it("lista APRs sem siteId (filtro opcional no backend — sem obra ativa selecionada)", async () => {
+    // Regressão (achado real, confirmado ao vivo em produção): site_id é
+    // documentado como filtro OPCIONAL em GET /aprs no backend
+    // (aprs.controller.ts: "Filtra a fila por obra/unidade"). Exigi-lo aqui
+    // travava a listagem para qualquer usuário sem uma obra ativa
+    // selecionada no dashboard (siteStore, um seletor separado e opcional).
+    (api.get as jest.Mock).mockResolvedValue({
+      data: { data: [], total: 0, page: 1, lastPage: 1 },
+    });
+
+    await aprsService.findPaginated({
+      companyId: "company-x",
+      page: 1,
+      limit: 20,
+    });
+
+    expect(api.get).toHaveBeenCalledWith(
+      "/aprs",
+      expect.objectContaining({
+        params: expect.objectContaining({ company_id: "company-x" }),
+      }),
+    );
+    const [, callOptions] = (api.get as jest.Mock).mock.calls.at(-1) as [
+      string,
+      { params: Record<string, unknown> },
+    ];
+    expect(callOptions.params).not.toHaveProperty("site_id");
   });
 
   it("usa a mesma key normalizada para filtros com ordem diferente", () => {
