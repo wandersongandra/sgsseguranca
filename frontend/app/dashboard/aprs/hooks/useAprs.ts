@@ -11,6 +11,7 @@ import { handleApiError } from "@/lib/error-handler";
 import { openPdfForPrint, openUrlInNewTab } from "@/lib/print-utils";
 import { isAiEnabled, isAprAnalyticsEnabled } from "@/lib/featureFlags";
 import { base64ToPdfBlob } from "@/lib/pdf/pdfFile";
+import { fetchGovernedPdfBlob } from "@/lib/pdf/fetchGovernedPdfBlob";
 import { AprDueFilter, AprSortOption } from "../components/aprListingUtils";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
 import { siteStore } from "@/lib/siteStore";
@@ -457,7 +458,8 @@ useEffect(() => {
         if (shouldUseGovernedPdf) {
           const access = await ensureGovernedPdf(apr);
           if (access?.url) {
-            openUrlInNewTab(access.url);
+            const { blob } = await fetchGovernedPdfBlob(access.url);
+            openUrlInNewTab(URL.createObjectURL(blob));
             return;
           }
 
@@ -491,7 +493,8 @@ useEffect(() => {
         if (shouldUseGovernedPdf) {
           const access = await ensureGovernedPdf(currentApr);
           if (access?.url) {
-            openPdfForPrint(access.url, () => {
+            const { blob } = await fetchGovernedPdfBlob(access.url);
+            openPdfForPrint(URL.createObjectURL(blob), () => {
               toast.info(
                 "Pop-up bloqueado. Abrimos o PDF final da APR na mesma aba para impressão.",
               );
