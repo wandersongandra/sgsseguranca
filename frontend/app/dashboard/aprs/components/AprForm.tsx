@@ -2233,6 +2233,7 @@ export function AprForm({ id }: AprFormProps) {
     setMachines,
     setSites,
     setUsers,
+    setCompanies,
   });
 
   useEffect(() => {
@@ -2710,6 +2711,16 @@ export function AprForm({ id }: AprFormProps) {
         isFieldMode && "pb-28",
       )}
     >
+      {/* h1 sr-only: garante um topo de hierarquia de heading antes dos <h2>
+          de Timeline/Comparação de versões/Evidência fotográfica, que
+          renderizam antes do título visível da APR (achado da auditoria de
+          acessibilidade — leitor de tela navegando por heading encontrava
+          h2 antes de qualquer h1 na página). */}
+      <h1 className="sr-only">
+        {id
+          ? `Editar APR${aprDocumentNumber ? ` ${aprDocumentNumber}` : ""}`
+          : "Nova APR"}
+      </h1>
       {fetching ? (
         <div className="rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)] print:hidden">
           <InlineLoadingState
@@ -3188,7 +3199,7 @@ export function AprForm({ id }: AprFormProps) {
         onSubmit={handleSubmit((data) => {
           submitIntentRef.current = "save";
           return onSubmit(data);
-        })}
+        }, handleValidationError)}
         className="space-y-6"
       >
         <div className="overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
@@ -3197,9 +3208,9 @@ export function AprForm({ id }: AprFormProps) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-black tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
+                    <h2 className="text-2xl font-black tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
                       {aprDocumentNumber}
-                    </h1>
+                    </h2>
                     <StatusPill tone={aprDocumentStatusTone}>
                       {aprDocumentStatus}
                     </StatusPill>
@@ -4056,6 +4067,10 @@ export function AprForm({ id }: AprFormProps) {
                       id="apr-numero"
                       type="text"
                       aria-required="true"
+                      aria-invalid={errors.numero ? true : undefined}
+                      aria-describedby={
+                        errors.numero ? "apr-numero-error" : undefined
+                      }
                       {...register("numero")}
                       className={cn(
                         aprFieldClass,
@@ -4064,7 +4079,7 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Ex: 2024/001"
                     />
                     {errors.numero && (
-                      <p className={aprErrorTextClass}>
+                      <p id="apr-numero-error" className={aprErrorTextClass}>
                         {errors.numero.message}
                       </p>
                     )}
@@ -4078,6 +4093,10 @@ export function AprForm({ id }: AprFormProps) {
                       id="apr-titulo"
                       type="text"
                       aria-required="true"
+                      aria-invalid={errors.titulo ? true : undefined}
+                      aria-describedby={
+                        errors.titulo ? "apr-titulo-error" : undefined
+                      }
                       {...register("titulo")}
                       className={cn(
                         aprFieldClass,
@@ -4086,7 +4105,7 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Ex: Instalação de Painéis Solares"
                     />
                     {errors.titulo && (
-                      <p className={aprErrorTextClass}>
+                      <p id="apr-titulo-error" className={aprErrorTextClass}>
                         {errors.titulo.message}
                       </p>
                     )}
@@ -4116,6 +4135,12 @@ export function AprForm({ id }: AprFormProps) {
                     <select
                       id="apr-tipo-atividade"
                       aria-required="true"
+                      aria-invalid={errors.tipo_atividade ? true : undefined}
+                      aria-describedby={
+                        errors.tipo_atividade
+                          ? "apr-tipo-atividade-error"
+                          : undefined
+                      }
                       {...register("tipo_atividade")}
                       className={cn(
                         aprFieldClass,
@@ -4133,7 +4158,10 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.tipo_atividade && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-tipo-atividade-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.tipo_atividade.message}
                       </p>
                     )}
@@ -4146,6 +4174,10 @@ export function AprForm({ id }: AprFormProps) {
                     <select
                       id="apr-turno"
                       aria-required="true"
+                      aria-invalid={errors.turno ? true : undefined}
+                      aria-describedby={
+                        errors.turno ? "apr-turno-error" : undefined
+                      }
                       {...register("turno")}
                       className={cn(
                         aprFieldClass,
@@ -4159,7 +4191,7 @@ export function AprForm({ id }: AprFormProps) {
                       <option value="Revezamento">Revezamento</option>
                     </select>
                     {errors.turno && (
-                      <p className={aprErrorTextClass}>
+                      <p id="apr-turno-error" className={aprErrorTextClass}>
                         {errors.turno.message}
                       </p>
                     )}
@@ -4174,6 +4206,12 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <input
                       id="apr-frente-trabalho"
+                      aria-invalid={errors.frente_trabalho ? true : undefined}
+                      aria-describedby={
+                        errors.frente_trabalho
+                          ? "apr-frente-trabalho-error"
+                          : undefined
+                      }
                       {...register("frente_trabalho")}
                       className={cn(
                         aprFieldClass,
@@ -4182,7 +4220,10 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Ex: Linha 02, setor de manutenção, área quente"
                     />
                     {errors.frente_trabalho && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-frente-trabalho-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.frente_trabalho.message}
                       </p>
                     )}
@@ -4245,6 +4286,14 @@ export function AprForm({ id }: AprFormProps) {
                     <textarea
                       id="apr-local-detalhado"
                       aria-required="true"
+                      aria-invalid={
+                        errors.local_execucao_detalhado ? true : undefined
+                      }
+                      aria-describedby={
+                        errors.local_execucao_detalhado
+                          ? "apr-local-detalhado-error"
+                          : undefined
+                      }
                       {...register("local_execucao_detalhado")}
                       rows={2}
                       className={cn(
@@ -4254,7 +4303,10 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Ex: Cobertura do bloco administrativo, face leste, acesso por plataforma elevatória"
                     />
                     {errors.local_execucao_detalhado && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-local-detalhado-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.local_execucao_detalhado.message}
                       </p>
                     )}
@@ -4270,6 +4322,14 @@ export function AprForm({ id }: AprFormProps) {
                     <input
                       id="apr-responsavel-tecnico"
                       aria-required="true"
+                      aria-invalid={
+                        errors.responsavel_tecnico_nome ? true : undefined
+                      }
+                      aria-describedby={
+                        errors.responsavel_tecnico_nome
+                          ? "apr-responsavel-tecnico-error"
+                          : undefined
+                      }
                       {...register("responsavel_tecnico_nome")}
                       className={cn(
                         aprFieldClass,
@@ -4278,7 +4338,10 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Nome do responsável técnico"
                     />
                     {errors.responsavel_tecnico_nome && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-responsavel-tecnico-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.responsavel_tecnico_nome.message}
                       </p>
                     )}
@@ -4293,6 +4356,14 @@ export function AprForm({ id }: AprFormProps) {
                     </label>
                     <input
                       id="apr-responsavel-registro"
+                      aria-invalid={
+                        errors.responsavel_tecnico_registro ? true : undefined
+                      }
+                      aria-describedby={
+                        errors.responsavel_tecnico_registro
+                          ? "apr-responsavel-registro-error"
+                          : undefined
+                      }
                       {...register("responsavel_tecnico_registro")}
                       className={cn(
                         aprFieldClass,
@@ -4302,7 +4373,10 @@ export function AprForm({ id }: AprFormProps) {
                       placeholder="Ex: CREA 000000 / TST 00000"
                     />
                     {errors.responsavel_tecnico_registro && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-responsavel-registro-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.responsavel_tecnico_registro.message}
                       </p>
                     )}
@@ -4364,6 +4438,10 @@ export function AprForm({ id }: AprFormProps) {
                     <select
                       id="apr-company"
                       aria-required="true"
+                      aria-invalid={errors.company_id ? true : undefined}
+                      aria-describedby={
+                        errors.company_id ? "apr-company-error" : undefined
+                      }
                       {...register("company_id")}
                       className={cn(
                         aprFieldClass,
@@ -4398,7 +4476,7 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.company_id && (
-                      <p className={aprErrorTextClass}>
+                      <p id="apr-company-error" className={aprErrorTextClass}>
                         {errors.company_id.message}
                       </p>
                     )}
@@ -4411,6 +4489,10 @@ export function AprForm({ id }: AprFormProps) {
                     <select
                       id="apr-site"
                       aria-required="true"
+                      aria-invalid={errors.site_id ? true : undefined}
+                      aria-describedby={
+                        errors.site_id ? "apr-site-error" : undefined
+                      }
                       {...register("site_id")}
                       disabled={!selectedCompanyId}
                       className={cn(
@@ -4431,7 +4513,7 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.site_id && (
-                      <p className={aprErrorTextClass}>
+                      <p id="apr-site-error" className={aprErrorTextClass}>
                         {errors.site_id.message}
                       </p>
                     )}
@@ -4444,6 +4526,12 @@ export function AprForm({ id }: AprFormProps) {
                     <select
                       id="apr-elaborador"
                       aria-required="true"
+                      aria-invalid={errors.elaborador_id ? true : undefined}
+                      aria-describedby={
+                        errors.elaborador_id
+                          ? "apr-elaborador-error"
+                          : undefined
+                      }
                       {...register("elaborador_id")}
                       disabled={!selectedCompanyId}
                       className={cn(
@@ -4464,7 +4552,10 @@ export function AprForm({ id }: AprFormProps) {
                       ))}
                     </select>
                     {errors.elaborador_id && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-elaborador-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.elaborador_id.message}
                       </p>
                     )}
@@ -4503,6 +4594,12 @@ export function AprForm({ id }: AprFormProps) {
                       id="apr-data-inicio"
                       type="date"
                       aria-required="true"
+                      aria-invalid={errors.data_inicio ? true : undefined}
+                      aria-describedby={
+                        errors.data_inicio
+                          ? "apr-data-inicio-error"
+                          : undefined
+                      }
                       {...register("data_inicio")}
                       className={cn(
                         aprFieldClass,
@@ -4510,7 +4607,10 @@ export function AprForm({ id }: AprFormProps) {
                       )}
                     />
                     {errors.data_inicio && (
-                      <p className={aprErrorTextClass}>
+                      <p
+                        id="apr-data-inicio-error"
+                        className={aprErrorTextClass}
+                      >
                         {errors.data_inicio.message}
                       </p>
                     )}
@@ -4524,6 +4624,10 @@ export function AprForm({ id }: AprFormProps) {
                       id="apr-data-fim"
                       type="date"
                       aria-required="true"
+                      aria-invalid={errors.data_fim ? true : undefined}
+                      aria-describedby={
+                        errors.data_fim ? "apr-data-fim-error" : undefined
+                      }
                       {...register("data_fim")}
                       min={dataInicioApr || undefined}
                       className={cn(
@@ -4532,7 +4636,7 @@ export function AprForm({ id }: AprFormProps) {
                       )}
                     />
                     {errors.data_fim && (
-                      <p className={aprErrorTextClass}>
+                      <p id="apr-data-fim-error" className={aprErrorTextClass}>
                         {errors.data_fim.message}
                       </p>
                     )}
