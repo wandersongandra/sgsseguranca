@@ -46,143 +46,147 @@ const syntheticPt = {
   pdf_file_key: null,
 };
 
-async function fulfillJson(route: Route, body: unknown) {
+type SyntheticRouteResponse = {
+  body: unknown;
+  headers?: Record<string, string>;
+};
+
+async function fulfillJson(
+  route: Route,
+  body: unknown,
+  headers?: Record<string, string>,
+) {
   await route.fulfill({
     status: 200,
     contentType: 'application/json',
+    headers,
     body: JSON.stringify(body),
   });
 }
 
-test.describe('PT autenticada — smoke visual e acessibilidade', () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/*', async (route) => {
-      const requestUrl = new URL(route.request().url());
-      const isProxyRequest = requestUrl.pathname.startsWith('/proxy');
-      if (requestUrl.host !== apiHost && !isProxyRequest) {
-        await route.continue();
-        return;
-      }
-
-      const pathname = requestUrl.pathname.replace(/^\/proxy(?=\/|$)/, '');
-
-      if (pathname === '/auth/csrf') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ csrfToken: 'synthetic-csrf-token' }),
-        });
-        return;
-      }
-
-      if (pathname === '/auth/login') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          headers: { 'set-cookie': 'refresh_csrf=synthetic; Path=/; SameSite=Lax' },
-          body: JSON.stringify(syntheticSession),
-        });
-        return;
-      }
-
-      if (pathname === '/auth/me') {
-        await fulfillJson(route, syntheticSession);
-        return;
-      }
-
-      if (pathname === '/auth/refresh') {
-        await fulfillJson(route, { accessToken });
-        return;
-      }
-
-      if (pathname === '/pts' && route.request().method() === 'GET') {
-        await fulfillJson(route, { data: [syntheticPt], total: 1, lastPage: 1 });
-        return;
-      }
-
-      if (pathname === '/pts/analytics/overview') {
-        await fulfillJson(route, {
-          totalPts: 1,
-          aprovadas: 0,
-          pendentes: 1,
-          canceladas: 0,
-          encerradas: 0,
-          expiradas: 0,
-        });
-        return;
-      }
-
-      if (pathname === '/pts/approval-rules') {
-        await fulfillJson(route, {
-          blockCriticalRiskWithoutEvidence: true,
-          blockWorkerWithoutValidMedicalExam: false,
-          blockWorkerWithExpiredBlockingTraining: true,
-          requireAtLeastOneExecutante: false,
-        });
-        return;
-      }
-
-      if (pathname === '/pts/files/list') {
-        await fulfillJson(route, []);
-        return;
-      }
-
-      if (pathname === `/companies/${companyId}`) {
-        await fulfillJson(route, {
-          id: companyId,
-          razao_social: 'Empresa PT Sintética',
-          cnpj: '00000000000000',
-          endereco: 'Endereço sintético',
-          responsavel: 'Responsável sintético',
-          status: true,
+const syntheticResponses = new Map<string, SyntheticRouteResponse>([
+  ['*:/auth/csrf', { body: { csrfToken: 'synthetic-csrf-token' } }],
+  [
+    '*:/auth/login',
+    {
+      body: syntheticSession,
+      headers: { 'set-cookie': 'refresh_csrf=synthetic; Path=/; SameSite=Lax' },
+    },
+  ],
+  ['*:/auth/me', { body: syntheticSession }],
+  ['*:/auth/refresh', { body: { accessToken } }],
+  ['GET:/pts', { body: { data: [syntheticPt], total: 1, lastPage: 1 } }],
+  [
+    '*:/pts/analytics/overview',
+    {
+      body: {
+        totalPts: 1,
+        aprovadas: 0,
+        pendentes: 1,
+        canceladas: 0,
+        encerradas: 0,
+        expiradas: 0,
+      },
+    },
+  ],
+  [
+    '*:/pts/approval-rules',
+    {
+      body: {
+        blockCriticalRiskWithoutEvidence: true,
+        blockWorkerWithoutValidMedicalExam: false,
+        blockWorkerWithExpiredBlockingTraining: true,
+        requireAtLeastOneExecutante: false,
+      },
+    },
+  ],
+  ['*:/pts/files/list', { body: [] }],
+  [
+    '*:/companies/:id',
+    {
+      body: {
+        id: companyId,
+        razao_social: 'Empresa PT Sintética',
+        cnpj: '00000000000000',
+        endereco: 'Endereço sintético',
+        responsavel: 'Responsável sintético',
+        status: true,
+        created_at: '2026-09-11T00:00:00.000Z',
+        updated_at: '2026-09-11T00:00:00.000Z',
+      },
+    },
+  ],
+  [
+    '*:/sites',
+    {
+      body: {
+        data: [{
+          id: siteId,
+          nome: 'Obra PT Sintética',
+          company_id: companyId,
           created_at: '2026-09-11T00:00:00.000Z',
           updated_at: '2026-09-11T00:00:00.000Z',
-        });
-        return;
-      }
+        }],
+        total: 1,
+        lastPage: 1,
+      },
+    },
+  ],
+  [
+    '*:/users',
+    {
+      body: {
+        data: [{
+          id: userId,
+          nome: 'Usuário PT Sintético',
+          company_id: companyId,
+          site_id: siteId,
+          site_ids: [siteId],
+        }],
+        total: 1,
+        lastPage: 1,
+      },
+    },
+  ],
+  ['*:/aprs', { body: { data: [], total: 0, lastPage: 1 } }],
+  ['*:/ai/', { body: { insights: [] } }],
+]);
 
-      if (pathname === '/sites') {
-        await fulfillJson(route, {
-          data: [{
-            id: siteId,
-            nome: 'Obra PT Sintética',
-            company_id: companyId,
-            created_at: '2026-09-11T00:00:00.000Z',
-            updated_at: '2026-09-11T00:00:00.000Z',
-          }],
-          total: 1,
-          lastPage: 1,
-        });
-        return;
-      }
+function normalizeSyntheticPath(pathname: string): string {
+  if (pathname.startsWith('/companies/')) return '*:/companies/:id';
+  if (pathname.startsWith('/ai/')) return '*:/ai/';
+  return pathname;
+}
 
-      if (pathname === '/users') {
-        await fulfillJson(route, {
-          data: [{
-            id: userId,
-            nome: 'Usuário PT Sintético',
-            company_id: companyId,
-            site_id: siteId,
-            site_ids: [siteId],
-          }],
-          total: 1,
-          lastPage: 1,
-        });
-        return;
-      }
+function resolveSyntheticResponse(
+  pathname: string,
+  method: string,
+): SyntheticRouteResponse {
+  const normalizedPath = normalizeSyntheticPath(pathname);
+  return (
+    syntheticResponses.get(`${method}:${normalizedPath}`) ??
+    syntheticResponses.get(`*:${normalizedPath}`) ??
+    syntheticResponses.get(normalizedPath) ??
+    { body: {} }
+  );
+}
 
-      if (pathname === '/aprs') {
-        await fulfillJson(route, { data: [], total: 0, lastPage: 1 });
-        return;
-      }
+async function handleSyntheticApiRoute(route: Route) {
+  const requestUrl = new URL(route.request().url());
+  const isProxyRequest = requestUrl.pathname.startsWith('/proxy');
+  if (requestUrl.host !== apiHost && !isProxyRequest) {
+    await route.continue();
+    return;
+  }
 
-      if (pathname.startsWith('/ai/')) {
-        await fulfillJson(route, { insights: [] });
-        return;
-      }
+  const pathname = requestUrl.pathname.replace(/^\/proxy(?=\/|$)/, '');
+  const response = resolveSyntheticResponse(pathname, route.request().method());
+  await fulfillJson(route, response.body, response.headers);
+}
 
-      await fulfillJson(route, {});
-    });
+test.describe('PT autenticada — smoke visual e acessibilidade', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/*', handleSyntheticApiRoute);
 
     await page.context().addCookies([
       {
