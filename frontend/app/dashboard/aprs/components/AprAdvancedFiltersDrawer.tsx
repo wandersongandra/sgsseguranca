@@ -302,8 +302,12 @@ export function AprAdvancedFiltersDrawer({
           </div>
 
           <div className="space-y-2">
-            <label>Densidade da tabela</label>
-            <div className="inline-flex rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-muted)] p-1">
+            <span id="apr-advanced-density-label">Densidade da tabela</span>
+            <div
+              role="group"
+              aria-labelledby="apr-advanced-density-label"
+              className="inline-flex rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-muted)] p-1"
+            >
               <button
                 type="button"
                 onClick={() =>

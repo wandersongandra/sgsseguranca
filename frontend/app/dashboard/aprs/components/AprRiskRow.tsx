@@ -482,6 +482,8 @@ export const AprRiskRow = React.memo(function AprRiskRow({
                 onClick={() => onToggleExpanded(index)}
                 className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] p-1.5 text-[var(--ds-color-text-secondary)] motion-safe:transition-colors hover:bg-[var(--ds-color-surface-muted)]"
                 title={isRowExpanded ? "Recolher detalhes" : "Expandir detalhes"}
+                aria-expanded={isRowExpanded}
+                aria-label={isRowExpanded ? "Recolher detalhes" : "Expandir detalhes"}
               >
                 {isRowExpanded ? (
                   <Minimize2 className="h-3.5 w-3.5" />
