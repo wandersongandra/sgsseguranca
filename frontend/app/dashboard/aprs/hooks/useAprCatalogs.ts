@@ -1,4 +1,4 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { siteStore } from "@/lib/siteStore";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
 import { logger } from "@/lib/logger";
@@ -43,6 +43,9 @@ interface UseAprCatalogsOptions {
   setSites: Dispatch<SetStateAction<Site[]>>;
   setUsers: Dispatch<SetStateAction<User[]>>;
   setCompanies: Dispatch<SetStateAction<Company[]>>;
+  companies: Pick<Company, "id">[];
+  sites: Pick<Site, "id">[];
+  users: Pick<User, "id">[];
 }
 
 function mergeTenantCatalog<T extends { id: string; company_id: string }>(
@@ -80,6 +83,9 @@ export function useAprCatalogs({
   setSites,
   setUsers,
   setCompanies,
+  companies,
+  sites,
+  users,
 }: UseAprCatalogsOptions) {
   // Achado real (auditoria): o estado `companies` no AprForm nunca era
   // populado em lugar nenhum do fluxo — o <select> "Empresa" ficava com
@@ -331,25 +337,55 @@ export function useAprCatalogs({
     };
   }, [selectedCompanyId, selectedSiteId, setUsers]);
 
+  // Achado real (auditoria v2): um <select> nativo não reflete um valor
+  // setado via setValue() sem uma <option> correspondente já renderizada no
+  // DOM — o navegador silenciosamente ignora a atribuição e mantém o valor
+  // vazio (placeholder). O efeito original chamava setValue("company_id", …)
+  // assim que sabia o companyId, sem esperar `companies` carregar; como o
+  // fetch de companies é assíncrono, o <option> ainda não existia no
+  // primeiro tick e o valor nunca "colava" — mesmo depois de `companies`
+  // carregar e o <option> aparecer, nada reaplicava o setValue. Resultado:
+  // o campo "Empresa" ficava visualmente vazio (e o submit lia o valor
+  // vazio direto do DOM, já que react-hook-form lê refs não controladas no
+  // momento do submit) mesmo com o companyId certo resolvido em memória.
   useEffect(() => {
     if (id || selectedCompanyId) return;
     const companyId = selectedTenantStore.get()?.companyId || user?.company_id;
-    const activeSiteId = siteStore.get()?.siteId;
     if (!isUuidLike(companyId)) return;
+    if (!companies.some((company) => company.id === companyId)) return;
     setValue("company_id", String(companyId));
-    if (isUuidLike(activeSiteId)) {
-      setValue("site_id", String(activeSiteId));
+  }, [id, selectedCompanyId, setValue, user?.company_id, companies]);
+
+  // Efeito separado do de cima: site_id/elaborador_id/participants só podem
+  // ser setados depois que a empresa é definida, porque os catálogos de
+  // obras/usuários (sites/users acima) só carregam DEPOIS que
+  // selectedCompanyId existe — tentar tudo no mesmo tick do efeito de
+  // empresa sempre falhava pelo mesmo motivo (opções ainda não existiam).
+  // autoPopulatedRef evita reaplicar o valor toda vez que `sites`/`users`
+  // mudam de referência (ex.: merge de outro catálogo), o que sobrescreveria
+  // uma escolha manual do usuário depois do auto-preenchimento inicial.
+  const autoPopulatedRef = useRef({ site: false, elaborador: false });
+  useEffect(() => {
+    if (id || !selectedCompanyId) return;
+
+    if (
+      !autoPopulatedRef.current.site &&
+      !selectedSiteId &&
+      isUuidLike(siteStore.get()?.siteId) &&
+      sites.some((site) => site.id === siteStore.get()?.siteId)
+    ) {
+      setValue("site_id", String(siteStore.get()?.siteId));
+      autoPopulatedRef.current.site = true;
     }
-    if (isUuidLike(user?.id)) {
+
+    if (
+      !autoPopulatedRef.current.elaborador &&
+      isUuidLike(user?.id) &&
+      users.some((candidate) => candidate.id === user?.id)
+    ) {
       setValue("elaborador_id", String(user?.id));
       setValue("participants", [String(user?.id)]);
+      autoPopulatedRef.current.elaborador = true;
     }
-  }, [
-    id,
-    selectedCompanyId,
-    setValue,
-    user?.company_id,
-    user?.id,
-    user?.site_id,
-  ]);
+  }, [id, selectedCompanyId, selectedSiteId, setValue, user?.id, sites, users]);
 }

@@ -2234,6 +2234,9 @@ export function AprForm({ id }: AprFormProps) {
     setSites,
     setUsers,
     setCompanies,
+    companies,
+    sites,
+    users,
   });
 
   useEffect(() => {
