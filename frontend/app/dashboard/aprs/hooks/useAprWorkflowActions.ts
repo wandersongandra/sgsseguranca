@@ -11,6 +11,7 @@ import {
 import { openUrlInNewTab } from "@/lib/print-utils";
 import { extractApiErrorMessage, handleApiError } from "@/lib/error-handler";
 import { logger } from "@/lib/logger";
+import { fetchGovernedPdfBlob } from "@/lib/pdf/fetchGovernedPdfBlob";
 
 import type { AprFormData } from "../components/aprForm.schema";
 import type { AprWorkflowEvidenceItem } from "./useAprPdfWorkflow";
@@ -204,7 +205,8 @@ export function useAprWorkflowActions({
       await reloadAprWorkflowContext(id);
 
       if (access?.url) {
-        openUrlInNewTab(access.url);
+        const { blob } = await fetchGovernedPdfBlob(access.url);
+        openUrlInNewTab(URL.createObjectURL(blob));
         return;
       }
 
@@ -311,7 +313,8 @@ export function useAprWorkflowActions({
     try {
       const access = await aprsService.getPdfAccess(id);
       if (access.url) {
-        openUrlInNewTab(access.url);
+        const { blob } = await fetchGovernedPdfBlob(access.url);
+        openUrlInNewTab(URL.createObjectURL(blob));
         return;
       }
 
