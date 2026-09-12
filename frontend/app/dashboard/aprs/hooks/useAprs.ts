@@ -169,7 +169,15 @@ export function useAprs(options?: UseAprsOptions) {
     const siteId = activeSiteId;
     const requestId = ++activeRequestIdRef.current;
 
-    if (!companyId || !siteId) {
+    // Achado real (auditoria v2, confirmado ao vivo em produção): siteId
+    // vem do siteStore global ("obra ativa" do dashboard) — um seletor
+    // totalmente opcional e separado, que a maioria dos usuários nunca usa
+    // explicitamente. Exigi-lo aqui travava a fila de APRs inteira (0
+    // resultados, sem erro visível) para qualquer usuário sem uma obra
+    // ativa selecionada, mesmo com APRs reais cadastradas na empresa. O
+    // backend já trata site_id como filtro opcional (`?site_id=` filtra por
+    // obra quando presente); só companyId é realmente necessário.
+    if (!companyId) {
       activeControllerRef.current?.abort();
       activeControllerRef.current = null;
       lastAppliedContextRef.current = null;
@@ -330,9 +338,9 @@ useEffect(() => {
       setTotal(0);
       setLastPage(1);
       setLoadError(null);
-      setLoading(Boolean(nextCompanyId && nextSiteId));
+      setLoading(Boolean(nextCompanyId));
       setRefetching(false);
-      if (!nextCompanyId || !nextSiteId) {
+      if (!nextCompanyId) {
         return;
       }
     });
@@ -348,7 +356,7 @@ useEffect(() => {
       setTotal(0);
       setLastPage(1);
       setLoadError(null);
-      setLoading(Boolean(nextCompanyId && nextSiteId));
+      setLoading(Boolean(nextCompanyId));
       setRefetching(false);
     });
 

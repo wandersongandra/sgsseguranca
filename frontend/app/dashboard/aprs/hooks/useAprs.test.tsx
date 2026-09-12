@@ -137,13 +137,28 @@ describe('useAprs', () => {
     expect(result.current.loadError).toBeNull();
   });
 
-  it('não consulta sem obra ativa', async () => {
+  it('consulta com companyId mesmo sem obra ativa selecionada (site_id é filtro opcional no backend)', async () => {
+    // Regressão (achado real, confirmado ao vivo em produção): siteStore é
+    // o seletor GLOBAL e opcional de "obra ativa" do dashboard — a maioria
+    // dos usuários nunca o usa explicitamente. O backend documenta site_id
+    // como filtro opcional em GET /aprs ("Filtra a fila por obra/unidade"),
+    // não como requisito. Exigir uma obra ativa aqui travava a fila inteira
+    // de APRs (0 resultados, sem erro visível) mesmo com APRs reais
+    // cadastradas na empresa — inclusive para quem tinha acabado de criar
+    // uma.
     currentSite = null;
+    findPaginatedMock.mockResolvedValueOnce({
+      data: [{ id: 'apr-1' }],
+      total: 1,
+      lastPage: 1,
+    });
+
     const { result } = renderHook(() => useAprs());
 
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(findPaginatedMock).not.toHaveBeenCalled();
-    expect(result.current.aprs).toEqual([]);
+    await waitFor(() => expect(result.current.aprs).toEqual([{ id: 'apr-1' }]));
+    expect(findPaginatedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: 'company-x', siteId: undefined }),
+    );
     expect(result.current.loadError).toBeNull();
   });
 
