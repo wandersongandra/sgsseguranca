@@ -51,6 +51,7 @@ export function PtRejectModal({ isOpen, loading, onClose, onConfirm }: Props) {
           ref={inputRef}
           id="pt-reject-reason"
           rows={4}
+          maxLength={2000}
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           onBlur={() => setTouched(true)}

@@ -36,15 +36,17 @@ export async function clearSensitiveBrowserStorage(): Promise<void> {
     }
   }
 
-  for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
-    const key = window.localStorage.key(index);
-    if (!key) continue;
-    if (SENSITIVE_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
-      try {
-        window.localStorage.removeItem(key);
-      } catch {
-        // best effort
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    try {
+      for (let index = storage.length - 1; index >= 0; index -= 1) {
+        const key = storage.key(index);
+        if (!key) continue;
+        if (SENSITIVE_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+          storage.removeItem(key);
+        }
       }
+    } catch {
+      // best effort
     }
   }
 }

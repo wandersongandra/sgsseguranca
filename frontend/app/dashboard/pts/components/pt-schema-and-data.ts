@@ -337,10 +337,37 @@ export const initialChecklists = {
 // SCHEMA DE VALIDAÇÃO (ZOD)
 // =================================================================
 
+const ptChecklistItemSchema = z.object({
+  id: z.string().max(100),
+  pergunta: z.string().max(2000),
+  resposta: z.enum(['Sim', 'Não', 'Não aplicável']).optional(),
+  justificativa: z.string().max(2000).optional(),
+  anexo_nome: z.string().max(255).optional(),
+  anexo_ref: z.string().max(10_000).optional(),
+});
+
+const ptChecklistItemWithSectionSchema = ptChecklistItemSchema.extend({
+  section: z.string().max(100).optional(),
+});
+
+const ptRecommendationChecklistItemSchema = z.object({
+  id: z.string().max(100),
+  pergunta: z.string().max(2000),
+  resposta: z.enum(['Ciente', 'Não']).optional(),
+  justificativa: z.string().max(2000).optional(),
+});
+
+const ptRapidRiskChecklistItemSchema = z.object({
+  id: z.string().max(100),
+  pergunta: z.string().max(2000),
+  secao: z.enum(['basica', 'adicional']),
+  resposta: z.enum(['Sim', 'Não']).optional(),
+});
+
 export const ptSchema = z.object({
-  numero: z.string().min(1, 'O número é obrigatório'),
-  titulo: z.string().min(5, 'O título deve ter pelo menos 5 caracteres'),
-  descricao: z.string().optional(),
+  numero: z.string().min(1, 'O número é obrigatório').max(80, 'O número deve ter no máximo 80 caracteres'),
+  titulo: z.string().min(5, 'O título deve ter pelo menos 5 caracteres').max(200, 'O título deve ter no máximo 200 caracteres'),
+  descricao: z.string().max(5000, 'A descrição deve ter no máximo 5000 caracteres').optional(),
   data_hora_inicio: z.string(),
   data_hora_fim: z.string(),
   status: z.enum(['Pendente', 'Aprovada', 'Cancelada', 'Encerrada', 'Expirada']),
@@ -353,80 +380,19 @@ export const ptSchema = z.object({
   trabalho_quente: z.boolean(),
   eletricidade: z.boolean(),
   escavacao: z.boolean(),
-  analise_risco_rapida_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      secao: z.enum(['basica', 'adicional']),
-      resposta: z.enum(['Sim', 'Não']).optional(),
-    }),
-  ),
-  analise_risco_rapida_observacoes: z.string().optional(),
-  recomendacoes_gerais_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      resposta: z.enum(['Ciente', 'Não']).optional(),
-      justificativa: z.string().optional(),
-    }),
-  ),
-  trabalho_altura_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      resposta: z.enum(['Sim', 'Não', 'Não aplicável']).optional(),
-      justificativa: z.string().optional(),
-      anexo_nome: z.string().optional(),
-      anexo_ref: z.string().optional(),
-    }),
-  ),
-  trabalho_eletrico_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      resposta: z.enum(['Sim', 'Não', 'Não aplicável']).optional(),
-      justificativa: z.string().optional(),
-      anexo_nome: z.string().optional(),
-      anexo_ref: z.string().optional(),
-    }),
-  ),
-  trabalho_quente_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      resposta: z.enum(['Sim', 'Não', 'Não aplicável']).optional(),
-      justificativa: z.string().optional(),
-      anexo_nome: z.string().optional(),
-      anexo_ref: z.string().optional(),
-    }),
-  ),
-  trabalho_espaco_confinado_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      section: z.string().optional(),
-      resposta: z.enum(['Sim', 'Não', 'Não aplicável']).optional(),
-      justificativa: z.string().optional(),
-      anexo_nome: z.string().optional(),
-      anexo_ref: z.string().optional(),
-    }),
-  ),
-  trabalho_escavacao_checklist: z.array(
-    z.object({
-      id: z.string(),
-      pergunta: z.string(),
-      section: z.string().optional(),
-      resposta: z.enum(['Sim', 'Não', 'Não aplicável']).optional(),
-      justificativa: z.string().optional(),
-      anexo_nome: z.string().optional(),
-      anexo_ref: z.string().optional(),
-    }),
-  ),
-  executantes: z.array(z.string()).min(1, 'Selecione pelo menos um executante'),
+  analise_risco_rapida_checklist: z.array(ptRapidRiskChecklistItemSchema),
+  analise_risco_rapida_observacoes: z.string().max(5000, 'As observações devem ter no máximo 5000 caracteres').optional(),
+  recomendacoes_gerais_checklist: z.array(ptRecommendationChecklistItemSchema),
+  trabalho_altura_checklist: z.array(ptChecklistItemSchema),
+  trabalho_eletrico_checklist: z.array(ptChecklistItemSchema),
+  trabalho_quente_checklist: z.array(ptChecklistItemSchema),
+  trabalho_espaco_confinado_checklist: z.array(ptChecklistItemWithSectionSchema),
+  trabalho_escavacao_checklist: z.array(ptChecklistItemWithSectionSchema),
+  executantes: z.array(z.string()).min(1, 'Selecione pelo menos um executante').max(200, 'Máximo de 200 executantes'),
   auditado_por_id: z.string().optional(),
   data_auditoria: z.string().optional(),
-  resultado_auditoria: z.string().optional(),
-  notas_auditoria: z.string().optional(),
+  resultado_auditoria: z.string().max(200).optional(),
+  notas_auditoria: z.string().max(2000).optional(),
   contato_emergencia: z.string().max(200).optional(),
   plano_resgate: z.string().max(2000).optional(),
   ponto_encontro: z.string().max(300).optional(),

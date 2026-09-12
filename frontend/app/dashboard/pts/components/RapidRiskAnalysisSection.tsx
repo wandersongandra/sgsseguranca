@@ -86,13 +86,18 @@ export const RapidRiskAnalysisSection = () => {
                 const answerError = getRapidRiskAnswerError(index);
 
                 return (
-                  <div
+                  <fieldset
                     key={item.id}
                     className="rounded-lg border border-[var(--ds-color-border-default)] bg-[color:var(--ds-color-surface-muted)]/14 p-4"
+                    aria-required="true"
+                    aria-describedby={answerError ? `pt-arr-error-${item.id}` : undefined}
                   >
-                    <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                      {item.pergunta} <span className="text-[var(--ds-color-danger)]">*</span>
-                    </p>
+                    <legend className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
+                      {item.pergunta}{' '}
+                      <span className="text-[var(--ds-color-danger)]" aria-hidden="true">
+                        *
+                      </span>
+                    </legend>
 
                     <div className="mt-3 flex flex-wrap gap-4">
                       {(['Sim', 'Não'] as RapidRiskChecklistAnswer[]).map(
@@ -105,6 +110,8 @@ export const RapidRiskAnalysisSection = () => {
                               type="radio"
                               name={`arr-${item.id}`}
                               checked={item.resposta === option}
+                              required
+                              aria-describedby={answerError ? `pt-arr-error-${item.id}` : undefined}
                               onChange={() =>
                                 setRapidRiskChecklistAnswer(index, option)
                               }
@@ -117,11 +124,15 @@ export const RapidRiskAnalysisSection = () => {
                     </div>
 
                     {answerError && (
-                      <p className="mt-2 text-xs text-[var(--ds-color-danger)]">
+                      <p
+                        id={`pt-arr-error-${item.id}`}
+                        role="alert"
+                        className="mt-2 text-xs text-[var(--ds-color-danger)]"
+                      >
                         {String(answerError)}
                       </p>
                     )}
-                  </div>
+                  </fieldset>
                 );
               })}
             </div>
@@ -130,12 +141,21 @@ export const RapidRiskAnalysisSection = () => {
       </div>
 
       <div className="mt-6">
-        <label className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]">
+        <label
+          htmlFor="pt-arr-observacoes"
+          className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]"
+        >
           Observações e evidências
           {hasRapidRiskBasicNo && <span className="text-[var(--ds-color-danger)]"> *</span>}
         </label>
         <textarea
+          id="pt-arr-observacoes"
           value={rapidRiskObservacoes || ''}
+          maxLength={5000}
+          aria-invalid={Boolean(rapidRiskObservacoesErrorMessage)}
+          aria-describedby={
+            rapidRiskObservacoesErrorMessage ? 'pt-arr-observacoes-error' : undefined
+          }
           onChange={(event) =>
             setValue(
               'analise_risco_rapida_observacoes',
@@ -153,7 +173,11 @@ export const RapidRiskAnalysisSection = () => {
           )}
         />
         {rapidRiskObservacoesErrorMessage && (
-          <p className="mt-1 text-xs text-[var(--ds-color-danger)]">
+          <p
+            id="pt-arr-observacoes-error"
+            role="alert"
+            className="mt-1 text-xs text-[var(--ds-color-danger)]"
+          >
             {rapidRiskObservacoesErrorMessage}
           </p>
         )}

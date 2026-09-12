@@ -38,6 +38,8 @@ import {
 import { safeFormatDate } from '@/lib/date/safeFormat';
 import { logger } from '@/lib/logger';
 import api from '@/lib/api';
+import { selectedTenantStore } from '@/lib/selectedTenantStore';
+import { siteStore } from '@/lib/siteStore';
 
 /**
  * O link de download é assinado e de uso único, vinculado à sessão que o
@@ -50,7 +52,8 @@ import api from '@/lib/api';
 async function fetchPdfBlob(
   url: string,
 ): Promise<{ blob: Blob; filename: string | null }> {
-  const response = await api.get<Blob>(url, { responseType: 'blob' });
+  const safeUrl = resolveSafeBrowserUrl(url);
+  const response = await api.get<Blob>(safeUrl, { responseType: 'blob' });
   const contentDisposition = response.headers?.['content-disposition'];
   const match =
     typeof contentDisposition === 'string'
@@ -95,10 +98,11 @@ interface StoredFilesPanelProps {
     week: number;
   }) => Promise<Blob>;
   companyOptions?: Array<{ id: string; name: string }>;
+  showCompanyFilter?: boolean;
 }
 
 const inputClassName =
-  'w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-sm text-[var(--ds-color-text-primary)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]';
+  'min-h-11 w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-base text-[var(--ds-color-text-primary)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] sm:text-sm';
 
 function parseYearFilter(value: string) {
   if (!value || !/^\d{4}$/.test(value)) return undefined;
@@ -125,6 +129,7 @@ function StoredFilesPanelComponent({
   getPdfAccess,
   downloadWeeklyBundle,
   companyOptions = [],
+  showCompanyFilter = true,
 }: StoredFilesPanelProps) {
   const [files, setFiles] = useState<StoredFileItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -134,6 +139,7 @@ function StoredFilesPanelComponent({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const requestSequenceRef = useRef(0);
+  const [scopeRevision, setScopeRevision] = useState(0);
   const deferredYear = useDeferredValue(year);
   const deferredWeek = useDeferredValue(week);
   const deferredCompanyId = useDeferredValue(companyId);
@@ -154,6 +160,36 @@ function StoredFilesPanelComponent({
   const canBuildWeeklyBundle = Boolean(
     downloadWeeklyBundle && parsedYear && parsedWeek,
   );
+
+  useEffect(() => {
+    const getScopeKey = () => {
+      const tenant = selectedTenantStore.get();
+      const site = siteStore.get();
+      return [tenant?.companyId || '', site?.companyId || '', site?.siteId || ''].join(':');
+    };
+
+    let previousScopeKey = getScopeKey();
+    const invalidateScope = () => {
+      const nextScopeKey = getScopeKey();
+      if (nextScopeKey === previousScopeKey) return;
+
+      previousScopeKey = nextScopeKey;
+      requestSequenceRef.current += 1;
+      setFiles([]);
+      setLoading(true);
+      setCompanyId('');
+      setPage(1);
+      setScopeRevision((current) => current + 1);
+    };
+
+    const unsubscribeTenant = selectedTenantStore.subscribe(invalidateScope);
+    const unsubscribeSite = siteStore.subscribe(invalidateScope);
+
+    return () => {
+      unsubscribeTenant();
+      unsubscribeSite();
+    };
+  }, []);
 
   useEffect(() => {
     setPage(1);
@@ -192,7 +228,7 @@ function StoredFilesPanelComponent({
     return () => {
       mounted = false;
     };
-  }, [deferredCompanyId, parsedWeek, parsedYear, listStoredFiles]);
+  }, [deferredCompanyId, parsedWeek, parsedYear, listStoredFiles, scopeRevision]);
 
   const handleDownload = useCallback(
     async (entityId: string) => {
@@ -434,19 +470,21 @@ function StoredFilesPanelComponent({
 
       <div className="border-t border-[var(--ds-color-border-subtle)] px-4 py-4 sm:px-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr),0.7fr,0.7fr,0.7fr]">
-          <select
-            aria-label="Filtrar arquivos por empresa"
-            value={companyId}
-            onChange={(event) => setCompanyId(event.target.value)}
-            className={inputClassName}
-          >
-            <option value="">Todas empresas</option>
-            {companyOptions.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+          {showCompanyFilter ? (
+            <select
+              aria-label="Filtrar arquivos por empresa"
+              value={companyId}
+              onChange={(event) => setCompanyId(event.target.value)}
+              className={inputClassName}
+            >
+              <option value="">Todas empresas</option>
+              {companyOptions.map((company) => (
+                <option key={company.id} value={company.id}>
+                  {company.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
           <input
             type="number"
             min={2020}
@@ -646,6 +684,7 @@ const areStoredFilesPanelPropsEqual = (
   prev.listStoredFiles === next.listStoredFiles &&
   prev.getPdfAccess === next.getPdfAccess &&
   prev.downloadWeeklyBundle === next.downloadWeeklyBundle &&
+  prev.showCompanyFilter === next.showCompanyFilter &&
   areCompanyOptionsEqual(prev.companyOptions || [], next.companyOptions || []);
 
 export const StoredFilesPanel = memo(

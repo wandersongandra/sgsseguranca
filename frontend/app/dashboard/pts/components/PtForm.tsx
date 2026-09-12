@@ -49,7 +49,8 @@ import { cn } from '@/lib/utils';
 import { extractApiErrorMessage } from '@/lib/error-handler';
 import {
   getPtFocusLabel,
-  PtFocusTarget,
+  isPtFocusTarget,
+  type PtFocusTarget,
 } from './pt-approval-focus';
 import type {
   SophieDraftChecklistSuggestion,
@@ -464,7 +465,10 @@ export function PtForm({ id }: PtFormProps) {
   const prefillTitle = searchParams.get('title') || '';
   const prefillDescription = searchParams.get('description') || '';
   const isFieldMode = searchParams.get('field') === '1';
-  const focusTarget = searchParams.get('focus') as PtFocusTarget | null;
+  const rawFocusTarget = searchParams.get('focus');
+  const focusTarget = isPtFocusTarget(rawFocusTarget)
+    ? rawFocusTarget
+    : null;
   const [fetching, setFetching] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   
@@ -494,6 +498,9 @@ export function PtForm({ id }: PtFormProps) {
   const [preApprovalHistory, setPreApprovalHistory] = useState<PtPreApprovalHistoryEntry[]>([]);
   const [preApprovalHistoryLoading, setPreApprovalHistoryLoading] = useState(false);
   const lastHandledAprIdRef = useRef<string>('');
+  const aprLinkGenerationRef = useRef(0);
+  const currentPtRefreshGenerationRef = useRef(0);
+  const pdfEmissionInFlightRef = useRef(false);
   const draftAutosaveTimerRef = useRef<number | undefined>(undefined);
   const aprTenantRef = useRef<string | undefined>(undefined);
   const siteTenantRef = useRef<string | undefined>(undefined);
@@ -549,9 +556,20 @@ export function PtForm({ id }: PtFormProps) {
     trigger,
   } = methods;
 
+  const draftOwnerScope = useMemo(() => {
+    if (!user?.company_id || !user.id) {
+      return null;
+    }
+
+    return `${user.company_id}.${user.id}`;
+  }, [user?.company_id, user?.id]);
+
   const draftStorageKey = useMemo(
-    () => (id ? null : `gst.pt.wizard.draft.${user?.company_id || 'default'}`),
-    [id, user?.company_id],
+    () =>
+      id || !draftOwnerScope
+        ? null
+        : `gst.pt.wizard.draft.${draftOwnerScope}`,
+    [draftOwnerScope, id],
   );
 
   useEffect(() => {
@@ -579,9 +597,22 @@ export function PtForm({ id }: PtFormProps) {
     return () => window.clearTimeout(timeout);
   }, [currentStep, focusTarget]);
   const legacyDraftStorageKey = useMemo(
-    () => (id ? null : `compliancex.pt.wizard.draft.${user?.company_id || 'default'}`),
-    [id, user?.company_id],
+    () =>
+      id || !draftOwnerScope
+        ? null
+        : `compliancex.pt.wizard.draft.${draftOwnerScope}`,
+    [draftOwnerScope, id],
   );
+  const legacySharedDraftStorageKeys = useMemo(() => {
+    if (id || !user?.company_id) {
+      return [];
+    }
+
+    return [
+      `gst.pt.wizard.draft.${user.company_id}`,
+      `compliancex.pt.wizard.draft.${user.company_id}`,
+    ];
+  }, [id, user?.company_id]);
 
   const selectedCompanyId = watch('company_id');
   const selectedSiteId = watch('site_id');
@@ -628,8 +659,10 @@ export function PtForm({ id }: PtFormProps) {
     ['Pendente', 'Aprovada'].includes(currentPt?.status ?? '');
   const refetchCurrentPt = useCallback(async () => {
     if (!id) return;
+    const requestGeneration = ++currentPtRefreshGenerationRef.current;
     try {
       const fresh = await ptsService.findOne(id);
+      if (requestGeneration !== currentPtRefreshGenerationRef.current) return;
       setCurrentPt(fresh);
     } catch (error) {
       logger.error('Erro ao atualizar PT após mutação de evidência:', error);
@@ -1018,6 +1051,7 @@ export function PtForm({ id }: PtFormProps) {
 
   const handleAprLinked = useCallback(
     async (aprId: string) => {
+      const requestGeneration = ++aprLinkGenerationRef.current;
       if (aprId && lastHandledAprIdRef.current === aprId) {
         return;
       }
@@ -1030,6 +1064,7 @@ export function PtForm({ id }: PtFormProps) {
 
       try {
         const apr = filteredAprs.find((currentApr) => currentApr.id === aprId) || (await aprsService.findOne(aprId));
+        if (requestGeneration !== aprLinkGenerationRef.current) return;
         const currentValues = methods.getValues();
 
         if (!currentValues.company_id) {
@@ -1079,6 +1114,7 @@ export function PtForm({ id }: PtFormProps) {
               : 'Título, descrição e contexto operacional foram reaproveitados quando estavam em branco.',
         });
       } catch (error) {
+        if (requestGeneration !== aprLinkGenerationRef.current) return;
         logger.error('Erro ao aplicar contexto da APR na PT:', error);
         toast.error('Não foi possível aproveitar automaticamente o contexto da APR.');
       }
@@ -1173,53 +1209,15 @@ export function PtForm({ id }: PtFormProps) {
       }
 
       // Persist signatures only after the PT entity exists.
-      if (ptId) {
-        const signaturesToDelete = Object.entries(persistedSignatures).filter(
-          ([userId, persisted]) => {
-            const current = signatures[userId];
-            return (
-              !current ||
-              current.data !== persisted.data ||
-              current.type !== persisted.type
-            );
-          },
+      if (ptId && hasPendingSignatureChanges) {
+        await ptsService.replaceSignatures(
+          ptId,
+          Object.entries(signatures).map(([userId, signature]) => ({
+            user_id: userId,
+            signature_data: signature.data,
+            type: signature.type,
+          })),
         );
-        const signaturesToCreate = Object.entries(signatures).filter(
-          ([userId, current]) => {
-            const persisted = persistedSignatures[userId];
-            return (
-              !persisted ||
-              current.data !== persisted.data ||
-              current.type !== persisted.type
-            );
-          },
-        );
-
-        const signatureIdsToDelete = signaturesToDelete
-          .map(([, persisted]) => persisted.id)
-          .filter((signatureId): signatureId is string => Boolean(signatureId));
-
-        if (signatureIdsToDelete.length > 0) {
-          await Promise.all(
-            signatureIdsToDelete.map((signatureId) =>
-              signaturesService.deleteById(signatureId),
-            ),
-          );
-        }
-
-        if (signaturesToCreate.length > 0) {
-          await Promise.all(
-            signaturesToCreate.map(([userId, sig]) =>
-              signaturesService.create({
-                user_id: userId,
-                document_id: ptId as string,
-                document_type: 'PT',
-                signature_data: sig.data,
-                type: sig.type,
-              }),
-            ),
-          );
-        }
       }
 
       return { offlineQueued: false, ptId };
@@ -1438,6 +1436,9 @@ export function PtForm({ id }: PtFormProps) {
           setCurrentPt(null);
           setPreApprovalHistory([]);
           setPersistedSignatures({});
+          for (const sharedDraftKey of legacySharedDraftStorageKeys) {
+            window.localStorage.removeItem(sharedDraftKey);
+          }
           const rawDraft =
             window.localStorage.getItem(draftStorageKey) ||
             (legacyDraftStorageKey
@@ -1534,11 +1535,21 @@ export function PtForm({ id }: PtFormProps) {
     return () => {
       active = false;
     };
-  }, [draftStorageKey, id, legacyDraftStorageKey, methods, reset, user?.company_id, user?.profile?.nome]);
+  }, [
+    draftStorageKey,
+    id,
+    legacyDraftStorageKey,
+    legacySharedDraftStorageKeys,
+    methods,
+    reset,
+    user?.company_id,
+    user?.profile?.nome,
+  ]);
 
   useEffect(() => {
     let active = true;
     const requestCompanyId = selectedCompanyId;
+    const requestSiteId = selectedSiteId;
 
     if (aprTenantRef.current !== requestCompanyId) {
       aprTenantRef.current = requestCompanyId;
@@ -1546,7 +1557,7 @@ export function PtForm({ id }: PtFormProps) {
     }
 
     async function loadCompanyScopedAprs() {
-      if (!requestCompanyId) {
+      if (!requestCompanyId || !requestSiteId) {
         setAprs([]);
         return;
       }
@@ -1556,6 +1567,7 @@ export function PtForm({ id }: PtFormProps) {
           page: 1,
           limit: 100,
           companyId: requestCompanyId,
+          siteId: requestSiteId,
         });
         if (!active) return;
 
@@ -1593,7 +1605,7 @@ export function PtForm({ id }: PtFormProps) {
     return () => {
       active = false;
     };
-  }, [selectedAprId, selectedCompanyId]);
+  }, [selectedAprId, selectedCompanyId, selectedSiteId]);
 
   useEffect(() => {
     let active = true;
@@ -1893,7 +1905,8 @@ export function PtForm({ id }: PtFormProps) {
   };
 
   const handleEmitGovernedPdfFromForm = async () => {
-    if (!id || !currentPt) return;
+    if (!id || !currentPt || pdfEmissionInFlightRef.current) return;
+    pdfEmissionInFlightRef.current = true;
     setEmittingPdf(true);
     try {
       const [fullPt, ptSignatures] = await Promise.all([
@@ -1917,6 +1930,7 @@ export function PtForm({ id }: PtFormProps) {
       const msg = extractApiErrorMessage(err) || 'Falha ao emitir PDF final da PT.';
       toast.error(msg);
     } finally {
+      pdfEmissionInFlightRef.current = false;
       setEmittingPdf(false);
     }
   };
@@ -1960,7 +1974,7 @@ export function PtForm({ id }: PtFormProps) {
 
   return (
     <div className={cn(
-      "ds-form-page mx-auto max-w-7xl space-y-6 pb-12 motion-safe:animate-in fade-in slide-in-from-bottom-4 motion-safe:duration-500",
+      "ds-form-page ds-pt-form-page mx-auto max-w-7xl space-y-6 pb-12 motion-safe:animate-in fade-in slide-in-from-bottom-4 motion-safe:duration-500",
       isFieldMode && "pb-28",
     )}>
       {fetching ? (
@@ -2068,26 +2082,25 @@ export function PtForm({ id }: PtFormProps) {
                   const isCompleted = currentStep > step.id;
 
                   return (
-                    <button
-                      key={step.id}
-                      type="button"
-                      role="listitem"
-                      aria-current={isActive ? 'step' : undefined}
-                      aria-label={`Etapa ${step.id}: ${step.title}${isCompleted ? ' (concluída)' : isActive ? ' (em edição)' : ''}`}
-                      onClick={() => {
-                        if (step.id <= currentStep) {
-                          setCurrentStep(step.id);
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      className={`w-full rounded-[var(--ds-radius-lg)] border px-4 py-3 text-left motion-safe:transition-all ${
-                        isActive
-                          ? 'border-[var(--ds-color-action-primary)] bg-[var(--ds-color-action-primary)]/12 shadow-[var(--ds-shadow-sm)]'
-                          : isCompleted
-                            ? 'border-[color:var(--ds-color-success)]/20 bg-[color:var(--ds-color-success-subtle)] hover:border-[color:var(--ds-color-success)]/28'
-                            : 'border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)]/75'
-                      }`}
-                    >
+                    <div key={step.id} role="listitem">
+                      <button
+                        type="button"
+                        aria-current={isActive ? 'step' : undefined}
+                        aria-label={`Etapa ${step.id}: ${step.title}${isCompleted ? ' (concluída)' : isActive ? ' (em edição)' : ''}`}
+                        onClick={() => {
+                          if (step.id <= currentStep) {
+                            setCurrentStep(step.id);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`w-full rounded-[var(--ds-radius-lg)] border px-4 py-3 text-left motion-safe:transition-all ${
+                          isActive
+                            ? 'border-[var(--ds-color-action-primary)] bg-[var(--ds-color-action-primary)]/12 shadow-[var(--ds-shadow-sm)]'
+                            : isCompleted
+                              ? 'border-[color:var(--ds-color-success)]/20 bg-[color:var(--ds-color-success-subtle)] hover:border-[color:var(--ds-color-success)]/28'
+                              : 'border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)]/75'
+                        }`}
+                      >
                       <div className="flex items-start gap-3">
                         <div
                           className={`flex h-10 w-10 items-center justify-center rounded-2xl ${
@@ -2107,7 +2120,8 @@ export function PtForm({ id }: PtFormProps) {
                           <p className="mt-1 text-xs text-[var(--ds-color-text-secondary)]">{step.description}</p>
                         </div>
                       </div>
-                    </button>
+                      </button>
+                    </div>
                   );
                 })}
               </div>

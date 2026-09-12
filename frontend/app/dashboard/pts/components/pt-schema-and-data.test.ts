@@ -129,4 +129,23 @@ describe('ptSchema — campos normativos NR-33/NR-35', () => {
     });
     expect(invalidHora.success).toBe(false);
   });
+
+  it('limita textos e a quantidade de executantes antes do envio', () => {
+    const base = buildValidBase();
+    const invalid = ptSchema.safeParse({
+      ...base,
+      numero: 'x'.repeat(81),
+      titulo: 'x'.repeat(201),
+      descricao: 'x'.repeat(5001),
+      executantes: Array.from({ length: 201 }, (_, index) => `user-${index}`),
+    });
+
+    expect(invalid.success).toBe(false);
+    if (!invalid.success) {
+      const paths = invalid.error.issues.map((issue) => issue.path.join('.'));
+      expect(paths).toEqual(
+        expect.arrayContaining(['numero', 'titulo', 'descricao', 'executantes']),
+      );
+    }
+  });
 });

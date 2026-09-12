@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { type Path, useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -54,6 +54,7 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
 }) => {
   const { control, formState: { errors }, setValue } = useFormContext<PtFormData>();
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const uploadLockRef = useRef(false);
   const { fields } = useFieldArray({ control, name });
   const watchedItems = useWatch({ control, name }) as Array<{ resposta?: string }> | undefined;
   const answeredCount = (watchedItems ?? []).filter((item) => item?.resposta).length;
@@ -79,11 +80,13 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
 
   const handleAttachmentUpload = async (index: number, file: File) => {
     if (!ptId || !hasAttachmentField(name)) return;
+    if (uploadLockRef.current) return;
     const MAX_SIZE_MB = 10;
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
       toast.error(`O arquivo deve ter no máximo ${MAX_SIZE_MB}MB.`);
       return;
     }
+    uploadLockRef.current = true;
     setUploadingIndex(index);
     try {
       const result = await ptsService.attachChecklistItemFile(
@@ -109,6 +112,7 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
           ?.data?.message || 'Erro ao enviar o anexo.';
       toast.error(message);
     } finally {
+      uploadLockRef.current = false;
       setUploadingIndex(null);
     }
   };
@@ -177,10 +181,20 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
               key={item.id}
               className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[color:var(--ds-color-surface-muted)]/14 p-4"
             >
-              <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
+              <fieldset
+                className="min-w-0"
+                aria-required={!isOptional}
+                aria-describedby={responseError ? `pt-checklist-error-${index}` : undefined}
+              >
+              <legend className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
                 {prompt}
-                {!isOptional && <span className="text-[var(--color-danger)]"> *</span>}
-              </p>
+                {!isOptional && (
+                  <span className="text-[var(--color-danger)]" aria-hidden="true">
+                    {' '}
+                    *
+                  </span>
+                )}
+              </legend>
 
               {/* Respostas (Radio) */}
               <div className="mt-3 flex flex-wrap gap-4">
@@ -193,6 +207,8 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
                       type="radio"
                       name={`${name}-${index}`}
                       checked={field.resposta === responseValue}
+                      required={!isOptional}
+                      aria-describedby={responseError ? `pt-checklist-error-${index}` : undefined}
                       onChange={() => setValue(`${name}.${index}.resposta`, responseValue, { shouldValidate: true })}
                       className="h-4 w-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                     />
@@ -200,7 +216,11 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
                   </label>
                 ))}
               </div>
-              {responseError && <p className="mt-2 text-xs text-[var(--color-danger)]">{responseError}</p>}
+              {responseError && (
+                <p id={`pt-checklist-error-${index}`} role="alert" className="mt-2 text-xs text-[var(--color-danger)]">
+                  {responseError}
+                </p>
+              )}
 
               {/* Justificativa */}
               {field.resposta && showJustificationOn.some((value) => value === field.resposta) && (
@@ -211,9 +231,14 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
                   <textarea
                     id={`pt-checklist-just-${index}`}
                     aria-required="true"
+                    aria-invalid={Boolean(justificationError)}
+                    aria-describedby={
+                      justificationError ? `pt-checklist-just-error-${index}` : undefined
+                    }
                     value={field.justificativa || ''}
                     onChange={(e) => setValue(`${name}.${index}.justificativa`, e.target.value, { shouldValidate: true })}
                     rows={3}
+                    maxLength={2000}
                     className={cn(
                       'block w-full rounded-[var(--ds-radius-md)] border bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs text-[var(--ds-color-text-primary)] motion-safe:transition-all focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]',
                       justificationError
@@ -222,7 +247,15 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
                     )}
                     placeholder="Explique o motivo da resposta."
                   />
-                  {justificationError && <p className="mt-2 text-xs text-[var(--color-danger)]">{justificationError}</p>}
+                  {justificationError && (
+                    <p
+                      id={`pt-checklist-just-error-${index}`}
+                      role="alert"
+                      className="mt-2 text-xs text-[var(--color-danger)]"
+                    >
+                      {justificationError}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -236,7 +269,7 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
                       id={`pt-checklist-anexo-${index}`}
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png,.webp"
-                      disabled={!ptId || uploadingIndex === index}
+                      disabled={!ptId || uploadingIndex !== null}
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         e.target.value = '';
@@ -268,6 +301,7 @@ const ChecklistSection: React.FC<ChecklistSectionProps> = ({
                     </p>
                   </div>
               )}
+              </fieldset>
             </div>
           );
   };

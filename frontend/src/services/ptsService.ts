@@ -111,6 +111,12 @@ export interface PtEvidencePhoto {
   uploaded_at: string;
 }
 
+export interface PtSignatureInput {
+  user_id: string;
+  signature_data: string;
+  type: string;
+}
+
 export interface PtAtmosphericReading {
   id: string;
   hora: string;
@@ -503,6 +509,30 @@ export const ptsService = {
         offlineQueued: true,
       } as Pt & { offlineQueued: true };
     }
+  },
+
+  replaceSignatures: async (
+    id: string,
+    signatures: PtSignatureInput[],
+  ): Promise<{ entityId: string; replaced: number }> => {
+    const response = await api.put<{ entityId: string; replaced: number }>(
+      `/pts/${id}/signatures`,
+      { signatures },
+    );
+    return response.data;
+  },
+
+  createSignature: async (
+    id: string,
+    signature: Pick<PtSignatureInput, 'signature_data' | 'type'> & {
+      pin?: string;
+    },
+  ): Promise<{ entityId: string; created: true }> => {
+    const response = await api.post<{ entityId: string; created: true }>(
+      `/pts/${id}/signatures`,
+      signature,
+    );
+    return response.data;
   },
 
   approve: async (id: string, reason?: string) => {
