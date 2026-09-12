@@ -1189,112 +1189,149 @@ export class PtsService {
     return pt;
   }
 
+  private async findPtForUpdate(
+    id: string,
+    companyId: string,
+    manager: EntityManager,
+  ): Promise<Pt> {
+    const pt = await manager.getRepository(Pt).findOne({
+      where: { id, company_id: companyId },
+      relations: [
+        'site',
+        'apr',
+        'responsavel',
+        'executantes',
+        'auditado_por',
+        'vigia',
+        'encerrado_por',
+      ],
+    });
+    if (!pt) {
+      throw new NotFoundException(`PT com ID ${id} não encontrada`);
+    }
+    return pt;
+  }
+
+  private assertPtUpdateSiteScope(
+    pt: Pt,
+    siteId: UpdatePtDto['site_id'],
+  ): void {
+    if (siteId === undefined || siteId === pt.site_id) {
+      return;
+    }
+
+    const { siteIds, siteScope, isSuperAdmin } = this.getTenantContextOrThrow();
+    if (!isSuperAdmin && siteScope !== 'all' && !siteIds.includes(siteId)) {
+      throw new BadRequestException(
+        'PT deve permanecer na obra atual do tenant. A obra só pode ser alterada por um administrador com acesso global.',
+      );
+    }
+  }
+
+  private assertPtUpdateDates(
+    pt: Pt,
+    updateFields: Omit<UpdatePtDto, 'executantes' | 'status'>,
+  ): void {
+    const effectiveInicio =
+      updateFields.data_hora_inicio ?? pt.data_hora_inicio;
+    const effectiveFim = updateFields.data_hora_fim ?? pt.data_hora_fim;
+    if (
+      effectiveFim &&
+      effectiveInicio &&
+      new Date(effectiveFim) <= new Date(effectiveInicio)
+    ) {
+      throw new BadRequestException(
+        'A data/hora de término deve ser posterior à data/hora de início.',
+      );
+    }
+  }
+
+  private buildPtUpdateScope(
+    pt: Pt,
+    updateFields: Omit<UpdatePtDto, 'executantes' | 'status'>,
+    executantes?: string[],
+  ) {
+    return {
+      companyId: pt.company_id,
+      siteId: updateFields.site_id ?? pt.site_id,
+      aprId:
+        updateFields.apr_id !== undefined ? updateFields.apr_id : pt.apr_id,
+      responsavelId: updateFields.responsavel_id ?? pt.responsavel_id,
+      auditadoPorId:
+        updateFields.auditado_por_id !== undefined
+          ? updateFields.auditado_por_id
+          : pt.auditado_por_id,
+      executantes:
+        executantes ??
+        (Array.isArray(pt.executantes)
+          ? pt.executantes.map((executante) => executante.id)
+          : []),
+      vigiaUserId:
+        updateFields.vigia_user_id !== undefined
+          ? updateFields.vigia_user_id
+          : pt.vigia_user_id,
+    };
+  }
+
+  private applyPtUpdateFields(
+    pt: Pt,
+    updateFields: Omit<UpdatePtDto, 'executantes' | 'status'>,
+    requestedStatus: UpdatePtDto['status'],
+    executantes?: string[],
+  ): void {
+    const initialRisk = this.riskCalculationService.calculateScore(
+      updateFields.probability ?? pt.probability,
+      updateFields.severity ?? pt.severity,
+      updateFields.exposure ?? pt.exposure,
+    );
+    const residualRisk =
+      updateFields.residual_risk ||
+      this.riskCalculationService.classifyByScore(initialRisk) ||
+      pt.residual_risk ||
+      null;
+
+    Object.assign(pt, {
+      ...updateFields,
+      status: this.resolveStatusForGenericUpdate(pt.status, requestedStatus),
+      initial_risk: initialRisk,
+      residual_risk: residualRisk,
+      control_evidence:
+        updateFields.control_evidence !== undefined
+          ? Boolean(updateFields.control_evidence)
+          : Boolean(pt.control_evidence),
+    });
+
+    if (executantes) {
+      pt.executantes = executantes.map(
+        (userId) => ({ id: userId }) as unknown as User,
+      );
+    }
+  }
+
   async update(id: string, updatePtDto: UpdatePtDto): Promise<Pt> {
     let before: Pt | null = null;
     const saved = await this.executePtWorkflowTransition(
       id,
       async (lockedRow, manager) => {
-        const pt = await manager.getRepository(Pt).findOne({
-          where: { id, company_id: lockedRow.company_id },
-          relations: [
-            'site',
-            'apr',
-            'responsavel',
-            'executantes',
-            'auditado_por',
-            'vigia',
-            'encerrado_por',
-          ],
-        });
-        if (!pt) {
-          throw new NotFoundException(`PT com ID ${id} não encontrada`);
-        }
+        const pt = await this.findPtForUpdate(
+          id,
+          lockedRow.company_id,
+          manager,
+        );
 
         this.assertPtEditableStatus(pt.status);
         this.assertPtDocumentMutable(pt);
         const { executantes, status, ...rest } = updatePtDto;
         this.preservePersistedChecklistAnexoRefs(pt, rest);
-
-        // SGS-PT-SEC-004: mirror the site-scope guard from create() — the RLS
-        // WITH CHECK would also reject the write, but as a 500 (Postgres error)
-        // instead of the expected 400 with an actionable message.
-        if (rest.site_id !== undefined && rest.site_id !== pt.site_id) {
-          const { siteIds, siteScope, isSuperAdmin } =
-            this.getTenantContextOrThrow();
-          if (
-            !isSuperAdmin &&
-            siteScope !== 'all' &&
-            !siteIds.includes(rest.site_id)
-          ) {
-            throw new BadRequestException(
-              'PT deve permanecer na obra atual do tenant. A obra só pode ser alterada por um administrador com acesso global.',
-            );
-          }
-        }
-
-        const effectiveInicio = rest.data_hora_inicio ?? pt.data_hora_inicio;
-        const effectiveFim = rest.data_hora_fim ?? pt.data_hora_fim;
-        if (
-          effectiveFim &&
-          effectiveInicio &&
-          new Date(effectiveFim) <= new Date(effectiveInicio)
-        ) {
-          throw new BadRequestException(
-            'A data/hora de término deve ser posterior à data/hora de início.',
-          );
-        }
+        this.assertPtUpdateSiteScope(pt, rest.site_id);
+        this.assertPtUpdateDates(pt, rest);
         before = { ...pt };
 
         await this.validateRelatedEntityScope(
-          {
-            companyId: pt.company_id,
-            siteId: rest.site_id ?? pt.site_id,
-            aprId: rest.apr_id !== undefined ? rest.apr_id : pt.apr_id,
-            responsavelId: rest.responsavel_id ?? pt.responsavel_id,
-            auditadoPorId:
-              rest.auditado_por_id !== undefined
-                ? rest.auditado_por_id
-                : pt.auditado_por_id,
-            executantes:
-              executantes ??
-              (Array.isArray(pt.executantes)
-                ? pt.executantes.map((executante) => executante.id)
-                : []),
-            vigiaUserId:
-              rest.vigia_user_id !== undefined
-                ? rest.vigia_user_id
-                : pt.vigia_user_id,
-          },
+          this.buildPtUpdateScope(pt, rest, executantes),
           manager,
         );
-
-        const initialRisk = this.riskCalculationService.calculateScore(
-          rest.probability ?? pt.probability,
-          rest.severity ?? pt.severity,
-          rest.exposure ?? pt.exposure,
-        );
-        const residualRisk =
-          rest.residual_risk ||
-          this.riskCalculationService.classifyByScore(initialRisk) ||
-          pt.residual_risk ||
-          null;
-
-        Object.assign(pt, {
-          ...rest,
-          status: this.resolveStatusForGenericUpdate(pt.status, status),
-          initial_risk: initialRisk,
-          residual_risk: residualRisk,
-          control_evidence:
-            rest.control_evidence !== undefined
-              ? Boolean(rest.control_evidence)
-              : Boolean(pt.control_evidence),
-        });
-
-        if (executantes) {
-          pt.executantes = executantes.map(
-            (userId) => ({ id: userId }) as unknown as User,
-          );
-        }
+        this.applyPtUpdateFields(pt, rest, status, executantes);
 
         const savedPt = await manager.getRepository(Pt).save(pt);
         return savedPt;
