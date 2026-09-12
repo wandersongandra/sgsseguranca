@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
+import QRCode from 'qrcode';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { cleanupUploadedFile } from '../../../shared/storage/storage-compensation.util';
 import { DocumentStorageService } from '../../../shared/services/document-storage.service';
@@ -723,6 +724,7 @@ export class AprsPdfService {
       apr.final_pdf_hash_sha256 ??
       'Calculado e registrado após a emissão';
     let verificationUrl: string | null = null;
+    let verificationQrDataUri: string | null = null;
     if (verificationCode) {
       try {
         verificationUrl = await this.buildVerificationUrl({
@@ -736,6 +738,27 @@ export class AprsPdfService {
           aprId: apr.id,
           error: error instanceof Error ? error.message : String(error),
         });
+      }
+      if (verificationUrl) {
+        try {
+          // Mesmo padrão já usado em NC/ARR/Relatório Fotográfico: o link
+          // de validação carrega um token JWT longo — impraticável de
+          // digitar manualmente num documento impresso. QR code degrada
+          // graciosamente (PDF ainda é emitido com o link em texto) se a
+          // geração falhar por qualquer motivo.
+          verificationQrDataUri = await QRCode.toDataURL(verificationUrl, {
+            errorCorrectionLevel: 'M',
+            margin: 1,
+            width: 220,
+            color: { dark: '#0f172a', light: '#ffffff' },
+          });
+        } catch (error) {
+          this.logger.warn({
+            event: 'apr_pdf_public_validation_qr_failed',
+            aprId: apr.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
     const signaturesWithData = await Promise.all(
@@ -1459,7 +1482,17 @@ export class AprsPdfService {
           </div>
           ${
             verificationUrl
-              ? `<div class="notes-block"><div class="kv-label">Validação pública</div><div class="notes-content">${this.escapeHtml(verificationUrl)}</div></div>`
+              ? `<div class="notes-block" style="display:flex;align-items:flex-start;gap:12px;">
+                  ${
+                    verificationQrDataUri
+                      ? `<img src="${verificationQrDataUri}" alt="QR code de validação pública" width="72" height="72" style="flex-shrink:0;border:1px solid #dbe7f2;border-radius:4px;" />`
+                      : ''
+                  }
+                  <div style="min-width:0;flex:1;">
+                    <div class="kv-label">Validação pública</div>
+                    <div class="notes-content">${this.escapeHtml(verificationUrl)}</div>
+                  </div>
+                </div>`
               : ''
           }
         </div>
@@ -1717,6 +1750,8 @@ export class AprsPdfService {
             .notes-content {
               margin-top: 4px;
               white-space: pre-wrap;
+              overflow-wrap: anywhere;
+              word-break: break-word;
             }
 
             .apr-risk-table thead th {
