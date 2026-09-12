@@ -2711,6 +2711,16 @@ export function AprForm({ id }: AprFormProps) {
         isFieldMode && "pb-28",
       )}
     >
+      {/* h1 sr-only: garante um topo de hierarquia de heading antes dos <h2>
+          de Timeline/Comparação de versões/Evidência fotográfica, que
+          renderizam antes do título visível da APR (achado da auditoria de
+          acessibilidade — leitor de tela navegando por heading encontrava
+          h2 antes de qualquer h1 na página). */}
+      <h1 className="sr-only">
+        {id
+          ? `Editar APR${aprDocumentNumber ? ` ${aprDocumentNumber}` : ""}`
+          : "Nova APR"}
+      </h1>
       {fetching ? (
         <div className="rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)] print:hidden">
           <InlineLoadingState
@@ -3198,9 +3208,9 @@ export function AprForm({ id }: AprFormProps) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="text-2xl font-black tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
+                    <h2 className="text-2xl font-black tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
                       {aprDocumentNumber}
-                    </h1>
+                    </h2>
                     <StatusPill tone={aprDocumentStatusTone}>
                       {aprDocumentStatus}
                     </StatusPill>
