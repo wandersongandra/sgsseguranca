@@ -203,13 +203,23 @@ export class AprsService {
     return clamped;
   }
 
-  private buildAprOverviewCacheKey(tenantId: string): string {
-    return `${APR_OVERVIEW_CACHE_PREFIX}:${tenantId}`;
+  private buildAprOverviewCacheKey(
+    tenantId: string,
+    siteScopeKey: string,
+  ): string {
+    return `${APR_OVERVIEW_CACHE_PREFIX}:${tenantId}:${siteScopeKey}`;
   }
 
   private async invalidateAprOverviewCache(tenantId: string): Promise<void> {
     try {
-      await this.cacheService.del(this.buildAprOverviewCacheKey(tenantId));
+      // Pattern (não chave exata): a chave agora carrega o escopo de site
+      // (achado da auditoria v2 — getAnalyticsOverview vazava métricas entre
+      // obras da mesma empresa por não filtrar site_id, ao contrário do
+      // getRiskMatrix). Uma única mutação precisa invalidar todas as
+      // variações de escopo em cache para este tenant, não só uma chave.
+      await this.cacheService.invalidatePattern(
+        `${APR_OVERVIEW_CACHE_PREFIX}:${tenantId}:*`,
+      );
     } catch (err) {
       this.logger.warn({
         event: 'apr_overview_cache_invalidate_failed',
@@ -526,62 +536,6 @@ export class AprsService {
     ) {
       throw new BadRequestException(
         'A lista de participantes da APR contém registros duplicados.',
-      );
-    }
-  }
-
-  private assertAprReadyForApproval(
-    apr: Pick<
-      Apr,
-      | 'id'
-      | 'status'
-      | 'pdf_file_key'
-      | 'participants'
-      | 'risk_items'
-      | 'data_inicio'
-      | 'data_fim'
-    >,
-  ): void {
-    this.assertAprWorkflowTransitionAllowed(apr);
-    this.assertAprDateRange(apr.data_inicio, apr.data_fim);
-
-    if (this.ensureAprStatus(apr.status) !== AprStatus.PENDENTE) {
-      throw new BadRequestException(
-        'Somente APRs pendentes podem seguir para aprovação.',
-      );
-    }
-
-    const participantIds = Array.isArray(apr.participants)
-      ? apr.participants
-          .map((participant) => participant.id)
-          .filter((participantId): participantId is string =>
-            Boolean(participantId),
-          )
-      : [];
-
-    if (participantIds.length === 0) {
-      throw new BadRequestException(
-        'A APR precisa ter participantes definidos antes da aprovação.',
-      );
-    }
-
-    const normalizedRiskItems = Array.isArray(apr.risk_items)
-      ? apr.risk_items.map((item) => this.mapPersistedRiskItemToSnapshot(item))
-      : [];
-
-    if (normalizedRiskItems.length === 0) {
-      throw new BadRequestException(
-        'A APR precisa ter ao menos um item de risco válido antes da aprovação.',
-      );
-    }
-
-    const incompleteItem = normalizedRiskItems.find(
-      (item) => this.getRiskItemApprovalIssues(item).length > 0,
-    );
-
-    if (incompleteItem) {
-      throw new BadRequestException(
-        `A APR não pode ser aprovada com itens de risco incompletos. Revise a linha ${incompleteItem.ordem + 1} e preencha: ${this.getRiskItemApprovalIssues(incompleteItem).join(', ')}.`,
       );
     }
   }
@@ -1924,121 +1878,136 @@ export class AprsService {
       apr.residual_risk ||
       null;
 
-    await this.aprsRepository.manager.transaction(async (manager) => {
-      // !== undefined (não ??): um payload explícito de site_id: null
-      // precisa ser tratado como "mudou" — com ??, cairia silenciosamente
-      // no valor antigo e a checagem abaixo nunca revalidaria participantes
-      // mesmo com Object.assign gravando null logo depois (achado da
-      // auditoria v2). Mesmo padrão já usado por auditadoPorId abaixo.
-      const effectiveSiteId =
-        next.site_id !== undefined ? next.site_id : apr.site_id;
-      let participantsForScopeCheck = participants;
-      if (effectiveSiteId !== apr.site_id && participants === undefined) {
-        // Troca de obra sem payload de participantes: sem isto, os
-        // participantes atuais ficam vinculados à obra antiga sem
-        // reconferência. Carrega os ids atuais para que
-        // assertUsersScopedToSite valide também o novo site_id contra eles
-        // — mesmo tenant, não é vazamento cross-tenant, é consistência de
-        // escopo operacional.
-        const currentParticipants = await manager.getRepository(Apr).findOne({
-          where: { id: apr.id },
-          relations: ['participants'],
+    try {
+      await this.aprsRepository.manager.transaction(async (manager) => {
+        // !== undefined (não ??): um payload explícito de site_id: null
+        // precisa ser tratado como "mudou" — com ??, cairia silenciosamente
+        // no valor antigo e a checagem abaixo nunca revalidaria participantes
+        // mesmo com Object.assign gravando null logo depois (achado da
+        // auditoria v2). Mesmo padrão já usado por auditadoPorId abaixo.
+        const effectiveSiteId =
+          next.site_id !== undefined ? next.site_id : apr.site_id;
+        let participantsForScopeCheck = participants;
+        if (effectiveSiteId !== apr.site_id && participants === undefined) {
+          // Troca de obra sem payload de participantes: sem isto, os
+          // participantes atuais ficam vinculados à obra antiga sem
+          // reconferência. Carrega os ids atuais para que
+          // assertUsersScopedToSite valide também o novo site_id contra eles
+          // — mesmo tenant, não é vazamento cross-tenant, é consistência de
+          // escopo operacional.
+          const currentParticipants = await manager.getRepository(Apr).findOne({
+            where: { id: apr.id },
+            relations: ['participants'],
+          });
+          participantsForScopeCheck = (currentParticipants?.participants ?? [])
+            .map((participant) => participant.id)
+            .filter((participantId): participantId is string =>
+              Boolean(participantId),
+            );
+        }
+
+        await this.validateRelatedEntityScope({
+          manager,
+          companyId: apr.company_id,
+          siteId: effectiveSiteId,
+          elaboradorId: next.elaborador_id ?? apr.elaborador_id,
+          auditadoPorId:
+            next.auditado_por_id !== undefined
+              ? next.auditado_por_id
+              : apr.auditado_por_id,
+          activities,
+          risks,
+          epis,
+          tools,
+          machines,
+          participants: participantsForScopeCheck,
         });
-        participantsForScopeCheck = (currentParticipants?.participants ?? [])
-          .map((participant) => participant.id)
-          .filter((participantId): participantId is string =>
-            Boolean(participantId),
-          );
-      }
 
-      await this.validateRelatedEntityScope({
-        manager,
-        companyId: apr.company_id,
-        siteId: effectiveSiteId,
-        elaboradorId: next.elaborador_id ?? apr.elaborador_id,
-        auditadoPorId:
-          next.auditado_por_id !== undefined
-            ? next.auditado_por_id
-            : apr.auditado_por_id,
-        activities,
-        risks,
-        epis,
-        tools,
-        machines,
-        participants: participantsForScopeCheck,
-      });
-
-      Object.assign(apr, {
-        ...next,
-        initial_risk: initialRisk,
-        residual_risk: residualRisk,
-        classificacao_resumo: this.buildAprClassificationSummary(nextRiskItems),
-        control_evidence:
-          next.control_evidence !== undefined
-            ? Boolean(next.control_evidence)
-            : Boolean(apr.control_evidence),
-      });
-      apr.itens_risco = undefined;
-
-      if (activities) {
-        apr.activities = activities.map((itemId) => ({
-          id: itemId,
-        })) as unknown as Activity[];
-      }
-      if (risks) {
-        apr.risks = risks.map((itemId) => ({
-          id: itemId,
-        })) as unknown as Risk[];
-      }
-      if (epis) {
-        apr.epis = epis.map((itemId) => ({ id: itemId })) as unknown as Epi[];
-      }
-      if (tools) {
-        apr.tools = tools.map((itemId) => ({
-          id: itemId,
-        })) as unknown as Tool[];
-      }
-      if (machines) {
-        apr.machines = machines.map((itemId) => ({
-          id: itemId,
-        })) as unknown as Machine[];
-      }
-      if (participants) {
-        apr.participants = participants.map((itemId) => ({
-          id: itemId,
-        })) as unknown as User[];
-      }
-
-      const aprRepository = manager.getRepository(Apr);
-      const saved = await aprRepository.save(apr);
-      await this.assertRiskItemSyncAllowed(saved.id, nextRiskItems, manager);
-      await this.syncRiskItems(manager, saved.id, nextRiskItems);
-
-      // Aviso antecipado: detecta itens com campos obrigatórios ausentes para
-      // que o usuário corrija antes de tentar aprovar (o bloqueio real ocorre na aprovação).
-      const incompleteItems = nextRiskItems.filter(
-        (item) => this.getRiskItemApprovalIssues(item).length > 0,
-      );
-      if (incompleteItems.length > 0) {
-        this.logger.warn({
-          event: 'apr_update_incomplete_risk_items',
-          aprId: saved.id,
-          count: incompleteItems.length,
-          message:
-            'APR salva com itens de risco incompletos. A aprovação será bloqueada até que todos os campos obrigatórios sejam preenchidos.',
+        Object.assign(apr, {
+          ...next,
+          initial_risk: initialRisk,
+          residual_risk: residualRisk,
+          classificacao_resumo:
+            this.buildAprClassificationSummary(nextRiskItems),
+          control_evidence:
+            next.control_evidence !== undefined
+              ? Boolean(next.control_evidence)
+              : Boolean(apr.control_evidence),
         });
-      }
+        apr.itens_risco = undefined;
 
-      if (saved.is_modelo_padrao) {
-        await manager.query(
-          `UPDATE aprs
+        if (activities) {
+          apr.activities = activities.map((itemId) => ({
+            id: itemId,
+          })) as unknown as Activity[];
+        }
+        if (risks) {
+          apr.risks = risks.map((itemId) => ({
+            id: itemId,
+          })) as unknown as Risk[];
+        }
+        if (epis) {
+          apr.epis = epis.map((itemId) => ({ id: itemId })) as unknown as Epi[];
+        }
+        if (tools) {
+          apr.tools = tools.map((itemId) => ({
+            id: itemId,
+          })) as unknown as Tool[];
+        }
+        if (machines) {
+          apr.machines = machines.map((itemId) => ({
+            id: itemId,
+          })) as unknown as Machine[];
+        }
+        if (participants) {
+          apr.participants = participants.map((itemId) => ({
+            id: itemId,
+          })) as unknown as User[];
+        }
+
+        const aprRepository = manager.getRepository(Apr);
+        const saved = await aprRepository.save(apr);
+        await this.assertRiskItemSyncAllowed(saved.id, nextRiskItems, manager);
+        await this.syncRiskItems(manager, saved.id, nextRiskItems);
+
+        // Aviso antecipado: detecta itens com campos obrigatórios ausentes para
+        // que o usuário corrija antes de tentar aprovar (o bloqueio real ocorre na aprovação).
+        const incompleteItems = nextRiskItems.filter(
+          (item) => this.getRiskItemApprovalIssues(item).length > 0,
+        );
+        if (incompleteItems.length > 0) {
+          this.logger.warn({
+            event: 'apr_update_incomplete_risk_items',
+            aprId: saved.id,
+            count: incompleteItems.length,
+            message:
+              'APR salva com itens de risco incompletos. A aprovação será bloqueada até que todos os campos obrigatórios sejam preenchidos.',
+          });
+        }
+
+        if (saved.is_modelo_padrao) {
+          await manager.query(
+            `UPDATE aprs
            SET is_modelo_padrao = CASE WHEN id = $1 THEN true ELSE false END,
                is_modelo        = CASE WHEN id = $1 THEN true ELSE is_modelo END
            WHERE company_id = $2 AND deleted_at IS NULL AND (is_modelo_padrao = true OR id = $1)`,
-          [saved.id, saved.company_id],
+            [saved.id, saved.company_id],
+          );
+        }
+      });
+    } catch (error) {
+      // Mesmo tratamento de create(): sem isto, uma colisão de "numero" ao
+      // editar (ex.: duas edições concorrentes renumerando para o mesmo
+      // valor) vaza o 23505 cru até o filtro global, que devolve 409 com
+      // mensagem genérica em vez da mensagem amigável específica da APR
+      // (achado da auditoria v2).
+      if (this.isDuplicateAprNumeroError(error)) {
+        throw new ConflictException(
+          `Já existe uma APR com o número "${next.numero ?? apr.numero}" nesta empresa.`,
         );
       }
-    });
+      throw error;
+    }
 
     const saved = await this.findOne(id);
     this.logger.log({
@@ -2939,24 +2908,42 @@ export class AprsService {
 
   // ─── Analytics ────────────────────────────────────────────────────────────────
 
-  async getAnalyticsOverview(): Promise<{
+  async getAnalyticsOverview(siteId?: string): Promise<{
     totalAprs: number;
     aprovadas: number;
     pendentes: number;
     riscosCriticos: number;
     mediaScoreRisco: number;
   }> {
-    const tenantId = this.tenantService.getTenantId();
-    if (!tenantId) {
-      throw new InternalServerErrorException(
-        'Tenant context ausente em consulta de APR (analytics)',
-      );
-    }
+    const { companyId, siteIds, siteScope, isSuperAdmin } =
+      this.getTenantContextOrThrow();
+
+    // Mesmo padrão de escopo do getRiskMatrix: usuário restrito a obras
+    // específicas só vê o agregado das obras dele; super admin/escopo "all"
+    // pode opcionalmente filtrar por uma obra via siteId.
+    const scopedSiteIds =
+      !isSuperAdmin && siteScope !== 'all' ? siteIds : undefined;
+    const explicitSiteId =
+      isSuperAdmin || siteScope === 'all' ? siteId : undefined;
+
+    const cacheKey = this.buildAprOverviewCacheKey(
+      companyId,
+      isSuperAdmin
+        ? 'super'
+        : siteScope === 'all'
+          ? `all:${explicitSiteId ?? 'all'}`
+          : siteIds.slice().sort().join(','),
+    );
 
     return this.cacheService.getOrSet(
-      this.buildAprOverviewCacheKey(tenantId),
+      cacheKey,
       async () => {
-        const baseWhere: FindOptionsWhere<Apr> = { company_id: tenantId };
+        const baseWhere: FindOptionsWhere<Apr> = { company_id: companyId };
+        if (scopedSiteIds) {
+          baseWhere.site_id = In(scopedSiteIds);
+        } else if (explicitSiteId) {
+          baseWhere.site_id = explicitSiteId;
+        }
         const approvedWhere: FindOptionsWhere<Apr> = {
           ...baseWhere,
           status: AprStatus.APROVADA,
@@ -2972,7 +2959,7 @@ export class AprsService {
           this.aprsRepository.count({ where: pendingWhere }),
         ]);
 
-        const riskStats = await this.aprsRepository
+        const riskStatsQb = this.aprsRepository
           .createQueryBuilder('apr')
           .innerJoin('apr.risk_items', 'ri')
           .select('AVG(ri.score_risco)', 'avg')
@@ -2980,10 +2967,24 @@ export class AprsService {
             `COUNT(CASE WHEN UPPER(ri.categoria_risco) IN ('CRÍTICO', 'CRITICO') THEN 1 END)`,
             'criticos',
           )
-          .where('apr.company_id = :tenantId', { tenantId })
+          .where('apr.company_id = :companyId', { companyId })
           .andWhere('apr.deleted_at IS NULL')
-          .andWhere('ri.deleted_at IS NULL')
-          .getRawOne<{ avg: string; criticos: string }>();
+          .andWhere('ri.deleted_at IS NULL');
+
+        if (scopedSiteIds) {
+          riskStatsQb.andWhere('apr.site_id IN (:...scopedSiteIds)', {
+            scopedSiteIds,
+          });
+        } else if (explicitSiteId) {
+          riskStatsQb.andWhere('apr.site_id = :explicitSiteId', {
+            explicitSiteId,
+          });
+        }
+
+        const riskStats = await riskStatsQb.getRawOne<{
+          avg: string;
+          criticos: string;
+        }>();
 
         return {
           totalAprs,

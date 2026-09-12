@@ -143,6 +143,14 @@ describe('AprsPdfService', () => {
       documentGovernanceService as DocumentGovernanceService,
       signaturesService as SignaturesService,
       { issueToken: jest.fn().mockResolvedValue('token-publico') } as never,
+      {
+        runExclusive: jest.fn(
+          (
+            _id: string,
+            operation: (assertHealthy: () => void) => Promise<unknown>,
+          ) => operation(() => {}),
+        ),
+      } as never,
     );
   });
 

@@ -7,6 +7,7 @@ import { AprsService } from '../aprs/aprs.service';
 import { AprWorkflowService } from '../aprs/aprs-workflow.service';
 import { AprsEvidenceService } from '../aprs/services/aprs-evidence.service';
 import { AprsPdfService } from '../aprs/services/aprs-pdf.service';
+import type { AprWorkflowLockService } from '../aprs/services/apr-workflow-lock.service';
 import type { AprExcelService } from '../aprs/apr-excel.service';
 import type { AprRiskMatrixService } from '../aprs/apr-risk-matrix.service';
 import { Apr, AprStatus } from '../aprs/entities/apr.entity';
@@ -130,6 +131,17 @@ function buildPublicValidationGrantService(): PublicValidationGrantService {
 
 function buildAprRiskMatrixService(): AprRiskMatrixService {
   return {} as unknown as AprRiskMatrixService;
+}
+
+function buildAprWorkflowLockService(): AprWorkflowLockService {
+  return {
+    runExclusive: jest.fn(
+      (
+        _id: string,
+        operation: (assertHealthy: () => void) => Promise<unknown>,
+      ) => operation(() => {}),
+    ),
+  } as unknown as AprWorkflowLockService;
 }
 
 function buildAprExcelService(): AprExcelService {
@@ -314,6 +326,7 @@ describe('Document governance integration', () => {
       governanceService,
       signaturesService,
       buildPublicValidationGrantService(),
+      buildAprWorkflowLockService(),
     );
     const aprsEvidenceService = new AprsEvidenceService(
       dataSource.getRepository(Apr),

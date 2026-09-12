@@ -491,8 +491,10 @@ export class AprsController {
   @Get('analytics/overview')
   @Authorize(APR_PERMISSIONS.VIEW)
   @AprFeatureFlag('APR_ANALYTICS')
-  getAnalyticsOverview() {
-    return this.aprsService.getAnalyticsOverview();
+  getAnalyticsOverview(
+    @Query('site_id', new ParseUUIDPipe({ optional: true })) siteId?: string,
+  ) {
+    return this.aprsService.getAnalyticsOverview(siteId || undefined);
   }
 
   @Get('capabilities')

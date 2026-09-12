@@ -2,7 +2,6 @@
 import {
   ConflictException,
   ForbiddenException,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { EntityManager, Repository } from 'typeorm';
@@ -378,6 +377,14 @@ describe('AprsService', () => {
       documentGovernanceService as DocumentGovernanceService,
       signaturesService as SignaturesService,
       { issueToken: jest.fn().mockResolvedValue('token-publico') } as never,
+      {
+        runExclusive: jest.fn(
+          (
+            _id: string,
+            operation: (assertHealthy: () => void) => Promise<unknown>,
+          ) => operation(() => {}),
+        ),
+      } as never,
     );
     const aprsEvidenceService = new AprsEvidenceService(
       aprRepository as unknown as Repository<Apr>,
@@ -1821,14 +1828,27 @@ describe('AprsService', () => {
 
   // ─── getAnalyticsOverview ──────────────────────────────────────────────────
 
-  it('getAnalyticsOverview lança InternalServerErrorException quando tenant está ausente', async () => {
-    (tenantService.getTenantId as jest.Mock).mockReturnValue(null);
+  it('getAnalyticsOverview lança BadRequestException quando tenant está ausente', async () => {
+    // Desde a auditoria v2, getAnalyticsOverview usa getTenantContextOrThrow()
+    // (mesmo helper do getRiskMatrix) para aplicar escopo de site — o
+    // contexto ausente agora é detectado ali, não mais por um check manual
+    // de getTenantId().
+    (tenantService.getContext as jest.Mock).mockReturnValueOnce({
+      companyId: undefined,
+      siteScope: 'all',
+      isSuperAdmin: false,
+    });
 
     await expect(service.getAnalyticsOverview()).rejects.toThrow(
-      InternalServerErrorException,
+      BadRequestException,
     );
+    (tenantService.getContext as jest.Mock).mockReturnValueOnce({
+      companyId: undefined,
+      siteScope: 'all',
+      isSuperAdmin: false,
+    });
     await expect(service.getAnalyticsOverview()).rejects.toThrow(
-      'Tenant context ausente em consulta de APR (analytics)',
+      'Contexto de empresa nao definido para APR.',
     );
   });
 
