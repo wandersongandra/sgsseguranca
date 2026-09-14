@@ -184,7 +184,7 @@
     "@nestjs/typeorm": "^12.0.1",
     "@nestjs/websockets": "^12.0.1",
     "@opentelemetry/auto-instrumentations-node": "^0.79.0",
-    "@opentelemetry/exporter-prometheus": "^0.219.0",
+    "@opentelemetry/exporter-prometheus": "^0.222.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.222.0",
     "@opentelemetry/instrumentation-fs": "^0.41.0",
     "@opentelemetry/resources": "^2.8.0",
