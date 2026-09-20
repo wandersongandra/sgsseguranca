@@ -399,7 +399,7 @@ export function UserForm({ id }: UserFormProps) {
         const sitesPage = await sitesService.findPaginated({
           page: 1,
           limit: 100,
-          companyId: requestTenantId,
+          companyId: requestTenantId ?? undefined,
         });
 
         if (
