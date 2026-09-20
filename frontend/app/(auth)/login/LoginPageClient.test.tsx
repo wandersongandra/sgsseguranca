@@ -110,6 +110,29 @@ describe('LoginPageClient', () => {
     expect(screen.getByRole('button', { name: 'Ativar MFA e entrar' })).toBeInTheDocument();
   });
 
+  it('não renderiza URI de MFA com esquema não permitido', async () => {
+    mockLogin.mockResolvedValue({
+      mfaEnrollRequired: true,
+      challengeToken: 'bootstrap-token',
+      expiresIn: 600,
+      otpAuthUrl: 'javascript:alert(document.cookie)',
+      manualEntryKey: 'ABCDEF123',
+      recoveryCodes: [],
+    });
+
+    render(
+      <LoginPageClient turnstileSiteKey="" supportHref="https://suporte.example" />,
+    );
+
+    fillCredentialsAndSubmit();
+
+    expect(await screen.findByLabelText('Código MFA')).toBeInTheDocument();
+    expect(screen.queryByTestId('mfa-qr-code')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Abrir cadastro no app autenticador' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('ativa MFA bootstrap e finaliza login ao enviar código MFA no estágio bootstrap', async () => {
     mockLogin.mockResolvedValue({
       mfaEnrollRequired: true,

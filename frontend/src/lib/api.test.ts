@@ -110,6 +110,23 @@ describe('api client', () => {
     });
   });
 
+  it('não trata endpoint protegido com falso prefixo como público', async () => {
+    await expect(
+      api.get('/auth/login-evil', {
+        adapter: async (config) => ({
+          data: {},
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          config,
+        }),
+      }),
+    ).rejects.toMatchObject({
+      code: 'ERR_AUTH_REQUIRED',
+      response: { status: 401 },
+    });
+  });
+
   it('anexa Bearer token, x-company-id e limita paginação no request global', async () => {
     tokenStore.set('access-token');
     sessionStore.set({

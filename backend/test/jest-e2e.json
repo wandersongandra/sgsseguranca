@@ -5,8 +5,12 @@
   "testTimeout": 30000,
   "testRegex": ".e2e-spec.ts$",
   "transform": {
-    "^.+\\.(t|j)s$": "ts-jest"
+    "^.+\\.(t|j)s$": [
+      "<rootDir>/nestjs-esm-transformer.js",
+      { "tsconfig": { "allowJs": true }, "diagnostics": false }
+    ]
   },
+  "transformIgnorePatterns": ["/node_modules/(?!@nestjs/)"],
   "moduleNameMapper": {
     "^uuid$": "<rootDir>/uuid-cjs.js",
     "^puppeteer$": "<rootDir>/puppeteer-cjs-shim.js"

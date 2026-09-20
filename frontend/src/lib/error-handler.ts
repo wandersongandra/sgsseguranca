@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'sonner';
+import { logger } from './logger';
 
 export interface FormErrorMessages {
   badRequest?: string;
@@ -230,8 +231,8 @@ export function handleApiError(error: unknown, context: string) {
     const message = normalizeUnknownMessage(data);
 
     if (process.env.NODE_ENV !== 'production') {
-      console.error(
-        '[API Error] %s: status=%s message=%s',
+      logger.error(
+        "[API Error] %s: status=%s message=%s",
         context,
         status ?? 'unknown',
         message || 'sem mensagem legível',
@@ -299,7 +300,7 @@ export function handleApiError(error: unknown, context: string) {
     }
   } else {
     if (process.env.NODE_ENV !== 'production') {
-      console.error('[Unexpected Error] %s:', context, error);
+      logger.error("[Unexpected Error] %s:", context, error);
     }
     toast.error('Erro de conexão ou erro inesperado. Verifique sua internet.');
   }

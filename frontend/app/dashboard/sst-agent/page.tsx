@@ -494,7 +494,7 @@ export default function SstAgentPage() {
         escavacao: ptEscavacao,
       });
       setCreatedPtDraft(response);
-      storeSophiePtDraft(user?.company_id, response.draft, {
+      storeSophiePtDraft(user?.company_id, user?.id, response.draft, {
         riskLevel: response.riskLevel,
         suggestedRisks: response.suggestedRisks,
         mandatoryChecklists: response.mandatoryChecklists,

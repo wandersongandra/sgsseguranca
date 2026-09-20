@@ -4,6 +4,17 @@ export type PtFocusTarget =
   | 'checklists'
   | 'team';
 
+const PT_FOCUS_TARGETS: readonly PtFocusTarget[] = [
+  'basic-info',
+  'risk-analysis',
+  'checklists',
+  'team',
+];
+
+export function isPtFocusTarget(value: string | null): value is PtFocusTarget {
+  return value !== null && PT_FOCUS_TARGETS.includes(value as PtFocusTarget);
+}
+
 export function inferPtFocusTarget(reason: string): PtFocusTarget {
   const normalized = String(reason || '')
     .normalize('NFD')

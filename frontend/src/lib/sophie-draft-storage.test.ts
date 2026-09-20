@@ -34,13 +34,13 @@ describe("sophie-draft-storage", () => {
     };
 
     storeSophieAprDraft("company-1", draft);
-    storeSophiePtDraft("company-1", draft);
+    storeSophiePtDraft("company-1", "user-1", draft);
 
     const aprDraft = window.sessionStorage.getItem(
       "gst.apr.wizard.draft.company-1",
     );
-    const ptDraft = window.sessionStorage.getItem(
-      "gst.pt.wizard.draft.company-1",
+    const ptDraft = window.localStorage.getItem(
+      "gst.pt.wizard.draft.company-1.user-1",
     );
 
     expect(aprDraft).not.toContain("12345678900");
@@ -51,6 +51,7 @@ describe("sophie-draft-storage", () => {
     expect(ptDraft).not.toContain("presignedUrl");
     expect(ptDraft).not.toContain("data:image");
     expect(ptDraft).toContain('"signatures":{}');
+    expect(window.sessionStorage.getItem("gst.pt.wizard.draft.company-1")).toBeNull();
   });
 
   it("remove anexos de evidencia do preview de NC", () => {

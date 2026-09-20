@@ -1,7 +1,7 @@
 'use client';
 
 import { logger } from '@/lib/logger';
-import { useCallback, useDeferredValue, useEffect, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, Pencil, Plus, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ import { ListPageLayout } from '@/components/layout';
 import { cn } from '@/lib/utils';
 import { safeToLocaleDateString } from '@/lib/date/safeFormat';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 import {
   CatalogMobileCard,
   catalogMobileActionClassName,
@@ -31,6 +32,7 @@ export default function ActivitiesPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -70,18 +72,20 @@ export default function ActivitiesPage() {
       return;
     }
 
-    try {
-      await activitiesService.delete(id);
-      toast.success('Atividade excluida com sucesso');
-      if (activities.length === 1 && page > 1) {
-        setPage((current) => current - 1);
-        return;
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await activitiesService.delete(id);
+        toast.success('Atividade excluida com sucesso');
+        if (activities.length === 1 && page > 1) {
+          setPage((current) => current - 1);
+          return;
+        }
+        void loadActivities();
+      } catch (error) {
+        logger.error('Erro ao excluir atividade:', error);
+        toast.error('Erro ao excluir atividade. Verifique dependencias e tente novamente.');
       }
-      void loadActivities();
-    } catch (error) {
-      logger.error('Erro ao excluir atividade:', error);
-      toast.error('Erro ao excluir atividade. Verifique dependencias e tente novamente.');
-    }
+    });
   }
 
   if (loadError) {
@@ -220,6 +224,5 @@ export default function ActivitiesPage() {
     </ListPageLayout>
   );
 }
-
 
 

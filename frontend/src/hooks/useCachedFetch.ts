@@ -15,6 +15,7 @@ const memoryCache = new Map<string, CacheEntry<unknown>>();
 const CACHE_CLEANUP_INTERVAL_MS = 60_000;
 const MAX_MEMORY_CACHE_ENTRIES = 500;
 let lastCacheCleanupAt = 0;
+let cacheGeneration = 0;
 
 function maybePruneCache(force = false) {
   const now = Date.now();
@@ -70,6 +71,7 @@ function buildCacheKey(
 }
 
 export function clearCachedFetches(): void {
+  cacheGeneration += 1;
   memoryCache.clear();
   lastCacheCleanupAt = Date.now();
 }
@@ -112,6 +114,8 @@ export function useCachedFetch<TArgs extends unknown[], TResult>(
         resolveBrowserCacheScope(),
       );
       const now = Date.now();
+      const requestGeneration = cacheGeneration;
+      const requestScope = resolveBrowserCacheScope();
       const existingEntry = memoryCache.get(resolvedKey) as
         | CacheEntry<TResult>
         | undefined;
@@ -149,11 +153,16 @@ export function useCachedFetch<TArgs extends unknown[], TResult>(
       const inflight = fetcher(...args)
         .then((result) => {
           const durationMs = performance.now() - startedAt;
-          memoryCache.set(resolvedKey, {
-            value: result,
-            expiresAt: Date.now() + ttlMs,
-            lastAccessedAt: Date.now(),
-          });
+          if (
+            requestGeneration === cacheGeneration &&
+            requestScope === resolveBrowserCacheScope()
+          ) {
+            memoryCache.set(resolvedKey, {
+              value: result,
+              expiresAt: Date.now() + ttlMs,
+              lastAccessedAt: Date.now(),
+            });
+          }
           recordClientMetric({
             name: 'fetch_success',
             key: resolvedKey,
@@ -164,14 +173,19 @@ export function useCachedFetch<TArgs extends unknown[], TResult>(
         })
         .catch((error: unknown) => {
           const durationMs = performance.now() - startedAt;
-          if (existingEntry?.value !== undefined) {
-            memoryCache.set(resolvedKey, {
-              value: existingEntry.value,
-              expiresAt: existingEntry.expiresAt,
-              lastAccessedAt: existingEntry.lastAccessedAt ?? Date.now(),
-            });
-          } else {
-            memoryCache.delete(resolvedKey);
+          if (
+            requestGeneration === cacheGeneration &&
+            requestScope === resolveBrowserCacheScope()
+          ) {
+            if (existingEntry?.value !== undefined) {
+              memoryCache.set(resolvedKey, {
+                value: existingEntry.value,
+                expiresAt: existingEntry.expiresAt,
+                lastAccessedAt: existingEntry.lastAccessedAt ?? Date.now(),
+              });
+            } else {
+              memoryCache.delete(resolvedKey);
+            }
           }
 
           recordClientMetric({
@@ -201,6 +215,7 @@ export function useCachedFetch<TArgs extends unknown[], TResult>(
 
   const invalidate = useCallback(
     (...args: TArgs) => {
+      cacheGeneration += 1;
       const resolvedKey = buildCacheKey(
         cacheKey,
         args,
@@ -218,6 +233,7 @@ export function useCachedFetch<TArgs extends unknown[], TResult>(
   );
 
   const invalidateAll = useCallback(() => {
+    cacheGeneration += 1;
     const keyPrefix = `${cacheKey}:`;
     const scopedPrefix = `${cacheKey}@`;
     let deletedCount = 0;
