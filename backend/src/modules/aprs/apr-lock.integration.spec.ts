@@ -39,6 +39,7 @@ import { AprWorkflowService } from './aprs-workflow.service';
 import { AprFeatureFlagGuard } from './guards/apr-feature-flag.guard';
 import { AprsEvidenceService } from './services/aprs-evidence.service';
 import { AprsPdfService } from './services/aprs-pdf.service';
+import { AprWorkflowLockService } from './services/apr-workflow-lock.service';
 import { AprMetricsService } from './services/apr-metrics.service';
 import { Apr, AprStatus } from './entities/apr.entity';
 import { AprLog } from './entities/apr-log.entity';
@@ -964,6 +965,17 @@ describe('APR lock (http integration)', () => {
           provide: PublicValidationGrantService,
           useValue: {
             issueToken: jest.fn().mockResolvedValue('token-publico'),
+          },
+        },
+        {
+          provide: AprWorkflowLockService,
+          useValue: {
+            runExclusive: jest.fn(
+              (
+                _id: string,
+                operation: (assertHealthy: () => void) => Promise<unknown>,
+              ) => operation(() => {}),
+            ),
           },
         },
         { provide: DataSource, useValue: dataSource },

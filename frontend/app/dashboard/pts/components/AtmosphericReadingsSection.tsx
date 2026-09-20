@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -66,6 +66,7 @@ export const AtmosphericReadingsSection = ({
 
   const [draft, setDraft] = useState<PtAtmosphericReading>(buildEmptyReading);
   const [appending, setAppending] = useState(false);
+  const appendLockRef = useRef(false);
 
   const getCellError = (index: number, key: string): string | undefined => {
     const rowErrors = errors.medicoes_atmosfericas;
@@ -78,6 +79,7 @@ export const AtmosphericReadingsSection = ({
 
   const submitAppendOnly = async () => {
     if (!ptId) return;
+    if (appendLockRef.current) return;
     if (
       !draft.hora ||
       !draft.instrumento.trim() ||
@@ -89,6 +91,7 @@ export const AtmosphericReadingsSection = ({
       toast.error('Preencha todos os campos da medição antes de registrar.');
       return;
     }
+    appendLockRef.current = true;
     setAppending(true);
     try {
       await ptsService.appendAtmosphericReading(ptId, {
@@ -105,6 +108,7 @@ export const AtmosphericReadingsSection = ({
           ?.data?.message || 'Erro ao registrar medição.';
       toast.error(message);
     } finally {
+      appendLockRef.current = false;
       setAppending(false);
     }
   };
@@ -132,7 +136,12 @@ export const AtmosphericReadingsSection = ({
               <thead>
                 <tr className="text-[var(--ds-color-text-secondary)]">
                   {READING_COLUMNS.map((column) => (
-                    <th key={column.key} className="px-2 py-1.5 font-semibold">
+                    <th
+                      key={column.key}
+                      id={`pt-atmospheric-column-${column.key}`}
+                      scope="col"
+                      className="px-2 py-1.5 font-semibold"
+                    >
                       {column.label}
                     </th>
                   ))}
@@ -156,6 +165,7 @@ export const AtmosphericReadingsSection = ({
                             )}
                             type={isNumeric ? 'number' : 'text'}
                             step={isNumeric ? 'any' : undefined}
+                            aria-labelledby={`pt-atmospheric-column-${column.key}`}
                             placeholder={column.placeholder}
                             className={cellInputClass(
                               Boolean(getCellError(index, column.key)),

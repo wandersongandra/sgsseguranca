@@ -86,6 +86,67 @@ describe('openai-request.util', () => {
     jest.clearAllMocks();
   });
 
+  it('revalida a flag antes do transporte quando o retry comeÃ§a apÃ³s desativaÃ§Ã£o', async () => {
+    let enabled = true;
+    const runtimeConfig = {
+      get: (key: string) =>
+        key === 'FEATURE_AI_ENABLED' ? enabled : undefined,
+    } as unknown as ConfigService;
+    const integration = createIntegrationMock();
+    integration.execute.mockImplementationOnce(
+      <T>(_name: string, callback: () => Promise<T>) => {
+        enabled = false;
+        return callback();
+      },
+    );
+    const circuitBreaker = createCircuitBreakerMock();
+    const fetchImpl: typeof fetch = jest
+      .fn()
+      .mockResolvedValue(new Response('{}'));
+    await expect(
+      requestOpenAiChatCompletionResponse({
+        runtime: openAiRuntime,
+        body: { model: openAiRuntime.model },
+        configService: runtimeConfig,
+        integration: integration as unknown as IntegrationResilienceService,
+        circuitBreaker:
+          circuitBreaker as unknown as OpenAiCircuitBreakerService,
+        fetchImpl,
+      }),
+    ).rejects.toThrow(ServiceUnavailableException);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([openAiRuntime, nvidiaRuntime])(
+    'bloqueia outbound de $provider quando IA estÃ¡ desabilitada',
+    async (runtime) => {
+      const integration = createIntegrationMock();
+      const circuitBreaker = createCircuitBreakerMock();
+      const fetchImpl: typeof fetch = jest
+        .fn()
+        .mockResolvedValue(new Response('{}'));
+      const disabledConfig = new ConfigService({ FEATURE_AI_ENABLED: false });
+
+      await expect(
+        requestOpenAiChatCompletionResponse({
+          runtime,
+          body: {
+            model: runtime.model,
+            messages: [{ role: 'user', content: 'synthetic' }],
+          },
+          configService: disabledConfig,
+          integration: integration as unknown as IntegrationResilienceService,
+          circuitBreaker:
+            circuitBreaker as unknown as OpenAiCircuitBreakerService,
+          fetchImpl,
+        }),
+      ).rejects.toThrow();
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(integration.execute).not.toHaveBeenCalled();
+      expect(circuitBreaker.assertRequestAllowed).not.toHaveBeenCalled();
+    },
+  );
+
   it('usa o wrapper de resiliencia para chamar a OpenAI', async () => {
     const response = new Response(JSON.stringify({ ok: true }), {
       status: 200,
@@ -133,7 +194,7 @@ describe('openai-request.util', () => {
     });
   });
 
-  it('usa credencial, URL e normalização próprias do runtime NVIDIA', async () => {
+  it('usa credencial, URL e normalizaÃ§Ã£o prÃ³prias do runtime NVIDIA', async () => {
     const response = new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -148,7 +209,7 @@ describe('openai-request.util', () => {
         model: 'openai/gpt-oss-120b',
         max_completion_tokens: 600,
         messages: [
-          { role: 'developer', content: 'Instruções do sistema.' },
+          { role: 'developer', content: 'InstruÃ§Ãµes do sistema.' },
           { role: 'user', content: 'Liste riscos de SST.' },
         ],
       },
@@ -183,7 +244,7 @@ describe('openai-request.util', () => {
     expect(body.messages?.[0]?.role).toBe('system');
   });
 
-  it('sanitiza PII e contexto sensível antes de enviar para a OpenAI', async () => {
+  it('sanitiza PII e contexto sensÃ­vel antes de enviar para a OpenAI', async () => {
     const response = new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -295,7 +356,7 @@ describe('openai-request.util', () => {
     const fetchImpl: typeof fetch = jest.fn();
     circuitBreaker.assertRequestAllowed.mockRejectedValue(
       new ServiceUnavailableException(
-        'Serviço de IA temporariamente indisponível. Tente novamente em alguns instantes.',
+        'ServiÃ§o de IA temporariamente indisponÃ­vel. Tente novamente em alguns instantes.',
       ),
     );
 

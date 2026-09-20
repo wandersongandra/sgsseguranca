@@ -1,12 +1,12 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { PenLine, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Permission } from '@/lib/permissions';
-import { signaturesService } from '@/services/signaturesService';
+import { ptsService } from '@/services/ptsService';
 import { toast } from 'sonner';
 
 const SignatureModal = dynamic(
@@ -20,7 +20,6 @@ const SignaturesPanel = dynamic(
 
 type Props = {
   ptId: string;
-  companyId?: string;
   buttonClassName?: string;
   iconOnly?: boolean;
   onSignatureSaved: () => void;
@@ -28,7 +27,6 @@ type Props = {
 
 export function PtSignatureActions({
   ptId,
-  companyId,
   buttonClassName,
   iconOnly = false,
   onSignatureSaved,
@@ -36,24 +34,25 @@ export function PtSignatureActions({
   const { user, hasPermission } = useAuth();
   const [showSignModal, setShowSignModal] = useState(false);
   const [showSignaturesPanel, setShowSignaturesPanel] = useState(false);
+  const signatureSaveLockRef = useRef(false);
   const canSign = hasPermission(Permission.CAN_MANAGE_SIGNATURES);
   const canView = hasPermission(Permission.CAN_VIEW_SIGNATURES);
 
   const handleSave = async (signatureData: string, type: string) => {
+    if (signatureSaveLockRef.current) return;
+    signatureSaveLockRef.current = true;
     try {
-      await signaturesService.create({
-        document_id: ptId,
-        document_type: 'PT',
+      await ptsService.createSignature(ptId, {
         signature_data: signatureData,
         type,
-        user_id: user?.id,
-        company_id: companyId,
       });
       setShowSignModal(false);
       onSignatureSaved();
       toast.success('Assinatura registrada com sucesso.');
     } catch {
       toast.error('Erro ao registrar assinatura.');
+    } finally {
+      signatureSaveLockRef.current = false;
     }
   };
 

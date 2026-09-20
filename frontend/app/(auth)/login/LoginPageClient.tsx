@@ -46,6 +46,24 @@ type LoginPageClientProps = {
   supportHref: string;
 };
 
+function resolveSafeMfaOtpAuthUrl(rawUrl: string | null | undefined): string {
+  const value = String(rawUrl || '').trim();
+  if (!value) return '';
+
+  try {
+    const parsed = new URL(value);
+    if (
+      parsed.protocol !== 'otpauth:' ||
+      !['totp', 'hotp'].includes(parsed.hostname.toLowerCase())
+    ) {
+      return '';
+    }
+    return value;
+  } catch {
+    return '';
+  }
+}
+
 function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageClientProps) {
   const searchParams = useSearchParams();
   const sessionExpired = searchParams.get('expired') === '1';
@@ -159,7 +177,7 @@ function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageCli
       if ('mfaEnrollRequired' in result) {
         setMfaStage('bootstrap');
         setMfaChallengeToken(result.challengeToken);
-        setMfaOtpAuthUrl(result.otpAuthUrl || '');
+        setMfaOtpAuthUrl(resolveSafeMfaOtpAuthUrl(result.otpAuthUrl));
         setMfaManualEntryKey(result.manualEntryKey || '');
         setMfaRecoveryCodes(Array.isArray(result.recoveryCodes) ? result.recoveryCodes : []);
         return;
@@ -566,4 +584,3 @@ export default function LoginPageClient(props: LoginPageClientProps) {
     </Suspense>
   );
 }
-

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -9,7 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
-import { Repository, IsNull } from 'typeorm';
+import { EntityManager, IsNull, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { createHash, randomUUID } from 'node:crypto';
 import QRCode from 'qrcode';
@@ -407,8 +408,11 @@ export class PhotographicReportsService {
     );
   }
 
-  private async renumberImages(report: PhotographicReport): Promise<void> {
-    const orderedImages = await this.imageRepository.find({
+  private async renumberImages(
+    report: PhotographicReport,
+    manager: EntityManager | null = null,
+  ): Promise<void> {
+    const orderedImages = await this.imageRepositoryFor(manager).find({
       where: {
         report_id: report.id,
         company_id: report.company_id,
@@ -427,7 +431,7 @@ export class PhotographicReportsService {
       }
       image.image_order = index + 1;
     }
-    await this.imageRepository.save(orderedImages);
+    await this.imageRepositoryFor(manager).save(orderedImages);
   }
 
   private mapDayEntity(
@@ -677,18 +681,103 @@ export class PhotographicReportsService {
       report.status === PhotographicReportStatus.FINALIZADO ||
       report.status === PhotographicReportStatus.EXPORTADO
     ) {
-      report.status = PhotographicReportStatus.EM_EDICAO;
-      return;
+      throw new ConflictException(
+        'Relatórios finalizados ou exportados são imutáveis. Use o fluxo formal de revisão.',
+      );
     }
 
     report.status = nextStatus;
   }
 
+  /**
+   * Serializa qualquer mutação do conteúdo pelo registro-pai. O lock é
+   * deliberadamente obtido na mesma transação em que os dias, fotos e o
+   * status são persistidos; uma leitura prévia seguida de save em outra
+   * conexão permitiria reabrir um relatório que acabou de ser finalizado.
+   */
+  private async withReportMutationLock<T>(
+    reportId: string,
+    companyId: string,
+    apply: (
+      report: PhotographicReport,
+      manager: EntityManager | null,
+    ) => Promise<T>,
+  ): Promise<T> {
+    const manager = this.reportRepository.manager;
+    if (!manager?.transaction) {
+      const report = await this.findReportEntity(reportId, companyId);
+      return apply(report, null);
+    }
+
+    try {
+      return await manager.transaction(async (transactionManager) => {
+        const reportRepository =
+          transactionManager.getRepository(PhotographicReport);
+        const lockedReport = await reportRepository.findOne({
+          where: {
+            id: reportId,
+            company_id: companyId,
+            deleted_at: IsNull(),
+          },
+          lock: { mode: 'pessimistic_write', onLocked: 'nowait' },
+        });
+
+        if (!lockedReport) {
+          throw new NotFoundException('Relatório fotográfico não encontrado.');
+        }
+        const report = await reportRepository.findOne({
+          where: {
+            id: reportId,
+            company_id: companyId,
+            deleted_at: IsNull(),
+          },
+          relations: {
+            days: true,
+            images: { reportDay: true },
+            exports: true,
+          },
+        });
+        if (!report) {
+          throw new NotFoundException('Relatório fotográfico não encontrado.');
+        }
+        return apply(report, transactionManager);
+      });
+    } catch (error) {
+      if ((error as { code?: string })?.code === '55P03') {
+        throw new ConflictException(
+          'Outra operação está finalizando ou exportando este relatório. Tente novamente.',
+        );
+      }
+      throw error;
+    }
+  }
+
+  private reportRepositoryFor(
+    manager: EntityManager | null,
+  ): Repository<PhotographicReport> {
+    return manager?.getRepository(PhotographicReport) || this.reportRepository;
+  }
+
+  private dayRepositoryFor(
+    manager: EntityManager | null,
+  ): Repository<PhotographicReportDay> {
+    return manager?.getRepository(PhotographicReportDay) || this.dayRepository;
+  }
+
+  private imageRepositoryFor(
+    manager: EntityManager | null,
+  ): Repository<PhotographicReportImage> {
+    return (
+      manager?.getRepository(PhotographicReportImage) || this.imageRepository
+    );
+  }
+
   private async ensureDayBelongsToReport(
     report: PhotographicReport,
     dayId: string,
+    manager: EntityManager | null = null,
   ): Promise<PhotographicReportDay> {
-    const day = await this.dayRepository.findOne({
+    const day = await this.dayRepositoryFor(manager).findOne({
       where: {
         id: dayId,
         report_id: report.id,
@@ -709,8 +798,9 @@ export class PhotographicReportsService {
   private async ensureImageBelongsToReport(
     report: PhotographicReport,
     imageId: string,
+    manager: EntityManager | null = null,
   ): Promise<PhotographicReportImage> {
-    const image = await this.imageRepository.findOne({
+    const image = await this.imageRepositoryFor(manager).findOne({
       where: {
         id: imageId,
         report_id: report.id,
@@ -883,156 +973,165 @@ export class PhotographicReportsService {
     dto: UpdatePhotographicReportDto,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(id, companyId);
+    await this.withReportMutationLock(
+      id,
+      companyId,
+      async (report, manager) => {
+        let hasMutations = false;
 
-    let hasMutations = false;
+        if (dto.client_id !== undefined) {
+          report.client_id = this.normalizeText(dto.client_id);
+          hasMutations = true;
+        }
+        if (dto.project_id !== undefined) {
+          report.project_id = this.normalizeText(dto.project_id);
+          hasMutations = true;
+        }
+        if (dto.client_name !== undefined) {
+          report.client_name = this.normalizeRequiredText(
+            dto.client_name,
+            'Cliente',
+          );
+          hasMutations = true;
+        }
+        if (dto.project_name !== undefined) {
+          report.project_name = this.normalizeRequiredText(
+            dto.project_name,
+            'Obra',
+          );
+          hasMutations = true;
+        }
+        if (dto.unit_name !== undefined) {
+          report.unit_name = this.normalizeText(dto.unit_name);
+          hasMutations = true;
+        }
+        if (dto.location !== undefined) {
+          report.location = this.normalizeText(dto.location);
+          hasMutations = true;
+        }
+        if (dto.activity_type !== undefined) {
+          report.activity_type = this.normalizeRequiredText(
+            dto.activity_type,
+            'Tipo de atividade',
+          );
+          hasMutations = true;
+        }
+        if (dto.report_tone !== undefined) {
+          report.report_tone = dto.report_tone;
+          hasMutations = true;
+        }
+        if (dto.area_status !== undefined) {
+          report.area_status = dto.area_status;
+          hasMutations = true;
+        }
+        if (dto.shift !== undefined) {
+          report.shift = dto.shift;
+          hasMutations = true;
+        }
+        if (dto.start_date !== undefined) {
+          report.start_date =
+            this.normalizeDate(dto.start_date) || report.start_date;
+          hasMutations = true;
+        }
+        if (dto.end_date !== undefined) {
+          report.end_date = this.normalizeDate(dto.end_date);
+          hasMutations = true;
+        }
+        if (dto.start_time !== undefined) {
+          report.start_time = this.normalizeTime(
+            dto.start_time,
+            'Horário de início',
+          );
+          hasMutations = true;
+        }
+        if (dto.end_time !== undefined) {
+          report.end_time = this.normalizeTime(
+            dto.end_time,
+            'Horário de término',
+          );
+          hasMutations = true;
+        }
+        if (dto.responsible_name !== undefined) {
+          report.responsible_name = this.normalizeRequiredText(
+            dto.responsible_name,
+            'Responsável pelo relatório',
+          );
+          hasMutations = true;
+        }
+        if (dto.responsible_registration_type !== undefined) {
+          report.responsible_registration_type =
+            dto.responsible_registration_type ?? null;
+          hasMutations = true;
+        }
+        if (dto.responsible_registration_number !== undefined) {
+          report.responsible_registration_number = this.normalizeText(
+            dto.responsible_registration_number,
+          );
+          hasMutations = true;
+        }
+        if (dto.responsible_registration_state !== undefined) {
+          report.responsible_registration_state =
+            this.normalizeRegistrationState(dto.responsible_registration_state);
+          hasMutations = true;
+        }
+        if (dto.art_number !== undefined) {
+          report.art_number = this.normalizeText(dto.art_number);
+          hasMutations = true;
+        }
+        if (dto.contractor_company !== undefined) {
+          report.contractor_company = this.normalizeRequiredText(
+            dto.contractor_company,
+            'Empresa executora',
+          );
+          hasMutations = true;
+        }
+        if (dto.applicable_nrs !== undefined) {
+          report.applicable_nrs = this.normalizeApplicableNrs(
+            dto.applicable_nrs,
+          );
+          hasMutations = true;
+        }
+        if (dto.inspection_methodology !== undefined) {
+          report.inspection_methodology = this.normalizeText(
+            dto.inspection_methodology,
+          );
+          hasMutations = true;
+        }
+        if (dto.scope_and_limitations !== undefined) {
+          report.scope_and_limitations = this.normalizeText(
+            dto.scope_and_limitations,
+          );
+          hasMutations = true;
+        }
+        if (dto.general_observations !== undefined) {
+          report.general_observations = this.normalizeText(
+            dto.general_observations,
+          );
+          hasMutations = true;
+        }
+        if (dto.ai_summary !== undefined) {
+          report.ai_summary = this.normalizeText(dto.ai_summary);
+          hasMutations = true;
+        }
+        if (dto.final_conclusion !== undefined) {
+          report.final_conclusion = this.normalizeText(dto.final_conclusion);
+          hasMutations = true;
+        }
+        if (dto.status !== undefined && dto.status !== report.status) {
+          throw new BadRequestException(
+            'A transição de status deve ocorrer pelos fluxos dedicados (análise, finalização ou exportação).',
+          );
+        }
 
-    if (dto.client_id !== undefined) {
-      report.client_id = this.normalizeText(dto.client_id);
-      hasMutations = true;
-    }
-    if (dto.project_id !== undefined) {
-      report.project_id = this.normalizeText(dto.project_id);
-      hasMutations = true;
-    }
-    if (dto.client_name !== undefined) {
-      report.client_name = this.normalizeRequiredText(
-        dto.client_name,
-        'Cliente',
-      );
-      hasMutations = true;
-    }
-    if (dto.project_name !== undefined) {
-      report.project_name = this.normalizeRequiredText(
-        dto.project_name,
-        'Obra',
-      );
-      hasMutations = true;
-    }
-    if (dto.unit_name !== undefined) {
-      report.unit_name = this.normalizeText(dto.unit_name);
-      hasMutations = true;
-    }
-    if (dto.location !== undefined) {
-      report.location = this.normalizeText(dto.location);
-      hasMutations = true;
-    }
-    if (dto.activity_type !== undefined) {
-      report.activity_type = this.normalizeRequiredText(
-        dto.activity_type,
-        'Tipo de atividade',
-      );
-      hasMutations = true;
-    }
-    if (dto.report_tone !== undefined) {
-      report.report_tone = dto.report_tone;
-      hasMutations = true;
-    }
-    if (dto.area_status !== undefined) {
-      report.area_status = dto.area_status;
-      hasMutations = true;
-    }
-    if (dto.shift !== undefined) {
-      report.shift = dto.shift;
-      hasMutations = true;
-    }
-    if (dto.start_date !== undefined) {
-      report.start_date =
-        this.normalizeDate(dto.start_date) || report.start_date;
-      hasMutations = true;
-    }
-    if (dto.end_date !== undefined) {
-      report.end_date = this.normalizeDate(dto.end_date);
-      hasMutations = true;
-    }
-    if (dto.start_time !== undefined) {
-      report.start_time = this.normalizeTime(
-        dto.start_time,
-        'Horário de início',
-      );
-      hasMutations = true;
-    }
-    if (dto.end_time !== undefined) {
-      report.end_time = this.normalizeTime(dto.end_time, 'Horário de término');
-      hasMutations = true;
-    }
-    if (dto.responsible_name !== undefined) {
-      report.responsible_name = this.normalizeRequiredText(
-        dto.responsible_name,
-        'Responsável pelo relatório',
-      );
-      hasMutations = true;
-    }
-    if (dto.responsible_registration_type !== undefined) {
-      report.responsible_registration_type =
-        dto.responsible_registration_type ?? null;
-      hasMutations = true;
-    }
-    if (dto.responsible_registration_number !== undefined) {
-      report.responsible_registration_number = this.normalizeText(
-        dto.responsible_registration_number,
-      );
-      hasMutations = true;
-    }
-    if (dto.responsible_registration_state !== undefined) {
-      report.responsible_registration_state = this.normalizeRegistrationState(
-        dto.responsible_registration_state,
-      );
-      hasMutations = true;
-    }
-    if (dto.art_number !== undefined) {
-      report.art_number = this.normalizeText(dto.art_number);
-      hasMutations = true;
-    }
-    if (dto.contractor_company !== undefined) {
-      report.contractor_company = this.normalizeRequiredText(
-        dto.contractor_company,
-        'Empresa executora',
-      );
-      hasMutations = true;
-    }
-    if (dto.applicable_nrs !== undefined) {
-      report.applicable_nrs = this.normalizeApplicableNrs(dto.applicable_nrs);
-      hasMutations = true;
-    }
-    if (dto.inspection_methodology !== undefined) {
-      report.inspection_methodology = this.normalizeText(
-        dto.inspection_methodology,
-      );
-      hasMutations = true;
-    }
-    if (dto.scope_and_limitations !== undefined) {
-      report.scope_and_limitations = this.normalizeText(
-        dto.scope_and_limitations,
-      );
-      hasMutations = true;
-    }
-    if (dto.general_observations !== undefined) {
-      report.general_observations = this.normalizeText(
-        dto.general_observations,
-      );
-      hasMutations = true;
-    }
-    if (dto.ai_summary !== undefined) {
-      report.ai_summary = this.normalizeText(dto.ai_summary);
-      hasMutations = true;
-    }
-    if (dto.final_conclusion !== undefined) {
-      report.final_conclusion = this.normalizeText(dto.final_conclusion);
-      hasMutations = true;
-    }
-    if (dto.status !== undefined && dto.status !== report.status) {
-      throw new BadRequestException(
-        'A transição de status deve ocorrer pelos fluxos dedicados (análise, finalização ou exportação).',
-      );
-    }
+        if (hasMutations) {
+          this.markEditingIfNeeded(report, report.status);
+        }
 
-    if (hasMutations) {
-      this.markEditingIfNeeded(report, report.status);
-    }
-
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+        await this.reportRepositoryFor(manager).save(report);
+        return report;
+      },
+    );
+    return this.findOne(id);
   }
 
   async saveDraft(
@@ -1040,196 +1139,214 @@ export class PhotographicReportsService {
     dto: UpdatePhotographicReportDto,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(id, companyId);
+    await this.withReportMutationLock(
+      id,
+      companyId,
+      async (report, manager) => {
+        if (
+          report.status === PhotographicReportStatus.FINALIZADO ||
+          report.status === PhotographicReportStatus.EXPORTADO
+        ) {
+          throw new BadRequestException(
+            'Relatórios finalizados ou exportados não podem ser revertidos para rascunho via edição direta. Use os fluxos formais de revisão.',
+          );
+        }
 
-    if (
-      report.status === PhotographicReportStatus.FINALIZADO ||
-      report.status === PhotographicReportStatus.EXPORTADO
-    ) {
-      throw new BadRequestException(
-        'Relatórios finalizados ou exportados não podem ser revertidos para rascunho via edição direta. Use os fluxos formais de revisão.',
-      );
-    }
-
-    Object.assign(report, {
-      ...report,
-      ...dto,
-      status: PhotographicReportStatus.RASCUNHO,
-      client_id:
-        dto.client_id !== undefined
-          ? this.normalizeText(dto.client_id)
-          : report.client_id,
-      project_id:
-        dto.project_id !== undefined
-          ? this.normalizeText(dto.project_id)
-          : report.project_id,
-      client_name:
-        dto.client_name !== undefined
-          ? this.normalizeRequiredText(dto.client_name, 'Cliente')
-          : report.client_name,
-      project_name:
-        dto.project_name !== undefined
-          ? this.normalizeRequiredText(dto.project_name, 'Obra')
-          : report.project_name,
-      unit_name:
-        dto.unit_name !== undefined
-          ? this.normalizeText(dto.unit_name)
-          : report.unit_name,
-      location:
-        dto.location !== undefined
-          ? this.normalizeText(dto.location)
-          : report.location,
-      activity_type:
-        dto.activity_type !== undefined
-          ? this.normalizeRequiredText(dto.activity_type, 'Tipo de atividade')
-          : report.activity_type,
-      report_tone: dto.report_tone ?? report.report_tone,
-      area_status: dto.area_status ?? report.area_status,
-      shift: dto.shift ?? report.shift,
-      start_date:
-        dto.start_date !== undefined
-          ? this.normalizeDate(dto.start_date) || report.start_date
-          : report.start_date,
-      end_date:
-        dto.end_date !== undefined
-          ? this.normalizeDate(dto.end_date)
-          : report.end_date,
-      start_time:
-        dto.start_time !== undefined
-          ? this.normalizeTime(dto.start_time, 'Horário de início')
-          : report.start_time,
-      end_time:
-        dto.end_time !== undefined
-          ? this.normalizeTime(dto.end_time, 'Horário de término')
-          : report.end_time,
-      responsible_name:
-        dto.responsible_name !== undefined
-          ? this.normalizeRequiredText(
-              dto.responsible_name,
-              'Responsável pelo relatório',
-            )
-          : report.responsible_name,
-      responsible_registration_type:
-        dto.responsible_registration_type !== undefined
-          ? (dto.responsible_registration_type ?? null)
-          : report.responsible_registration_type,
-      responsible_registration_number:
-        dto.responsible_registration_number !== undefined
-          ? this.normalizeText(dto.responsible_registration_number)
-          : report.responsible_registration_number,
-      responsible_registration_state:
-        dto.responsible_registration_state !== undefined
-          ? this.normalizeRegistrationState(dto.responsible_registration_state)
-          : report.responsible_registration_state,
-      art_number:
-        dto.art_number !== undefined
-          ? this.normalizeText(dto.art_number)
-          : report.art_number,
-      contractor_company:
-        dto.contractor_company !== undefined
-          ? this.normalizeRequiredText(
-              dto.contractor_company,
-              'Empresa executora',
-            )
-          : report.contractor_company,
-      applicable_nrs:
-        dto.applicable_nrs !== undefined
-          ? this.normalizeApplicableNrs(dto.applicable_nrs)
-          : report.applicable_nrs,
-      inspection_methodology:
-        dto.inspection_methodology !== undefined
-          ? this.normalizeText(dto.inspection_methodology)
-          : report.inspection_methodology,
-      scope_and_limitations:
-        dto.scope_and_limitations !== undefined
-          ? this.normalizeText(dto.scope_and_limitations)
-          : report.scope_and_limitations,
-      general_observations:
-        dto.general_observations !== undefined
-          ? this.normalizeText(dto.general_observations)
-          : report.general_observations,
-      ai_summary:
-        dto.ai_summary !== undefined
-          ? this.normalizeText(dto.ai_summary)
-          : report.ai_summary,
-      final_conclusion:
-        dto.final_conclusion !== undefined
-          ? this.normalizeText(dto.final_conclusion)
-          : report.final_conclusion,
-    });
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+        Object.assign(report, {
+          ...report,
+          ...dto,
+          status: PhotographicReportStatus.RASCUNHO,
+          client_id:
+            dto.client_id !== undefined
+              ? this.normalizeText(dto.client_id)
+              : report.client_id,
+          project_id:
+            dto.project_id !== undefined
+              ? this.normalizeText(dto.project_id)
+              : report.project_id,
+          client_name:
+            dto.client_name !== undefined
+              ? this.normalizeRequiredText(dto.client_name, 'Cliente')
+              : report.client_name,
+          project_name:
+            dto.project_name !== undefined
+              ? this.normalizeRequiredText(dto.project_name, 'Obra')
+              : report.project_name,
+          unit_name:
+            dto.unit_name !== undefined
+              ? this.normalizeText(dto.unit_name)
+              : report.unit_name,
+          location:
+            dto.location !== undefined
+              ? this.normalizeText(dto.location)
+              : report.location,
+          activity_type:
+            dto.activity_type !== undefined
+              ? this.normalizeRequiredText(
+                  dto.activity_type,
+                  'Tipo de atividade',
+                )
+              : report.activity_type,
+          report_tone: dto.report_tone ?? report.report_tone,
+          area_status: dto.area_status ?? report.area_status,
+          shift: dto.shift ?? report.shift,
+          start_date:
+            dto.start_date !== undefined
+              ? this.normalizeDate(dto.start_date) || report.start_date
+              : report.start_date,
+          end_date:
+            dto.end_date !== undefined
+              ? this.normalizeDate(dto.end_date)
+              : report.end_date,
+          start_time:
+            dto.start_time !== undefined
+              ? this.normalizeTime(dto.start_time, 'Horário de início')
+              : report.start_time,
+          end_time:
+            dto.end_time !== undefined
+              ? this.normalizeTime(dto.end_time, 'Horário de término')
+              : report.end_time,
+          responsible_name:
+            dto.responsible_name !== undefined
+              ? this.normalizeRequiredText(
+                  dto.responsible_name,
+                  'Responsável pelo relatório',
+                )
+              : report.responsible_name,
+          responsible_registration_type:
+            dto.responsible_registration_type !== undefined
+              ? (dto.responsible_registration_type ?? null)
+              : report.responsible_registration_type,
+          responsible_registration_number:
+            dto.responsible_registration_number !== undefined
+              ? this.normalizeText(dto.responsible_registration_number)
+              : report.responsible_registration_number,
+          responsible_registration_state:
+            dto.responsible_registration_state !== undefined
+              ? this.normalizeRegistrationState(
+                  dto.responsible_registration_state,
+                )
+              : report.responsible_registration_state,
+          art_number:
+            dto.art_number !== undefined
+              ? this.normalizeText(dto.art_number)
+              : report.art_number,
+          contractor_company:
+            dto.contractor_company !== undefined
+              ? this.normalizeRequiredText(
+                  dto.contractor_company,
+                  'Empresa executora',
+                )
+              : report.contractor_company,
+          applicable_nrs:
+            dto.applicable_nrs !== undefined
+              ? this.normalizeApplicableNrs(dto.applicable_nrs)
+              : report.applicable_nrs,
+          inspection_methodology:
+            dto.inspection_methodology !== undefined
+              ? this.normalizeText(dto.inspection_methodology)
+              : report.inspection_methodology,
+          scope_and_limitations:
+            dto.scope_and_limitations !== undefined
+              ? this.normalizeText(dto.scope_and_limitations)
+              : report.scope_and_limitations,
+          general_observations:
+            dto.general_observations !== undefined
+              ? this.normalizeText(dto.general_observations)
+              : report.general_observations,
+          ai_summary:
+            dto.ai_summary !== undefined
+              ? this.normalizeText(dto.ai_summary)
+              : report.ai_summary,
+          final_conclusion:
+            dto.final_conclusion !== undefined
+              ? this.normalizeText(dto.final_conclusion)
+              : report.final_conclusion,
+        });
+        await this.reportRepositoryFor(manager).save(report);
+        return report;
+      },
+    );
+    return this.findOne(id);
   }
 
   async remove(id: string): Promise<void> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(id, companyId);
+    await this.withReportMutationLock(
+      id,
+      companyId,
+      async (report, manager) => {
+        if (
+          report.status === PhotographicReportStatus.FINALIZADO ||
+          report.status === PhotographicReportStatus.EXPORTADO ||
+          (report.exports || []).length > 0
+        ) {
+          throw new BadRequestException(
+            'Somente relatórios fotográficos sem exportação final podem ser removidos. Use os fluxos formais de cancelamento para registros já finalizados/exportados.',
+          );
+        }
 
-    if (
-      report.status === PhotographicReportStatus.FINALIZADO ||
-      report.status === PhotographicReportStatus.EXPORTADO ||
-      (report.exports || []).length > 0
-    ) {
-      throw new BadRequestException(
-        'Somente relatórios fotográficos sem exportação final podem ser removidos. Use os fluxos formais de cancelamento para registros já finalizados/exportados.',
-      );
-    }
+        const imagesToRemove = (report.images || []).filter((entry) =>
+          Boolean(entry.image_url),
+        );
 
-    const imagesToRemove = (report.images || []).filter((entry) =>
-      Boolean(entry.image_url),
+        for (const image of imagesToRemove) {
+          try {
+            await this.documentStorageService.deleteFile(
+              this.documentStorageService.referenceForExistingObject(
+                image.image_url,
+                {
+                  resourceType: 'photographic-report-image',
+                  resourceId: image.id,
+                },
+                'p1-document-storage-deleteFile',
+              ),
+            );
+          } catch (error) {
+            this.logger.warn(
+              `Falha ao limpar imagem do relatório ${report.id}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
+
+        for (const exportEntity of report.exports || []) {
+          try {
+            await this.documentStorageService.deleteFile(
+              this.documentStorageService.referenceForExistingObject(
+                exportEntity.file_url,
+                {
+                  resourceType: 'photographic-report-export',
+                  resourceId: exportEntity.id,
+                },
+                'p1-document-storage-deleteFile',
+              ),
+            );
+          } catch (error) {
+            this.logger.warn(
+              `Falha ao limpar arquivo do relatório ${report.id}: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
+
+        await this.documentGovernanceService.removeFinalDocumentReference({
+          companyId: report.company_id,
+          module: 'photographic_report',
+          entityId: report.id,
+          documentType: 'pdf',
+          cleanupStoredFile: () => Promise.resolve(undefined),
+          transactionManager: manager || undefined,
+        });
+
+        await (
+          manager?.getRepository(PhotographicReport) || this.reportRepository
+        ).softDelete(report.id);
+        return undefined;
+      },
     );
-
-    for (const image of imagesToRemove) {
-      try {
-        await this.documentStorageService.deleteFile(
-          this.documentStorageService.referenceForExistingObject(
-            image.image_url,
-            {
-              resourceType: 'photographic-report-image',
-              resourceId: image.id,
-            },
-            'p1-document-storage-deleteFile',
-          ),
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Falha ao limpar imagem do relatório ${report.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
-
-    for (const exportEntity of report.exports || []) {
-      try {
-        await this.documentStorageService.deleteFile(
-          this.documentStorageService.referenceForExistingObject(
-            exportEntity.file_url,
-            {
-              resourceType: 'photographic-report-export',
-              resourceId: exportEntity.id,
-            },
-            'p1-document-storage-deleteFile',
-          ),
-        );
-      } catch (error) {
-        this.logger.warn(
-          `Falha ao limpar arquivo do relatório ${report.id}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-      }
-    }
-
-    await this.documentGovernanceService.removeFinalDocumentReference({
-      companyId: report.company_id,
-      module: 'photographic_report',
-      entityId: report.id,
-      documentType: 'pdf',
-      cleanupStoredFile: () => Promise.resolve(undefined),
-    });
-
-    await this.reportRepository.softDelete(report.id);
   }
 
   async createDay(
@@ -1237,39 +1354,49 @@ export class PhotographicReportsService {
     dto: CreatePhotographicReportDayDto,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
     const activityDate = this.normalizeDate(dto.activity_date);
     if (!activityDate) {
       throw new BadRequestException('Data da atividade obrigatória.');
     }
 
-    const existingDay = (report.days || []).find(
-      (day) => day.activity_date === activityDate,
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (report, manager) => {
+        const dayRepository = this.dayRepositoryFor(manager);
+        const reportRepository = this.reportRepositoryFor(manager);
+        const existingDay = (report.days || []).find(
+          (day) => day.activity_date === activityDate,
+        );
+        if (existingDay) {
+          existingDay.day_summary =
+            dto.day_summary !== undefined
+              ? this.normalizeText(dto.day_summary)
+              : existingDay.day_summary;
+          this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+          await dayRepository.save(existingDay);
+          await reportRepository.save(report);
+          return report;
+        }
+
+        this.markEditingIfNeeded(
+          report,
+          PhotographicReportStatus.AGUARDANDO_FOTOS,
+        );
+        await reportRepository.save(report);
+        await dayRepository.save(
+          dayRepository.create({
+            company_id: companyId,
+            report_id: report.id,
+            activity_date: activityDate,
+            day_summary: this.normalizeText(dto.day_summary),
+          }),
+        );
+        return report;
+      },
     );
-    if (existingDay) {
-      existingDay.day_summary =
-        dto.day_summary !== undefined
-          ? this.normalizeText(dto.day_summary)
-          : existingDay.day_summary;
-      this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
-      await this.dayRepository.save(existingDay);
-      await this.reportRepository.save(report);
-      return this.findOne(report.id);
-    }
 
-    this.markEditingIfNeeded(report, PhotographicReportStatus.AGUARDANDO_FOTOS);
-    await this.reportRepository.save(report);
-
-    await this.dayRepository.save(
-      this.dayRepository.create({
-        company_id: companyId,
-        report_id: report.id,
-        activity_date: activityDate,
-        day_summary: this.normalizeText(dto.day_summary),
-      }),
-    );
-
-    return this.findOne(report.id);
+    return this.findOne(reportId);
   }
 
   async updateDay(
@@ -1278,30 +1405,36 @@ export class PhotographicReportsService {
     dto: UpdatePhotographicReportDayDto,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
-    const day = await this.ensureDayBelongsToReport(report, dayId);
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (report, manager) => {
+        const day = await this.ensureDayBelongsToReport(report, dayId, manager);
 
-    if (dto.activity_date !== undefined) {
-      const nextDate =
-        this.normalizeDate(dto.activity_date) || day.activity_date;
-      const duplicate = (report.days || []).find(
-        (item) => item.id !== day.id && item.activity_date === nextDate,
-      );
-      if (duplicate) {
-        throw new BadRequestException(
-          'Já existe uma data cadastrada para essa mesma atividade.',
-        );
-      }
-      day.activity_date = nextDate;
-    }
-    if (dto.day_summary !== undefined) {
-      day.day_summary = this.normalizeText(dto.day_summary);
-    }
+        if (dto.activity_date !== undefined) {
+          const nextDate =
+            this.normalizeDate(dto.activity_date) || day.activity_date;
+          const duplicate = (report.days || []).find(
+            (item) => item.id !== day.id && item.activity_date === nextDate,
+          );
+          if (duplicate) {
+            throw new BadRequestException(
+              'Já existe uma data cadastrada para essa mesma atividade.',
+            );
+          }
+          day.activity_date = nextDate;
+        }
+        if (dto.day_summary !== undefined) {
+          day.day_summary = this.normalizeText(dto.day_summary);
+        }
 
-    this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
-    await this.dayRepository.save(day);
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+        this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+        await this.dayRepositoryFor(manager).save(day);
+        await this.reportRepositoryFor(manager).save(report);
+        return report;
+      },
+    );
+    return this.findOne(reportId);
   }
 
   async removeDay(
@@ -1309,26 +1442,22 @@ export class PhotographicReportsService {
     dayId: string,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
-
-    if (
-      report.status === PhotographicReportStatus.FINALIZADO ||
-      report.status === PhotographicReportStatus.EXPORTADO
-    ) {
-      throw new BadRequestException(
-        'Não é possível remover dias de relatórios finalizados ou exportados.',
-      );
-    }
-
-    await this.ensureDayBelongsToReport(report, dayId);
-    await this.dayRepository.delete({
-      id: dayId,
-      report_id: report.id,
-      company_id: companyId,
-    });
-    this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (report, manager) => {
+        await this.ensureDayBelongsToReport(report, dayId, manager);
+        await this.dayRepositoryFor(manager).delete({
+          id: dayId,
+          report_id: report.id,
+          company_id: companyId,
+        });
+        this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+        await this.reportRepositoryFor(manager).save(report);
+        return report;
+      },
+    );
+    return this.findOne(reportId);
   }
 
   async uploadImages(
@@ -1348,6 +1477,7 @@ export class PhotographicReportsService {
     }
 
     let targetDay: PhotographicReportDay | null = null;
+    let targetActivityDate: string | null = null;
     if (dto.report_day_id) {
       targetDay = await this.ensureDayBelongsToReport(
         report,
@@ -1356,18 +1486,11 @@ export class PhotographicReportsService {
     } else if (dto.activity_date) {
       const normalizedDate = this.normalizeDate(dto.activity_date);
       if (normalizedDate) {
+        targetActivityDate = normalizedDate;
         targetDay =
           (report.days || []).find(
             (day) => day.activity_date === normalizedDate,
-          ) ||
-          (await this.dayRepository.save(
-            this.dayRepository.create({
-              company_id: companyId,
-              report_id: report.id,
-              activity_date: normalizedDate,
-              day_summary: null,
-            }),
-          ));
+          ) || null;
       }
     }
 
@@ -1485,16 +1608,53 @@ export class PhotographicReportsService {
       // coluna nova adicionada ao create() era descartada em silêncio no
       // insert() — foi assim que os metadados de integridade quase nasceram
       // mortos.
-      await this.imageRepository.insert(createdImages);
+      await this.withReportMutationLock(
+        reportId,
+        companyId,
+        async (lockedReport, manager) => {
+          const dayRepository = this.dayRepositoryFor(manager);
+          const imageRepository = this.imageRepositoryFor(manager);
+          const reportRepository = this.reportRepositoryFor(manager);
+          let lockedTargetDay = targetDay
+            ? await this.ensureDayBelongsToReport(
+                lockedReport,
+                targetDay.id,
+                manager,
+              )
+            : null;
+          if (!lockedTargetDay && targetActivityDate) {
+            lockedTargetDay =
+              (lockedReport.days || []).find(
+                (day) => day.activity_date === targetActivityDate,
+              ) ||
+              (await dayRepository.save(
+                dayRepository.create({
+                  company_id: companyId,
+                  report_id: lockedReport.id,
+                  activity_date: targetActivityDate,
+                  day_summary: null,
+                }),
+              ));
+          }
 
-      const nextStatus =
-        report.status === PhotographicReportStatus.FINALIZADO ||
-        report.status === PhotographicReportStatus.EXPORTADO
-          ? PhotographicReportStatus.EM_EDICAO
-          : PhotographicReportStatus.AGUARDANDO_ANALISE;
-      await this.reportRepository.update(
-        { id: report.id },
-        { status: nextStatus },
+          const startingOrder =
+            Math.max(
+              ...(lockedReport.images || []).map((image) => image.image_order),
+              0,
+            ) || 0;
+          createdImages.forEach((image, index) => {
+            image.report_day_id = lockedTargetDay?.id || null;
+            image.image_order = startingOrder + index + 1;
+          });
+
+          this.markEditingIfNeeded(
+            lockedReport,
+            PhotographicReportStatus.AGUARDANDO_ANALISE,
+          );
+          await imageRepository.insert(createdImages);
+          await reportRepository.save(lockedReport);
+          return lockedReport;
+        },
       );
 
       return await this.findOne(report.id);
@@ -1525,101 +1685,118 @@ export class PhotographicReportsService {
     dto: UpdatePhotographicReportImageDto,
   ): Promise<PhotographicReportImageResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
-    const image = await this.ensureImageBelongsToReport(report, imageId);
+    let mapped: PhotographicReportImageResponse;
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (report, manager) => {
+        const image = await this.ensureImageBelongsToReport(
+          report,
+          imageId,
+          manager,
+        );
 
-    if (dto.report_day_id !== undefined) {
-      image.report_day_id = dto.report_day_id
-        ? (await this.ensureDayBelongsToReport(report, dto.report_day_id)).id
-        : null;
-    }
-    if (dto.manual_caption !== undefined) {
-      image.manual_caption = this.normalizeText(dto.manual_caption);
-    }
-    if (dto.image_order !== undefined) {
-      image.image_order = dto.image_order;
-    }
-    if (dto.ai_title !== undefined) {
-      image.ai_title = this.normalizeText(dto.ai_title);
-    }
-    if (dto.ai_description !== undefined) {
-      image.ai_description = this.normalizeText(dto.ai_description);
-    }
-    if (dto.ai_positive_points !== undefined) {
-      image.ai_positive_points = this.normalizeStringArray(
-        dto.ai_positive_points,
-        8,
-      );
-    }
-    if (dto.ai_technical_assessment !== undefined) {
-      image.ai_technical_assessment = this.normalizeText(
-        dto.ai_technical_assessment,
-      );
-    }
-    if (dto.ai_condition_classification !== undefined) {
-      image.ai_condition_classification = this.normalizeText(
-        dto.ai_condition_classification,
-      );
-    }
-    if (dto.ai_recommendations !== undefined) {
-      image.ai_recommendations = this.normalizeStringArray(
-        dto.ai_recommendations,
-        5,
-      );
-    }
+        if (dto.report_day_id !== undefined) {
+          image.report_day_id = dto.report_day_id
+            ? (
+                await this.ensureDayBelongsToReport(
+                  report,
+                  dto.report_day_id,
+                  manager,
+                )
+              ).id
+            : null;
+        }
+        if (dto.manual_caption !== undefined) {
+          image.manual_caption = this.normalizeText(dto.manual_caption);
+        }
+        if (dto.image_order !== undefined) {
+          image.image_order = dto.image_order;
+        }
+        if (dto.ai_title !== undefined) {
+          image.ai_title = this.normalizeText(dto.ai_title);
+        }
+        if (dto.ai_description !== undefined) {
+          image.ai_description = this.normalizeText(dto.ai_description);
+        }
+        if (dto.ai_positive_points !== undefined) {
+          image.ai_positive_points = this.normalizeStringArray(
+            dto.ai_positive_points,
+            8,
+          );
+        }
+        if (dto.ai_technical_assessment !== undefined) {
+          image.ai_technical_assessment = this.normalizeText(
+            dto.ai_technical_assessment,
+          );
+        }
+        if (dto.ai_condition_classification !== undefined) {
+          image.ai_condition_classification = this.normalizeText(
+            dto.ai_condition_classification,
+          );
+        }
+        if (dto.ai_recommendations !== undefined) {
+          image.ai_recommendations = this.normalizeStringArray(
+            dto.ai_recommendations,
+            5,
+          );
+        }
 
-    // BUG CORRIGIDO: `photo_conditions` era declarado no DTO, devolvido por
-    // mapImageEntity e enviado pelo PhotoCard, mas NÃO tinha branch de escrita
-    // aqui — todo checkbox marcado pelo usuário era descartado em silêncio
-    // desde que a feature foi entregue.
-    if (dto.photo_conditions !== undefined) {
-      image.photo_conditions = this.normalizeStringArray(
-        dto.photo_conditions,
-        MAX_PHOTO_CONDITIONS,
-      );
-    }
+        // BUG CORRIGIDO: `photo_conditions` era declarado no DTO, devolvido por
+        // mapImageEntity e enviado pelo PhotoCard, mas NÃO tinha branch de escrita
+        // aqui — todo checkbox marcado pelo usuário era descartado em silêncio
+        // desde que a feature foi entregue.
+        if (dto.photo_conditions !== undefined) {
+          image.photo_conditions = this.normalizeStringArray(
+            dto.photo_conditions,
+            MAX_PHOTO_CONDITIONS,
+          );
+        }
 
-    // Não conformidade. Os campos são independentes de propósito: desmarcar a
-    // NC não deve exigir reenviar a ação, e limpar a ação não deve exigir
-    // desmarcar a NC.
-    if (dto.is_nonconformity !== undefined) {
-      image.is_nonconformity = Boolean(dto.is_nonconformity);
-    }
-    if (dto.recommended_action !== undefined) {
-      image.recommended_action = this.normalizeText(dto.recommended_action);
-    }
-    if (dto.action_deadline !== undefined) {
-      image.action_deadline = dto.action_deadline
-        ? this.normalizeDate(dto.action_deadline)
-        : null;
-    }
-    if (dto.action_responsible !== undefined) {
-      image.action_responsible = this.normalizeText(dto.action_responsible);
-    }
+        // Não conformidade. Os campos são independentes de propósito: desmarcar a
+        // NC não deve exigir reenviar a ação, e limpar a ação não deve exigir
+        // desmarcar a NC.
+        if (dto.is_nonconformity !== undefined) {
+          image.is_nonconformity = Boolean(dto.is_nonconformity);
+        }
+        if (dto.recommended_action !== undefined) {
+          image.recommended_action = this.normalizeText(dto.recommended_action);
+        }
+        if (dto.action_deadline !== undefined) {
+          image.action_deadline = dto.action_deadline
+            ? this.normalizeDate(dto.action_deadline)
+            : null;
+        }
+        if (dto.action_responsible !== undefined) {
+          image.action_responsible = this.normalizeText(dto.action_responsible);
+        }
 
-    this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
-    await this.imageRepository.save(image);
-    await this.reportRepository.save(report);
-    const mapped = await this.mapImageEntity(
-      image,
-      new Map(
-        (report.days || []).map((day) => [
-          day.id,
-          {
-            id: day.id,
-            report_id: day.report_id,
-            activity_date: day.activity_date,
-            day_summary: day.day_summary,
-            created_at: day.created_at.toISOString(),
-            updated_at: day.updated_at.toISOString(),
-            image_count: (report.images || []).filter(
-              (item) => item.report_day_id === day.id,
-            ).length,
-          } satisfies PhotographicReportDayResponse,
-        ]),
-      ),
+        this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+        await this.imageRepositoryFor(manager).save(image);
+        await this.reportRepositoryFor(manager).save(report);
+        mapped = await this.mapImageEntity(
+          image,
+          new Map(
+            (report.days || []).map((day) => [
+              day.id,
+              {
+                id: day.id,
+                report_id: day.report_id,
+                activity_date: day.activity_date,
+                day_summary: day.day_summary,
+                created_at: day.created_at.toISOString(),
+                updated_at: day.updated_at.toISOString(),
+                image_count: (report.images || []).filter(
+                  (item) => item.report_day_id === day.id,
+                ).length,
+              } satisfies PhotographicReportDayResponse,
+            ]),
+          ),
+        );
+        return mapped;
+      },
     );
-    return mapped;
+    return mapped!;
   }
 
   async removeImage(
@@ -1627,43 +1804,43 @@ export class PhotographicReportsService {
     imageId: string,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (report, manager) => {
+        const image = await this.ensureImageBelongsToReport(
+          report,
+          imageId,
+          manager,
+        );
 
-    if (
-      report.status === PhotographicReportStatus.FINALIZADO ||
-      report.status === PhotographicReportStatus.EXPORTADO
-    ) {
-      throw new BadRequestException(
-        'Não é possível remover fotos de relatórios finalizados ou exportados.',
-      );
-    }
+        try {
+          await this.documentStorageService.deleteFile(
+            this.documentStorageService.referenceForExistingObject(
+              image.image_url,
+              {
+                resourceType: 'photographic-report-image',
+                resourceId: image.id,
+              },
+              'p1-document-storage-deleteFile',
+            ),
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Falha ao remover imagem do storage (${image.image_url}): ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
 
-    const image = await this.ensureImageBelongsToReport(report, imageId);
-
-    try {
-      await this.documentStorageService.deleteFile(
-        this.documentStorageService.referenceForExistingObject(
-          image.image_url,
-          {
-            resourceType: 'photographic-report-image',
-            resourceId: image.id,
-          },
-          'p1-document-storage-deleteFile',
-        ),
-      );
-    } catch (error) {
-      this.logger.warn(
-        `Falha ao remover imagem do storage (${image.image_url}): ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-
-    await this.imageRepository.delete({ id: image.id });
-    await this.renumberImages(report);
-    this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+        await this.imageRepositoryFor(manager).delete({ id: image.id });
+        await this.renumberImages(report, manager);
+        this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+        await this.reportRepositoryFor(manager).save(report);
+        return report;
+      },
+    );
+    return this.findOne(reportId);
   }
 
   async reorderImages(
@@ -1671,43 +1848,53 @@ export class PhotographicReportsService {
     dto: ReorderPhotographicReportImagesDto,
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
-    const report = await this.findReportEntity(reportId, companyId);
-    const images = this.sortImages(report.images || []);
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (report, manager) => {
+        const images = this.sortImages(report.images || []);
 
-    if (dto.imageIds.length !== images.length) {
-      throw new BadRequestException(
-        'A ordem enviada deve conter exatamente todas as fotos do relatório.',
-      );
-    }
+        if (dto.imageIds.length !== images.length) {
+          throw new BadRequestException(
+            'A ordem enviada deve conter exatamente todas as fotos do relatório.',
+          );
+        }
 
-    const imageMap = new Map(images.map((image) => [image.id, image]));
-    dto.imageIds.forEach((imageId, index) => {
-      const image = imageMap.get(imageId);
-      if (!image) {
-        throw new BadRequestException('A ordem enviada contém foto inválida.');
-      }
-      image.image_order = index + 1;
-    });
+        const imageMap = new Map(images.map((image) => [image.id, image]));
+        dto.imageIds.forEach((imageId, index) => {
+          const image = imageMap.get(imageId);
+          if (!image) {
+            throw new BadRequestException(
+              'A ordem enviada contém foto inválida.',
+            );
+          }
+          image.image_order = index + 1;
+        });
 
-    this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
-    // Two-pass save: first shift all orders to a high temporary range so the
-    // unique partial index (report_id, image_order) is not violated mid-batch
-    // when two images swap positions and TypeORM issues individual UPDATEs.
-    const finalOrders = new Map(
-      [...imageMap.values()].map((img) => [img.id, img.image_order]),
+        this.markEditingIfNeeded(report, PhotographicReportStatus.EM_EDICAO);
+        const finalOrders = new Map(
+          [...imageMap.values()].map((img) => [img.id, img.image_order]),
+        );
+        let tempIdx = 0;
+        for (const img of imageMap.values()) {
+          img.image_order = images.length * 2 + tempIdx + 1;
+          tempIdx++;
+        }
+        const imageRepository = this.imageRepositoryFor(manager);
+        for (const img of imageMap.values()) {
+          await imageRepository.save(img);
+        }
+        for (const img of imageMap.values()) {
+          img.image_order = finalOrders.get(img.id)!;
+        }
+        for (const img of imageMap.values()) {
+          await imageRepository.save(img);
+        }
+        await this.reportRepositoryFor(manager).save(report);
+        return report;
+      },
     );
-    let tempIdx = 0;
-    for (const img of imageMap.values()) {
-      img.image_order = images.length * 2 + tempIdx + 1;
-      tempIdx++;
-    }
-    await this.imageRepository.save([...imageMap.values()]);
-    for (const img of imageMap.values()) {
-      img.image_order = finalOrders.get(img.id)!;
-    }
-    await this.imageRepository.save([...imageMap.values()]);
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+    return this.findOne(reportId);
   }
 
   private buildImageAnalysisContext(
@@ -1780,27 +1967,44 @@ export class PhotographicReportsService {
         companyId,
       );
 
-    this.applyImageAnalysis(image, analysis);
-    await this.imageRepository.save(image);
-    this.markEditingIfNeeded(report, PhotographicReportStatus.ANALISADO);
-    await this.reportRepository.save(report);
-
-    return this.mapImageEntity(
-      image,
-      new Map(
-        report.days?.map((dayItem) => [
-          dayItem.id,
-          {
-            id: dayItem.id,
-            report_id: dayItem.report_id,
-            activity_date: dayItem.activity_date,
-            day_summary: dayItem.day_summary,
-            created_at: dayItem.created_at.toISOString(),
-            updated_at: dayItem.updated_at.toISOString(),
-          } satisfies PhotographicReportDayResponse,
-        ]) || [],
-      ),
+    let mapped: PhotographicReportImageResponse;
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (lockedReport, manager) => {
+        const lockedImage = await this.ensureImageBelongsToReport(
+          lockedReport,
+          imageId,
+          manager,
+        );
+        this.applyImageAnalysis(lockedImage, analysis);
+        await this.imageRepositoryFor(manager).save(lockedImage);
+        this.markEditingIfNeeded(
+          lockedReport,
+          PhotographicReportStatus.ANALISADO,
+        );
+        await this.reportRepositoryFor(manager).save(lockedReport);
+        mapped = await this.mapImageEntity(
+          lockedImage,
+          new Map(
+            lockedReport.days?.map((dayItem) => [
+              dayItem.id,
+              {
+                id: dayItem.id,
+                report_id: dayItem.report_id,
+                activity_date: dayItem.activity_date,
+                day_summary: dayItem.day_summary,
+                created_at: dayItem.created_at.toISOString(),
+                updated_at: dayItem.updated_at.toISOString(),
+              } satisfies PhotographicReportDayResponse,
+            ]) || [],
+          ),
+        );
+        return mapped;
+      },
     );
+
+    return mapped!;
   }
 
   async analyzeAllImages(
@@ -1812,6 +2016,9 @@ export class PhotographicReportsService {
     if (sortedImages.length === 0) {
       throw new BadRequestException('Relatório sem fotos.');
     }
+
+    const analyses = new Map<string, PhotographicReportAnalysisResult>();
+    const initialReportVersion = report.updated_at?.getTime?.() ?? null;
 
     for (const image of sortedImages) {
       const day = image.report_day_id
@@ -1835,7 +2042,7 @@ export class PhotographicReportsService {
           companyId,
         );
       this.applyImageAnalysis(image, analysis);
-      await this.imageRepository.save(image);
+      analyses.set(image.id, analysis);
     }
 
     const summary = await this.aiAnalysisService.summarizePhotographicReport({
@@ -1869,11 +2076,56 @@ export class PhotographicReportsService {
       tenantId: companyId,
     });
 
-    report.ai_summary = summary.summary;
-    report.final_conclusion = summary.finalConclusion;
-    this.markEditingIfNeeded(report, PhotographicReportStatus.ANALISADO);
-    await this.reportRepository.save(report);
-    return this.findOne(report.id);
+    await this.withReportMutationLock(
+      reportId,
+      companyId,
+      async (lockedReport, manager) => {
+        const lockedImages = this.sortImages(lockedReport.images || []);
+        if (
+          initialReportVersion !==
+          (lockedReport.updated_at?.getTime?.() ?? null)
+        ) {
+          throw new ConflictException(
+            'O conteúdo do relatório mudou durante a análise. Execute a análise novamente.',
+          );
+        }
+        const initialVersionByImage = new Map(
+          sortedImages.map((image) => [
+            image.id,
+            image.updated_at?.getTime?.() ?? null,
+          ]),
+        );
+        for (const image of lockedImages) {
+          if (
+            initialVersionByImage.has(image.id) &&
+            initialVersionByImage.get(image.id) !==
+              (image.updated_at?.getTime?.() ?? null)
+          ) {
+            throw new ConflictException(
+              'O conteúdo do relatório mudou durante a análise. Execute a análise novamente.',
+            );
+          }
+          const analysis = analyses.get(image.id);
+          if (analysis) {
+            this.applyImageAnalysis(image, analysis);
+          }
+        }
+
+        lockedReport.ai_summary = summary.summary;
+        lockedReport.final_conclusion = summary.finalConclusion;
+        this.markEditingIfNeeded(
+          lockedReport,
+          PhotographicReportStatus.ANALISADO,
+        );
+        const imageRepository = this.imageRepositoryFor(manager);
+        for (const image of lockedImages) {
+          await imageRepository.save(image);
+        }
+        await this.reportRepositoryFor(manager).save(lockedReport);
+        return lockedReport;
+      },
+    );
+    return this.findOne(reportId);
   }
 
   async generateReportSummary(
@@ -1890,10 +2142,22 @@ export class PhotographicReportsService {
     }
 
     const analyzed = await this.analyzeAllImages(reportId);
-    const persisted = await this.findReportEntity(analyzed.id, companyId);
-    persisted.status = PhotographicReportStatus.FINALIZADO;
-    await this.reportRepository.save(persisted);
-    return this.findOne(persisted.id);
+    await this.withReportMutationLock(
+      analyzed.id,
+      companyId,
+      async (persisted, manager) => {
+        if ((persisted.images || []).length === 0) {
+          throw new BadRequestException('Relatório sem fotos.');
+        }
+        if (persisted.status === PhotographicReportStatus.EXPORTADO) {
+          throw new ConflictException('Relatório já exportado e imutável.');
+        }
+        persisted.status = PhotographicReportStatus.FINALIZADO;
+        await this.reportRepositoryFor(manager).save(persisted);
+        return persisted;
+      },
+    );
+    return this.findOne(analyzed.id);
   }
 
   /**
@@ -2234,8 +2498,32 @@ export class PhotographicReportsService {
     });
   }
 
+  private buildReportMutationFingerprint(report: {
+    updated_at: Date | string;
+    days?: Array<{ id: string; updated_at: Date | string }>;
+    images?: Array<{ id: string; updated_at: Date | string }>;
+  }): string {
+    const asIso = (value: Date | string | null | undefined): string | null =>
+      value instanceof Date
+        ? value.toISOString()
+        : value == null
+          ? null
+          : String(value);
+
+    return JSON.stringify({
+      report: asIso(report.updated_at),
+      days: [...(report.days || [])]
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((day) => [day.id, asIso(day.updated_at)]),
+      images: [...(report.images || [])]
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .map((image) => [image.id, asIso(image.updated_at)]),
+    });
+  }
+
   private async persistExportRecord(params: {
     report: PhotographicReport;
+    manager: EntityManager | null;
     fileKey: string;
     exportId: string;
     exportType: PhotographicReportExportType;
@@ -2263,6 +2551,7 @@ export class PhotographicReportsService {
         createdBy: generatedBy,
         documentCode,
         documentType: 'pdf',
+        transactionManager: params.manager || undefined,
 
         // Sem este callback o hash e o código eram calculados, registrados no
         // Document Registry e depois esquecidos — a entidade nunca sabia que
@@ -2270,10 +2559,11 @@ export class PhotographicReportsService {
         // Roda DENTRO da transação de registerFinalDocument, então metadados,
         // integridade e registry commitam juntos ou não commitam.
         persistEntityMetadata: async (manager, hash) => {
-          await manager.getRepository(PhotographicReport).update(
+          const result = await manager.getRepository(PhotographicReport).update(
             {
               id: params.report.id,
               company_id: params.report.company_id,
+              pdf_file_key: IsNull(),
             },
             {
               final_pdf_hash_sha256: hash,
@@ -2284,12 +2574,20 @@ export class PhotographicReportsService {
               pdf_generated_at: new Date(),
             },
           );
+          if (result.affected !== 1) {
+            throw new ConflictException(
+              'O relatório fotográfico já possui um PDF final emitido.',
+            );
+          }
         },
       });
     }
 
-    return this.exportRepository.save(
-      this.exportRepository.create({
+    const exportRepository =
+      params.manager?.getRepository(PhotographicReportExport) ||
+      this.exportRepository;
+    return exportRepository.save(
+      exportRepository.create({
         id: params.exportId,
         company_id: params.report.company_id,
         report_id: params.report.id,
@@ -2350,15 +2648,42 @@ export class PhotographicReportsService {
       );
 
     try {
-      await this.persistExportRecord({
-        report: await this.findReportEntity(params.report.id, companyId),
-        fileKey,
-        exportId,
-        exportType: params.exportType,
-        originalName: fileName,
-        mimeType,
-        fileBuffer: buffer,
-      });
+      const initialFingerprint = this.buildReportMutationFingerprint(
+        params.report,
+      );
+      await this.withReportMutationLock(
+        params.report.id,
+        companyId,
+        async (lockedReport, manager) => {
+          if (
+            this.buildReportMutationFingerprint(lockedReport) !==
+            initialFingerprint
+          ) {
+            throw new ConflictException(
+              'O relatório mudou durante a geração. Gere a exportação novamente.',
+            );
+          }
+          if (lockedReport.status === PhotographicReportStatus.EXPORTADO) {
+            throw new ConflictException('Relatório já exportado e imutável.');
+          }
+
+          await this.persistExportRecord({
+            report: lockedReport,
+            manager,
+            fileKey,
+            exportId,
+            exportType: params.exportType,
+            originalName: fileName,
+            mimeType,
+            fileBuffer: buffer,
+          });
+          await this.reportRepositoryFor(manager).update(
+            { id: lockedReport.id, company_id: lockedReport.company_id },
+            { status: PhotographicReportStatus.EXPORTADO },
+          );
+          return lockedReport;
+        },
+      );
     } catch (error) {
       try {
         await this.documentStorageService.deleteFile(uploadedReference);
@@ -2367,10 +2692,6 @@ export class PhotographicReportsService {
       }
       throw error;
     }
-
-    const current = await this.findReportEntity(params.report.id, companyId);
-    current.status = PhotographicReportStatus.EXPORTADO;
-    await this.reportRepository.save(current);
 
     return { buffer, fileName, mimeType, fileKey };
   }

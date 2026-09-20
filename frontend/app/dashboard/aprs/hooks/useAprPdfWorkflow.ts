@@ -8,6 +8,7 @@ import { signaturesService } from "@/services/signaturesService";
 import type { Signature } from "@/services/signaturesService";
 import { openPdfForPrint } from "@/lib/print-utils";
 import { logger } from "@/lib/logger";
+import { fetchGovernedPdfBlob } from "@/lib/pdf/fetchGovernedPdfBlob";
 
 import type { AprFormData } from "../components/aprForm.schema";
 import type { AprLogEntry } from "../components/AprTimeline";
@@ -127,7 +128,8 @@ export function useAprPdfWorkflow({
       if (shouldUseGovernedPdf) {
         const access = await ensureGovernedPdf(current);
         if (access?.url) {
-          const usedPopup = openPdfForPrint(access.url, () => {
+          const { blob } = await fetchGovernedPdfBlob(access.url);
+          const usedPopup = openPdfForPrint(URL.createObjectURL(blob), () => {
             toast.info(
               "Pop-up bloqueado. Abrimos o PDF final da APR na mesma aba para impressão.",
             );

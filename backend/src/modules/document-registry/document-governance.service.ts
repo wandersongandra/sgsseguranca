@@ -44,6 +44,8 @@ type RegisterFinalDocumentInput = {
     manager: EntityManager,
     hash: string,
   ) => Promise<void>;
+  /** Reuse a caller-owned transaction when a business row is already locked. */
+  transactionManager?: EntityManager;
 };
 
 type SyncFinalDocumentMetadataInput = Omit<
@@ -62,6 +64,7 @@ type RemoveFinalDocumentReferenceInput = {
   cleanupStoredFile?: (fileKey: string) => Promise<void>;
   trailEventType?: string;
   trailMetadata?: Record<string, unknown>;
+  transactionManager?: EntityManager;
 };
 
 const signatureDocumentTypeToRegistryModule = new Map<string, GovernedModule>([
@@ -124,7 +127,7 @@ export class DocumentGovernanceService {
     const hash = this.pdfService.computeHash(input.fileBuffer);
 
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      const persist = async (manager: EntityManager) => {
         // O upload externo já ocorreu fora deste bloco. Daqui em diante,
         // mantemos a persistência relacional (entidade + integridade +
         // registry) dentro da mesma transação para evitar estado parcial.
@@ -182,7 +185,11 @@ export class DocumentGovernanceService {
         );
 
         return { hash, registryEntry };
-      });
+      };
+
+      return input.transactionManager
+        ? await persist(input.transactionManager)
+        : await this.dataSource.transaction(persist);
     } catch (error) {
       this.logger.error(
         {
@@ -265,7 +272,7 @@ export class DocumentGovernanceService {
       input.companyId,
     );
 
-    await this.dataSource.transaction(async (manager) => {
+    const remove = async (manager: EntityManager) => {
       if (input.removeEntityState) {
         await input.removeEntityState(manager);
       }
@@ -303,7 +310,13 @@ export class DocumentGovernanceService {
         },
         { manager },
       );
-    });
+    };
+
+    if (input.transactionManager) {
+      await remove(input.transactionManager);
+    } else {
+      await this.dataSource.transaction(remove);
+    }
 
     if (registryEntry?.file_key && input.cleanupStoredFile) {
       try {

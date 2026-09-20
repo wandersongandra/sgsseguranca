@@ -41,6 +41,17 @@ jest.mock('@/lib/siteStore', () => ({
   },
 }));
 
+// Usuário comum (não admin_geral): selectedTenantStore fica sempre vazio
+// (persistAuthenticatedSession limpa no login); o tenant real vem do JWT via
+// sessionStore. Default do mock reflete esse caso mais comum na produção.
+let currentSession: { companyId?: string } | null = { companyId: 'company-session' };
+
+jest.mock('@/lib/sessionStore', () => ({
+  sessionStore: {
+    get: () => currentSession,
+  },
+}));
+
 const findPaginatedMock = jest.fn();
 const getAnalyticsOverviewMock = jest.fn();
 const getInsightsMock = jest.fn();
@@ -107,15 +118,47 @@ describe('useAprs', () => {
     jest.clearAllMocks();
     currentTenant = { companyId: 'company-x', companyName: 'Empresa X' };
     currentSite = { siteId: 'site-x', siteName: 'Obra X', companyId: 'company-x' };
+    currentSession = { companyId: 'company-x' };
   });
 
-  it('não consulta sem obra ativa', async () => {
-    currentSite = null;
+  it('resolve companyId via sessionStore quando selectedTenantStore está vazio (usuário comum, não admin_geral)', async () => {
+    // Regressão: persistAuthenticatedSession limpa selectedTenantStore em TODO
+    // login (inclusive de usuários comuns) — sem o fallback para sessionStore,
+    // loadAprs() nunca chamava a API para nenhum usuário fora do admin_geral.
+    currentTenant = null;
+    currentSession = { companyId: 'company-session' };
+    currentSite = { siteId: 'site-x', siteName: 'Obra X', companyId: 'company-session' };
+    findPaginatedMock.mockResolvedValueOnce({ data: [{ id: 'apr-1' }], total: 1, lastPage: 1 });
+
     const { result } = renderHook(() => useAprs());
 
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(findPaginatedMock).not.toHaveBeenCalled();
-    expect(result.current.aprs).toEqual([]);
+    await waitFor(() => expect(result.current.aprs).toEqual([{ id: 'apr-1' }]));
+    expect(findPaginatedMock).toHaveBeenCalledTimes(1);
+    expect(result.current.loadError).toBeNull();
+  });
+
+  it('consulta com companyId mesmo sem obra ativa selecionada (site_id é filtro opcional no backend)', async () => {
+    // Regressão (achado real, confirmado ao vivo em produção): siteStore é
+    // o seletor GLOBAL e opcional de "obra ativa" do dashboard — a maioria
+    // dos usuários nunca o usa explicitamente. O backend documenta site_id
+    // como filtro opcional em GET /aprs ("Filtra a fila por obra/unidade"),
+    // não como requisito. Exigir uma obra ativa aqui travava a fila inteira
+    // de APRs (0 resultados, sem erro visível) mesmo com APRs reais
+    // cadastradas na empresa — inclusive para quem tinha acabado de criar
+    // uma.
+    currentSite = null;
+    findPaginatedMock.mockResolvedValueOnce({
+      data: [{ id: 'apr-1' }],
+      total: 1,
+      lastPage: 1,
+    });
+
+    const { result } = renderHook(() => useAprs());
+
+    await waitFor(() => expect(result.current.aprs).toEqual([{ id: 'apr-1' }]));
+    expect(findPaginatedMock).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: 'company-x', siteId: undefined }),
+    );
     expect(result.current.loadError).toBeNull();
   });
 

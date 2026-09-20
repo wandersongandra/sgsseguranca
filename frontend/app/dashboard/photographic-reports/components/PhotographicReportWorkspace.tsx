@@ -29,6 +29,7 @@ import { SendMailModal } from "@/components/SendMailModal";
 import { extractApiErrorMessage } from "@/lib/error-handler";
 import { Permission } from "@/lib/permissions";
 import { openSafeExternalUrlInNewTab, safeExternalArtifactUrl } from "@/lib/security/safe-external-url";
+import { runWithMutationLock } from "@/lib/mutation-lock";
 import {
   processMobileImage,
   processMobileImages,
@@ -284,6 +285,7 @@ export function PhotographicReportWorkspace({
   const previewUrlsRef = useRef<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const destructiveMutationLock = useRef(false);
 
   const reloadReport = async (currentReportId = reportId) => {
     if (!currentReportId) {
@@ -612,21 +614,23 @@ export function PhotographicReportWorkspace({
       return;
     }
 
-    try {
-      setSaving(true);
-      const updated = await photographicReportsService.removeDay(report.id, dayId);
-      setReport(updated);
-      toast.success("Data removida.");
-    } catch (err) {
-      toast.error(
-        await extractApiErrorMessage(
-          err,
-          "Não foi possível remover a data.",
-        ),
-      );
-    } finally {
-      setSaving(false);
-    }
+    await runWithMutationLock(destructiveMutationLock, async () => {
+      try {
+        setSaving(true);
+        const updated = await photographicReportsService.removeDay(report.id, dayId);
+        setReport(updated);
+        toast.success("Data removida.");
+      } catch (err) {
+        toast.error(
+          await extractApiErrorMessage(
+            err,
+            "Não foi possível remover a data.",
+          ),
+        );
+      } finally {
+        setSaving(false);
+      }
+    });
   }
 
   async function handleUploadImages() {
@@ -832,21 +836,23 @@ export function PhotographicReportWorkspace({
       return;
     }
 
-    try {
-      setSavingImageId(imageId);
-      const updated = await photographicReportsService.removeImage(
-        report.id,
-        imageId,
-      );
-      setReport(updated);
-      toast.success("Foto removida.");
-    } catch (err) {
-      toast.error(
-        await extractApiErrorMessage(err, "Não foi possível remover a foto."),
-      );
-    } finally {
-      setSavingImageId(null);
-    }
+    await runWithMutationLock(destructiveMutationLock, async () => {
+      try {
+        setSavingImageId(imageId);
+        const updated = await photographicReportsService.removeImage(
+          report.id,
+          imageId,
+        );
+        setReport(updated);
+        toast.success("Foto removida.");
+      } catch (err) {
+        toast.error(
+          await extractApiErrorMessage(err, "Não foi possível remover a foto."),
+        );
+      } finally {
+        setSavingImageId(null);
+      }
+    });
   }
 
   async function handleReorderImages() {

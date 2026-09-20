@@ -15,7 +15,7 @@ const STORAGE_KEY = 'cx_selected_site';
 let current: SelectedSite | null = null;
 const listeners = new Set<Listener>();
 let transition = Promise.resolve();
-let transitionVersion = 0;
+let transitionGeneration = 0;
 
 function isValidSite(value: unknown): value is SelectedSite {
   if (typeof value !== 'object' || value === null) return false;
@@ -75,9 +75,9 @@ export const siteStore = {
   },
 
   set(site: SelectedSite): Promise<void> {
-    const requestedVersion = transitionVersion;
+    const requestGeneration = transitionGeneration;
     const applySite = async () => {
-      if (requestedVersion !== transitionVersion) return;
+      if (requestGeneration !== transitionGeneration) return;
       const previousSite = current ?? loadFromStorage();
 
       // Se mudou a empresa ou a obra, limpa dados sensíveis
@@ -86,9 +86,10 @@ export const siteStore = {
         (previousSite.companyId !== site.companyId || previousSite.siteId !== site.siteId)
       ) {
         await clearSensitiveBrowserStorage();
+        if (requestGeneration !== transitionGeneration) return;
       }
 
-      if (requestedVersion !== transitionVersion) return;
+      if (requestGeneration !== transitionGeneration) return;
       current = site;
       saveToStorage(site);
       for (const l of listeners) l(current);
@@ -102,7 +103,7 @@ export const siteStore = {
    * Usado quando o usuário faz logout ou precisa redefinir o contexto.
    */
   clear() {
-    transitionVersion += 1;
+    transitionGeneration += 1;
     current = null;
     saveToStorage(null);
     for (const l of listeners) l(null);

@@ -10,6 +10,7 @@ import { authRefreshHint } from './authRefreshHint';
 import { selectedTenantStore } from './selectedTenantStore';
 import { normalizePublicApiBaseUrl } from './public-api-url';
 import { isAdminGeralAccount } from './auth-session-state';
+import { matchesPathSegment } from './route-config';
 import { getBrowserSentrySync } from './sentry/browser-client';
 import {
   OfflineCapabilityError,
@@ -190,19 +191,19 @@ function normalizeRequestPath(url?: string): string {
   }
 }
 
-function isPublicApiRequest(url?: string): boolean {
+export function isPublicApiRequest(url?: string): boolean {
   const path = normalizeRequestPath(url);
   return (
-    path.startsWith('/auth/login') ||
-    path.startsWith('/auth/refresh') ||
-    path.startsWith('/auth/csrf') ||
-    path.startsWith('/auth/forgot-password') ||
-    path.startsWith('/auth/reset-password') ||
-    path.startsWith('/tenant-lifecycle/onboarding') ||
-    path.startsWith('/health') ||
-    path.startsWith('/public') ||
-    path.startsWith('/validation') ||
-    path.startsWith('/validar')
+    matchesPathSegment(path, '/auth/login') ||
+    matchesPathSegment(path, '/auth/refresh') ||
+    matchesPathSegment(path, '/auth/csrf') ||
+    matchesPathSegment(path, '/auth/forgot-password') ||
+    matchesPathSegment(path, '/auth/reset-password') ||
+    matchesPathSegment(path, '/tenant-lifecycle/onboarding') ||
+    matchesPathSegment(path, '/health') ||
+    matchesPathSegment(path, '/public') ||
+    matchesPathSegment(path, '/validation') ||
+    matchesPathSegment(path, '/validar')
   );
 }
 
@@ -232,7 +233,7 @@ function scheduleLoginRedirect() {
   loginRedirectScheduled = true;
   window.setTimeout(() => {
     const currentPath = window.location.pathname;
-    if (!currentPath.startsWith('/login')) {
+    if (!matchesPathSegment(currentPath, '/login')) {
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign('/login?expired=1');
     }
@@ -582,7 +583,7 @@ api.interceptors.request.use(async (config) => {
   }
 
   const requestUrl = String(config.url || '');
-  if (requestUrl.includes('/auth/refresh')) {
+  if (matchesPathSegment(normalizeRequestPath(requestUrl), '/auth/refresh')) {
     const refreshCsrf = readCookie(REFRESH_CSRF_COOKIE_NAME);
     if (refreshCsrf) {
       config.headers['x-refresh-csrf'] = refreshCsrf;
@@ -690,11 +691,12 @@ api.interceptors.response.use(
 
     // 401 → tenta refresh via cookie httpOnly e refaz a request uma única vez
     const url = String(config.url || '');
+    const requestPath = normalizeRequestPath(url);
     const method = (config.method || 'get').toLowerCase();
     const isAuthEndpoint =
-      url.includes('/auth/login') ||
-      url.includes('/auth/refresh') ||
-      url.includes('/auth/logout');
+      matchesPathSegment(requestPath, '/auth/login') ||
+      matchesPathSegment(requestPath, '/auth/refresh') ||
+      matchesPathSegment(requestPath, '/auth/logout');
 
     if (status === 401 && !config.__authRetry && !isAuthEndpoint) {
       config.__authRetry = true;
@@ -745,4 +747,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
