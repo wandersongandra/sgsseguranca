@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomBytes } from 'crypto';
+import QRCode from 'qrcode';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { cleanupUploadedFile } from '../../../shared/storage/storage-compensation.util';
 import { DocumentStorageService } from '../../../shared/services/document-storage.service';
@@ -20,6 +21,7 @@ import { DocumentGovernanceService } from '../../document-registry/document-gove
 import { SignaturesService } from '../../signatures/signatures.service';
 import type { Signature } from '../../signatures/entities/signature.entity';
 import { PublicValidationGrantService } from '../../../shared/services/public-validation-grant.service';
+import { AprWorkflowLockService } from './apr-workflow-lock.service';
 import { AprLog } from '../entities/apr-log.entity';
 import { AprRiskEvidence } from '../entities/apr-risk-evidence.entity';
 import { Apr, AprStatus } from '../entities/apr.entity';
@@ -64,6 +66,7 @@ export class AprsPdfService {
     @Inject(forwardRef(() => SignaturesService))
     private readonly signaturesService: SignaturesService,
     private readonly publicValidationGrantService: PublicValidationGrantService,
+    private readonly workflowLock: AprWorkflowLockService,
   ) {}
 
   private ensureAprStatus(status: string): AprStatus {
@@ -723,6 +726,7 @@ export class AprsPdfService {
       apr.final_pdf_hash_sha256 ??
       'Calculado e registrado após a emissão';
     let verificationUrl: string | null = null;
+    let verificationQrDataUri: string | null = null;
     if (verificationCode) {
       try {
         verificationUrl = await this.buildVerificationUrl({
@@ -736,6 +740,27 @@ export class AprsPdfService {
           aprId: apr.id,
           error: error instanceof Error ? error.message : String(error),
         });
+      }
+      if (verificationUrl) {
+        try {
+          // Mesmo padrão já usado em NC/ARR/Relatório Fotográfico: o link
+          // de validação carrega um token JWT longo — impraticável de
+          // digitar manualmente num documento impresso. QR code degrada
+          // graciosamente (PDF ainda é emitido com o link em texto) se a
+          // geração falhar por qualquer motivo.
+          verificationQrDataUri = await QRCode.toDataURL(verificationUrl, {
+            errorCorrectionLevel: 'M',
+            margin: 1,
+            width: 220,
+            color: { dark: '#0f172a', light: '#ffffff' },
+          });
+        } catch (error) {
+          this.logger.warn({
+            event: 'apr_pdf_public_validation_qr_failed',
+            aprId: apr.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
     }
     const signaturesWithData = await Promise.all(
@@ -1459,7 +1484,17 @@ export class AprsPdfService {
           </div>
           ${
             verificationUrl
-              ? `<div class="notes-block"><div class="kv-label">Validação pública</div><div class="notes-content">${this.escapeHtml(verificationUrl)}</div></div>`
+              ? `<div class="notes-block" style="display:flex;align-items:flex-start;gap:12px;">
+                  ${
+                    verificationQrDataUri
+                      ? `<img src="${verificationQrDataUri}" alt="QR code de validação pública" width="72" height="72" style="flex-shrink:0;border:1px solid #dbe7f2;border-radius:4px;" />`
+                      : ''
+                  }
+                  <div style="min-width:0;flex:1;">
+                    <div class="kv-label">Validação pública</div>
+                    <div class="notes-content">${this.escapeHtml(verificationUrl)}</div>
+                  </div>
+                </div>`
               : ''
           }
         </div>
@@ -1717,6 +1752,8 @@ export class AprsPdfService {
             .notes-content {
               margin-top: 4px;
               white-space: pre-wrap;
+              overflow-wrap: anywhere;
+              word-break: break-word;
             }
 
             .apr-risk-table thead th {
@@ -2425,6 +2462,20 @@ export class AprsPdfService {
   }
 
   async generateFinalPdf(
+    id: string,
+    userId?: string,
+  ): Promise<AprPdfAccessResponse & { generated: boolean }> {
+    // Lock distribuído (achado da auditoria v2): sem isso, dois cliques em
+    // "gerar PDF final" chegando quase juntos passavam ambos pelo check de
+    // hasFinalPdf antes de qualquer um persistir, disparando dois renders
+    // Puppeteer simultâneos e deixando um objeto órfão no storage. O recheck
+    // de hasFinalPdf abaixo agora roda DENTRO da seção exclusiva.
+    return this.workflowLock.runExclusive(id, () =>
+      this.generateFinalPdfLocked(id, userId),
+    );
+  }
+
+  private async generateFinalPdfLocked(
     id: string,
     userId?: string,
   ): Promise<AprPdfAccessResponse & { generated: boolean }> {

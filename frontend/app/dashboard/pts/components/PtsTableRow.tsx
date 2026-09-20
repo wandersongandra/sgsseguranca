@@ -241,9 +241,10 @@ export const PtsTableRow = React.memo(
                   variant="ghost"
                   loading={emittingPdfId === pt.id}
                   onClick={() => onEmitGovernedPdf(pt.id)}
+                  aria-label="Emitir PDF final governado"
                   title="Emitir PDF final governado"
                 >
-                  <FileText className="h-4 w-4" />
+                  <FileText className="h-4 w-4" aria-hidden="true" />
                 </Button>
               ) : null}
               {isAwaitingApproval && canApprovePt ? (
@@ -285,20 +286,27 @@ export const PtsTableRow = React.memo(
               ) : null}
               {canManagePt ? (
                 <>
-                  <Link
-                    href={`/dashboard/pts/edit/${pt.id}`}
-                    className={cn(
-                      buttonVariants({ size: 'icon', variant: 'ghost' }),
-                      !isEditable
-                        ? 'pointer-events-none text-[var(--ds-color-text-muted)] opacity-40'
-                        : '',
-                    )}
-                    aria-label={isEditable ? 'Editar PT' : 'Somente PTs pendentes podem ser editadas'}
-                    aria-disabled={!isEditable}
-                    title={isEditable ? 'Editar PT' : 'Somente PTs pendentes podem ser editadas'}
-                  >
-                    <Pencil className="h-4 w-4" aria-hidden="true" />
-                  </Link>
+                  {isEditable ? (
+                    <Link
+                      href={`/dashboard/pts/edit/${pt.id}`}
+                      className={buttonVariants({ size: 'icon', variant: 'ghost' })}
+                      aria-label="Editar PT"
+                      title="Editar PT"
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      disabled
+                      aria-label="Somente PTs pendentes podem ser editadas"
+                      title="Somente PTs pendentes podem ser editadas"
+                    >
+                      <Pencil className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     size="icon"
@@ -314,7 +322,6 @@ export const PtsTableRow = React.memo(
               ) : null}
               <PtSignatureActions
                 ptId={pt.id}
-                companyId={pt.company_id}
                 iconOnly
                 onSignatureSaved={() => {
                   onDismissApprovalIssue(pt.id);

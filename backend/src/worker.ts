@@ -13,7 +13,6 @@ if (process.env.NEW_RELIC_ENABLED === 'true') {
   require('newrelic');
 }
 
-import * as http from 'http';
 import { buildStructuredLoggerOptions } from './shared/logging/structured-winston';
 import { createStructuredWinstonLogger } from './shared/logging/structured-winston';
 import {
@@ -24,73 +23,15 @@ import { initSentry, type SentryInitStatus } from './shared/monitoring/sentry';
 import { validateCommonEnvironment } from './shared/config/environment-contract';
 import { getRuntimeBuildMetadata } from './shared/observability/runtime-build-metadata';
 
+import {
+  getWorkerHealthPort,
+  startWorkerHealthServer,
+} from './shared/worker/worker-health.server';
+import { WorkerReadinessService } from './shared/worker/worker-readiness.service';
+
 const WORKER_SERVICE_NAME = 'wanderson-gandra-worker';
 const WORKER_TELEMETRY_PORT = 9465;
-const WORKER_HEALTH_PATH = '/health/public';
-
-function getWorkerHealthPort(): number {
-  const port = Number(process.env.PORT || '8080');
-  return Number.isFinite(port) && port > 0 ? port : 8080;
-}
-
-function startWorkerHealthServer(
-  logger: ReturnType<typeof createStructuredWinstonLogger>,
-) {
-  const port = getWorkerHealthPort();
-  const server = http.createServer((request, response) => {
-    if (request.url === '/health' || request.url === WORKER_HEALTH_PATH) {
-      response.writeHead(200, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store',
-      });
-      response.end(
-        JSON.stringify({
-          status: 'ok',
-          runtime: 'worker',
-          timestamp: new Date().toISOString(),
-        }),
-      );
-      return;
-    }
-
-    response.writeHead(404, {
-      'Content-Type': 'application/json; charset=utf-8',
-    });
-    response.end(JSON.stringify({ status: 'not_found' }));
-  });
-
-  server.on('error', (error) => {
-    logger.error({
-      event: 'worker_health_server_error',
-      errorName:
-        error instanceof Error ? error.name : 'WorkerHealthServerError',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-  });
-
-  server.listen(port, () => {
-    logger.info({
-      event: 'worker_health_server_listening',
-      port,
-      healthPath: WORKER_HEALTH_PATH,
-    });
-  });
-
-  return {
-    port,
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        server.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
-          resolve();
-        });
-      }),
-  };
-}
+const WORKER_HEALTH_PATH = '/health/ready';
 
 function logObservabilityStatus(
   logger: ReturnType<typeof createStructuredWinstonLogger>,
@@ -156,12 +97,19 @@ async function bootstrap() {
 
   logObservabilityStatus(bootstrapLogger, telemetry, sentryStatus);
 
+  let checkReadiness: () => Promise<boolean> = () => Promise.resolve(false);
+  const healthServer = startWorkerHealthServer(bootstrapLogger, () =>
+    checkReadiness(),
+  );
+  await healthServer.listening;
   const app = await NestFactory.createApplicationContext(WorkerModule, {
     logger: WinstonModule.createLogger(
       buildStructuredLoggerOptions(WORKER_SERVICE_NAME),
     ),
   });
-  const healthServer = startWorkerHealthServer(bootstrapLogger);
+  const readiness = app.get(WorkerReadinessService);
+  readiness.markInitialized();
+  checkReadiness = () => readiness.check();
   let isShuttingDown = false;
 
   const shutdown = async (signal: NodeJS.Signals) => {
@@ -169,6 +117,7 @@ async function bootstrap() {
       return;
     }
     isShuttingDown = true;
+    readiness.markShuttingDown();
 
     bootstrapLogger.info({
       event: 'worker_shutdown_requested',

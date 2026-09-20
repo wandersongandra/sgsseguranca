@@ -35,6 +35,7 @@ import { ListPageLayout } from '@/components/layout';
 import { cn } from '@/lib/utils';
 import { safeToLocaleDateString } from '@/lib/date/safeFormat';
 import { isUserVisibleForSite } from '@/lib/site-scoped-user-visibility';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 import {
   ModalBody,
   ModalFooter,
@@ -129,6 +130,7 @@ export default function ServiceOrdersPage() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [saving, setSaving] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const deleteMutationLock = useRef(false);
   const usersRequestRef = useRef(0);
 
   const summary = {
@@ -321,13 +323,15 @@ export default function ServiceOrdersPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir esta Ordem de Servico?')) return;
-    try {
-      await serviceOrdersService.delete(id);
-      toast.success('OS excluida.');
-      void loadData();
-    } catch {
-      toast.error('Erro ao excluir OS.');
-    }
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await serviceOrdersService.delete(id);
+        toast.success('OS excluida.');
+        void loadData();
+      } catch {
+        toast.error('Erro ao excluir OS.');
+      }
+    });
   };
 
   if (loadError) {
@@ -725,7 +729,6 @@ export default function ServiceOrdersPage() {
 function dedupeById<T extends { id: string }>(items: T[]) {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
 }
-
 
 
 

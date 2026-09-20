@@ -1,8 +1,20 @@
-# Only exact, reviewed synthetic placeholders may be ignored. Historical
-# Authorization/Bearer and CSRF headers intentionally remain scan blockers
-# until their owners confirm revocation/rotation.
+# Only exact, reviewed findings may be ignored. Historical Authorization and
+# Bearer material without revocation or retirement evidence remains a blocker.
 fdcdab7821d89df2f0c595d39c743c6d8b6ab43d:backend/test/setup/test-env.ts:generic-api-key:48
 8295a2ed768fcb08f7545978cde55510a06c7e01:backend/.env.example:generic-api-key:39
 8295a2ed768fcb08f7545978cde55510a06c7e01:backend/.env.example:generic-api-key:41
 6a73901e30b4001563d25b1aa8d667b27e9a98b6:backend/test/load/README_EXECUCAO.md:generic-api-key:120
 d9c36360fb3c8f0814f4843641b37d0e5e785776:backend/test/load/README_EXECUCAO.md:generic-api-key:120
+0e12bb217a3c1e5166e76a2b7c0fa5dfcd757d17:backend/test/setup/test-env.ts:generic-api-key:48
+2e633e748a06981c00d62ea618a81c2935ffa9ef:.tmp_pdf_head.ps1:jwt:1
+6a24daaf11a66ff2f6774a33c8cf03197d940407:backend/.env.example:generic-api-key:39
+6a24daaf11a66ff2f6774a33c8cf03197d940407:backend/.env.example:generic-api-key:41
+8beb5bebd73d156e659eea6ac921554fee0927f5:backend/test/critical/admin-routes-security.e2e-spec.ts:jwt:251
+4c0cdc2ffc842aabd9c3026f12170f95b01b4ecc:backend/test/critical/admin-routes-security.e2e-spec.ts:jwt:248
+d5d024b37c9226eaa75169dda49ef6fd018a0c84:FIXAR_MIGRAÇÕES_RENDER.md:curl-auth-header:23
+c6c4929a89365254b70460ce69d45315d916ece6:CHEAT_SHEET.md:curl-auth-header:266
+c6c4929a89365254b70460ce69d45315d916ece6:GUIA_INTEGRACAO_MELHORIAS.md:curl-auth-header:219
+026ece85ef2d3edd052d30f8fff75745fcce599f:CHEAT_SHEET.md:curl-auth-header:266
+026ece85ef2d3edd052d30f8fff75745fcce599f:GUIA_INTEGRACAO_MELHORIAS.md:curl-auth-header:219
+355c9000c918fa839705f1fc812d5464aa9b7568:prompts/CLOUDFLARE_R2_CONFIGURADO.md:generic-api-key:14
+355c9000c918fa839705f1fc812d5464aa9b7568:prompts/CLOUDFLARE_R2_CONFIGURADO.md:curl-auth-header:25

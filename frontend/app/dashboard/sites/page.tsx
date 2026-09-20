@@ -1,7 +1,7 @@
 'use client';
 import { logger } from '@/lib/logger';
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Building2, MapPinned, Pencil, Plus, QrCode, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { safeToLocaleDateString } from '@/lib/date/safeFormat';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { ModalBody, ModalFrame, ModalHeader } from '@/components/ui/modal-frame';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 import {
   CatalogMobileCard,
   catalogMobileActionClassName,
@@ -35,6 +36,7 @@ export default function SitesPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -74,18 +76,20 @@ export default function SitesPage() {
       return;
     }
 
-    try {
-      await sitesService.delete(id);
-      toast.success('Obra/Setor excluido com sucesso');
-      if (sites.length === 1 && page > 1) {
-        setPage((current) => current - 1);
-        return;
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await sitesService.delete(id);
+        toast.success('Obra/Setor excluido com sucesso');
+        if (sites.length === 1 && page > 1) {
+          setPage((current) => current - 1);
+          return;
+        }
+        void loadSites();
+      } catch (error) {
+        logger.error('Erro ao excluir site:', error);
+        toast.error('Erro ao excluir obra/setor. Verifique dependencias e tente novamente.');
       }
-      void loadSites();
-    } catch (error) {
-      logger.error('Erro ao excluir site:', error);
-      toast.error('Erro ao excluir obra/setor. Verifique dependencias e tente novamente.');
-    }
+    });
   }
 
   const summary = useMemo(
@@ -315,6 +319,5 @@ export default function SitesPage() {
     </>
   );
 }
-
 
 

@@ -7,6 +7,7 @@
  */
 
 import { InternalServerErrorException } from '@nestjs/common';
+import { isAiFeatureEnabled } from '../../shared/config/ai-feature-policy';
 
 export type AiLlmProviderName =
   'openai' | 'nvidia' | 'stub' | 'local' | 'anthropic' | 'gemini';
@@ -167,6 +168,12 @@ function resolveDegradedRuntime(params: {
 export function resolveAiLlmRuntimeConfig(
   config: ConfigGetter,
 ): AiLlmRuntimeConfig {
+  if (!isAiFeatureEnabled(config)) {
+    return resolveDegradedRuntime({
+      configuredProvider: 'stub',
+      officialProvider: 'disabled',
+    });
+  }
   const configuredProvider = (
     readString(config, 'AI_PROVIDER') || 'openai'
   ).toLowerCase() as AiLlmProviderName;

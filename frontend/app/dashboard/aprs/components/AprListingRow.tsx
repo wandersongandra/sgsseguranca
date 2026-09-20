@@ -63,7 +63,6 @@ interface AprListingRowProps {
   isPending: boolean;
   onOpenSignature: (apr: AprListingRecord) => void;
   onOpenSignatures: (apr: AprListingRecord) => void;
-  mobile?: boolean;
 }
 
 export function AprListingRow({
@@ -80,7 +79,6 @@ export function AprListingRow({
   isPending,
   onOpenSignature,
   onOpenSignatures,
-  mobile = false,
 }: AprListingRowProps) {
   const { hasPermission } = useAuth();
   const router = useRouter();
@@ -339,32 +337,6 @@ export function AprListingRow({
       isApproved,
     ],
   );
-
-  if (mobile) {
-    return (
-      <article className="min-w-0 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm" aria-label={`APR ${apr.numero || apr.titulo}`}>
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">{apr.numero || "Sem número"} · v{apr.versao || 1}</p>
-            <h3 className="mt-1 line-clamp-2 font-semibold text-[var(--ds-color-text-primary)]">{apr.titulo || "APR sem título"}</h3>
-          </div>
-          <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-bold", statusTone.badge)}>
-            <StatusIcon className="h-3.5 w-3.5" /> {status.label}
-          </span>
-        </div>
-        <dl className="mt-4 grid min-w-0 grid-cols-2 gap-3 text-sm">
-          <div className="min-w-0"><dt className="text-xs text-[var(--ds-color-text-secondary)]">Obra</dt><dd className="truncate">{apr.site?.nome || "Não vinculada"}</dd></div>
-          <div><dt className="text-xs text-[var(--ds-color-text-secondary)]">Início</dt><dd>{formatAprDate(apr.data_inicio)}</dd></div>
-          <div className="min-w-0"><dt className="text-xs text-[var(--ds-color-text-secondary)]">Responsável</dt><dd className="truncate">{responsible.name}</dd></div>
-          <div><dt className="text-xs text-[var(--ds-color-text-secondary)]">Prazo</dt><dd className={deadlineTone.text}>{deadline.relativeLabel}</dd></div>
-        </dl>
-        <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-t border-[var(--ds-color-border-subtle)] pt-3" aria-label={`Ações da APR ${apr.numero || apr.titulo}`}>
-          <div className="min-h-11 [&_a]:min-h-11 [&_button]:min-h-11">{primaryAction}</div>
-          <div className={cn("min-h-11 [&_button]:min-h-11 [&_button]:min-w-11", isPending && "pointer-events-none opacity-60")}><ActionMenu items={actionItems} /></div>
-        </div>
-      </article>
-    );
-  }
 
   return (
     <TableRow

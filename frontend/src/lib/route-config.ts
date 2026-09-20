@@ -75,21 +75,24 @@ function normalizePath(pathname: string): string {
   return cleaned ?? beforeQuery;
 }
 
+/** Match de rota por segmento; evita que "/admin" alcance "/admin-evil". */
+export function matchesPathSegment(pathname: string, route: string): boolean {
+  const cleanPathname = normalizePath(pathname);
+  const cleanRoute = normalizePath(route);
+  return cleanPathname === cleanRoute || cleanPathname.startsWith(`${cleanRoute}/`);
+}
+
 export function isAdminRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   const clean = normalizePath(pathname);
-  return ADMIN_ROUTES.some(
-    (route) => clean === route || clean.startsWith(`${route}/`),
-  );
+  return ADMIN_ROUTES.some((route) => matchesPathSegment(clean, route));
 }
 
 /** Retorna true se o pathname está temporariamente oculto. */
 export function isHiddenRoute(pathname: string | null | undefined): boolean {
   if (!pathname) return false;
   const clean = normalizePath(pathname);
-  return HIDDEN_ROUTES.some(
-    (prefix) => clean === prefix || clean.startsWith(`${prefix}/`),
-  );
+  return HIDDEN_ROUTES.some((prefix) => matchesPathSegment(clean, prefix));
 }
 
 /**
@@ -103,6 +106,6 @@ export function getRoutePermissionException(
   if (!pathname) return undefined;
   const clean = normalizePath(pathname);
   return PERMISSION_ROUTE_EXCEPTIONS.find(({ route }) =>
-    clean.startsWith(route),
+    matchesPathSegment(clean, route),
   )?.permission;
 }

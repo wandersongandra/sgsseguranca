@@ -226,7 +226,7 @@ describeE2E('E2E — APR reject without reason returns 400', () => {
     expect(body.status).toBe(AprStatus.CANCELADA);
   });
 
-  it('POST /aprs/:id/reopen sem flag APR_WORKFLOW_CONFIGURAVEL → 403', async () => {
+  it('POST /aprs/:id/reopen — rota da trilha configurável removida → 404', async () => {
     const res = await testApp
       .request()
       .post(`/aprs/${aprId}/reopen`)
@@ -234,6 +234,6 @@ describeE2E('E2E — APR reject without reason returns 400', () => {
       .set(csrfHeaders)
       .send({ reason: 'Reabrindo para correcao.' });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 });

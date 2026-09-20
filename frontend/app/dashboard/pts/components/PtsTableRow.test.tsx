@@ -44,9 +44,9 @@ const createSignature = jest.fn();
 const onDismissApprovalIssue = jest.fn();
 const onDismissApprovalReview = jest.fn();
 
-jest.mock('@/services/signaturesService', () => ({
-  signaturesService: {
-    create: (...args: unknown[]) => createSignature(...args),
+jest.mock('@/services/ptsService', () => ({
+  ptsService: {
+    createSignature: (...args: unknown[]) => createSignature(...args),
   },
 }));
 
@@ -105,16 +105,112 @@ describe('PtsTableRow', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Salvar assinatura' }));
 
     await waitFor(() => {
-      expect(createSignature).toHaveBeenCalledWith({
-        document_id: 'pt-1',
-        document_type: 'PT',
+      expect(createSignature).toHaveBeenCalledWith('pt-1', {
         signature_data: 'signature-data',
         type: 'draw',
-        user_id: 'user-1',
-        company_id: 'company-1',
       });
       expect(onDismissApprovalReview).not.toHaveBeenCalled();
       expect(onDismissApprovalIssue).toHaveBeenCalledWith('pt-1');
     });
+  });
+
+  it('expõe nome acessível para o botão de emissão do PDF governado', () => {
+    const pt = {
+      id: 'pt-1',
+      numero: 'PT-001',
+      titulo: 'PT aprovada',
+      data_hora_inicio: '2026-07-01T08:00:00.000Z',
+      data_hora_fim: '2026-07-01T10:00:00.000Z',
+      status: 'Aprovada',
+      company_id: 'company-1',
+      pdf_file_key: null,
+    };
+
+    render(
+      <table>
+        <tbody>
+          <PtsTableRow
+            pt={pt as never}
+            onDelete={jest.fn()}
+            onPrint={jest.fn()}
+            onSendEmail={jest.fn()}
+            onDownloadPdf={jest.fn()}
+            onPrepareApproval={jest.fn()}
+            onApprove={jest.fn()}
+            onReject={jest.fn()}
+            onFinalize={jest.fn()}
+            approvingId={null}
+            rejectingId={null}
+            finalizingId={null}
+            approvalReviewLoadingId={null}
+            approvalChecklist={{
+              reviewedReadiness: false,
+              reviewedWorkers: false,
+              confirmedRelease: false,
+            }}
+            onDismissApprovalIssue={jest.fn()}
+            onDismissApprovalReview={jest.fn()}
+            onUpdateApprovalChecklist={jest.fn()}
+            onEmitGovernedPdf={jest.fn()}
+            emittingPdfId={null}
+          />
+        </tbody>
+      </table>,
+    );
+
+    const emitButton = screen.getByRole('button', {
+      name: 'Emitir PDF final governado',
+    });
+    expect(emitButton).toHaveAttribute('aria-label', 'Emitir PDF final governado');
+  });
+
+  it('não deixa o link de edição de PT finalizada ativável por teclado', () => {
+    const pt = {
+      id: 'pt-1',
+      numero: 'PT-001',
+      titulo: 'PT encerrada',
+      data_hora_inicio: '2026-07-01T08:00:00.000Z',
+      data_hora_fim: '2026-07-01T10:00:00.000Z',
+      status: 'Encerrada',
+      company_id: 'company-1',
+      pdf_file_key: null,
+    };
+
+    render(
+      <table>
+        <tbody>
+          <PtsTableRow
+            pt={pt as never}
+            onDelete={jest.fn()}
+            onPrint={jest.fn()}
+            onSendEmail={jest.fn()}
+            onDownloadPdf={jest.fn()}
+            onPrepareApproval={jest.fn()}
+            onApprove={jest.fn()}
+            onReject={jest.fn()}
+            onFinalize={jest.fn()}
+            approvingId={null}
+            rejectingId={null}
+            finalizingId={null}
+            approvalReviewLoadingId={null}
+            approvalChecklist={{
+              reviewedReadiness: false,
+              reviewedWorkers: false,
+              confirmedRelease: false,
+            }}
+            onDismissApprovalIssue={jest.fn()}
+            onDismissApprovalReview={jest.fn()}
+            onUpdateApprovalChecklist={jest.fn()}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Somente PTs pendentes podem ser editadas',
+      }),
+    ).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Editar PT' })).not.toBeInTheDocument();
   });
 });

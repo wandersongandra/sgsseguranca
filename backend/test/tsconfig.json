@@ -4,6 +4,7 @@
     "rootDir": "..",
     "outDir": "../dist-test",
     "noEmit": true,
+    "isolatedModules": true,
     "types": ["jest", "node"]
   },
   "include": ["./**/*.ts", "../src/**/*.ts"]

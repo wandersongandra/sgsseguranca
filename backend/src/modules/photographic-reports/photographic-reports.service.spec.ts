@@ -101,6 +101,7 @@ describe('PhotographicReportsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    (reportRepository as unknown as { manager?: unknown }).manager = undefined;
     reportQueryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
@@ -251,6 +252,85 @@ describe('PhotographicReportsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
 
     expect(reportRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('serializa duas mutações concorrentes pelo lock pessimista do relatório', async () => {
+    let firstTransactionActive = false;
+    let releaseFirst!: () => void;
+    let firstEntered!: () => void;
+    const firstEnteredPromise = new Promise<void>((resolve) => {
+      firstEntered = resolve;
+    });
+    const report = {
+      id: 'report-1',
+      company_id: 'company-1',
+      status: PhotographicReportStatus.AGUARDANDO_ANALISE,
+      deleted_at: null,
+      days: [],
+      images: [],
+      exports: [],
+    } as unknown as PhotographicReport;
+    const transactionReportRepository = {
+      findOne: jest.fn().mockResolvedValue(report),
+    };
+
+    (reportRepository as unknown as { manager: unknown }).manager = {
+      transaction: jest.fn(async (callback: (manager: unknown) => unknown) => {
+        if (firstTransactionActive) {
+          const error = new Error('row lock unavailable') as Error & {
+            code?: string;
+          };
+          error.code = '55P03';
+          throw error;
+        }
+        firstTransactionActive = true;
+        try {
+          return await callback({
+            getRepository: () => transactionReportRepository,
+          });
+        } finally {
+          firstTransactionActive = false;
+        }
+      }),
+    };
+    transactionReportRepository.findOne.mockImplementationOnce(async () => {
+      firstEntered();
+      await new Promise<void>((resolve) => {
+        releaseFirst = resolve;
+      });
+      return report;
+    });
+
+    const privateService = service as unknown as {
+      withReportMutationLock: (
+        reportId: string,
+        companyId: string,
+        apply: (
+          report: PhotographicReport,
+          manager: unknown,
+        ) => Promise<unknown>,
+      ) => Promise<unknown>;
+    };
+    const firstMutation = privateService.withReportMutationLock(
+      'report-1',
+      'company-1',
+      () => Promise.resolve('first'),
+    );
+    await firstEnteredPromise;
+
+    await expect(
+      privateService.withReportMutationLock('report-1', 'company-1', () =>
+        Promise.resolve('second'),
+      ),
+    ).rejects.toThrow('Outra operação está finalizando');
+
+    releaseFirst();
+    await expect(firstMutation).resolves.toBe('first');
+    expect(transactionReportRepository.findOne).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lock: { mode: 'pessimistic_write', onLocked: 'nowait' },
+      }),
+    );
   });
 
   it('create() usa apenas o usuário autenticado como created_by', async () => {

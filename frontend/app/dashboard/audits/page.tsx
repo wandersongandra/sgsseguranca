@@ -33,6 +33,7 @@ import { correctiveActionsService } from "@/services/correctiveActionsService";
 import { companiesService } from "@/services/companiesService";
 import { openPdfForPrint, openUrlInNewTab } from "@/lib/print-utils";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
+import { runWithMutationLock } from "@/lib/mutation-lock";
 import { sessionStore } from "@/lib/sessionStore";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -106,6 +107,7 @@ const timerRef = useRef<number | undefined>(undefined);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(() =>
     selectedTenantStore.get()?.companyId || sessionStore.get()?.companyId || null,
   );
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -315,14 +317,16 @@ useEffect(() => {
       return;
     }
 
-    try {
-      await auditsService.delete(id, activeCompanyId || undefined);
-      toast.success("Auditoria excluida com sucesso");
-      await fetchAudits();
-    } catch (error) {
-      logger.error("Erro ao excluir auditoria:", error);
-      toast.error("Erro ao excluir auditoria");
-    }
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await auditsService.delete(id, activeCompanyId || undefined);
+        toast.success("Auditoria excluida com sucesso");
+        await fetchAudits();
+      } catch (error) {
+        logger.error("Erro ao excluir auditoria:", error);
+        toast.error("Erro ao excluir auditoria");
+      }
+    });
   };
 
   const handleDownloadPdf = async (audit: Audit) => {

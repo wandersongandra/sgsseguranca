@@ -11,9 +11,11 @@ import { handleApiError } from "@/lib/error-handler";
 import { openPdfForPrint, openUrlInNewTab } from "@/lib/print-utils";
 import { isAiEnabled, isAprAnalyticsEnabled } from "@/lib/featureFlags";
 import { base64ToPdfBlob } from "@/lib/pdf/pdfFile";
+import { fetchGovernedPdfBlob } from "@/lib/pdf/fetchGovernedPdfBlob";
 import { AprDueFilter, AprSortOption } from "../components/aprListingUtils";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
 import { siteStore } from "@/lib/siteStore";
+import { resolveActiveCompanyId } from "@/lib/tenant-context";
 import { queryKeys } from "@/lib/query-keys";
 
 type AprContextFilter = "minhas" | "vence-hoje" | "preciso-assinar" | "";
@@ -119,7 +121,7 @@ export function useAprs(options?: UseAprsOptions) {
     options?.initialResponsibleFilter || "",
   );
   const [tenantContext, setTenantContext] = useState(() => ({
-    companyId: selectedTenantStore.get()?.companyId || undefined,
+    companyId: resolveActiveCompanyId(),
     siteId: siteStore.get()?.siteId || undefined,
   }));
   const activeCompanyId = tenantContext.companyId;
@@ -168,7 +170,15 @@ export function useAprs(options?: UseAprsOptions) {
     const siteId = activeSiteId;
     const requestId = ++activeRequestIdRef.current;
 
-    if (!companyId || !siteId) {
+    // Achado real (auditoria v2, confirmado ao vivo em produção): siteId
+    // vem do siteStore global ("obra ativa" do dashboard) — um seletor
+    // totalmente opcional e separado, que a maioria dos usuários nunca usa
+    // explicitamente. Exigi-lo aqui travava a fila de APRs inteira (0
+    // resultados, sem erro visível) para qualquer usuário sem uma obra
+    // ativa selecionada, mesmo com APRs reais cadastradas na empresa. O
+    // backend já trata site_id como filtro opcional (`?site_id=` filtra por
+    // obra quando presente); só companyId é realmente necessário.
+    if (!companyId) {
       activeControllerRef.current?.abort();
       activeControllerRef.current = null;
       lastAppliedContextRef.current = null;
@@ -230,7 +240,7 @@ export function useAprs(options?: UseAprsOptions) {
       if (
         requestId !== activeRequestIdRef.current ||
         controller.signal.aborted ||
-        selectedTenantStore.get()?.companyId !== companyId ||
+        resolveActiveCompanyId() !== companyId ||
         siteStore.get()?.siteId !== siteId ||
         lastAppliedContextRef.current?.key === latestContext.key
       ) {
@@ -319,7 +329,7 @@ useEffect(() => {
 
   useEffect(() => {
     const unsubscribeTenant = selectedTenantStore.subscribe((tenant) => {
-      const nextCompanyId = tenant?.companyId || undefined;
+      const nextCompanyId = tenant?.companyId || resolveActiveCompanyId();
       const nextSiteId = siteStore.get()?.siteId || undefined;
       setTenantContext({ companyId: nextCompanyId, siteId: nextSiteId });
       activeControllerRef.current?.abort();
@@ -329,15 +339,15 @@ useEffect(() => {
       setTotal(0);
       setLastPage(1);
       setLoadError(null);
-      setLoading(Boolean(nextCompanyId && nextSiteId));
+      setLoading(Boolean(nextCompanyId));
       setRefetching(false);
-      if (!nextCompanyId || !nextSiteId) {
+      if (!nextCompanyId) {
         return;
       }
     });
 
     const unsubscribeSite = siteStore.subscribe((site) => {
-      const nextCompanyId = selectedTenantStore.get()?.companyId || undefined;
+      const nextCompanyId = resolveActiveCompanyId();
       const nextSiteId = site?.siteId || undefined;
       setTenantContext({ companyId: nextCompanyId, siteId: nextSiteId });
       activeControllerRef.current?.abort();
@@ -347,7 +357,7 @@ useEffect(() => {
       setTotal(0);
       setLastPage(1);
       setLoadError(null);
-      setLoading(Boolean(nextCompanyId && nextSiteId));
+      setLoading(Boolean(nextCompanyId));
       setRefetching(false);
     });
 
@@ -448,7 +458,8 @@ useEffect(() => {
         if (shouldUseGovernedPdf) {
           const access = await ensureGovernedPdf(apr);
           if (access?.url) {
-            openUrlInNewTab(access.url);
+            const { blob } = await fetchGovernedPdfBlob(access.url);
+            openUrlInNewTab(URL.createObjectURL(blob));
             return;
           }
 
@@ -482,7 +493,8 @@ useEffect(() => {
         if (shouldUseGovernedPdf) {
           const access = await ensureGovernedPdf(currentApr);
           if (access?.url) {
-            openPdfForPrint(access.url, () => {
+            const { blob } = await fetchGovernedPdfBlob(access.url);
+            openPdfForPrint(URL.createObjectURL(blob), () => {
               toast.info(
                 "Pop-up bloqueado. Abrimos o PDF final da APR na mesma aba para impressão.",
               );
@@ -578,10 +590,7 @@ useEffect(() => {
           setAprs((prev) => prev.filter((item) => item.id !== aprId));
           toast.success("APR excluída com sucesso!");
         } else if (action === "approve") {
-          const aprObj = aprs.find((item) => item.id === aprId);
-          const updated = aprObj?.workflowConfigId
-            ? await aprsService.workflowApprove(aprId)
-            : await aprsService.approve(aprId);
+          const updated = await aprsService.approve(aprId);
           setAprs((prev) =>
             prev.map((item) => (item.id === updated.id ? updated : item)),
           );
@@ -604,10 +613,7 @@ useEffect(() => {
             );
             return;
           }
-          const aprObj = aprs.find((item) => item.id === aprId);
-          const updated = aprObj?.workflowConfigId
-            ? await aprsService.workflowReject(aprId, rejectReason)
-            : await aprsService.reject(aprId, rejectReason);
+          const updated = await aprsService.reject(aprId, rejectReason);
           setAprs((prev) =>
             prev.map((item) => (item.id === updated.id ? updated : item)),
           );
@@ -635,7 +641,7 @@ useEffect(() => {
         });
       }
     },
-    [actionModal, aprs, loadAprs],
+    [actionModal, loadAprs],
   );
 
   const handleDelete = useCallback(

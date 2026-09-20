@@ -13,7 +13,7 @@ const STORAGE_KEY = "cx_selected_tenant";
 let current: SelectedTenant | null = null;
 const listeners = new Set<Listener>();
 let transition = Promise.resolve();
-let transitionVersion = 0;
+let transitionGeneration = 0;
 
 function isValidTenant(value: unknown): value is SelectedTenant {
   if (typeof value !== "object" || value === null) return false;
@@ -60,16 +60,16 @@ export const selectedTenantStore = {
   },
 
   set(tenant: SelectedTenant): Promise<void> {
-    const requestedVersion = transitionVersion;
+    const requestGeneration = transitionGeneration;
     const applyTenant = async () => {
-      if (requestedVersion !== transitionVersion) return;
+      if (requestGeneration !== transitionGeneration) return;
       const previousTenant = current ?? loadFromStorage();
       if (
         previousTenant?.companyId &&
         previousTenant.companyId !== tenant.companyId
       ) {
         await clearSensitiveBrowserStorage();
-        if (requestedVersion !== transitionVersion) return;
+        if (requestGeneration !== transitionGeneration) return;
         // Quando a empresa muda, limpa a obra selecionada também
         siteStore.clear();
       }
@@ -82,7 +82,7 @@ export const selectedTenantStore = {
   },
 
   clear() {
-    transitionVersion += 1;
+    transitionGeneration += 1;
     current = null;
     saveToStorage(null);
     siteStore.clear();

@@ -12,7 +12,6 @@ import { In, IsNull, Repository } from 'typeorm';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { resolveSiteAccessScopeFromTenantService } from '../../shared/tenant/site-access-scope.util';
 import { DocumentStorageService } from '../../shared/services/document-storage.service';
-import { PdfService } from '../../shared/services/pdf.service';
 import { DocumentGovernanceService } from '../document-registry/document-governance.service';
 import {
   normalizeOffsetPagination,
@@ -37,11 +36,7 @@ import { Arr, ArrStatus, ARR_ALLOWED_TRANSITIONS } from './entities/arr.entity';
 import { CreateArrDto } from './dto/create-arr.dto';
 import { UpdateArrDto } from './dto/update-arr.dto';
 import { PublicValidationGrantService } from '../../shared/services/public-validation-grant.service';
-import {
-  buildInstitutionalHeaderHtml,
-  INSTITUTIONAL_PDF_CSS,
-  INSTITUTIONAL_PDF_FOOTER_TEMPLATE,
-} from '../../shared/services/pdf-institutional-template';
+import { generateOfficialArrPdf } from './arr-official-pdf';
 
 export type ArrPdfAccessAvailability = GovernedPdfAccessAvailability;
 
@@ -65,7 +60,6 @@ export class ArrsService {
     private readonly documentStorageService: DocumentStorageService,
     private readonly documentGovernanceService: DocumentGovernanceService,
     private readonly publicValidationGrantService: PublicValidationGrantService,
-    private readonly pdfService: PdfService,
   ) {}
 
   /**
@@ -536,15 +530,19 @@ export class ArrsService {
     this.assertFinalDocumentMutable(arr);
     this.assertReadyForFinalDocument(arr);
 
-    const buffer = await this.pdfService.generateFromHtml(
-      this.buildFinalPdfHtml(arr),
-      {
-        format: 'A4',
-        displayHeaderFooter: true,
-        headerTemplate: '<span></span>',
-        footerTemplate: INSTITUTIONAL_PDF_FOOTER_TEMPLATE,
-        margin: { top: '14mm', right: '14mm', bottom: '16mm', left: '14mm' },
-      },
+    const validation = await this.getValidationContext(id);
+    const documentDate =
+      arr.data instanceof Date
+        ? arr.data.toISOString().slice(0, 10)
+        : String(arr.data).slice(0, 10);
+    const generatedAt = arr.data
+      ? `${documentDate}T12:00:00.000Z`
+      : new Date().toISOString();
+    const buffer = await generateOfficialArrPdf(
+      arr,
+      validation.documentCode,
+      this.buildPublicValidationUrl(validation.documentCode, validation.token),
+      generatedAt,
     );
 
     const originalName = `${this.safePdfName(arr.titulo || arr.id)}.pdf`;
@@ -686,85 +684,6 @@ export class ArrsService {
       .replace(/^\.+|\.+$/g, '')
       .slice(0, 100);
     return `ARR_${normalized || 'documento'}`;
-  }
-
-  private buildFinalPdfHtml(arr: Arr): string {
-    const escapeHtml = (value: unknown): string => {
-      let text: string;
-      if (value === null || value === undefined || value === '') {
-        text = '—';
-      } else if (
-        typeof value === 'string' ||
-        typeof value === 'number' ||
-        typeof value === 'boolean'
-      ) {
-        text = String(value);
-      } else {
-        try {
-          text = JSON.stringify(value) ?? '—';
-        } catch {
-          text = '—';
-        }
-      }
-
-      return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    };
-    const date = arr.data
-      ? new Intl.DateTimeFormat('pt-BR', {
-          dateStyle: 'short',
-          timeZone: 'America/Araguaina',
-        }).format(new Date(arr.data))
-      : '—';
-    const participants = (arr.participants || [])
-      .map(
-        (participant) =>
-          `<li>${escapeHtml(participant.nome || participant.id)}</li>`,
-      )
-      .join('');
-    const field = (label: string, value: unknown) =>
-      `<div class="field"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
-
-    return `<!doctype html>
-<html lang="pt-BR">
-<head><meta charset="utf-8"><style>${INSTITUTIONAL_PDF_CSS}</style></head>
-<body>
-  ${buildInstitutionalHeaderHtml({
-    title: 'Análise de Risco Rápida',
-    subtitle:
-      'Documento oficial operacional de identificação, avaliação e controle de riscos.',
-    code: arr.document_code || this.buildArrDocumentCode(arr),
-    status: arr.status,
-    company: arr.company_id,
-    site: arr.site?.nome || arr.site_id,
-    referenceDate: date,
-  })}
-  <div class="section-title">Identificação</div><div class="grid">
-    ${field('Título', arr.titulo)}
-    ${field('Turno', arr.turno)}
-    ${field('Frente de trabalho', arr.frente_trabalho)}
-    ${field('Atividade principal', arr.atividade_principal)}
-    ${field('Responsável', arr.responsavel?.nome || arr.responsavel_id)}
-    ${field('Obra / site', arr.site?.nome || arr.site_id)}
-  </div>
-  <div class="section-title">Avaliação de risco</div><div class="grid">
-    ${field('Condição observada', arr.condicao_observada)}
-    ${field('Risco identificado', arr.risco_identificado)}
-    ${field('Nível', arr.nivel_risco)}
-    ${field('Probabilidade', arr.probabilidade)}
-    ${field('Severidade', arr.severidade)}
-    ${field('EPI/EPC aplicáveis', arr.epi_epc_aplicaveis)}
-    ${field('Controles imediatos', arr.controles_imediatos)}
-    ${field('Ação recomendada', arr.acao_recomendada)}
-    ${field('Observações', arr.observacoes)}
-  </div>
-  <div class="section-title">Participantes</div><ul>${participants || '<li>Nenhum participante informado</li>'}</ul>
-  <div class="governance"><strong>Documento governado pelo SGS.</strong><br/>O hash, a identidade do tenant/site, a emissão e o acesso são registrados no catálogo documental oficial.</div>
-</body></html>`;
   }
 
   private assertFinalDocumentMutable(arr: Arr): void {
@@ -921,5 +840,39 @@ export class ArrsService {
       .toUpperCase();
 
     return `ARR-${year}-${reference || String(Date.now()).slice(-6)}`;
+  }
+
+  private buildPublicValidationUrl(code: string, token: string | null): string {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      process.env.PUBLIC_APP_URL?.trim() ||
+      'https://app.sgsseguranca.com.br';
+    const url = new URL(`/validar/${encodeURIComponent(code)}`, baseUrl);
+    if (token?.trim()) url.searchParams.set('token', token.trim());
+    url.searchParams.set('module', 'arr');
+    return url.toString();
+  }
+
+  private formatDocumentDate(value: string | Date): string {
+    if (typeof value === 'string') {
+      const dateOnlyMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:T|$)/);
+      if (dateOnlyMatch) {
+        return `${dateOnlyMatch[3]}/${dateOnlyMatch[2]}/${dateOnlyMatch[1]}`;
+      }
+    }
+
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return `${String(value.getUTCDate()).padStart(2, '0')}/${String(
+        value.getUTCMonth() + 1,
+      ).padStart(2, '0')}/${value.getUTCFullYear()}`;
+    }
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+
+    return new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeZone: 'America/Araguaina',
+    }).format(parsed);
   }
 }
