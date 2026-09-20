@@ -24,7 +24,11 @@ import { cn } from '@/lib/utils';
 import { safeToLocaleDateString } from '@/lib/date/safeFormat';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { ModalBody, ModalFrame, ModalHeader } from '@/components/ui/modal-frame';
-import { CatalogMobileCard, catalogMobileActionClassName } from '../components/CatalogMobileCard';
+import { runWithMutationLock } from '@/lib/mutation-lock';
+import {
+  CatalogMobileCard,
+  catalogMobileActionClassName,
+} from '../components/CatalogMobileCard';
 import { useAuth } from '@/context/AuthContext';
 import { Permission } from '@/lib/permissions';
 import { useSelectedTenantId } from '@/hooks/useSelectedTenantId';
@@ -51,6 +55,7 @@ export default function SitesPage() {
   const [lastPage, setLastPage] = useState(1);
   const requestSeqRef = useRef(0);
   const [loadedScope, setLoadedScope] = useState<string | null>(null);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -107,18 +112,20 @@ export default function SitesPage() {
       return;
     }
 
-    try {
-      await sitesService.delete(id);
-      toast.success('Obra/Setor excluido com sucesso');
-      if (sites.length === 1 && page > 1) {
-        setPage((current) => current - 1);
-        return;
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await sitesService.delete(id);
+        toast.success('Obra/Setor excluido com sucesso');
+        if (sites.length === 1 && page > 1) {
+          setPage((current) => current - 1);
+          return;
+        }
+        void loadSites();
+      } catch (error) {
+        logger.error('Erro ao excluir site:', error);
+        toast.error('Erro ao excluir obra/setor. Verifique dependencias e tente novamente.');
       }
-      void loadSites();
-    } catch (error) {
-      logger.error('Erro ao excluir site:', error);
-      toast.error('Erro ao excluir obra/setor. Verifique dependencias e tente novamente.');
-    }
+    });
   }
 
   const summary = useMemo(

@@ -21,7 +21,6 @@ import { PdfRateLimitService } from '../auth/services/pdf-rate-limit.service';
 import { FileInspectionService } from '../../shared/security/file-inspection.service';
 import { AprsController } from './aprs.controller';
 import { AprsService } from './aprs.service';
-import { AprWorkflowService } from './aprs-workflow.service';
 import { AprFeatureFlagGuard } from './guards/apr-feature-flag.guard';
 import { AprMetricsInterceptor } from './interceptors/apr-metrics.interceptor';
 
@@ -65,10 +64,6 @@ describe('AprsController (http)', () => {
   };
   const fileInspectionService = {
     inspect: jest.fn().mockResolvedValue({ safe: true }),
-  };
-  const aprWorkflowService = {
-    getWorkflowStatus: jest.fn(),
-    processApproval: jest.fn(),
   };
 
   const getForensicAppendMetadata = (): {
@@ -119,8 +114,6 @@ describe('AprsController (http)', () => {
     aprsService.approve.mockReset();
     aprsService.reject.mockReset();
     aprsService.finalize.mockReset();
-    aprWorkflowService.getWorkflowStatus.mockReset();
-    aprWorkflowService.processApproval.mockReset();
     pdfRateLimitService.checkDownloadLimit.mockReset();
     forensicTrailService.append.mockReset();
     fileInspectionService.inspect.mockClear();
@@ -136,10 +129,6 @@ describe('AprsController (http)', () => {
         {
           provide: FileInspectionService,
           useValue: fileInspectionService,
-        },
-        {
-          provide: AprWorkflowService,
-          useValue: aprWorkflowService,
         },
         ForensicAuditInterceptor,
       ],
@@ -302,54 +291,6 @@ describe('AprsController (http)', () => {
 
     expect(pdfRateLimitService.checkDownloadLimit).not.toHaveBeenCalled();
     expect(aprsService.findOne).toHaveBeenCalledWith(aprId);
-  });
-
-  it('retorna o status do fluxo da APR sem exigir escrita no módulo', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    aprsService.findOne.mockResolvedValue({
-      id: aprId,
-      status: 'Aprovada',
-      company_id: 'company-1',
-      workflowConfigId: 'workflow-1',
-    });
-    aprWorkflowService.getWorkflowStatus.mockResolvedValue({
-      currentStep: null,
-      nextStep: null,
-      history: [
-        {
-          id: 'record-1',
-          aprId,
-          stepOrder: 1,
-          roleName: 'Administrador da Empresa',
-          approverId: 'user-1',
-          action: 'APROVADO',
-          reason: null,
-          occurredAt: '2026-05-03T20:00:00.000Z',
-        },
-      ],
-      canEdit: false,
-      canApprove: false,
-      workflowConfig: null,
-    });
-
-    await request(httpServer)
-      .get(`/aprs/${aprId}/workflow-status`)
-      .expect(200)
-      .expect(({ body }) => {
-        const payload = body as {
-          history?: Array<{ action?: string }>;
-          canApprove?: boolean;
-        };
-        expect(payload.history?.[0]?.action).toBe('APROVADO');
-        expect(payload.canApprove).toBe(false);
-      });
-
-    expect(aprsService.findOne).toHaveBeenCalledWith(aprId);
-    expect(aprWorkflowService.getWorkflowStatus).toHaveBeenCalledWith(
-      expect.objectContaining({ id: aprId }),
-      'user-1',
-      'Administrador da Empresa',
-    );
   });
 
   it('encaminha filtros operacionais de listagem da APR para o service', async () => {
@@ -663,53 +604,6 @@ describe('AprsController (http)', () => {
     expect(forensicEvent.metadata?.method).toBe('PATCH');
   });
 
-  it('aprova a APR via POST legado (antes do sunset) passando pela mesma trilha forense', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    // Determinístico: fixa o relógio ANTES do sunset para exercitar o caminho de
-    // compatibilidade legado. Em produção, após 2026-06-30, o alias retorna 410
-    // (coberto pelos testes de sunset). restoreMocks:true reverte o spy.
-    jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-06-01T00:00:00Z').getTime());
-    aprsService.approve.mockResolvedValue({
-      id: aprId,
-      status: 'Aprovada',
-    });
-
-    await request(httpServer)
-      .post(`/aprs/${aprId}/approve`)
-      .send({ reason: 'Compat legado auditada' })
-      .expect(200)
-      .expect('Deprecation', 'true')
-      .expect('Sunset', 'Tue, 30 Jun 2026 00:00:00 GMT')
-      .expect(
-        'Warning',
-        '299 - "POST /aprs/:id/approve is deprecated; use PATCH /aprs/:id/approve"',
-      )
-      .expect(({ body }) => {
-        const payload = body as { id?: string; status?: string };
-        expect(payload.id).toBe(aprId);
-        expect(payload.status).toBe('Aprovada');
-      });
-
-    expect(aprsService.approve).toHaveBeenCalledWith(
-      aprId,
-      'user-1',
-      'Compat legado auditada',
-      expect.objectContaining({
-        roleName: 'Administrador da Empresa',
-        ipAddress: expect.any(String),
-      }),
-    );
-    const forensicEvent = getForensicAppendMetadata();
-    expect(forensicEvent.eventType).toBe('AUDIT_APPROVE');
-    expect(forensicEvent.module).toBe('apr');
-    expect(forensicEvent.entityId).toBe(aprId);
-    expect(forensicEvent.userId).toBe('user-1');
-    expect(forensicEvent.metadata?.action).toBe('approve');
-    expect(forensicEvent.metadata?.method).toBe('POST');
-  });
-
   it('rejeita a APR via PATCH usando o pipeline forense canonico', async () => {
     const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
     aprsService.reject.mockResolvedValue({
@@ -751,46 +645,6 @@ describe('AprsController (http)', () => {
     expect(forensicEvent.metadata?.method).toBe('PATCH');
   });
 
-  it('rejeita a APR via POST legado (antes do sunset) passando pela mesma trilha forense', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-06-01T00:00:00Z').getTime());
-    aprsService.reject.mockResolvedValue({
-      id: aprId,
-      status: 'Cancelada',
-      reprovado_motivo: 'Compat legado',
-    });
-
-    await request(httpServer)
-      .post(`/aprs/${aprId}/reject`)
-      .send({ reason: 'Compat legado' })
-      .expect(200)
-      .expect('Deprecation', 'true')
-      .expect('Sunset', 'Tue, 30 Jun 2026 00:00:00 GMT')
-      .expect(
-        'Warning',
-        '299 - "POST /aprs/:id/reject is deprecated; use PATCH /aprs/:id/reject"',
-      );
-
-    expect(aprsService.reject).toHaveBeenCalledWith(
-      aprId,
-      'user-1',
-      'Compat legado',
-      expect.objectContaining({
-        roleName: 'Administrador da Empresa',
-        ipAddress: expect.any(String),
-      }),
-    );
-    const forensicEvent = getForensicAppendMetadata();
-    expect(forensicEvent.eventType).toBe('AUDIT_REJECT');
-    expect(forensicEvent.module).toBe('apr');
-    expect(forensicEvent.entityId).toBe(aprId);
-    expect(forensicEvent.userId).toBe('user-1');
-    expect(forensicEvent.metadata?.action).toBe('reject');
-    expect(forensicEvent.metadata?.method).toBe('POST');
-  });
-
   it('encerra a APR via PATCH usando o pipeline forense canonico', async () => {
     const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
     aprsService.finalize.mockResolvedValue({
@@ -824,79 +678,19 @@ describe('AprsController (http)', () => {
     expect(forensicEvent.metadata?.method).toBe('PATCH');
   });
 
-  it('encerra a APR via POST legado (antes do sunset) passando pela mesma trilha forense', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-06-01T00:00:00Z').getTime());
-    aprsService.finalize.mockResolvedValue({
-      id: aprId,
-      status: 'Encerrada',
-    });
+  it.each(['approve', 'reject', 'finalize'])(
+    'não expõe mais o alias POST /aprs/:id/%s (rota removida no sunset)',
+    async (action) => {
+      const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
 
-    await request(httpServer)
-      .post(`/aprs/${aprId}/finalize`)
-      .expect(200)
-      .expect('Deprecation', 'true')
-      .expect('Sunset', 'Tue, 30 Jun 2026 00:00:00 GMT')
-      .expect(
-        'Warning',
-        '299 - "POST /aprs/:id/finalize is deprecated; use PATCH /aprs/:id/finalize"',
-      );
+      await request(httpServer)
+        .post(`/aprs/${aprId}/${action}`)
+        .send({ reason: 'Motivo suficientemente longo para validação' })
+        .expect(404);
 
-    expect(aprsService.finalize).toHaveBeenCalledWith(
-      aprId,
-      'user-1',
-      expect.objectContaining({
-        roleName: 'Administrador da Empresa',
-        ipAddress: expect.any(String),
-      }),
-    );
-    const forensicEvent = getForensicAppendMetadata();
-    expect(forensicEvent.eventType).toBe('AUDIT_FINALIZE');
-    expect(forensicEvent.module).toBe('apr');
-    expect(forensicEvent.entityId).toBe(aprId);
-    expect(forensicEvent.userId).toBe('user-1');
-    expect(forensicEvent.metadata?.action).toBe('finalize');
-    expect(forensicEvent.metadata?.method).toBe('POST');
-  });
-
-  it('POST legado de approve retorna 410 Gone após a data de sunset', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-07-01T00:00:00Z').getTime());
-
-    await request(httpServer)
-      .post(`/aprs/${aprId}/approve`)
-      .send({ reason: 'test' })
-      .expect(410);
-
-    jest.spyOn(Date, 'now').mockRestore();
-  });
-
-  it('POST legado de reject retorna 410 Gone após a data de sunset', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-07-01T00:00:00Z').getTime());
-
-    await request(httpServer)
-      .post(`/aprs/${aprId}/reject`)
-      .send({ reason: 'Motivo suficientemente longo para passar validação' })
-      .expect(410);
-
-    jest.spyOn(Date, 'now').mockRestore();
-  });
-
-  it('POST legado de finalize retorna 410 Gone após a data de sunset', async () => {
-    const httpServer = app.getHttpServer() as Parameters<typeof request>[0];
-    jest
-      .spyOn(Date, 'now')
-      .mockReturnValue(new Date('2026-07-01T00:00:00Z').getTime());
-
-    await request(httpServer).post(`/aprs/${aprId}/finalize`).expect(410);
-
-    jest.spyOn(Date, 'now').mockRestore();
-  });
+      expect(aprsService.approve).not.toHaveBeenCalled();
+      expect(aprsService.reject).not.toHaveBeenCalled();
+      expect(aprsService.finalize).not.toHaveBeenCalled();
+    },
+  );
 });

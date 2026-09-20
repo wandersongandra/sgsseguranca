@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
+import React, { useCallback, useMemo } from "react";
 import { Apr } from "@/services/aprsService";
 import {
   Building2,
@@ -21,10 +20,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { signaturesService } from "@/services/signaturesService";
 import { useAuth } from "@/context/AuthContext";
 import { Permission } from '@/lib/permissions';
-import { toast } from "sonner";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActionMenu } from "@/components/ActionMenu";
@@ -37,21 +34,6 @@ import {
   getToneClasses,
 } from "./aprListingUtils";
 
-const SignatureModal = dynamic(
-  () =>
-    import("@/components/SignatureModal").then(
-      (module) => module.SignatureModal,
-    ),
-  { ssr: false },
-);
-const SignaturesPanel = dynamic(
-  () =>
-    import("@/components/SignaturesPanel").then(
-      (module) => module.SignaturesPanel,
-    ),
-  { ssr: false },
-);
-
 interface AprCardProps {
   apr: Apr;
   onDelete: (id: string) => void;
@@ -62,6 +44,8 @@ interface AprCardProps {
   onFinalize: (id: string) => void;
   onReject: (id: string) => void;
   onCreateNewVersion: (id: string) => void;
+  onOpenSignature: (apr: Apr) => void;
+  onOpenSignatures: (apr: Apr) => void;
 }
 
 export const AprCard = React.memo(
@@ -75,29 +59,10 @@ export const AprCard = React.memo(
     onFinalize,
     onReject,
     onCreateNewVersion,
+    onOpenSignature,
+    onOpenSignatures,
   }: AprCardProps) => {
-    const { user, hasPermission } = useAuth();
-    const [showSignModal, setShowSignModal] = useState(false);
-    const [showSignaturesPanel, setShowSignaturesPanel] = useState(false);
-
-    const handleSignSave = useCallback(
-      async (signatureData: string, type: string) => {
-        try {
-          await signaturesService.create({
-            document_id: apr.id,
-            document_type: "APR",
-            signature_data: signatureData,
-            type,
-            user_id: user?.id,
-            company_id: apr.company_id,
-          });
-          toast.success("Assinatura registrada com sucesso.");
-        } catch {
-          toast.error("Erro ao registrar assinatura.");
-        }
-      },
-      [apr.company_id, apr.id, user?.id],
-    );
+    const { hasPermission } = useAuth();
 
     const isApproved = apr.status === "Aprovada";
     const isPending = apr.status === "Pendente";
@@ -155,21 +120,13 @@ export const AprCard = React.memo(
 
     const handleOpenSignModal = useCallback(() => {
       if (!canManageSignatures) return;
-      setShowSignModal(true);
-    }, [canManageSignatures]);
-
-    const handleCloseSignModal = useCallback(() => {
-      setShowSignModal(false);
-    }, []);
+      onOpenSignature(apr);
+    }, [apr, canManageSignatures, onOpenSignature]);
 
     const handleOpenSignaturesPanel = useCallback(() => {
       if (!canViewSignatures) return;
-      setShowSignaturesPanel(true);
-    }, [canViewSignatures]);
-
-    const handleCloseSignaturesPanel = useCallback(() => {
-      setShowSignaturesPanel(false);
-    }, []);
+      onOpenSignatures(apr);
+    }, [apr, canViewSignatures, onOpenSignatures]);
 
     const handleDeleteClick = useCallback(() => {
       onDelete(apr.id);
@@ -485,19 +442,6 @@ export const AprCard = React.memo(
             <ActionMenu items={actionItems} triggerAriaLabel="Mais ações" />
           </div>
         </CardContent>
-
-        <SignatureModal
-          isOpen={showSignModal}
-          onClose={handleCloseSignModal}
-          onSave={handleSignSave}
-          userName={user?.nome ?? "Usuário"}
-        />
-        <SignaturesPanel
-          isOpen={showSignaturesPanel}
-          onClose={handleCloseSignaturesPanel}
-          documentId={apr.id}
-          documentType="APR"
-        />
       </Card>
     );
   },

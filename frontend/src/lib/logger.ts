@@ -1,85 +1,127 @@
 /**
- * Logger utilitário para o frontend
- * Em produção, console.log/info/debug são suprimidos para performance e segurança
- * Erros (error/warn) são mantidos para debugging crítico
+ * Logger utilitário para o frontend.
+ * Em produção, logs de diagnóstico são suprimidos e todo argumento passa
+ * por uma sanitização recursiva antes de chegar ao console.
  */
 
 const isDev = process.env.NODE_ENV === 'development';
-
 const LOG_PREFIX = '[SGS]';
 
-const SENSITIVE_HEADER_PATTERN =
-  /authorization|cookie|csrf|token|secret|api[_-]?key/i;
+const SENSITIVE_KEY_PATTERN =
+  /authorization|cookie|csrf|token|secret|api[_-]?key|password|senha|cpf|cnpj|telefone|phone|email|otp|recovery|private|signature|assinatura|base64|dataurl|^data$|^payload$|^body$/i;
 
-/**
- * Remove headers sensíveis (ex.: Authorization com o Bearer em memória) de
- * objetos AxiosError antes de chegar ao console — evita vazar o token de
- * acesso para quem abrir o devtools em produção.
- */
-function sanitizeErrorArg(arg: unknown): unknown {
-  if (!(arg instanceof Error)) return arg;
+const SENSITIVE_TEXT_PATTERNS: Array<[RegExp, string]> = [
+  [/\bBearer\s+[^\s]+/gi, 'Bearer [REDACTED]'],
+  [/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, '[REDACTED_CPF]'],
+  [/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, '[REDACTED_EMAIL]'],
+  [
+    /([?&](?:access[_-]?token|refresh[_-]?token|token|signature|x-amz-signature|x-amz-credential|credential|api[_-]?key|password|senha|csrf)=)[^&#\s]*/gi,
+    '$1[REDACTED]',
+  ],
+];
 
-  const config = (arg as Error & { config?: Record<string, unknown> }).config;
-  if (!config || typeof config !== 'object') return arg;
+function redactText(value: string): string {
+  return SENSITIVE_TEXT_PATTERNS.reduce(
+    (current, [pattern, replacement]) => current.replace(pattern, replacement),
+    value,
+  );
+}
 
-  const headers = config.headers;
-  if (!headers || typeof headers !== 'object') return arg;
-
-  const sanitizedHeaders: Record<string, string> = {};
-  for (const key of Object.keys(headers as Record<string, unknown>)) {
-    sanitizedHeaders[key] = SENSITIVE_HEADER_PATTERN.test(key)
-      ? '[REDACTED]'
-      : String((headers as Record<string, unknown>)[key]);
+function sanitizeLogValue(
+  value: unknown,
+  key: string | undefined,
+  seen: WeakSet<object>,
+  depth: number,
+): unknown {
+  if (key && SENSITIVE_KEY_PATTERN.test(key)) {
+    return '[REDACTED]';
   }
 
-  return {
-    ...arg,
-    config: {
-      ...config,
-      headers: sanitizedHeaders,
-    },
-  };
+  if (typeof value === 'string') {
+    return redactText(value);
+  }
+
+  if (
+    value === null ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'undefined'
+  ) {
+    return value;
+  }
+
+  if (depth >= 6) {
+    return '[TRUNCATED]';
+  }
+
+  if (typeof value === 'object') {
+    if (seen.has(value)) {
+      return '[CIRCULAR]';
+    }
+    seen.add(value);
+
+    if (value instanceof Error) {
+      const result: Record<string, unknown> = {
+        name: value.name,
+        message: redactText(value.message),
+      };
+      for (const property of Object.keys(value)) {
+        result[property] = sanitizeLogValue(
+          (value as unknown as Record<string, unknown>)[property],
+          property,
+          seen,
+          depth + 1,
+        );
+      }
+      return result;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) =>
+        sanitizeLogValue(item, undefined, seen, depth + 1),
+      );
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [property, propertyValue] of Object.entries(value)) {
+      result[property] = sanitizeLogValue(
+        propertyValue,
+        property,
+        seen,
+        depth + 1,
+      );
+    }
+    return result;
+  }
+
+  return '[UNSUPPORTED]';
 }
 
 function sanitizeArgs(args: unknown[]): unknown[] {
-  return args.map(sanitizeErrorArg);
+  const seen = new WeakSet<object>();
+  return args.map((arg) => sanitizeLogValue(arg, undefined, seen, 0));
 }
 
 export const logger = {
-  /** Log apenas em desenvolvimento */
   log: (...args: unknown[]) => {
-    if (isDev) {
-      console.log(LOG_PREFIX, ...args);
-    }
+    if (isDev) console.log(LOG_PREFIX, ...sanitizeArgs(args));
   },
 
-  /** Warn sempre visível (produção e dev) */
   warn: (...args: unknown[]) => {
     console.warn(LOG_PREFIX, ...sanitizeArgs(args));
   },
 
-  /** Error sempre visível (produção e dev) */
   error: (...args: unknown[]) => {
     console.error(LOG_PREFIX, ...sanitizeArgs(args));
   },
 
-  /** Info apenas em desenvolvimento */
   info: (...args: unknown[]) => {
-    if (isDev) {
-      console.info(LOG_PREFIX, ...args);
-    }
+    if (isDev) console.info(LOG_PREFIX, ...sanitizeArgs(args));
   },
 
-  /** Debug apenas em desenvolvimento */
   debug: (...args: unknown[]) => {
-    if (isDev) {
-      console.debug(LOG_PREFIX, ...args);
-    }
+    if (isDev) console.debug(LOG_PREFIX, ...sanitizeArgs(args));
   },
 } as const;
 
-/**
- * Helper para verificar se deve logar
- * Útil para evitar cálculos desnecessários
- */
 export const shouldLog = isDev;

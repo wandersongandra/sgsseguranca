@@ -1,4 +1,8 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Repository } from 'typeorm';
 import { AprFeatureFlag } from '../entities/apr-feature-flag.entity';
@@ -99,6 +103,19 @@ describe('AprFeatureFlagGuard', () => {
     await expect(
       guard.canActivate(makeContext('apr_rules_engine')),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('falha fechado (ServiceUnavailableException) quando a verificação da feature flag lança erro transitório', async () => {
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue('apr_rules_engine');
+    jest
+      .spyOn(featureFlagService, 'isEnabled')
+      .mockRejectedValue(new Error('connection reset'));
+
+    await expect(
+      guard.canActivate(makeContext('apr_rules_engine')),
+    ).rejects.toThrow(ServiceUnavailableException);
   });
 });
 

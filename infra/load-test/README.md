@@ -1,8 +1,14 @@
 # SGS load-test isolado
 
-> Ambiente atual: VPS `83.229.115.37`, projeto remoto `/opt/sgs-loadtest`, domínio
-> `api-loadtest.sgsseguranca.com.br`. Consulte também
-> [`docs/deploy/INFRAESTRUTURA-ATUAL.md`](../../docs/deploy/INFRAESTRUTURA-ATUAL.md).
+> **DESATIVADO (set/2026).** A VPS `83.229.115.37` descrita neste documento foi
+> desligada pelo dono do produto por custo — não existe mais um ambiente de
+> load-test isolado. Este diretório fica como referência de arquitetura (guard
+> de ambiente, separação de containers, padrão de compose) para quando uma VPS
+> de produção dedicada for comprada no futuro. Testes de carga atuais rodam
+> direto na VPS de produção (`179.198.107.5`), sem isolamento, com autorização
+> explícita do dono do produto — ver
+> [`docs/deploy/INFRAESTRUTURA-ATUAL.md`](../../docs/deploy/INFRAESTRUTURA-ATUAL.md)
+> e os scripts em `backend/test/load/`.
 
 Ambiente exclusivo para testes do SGS. O alvo atual é a VPS `sgs-loadtest`
 (`83.229.115.37`), em Ubuntu 24.04, com 6 vCPU, 16 GB RAM e 60 GB SSD.

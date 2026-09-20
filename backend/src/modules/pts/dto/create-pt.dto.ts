@@ -14,19 +14,23 @@ import {
   Min,
   Max,
   ArrayMaxSize,
+  ArrayUnique,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class HeightChecklistItemDto {
   @IsString()
+  @MaxLength(100)
   id: string;
 
   @IsString()
+  @MaxLength(2000)
   pergunta: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   section?: string;
 
   @IsOptional()
@@ -35,22 +39,26 @@ export class HeightChecklistItemDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   justificativa?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   anexo_nome?: string;
 
   // Aceito para round-trip do form, mas o service sempre restaura o valor
   // persistido — o cliente não consegue forjar referências governadas.
   @IsOptional()
   @IsString()
+  @MaxLength(10_000)
   anexo_ref?: string;
 }
 
 export class PtAtmosphericReadingDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(100)
   id: string;
 
   @IsString()
@@ -92,9 +100,11 @@ export class PtAtmosphericReadingDto {
 
 export class RecommendationChecklistItemDto {
   @IsString()
+  @MaxLength(100)
   id: string;
 
   @IsString()
+  @MaxLength(2000)
   pergunta: string;
 
   @IsOptional()
@@ -103,14 +113,17 @@ export class RecommendationChecklistItemDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   justificativa?: string;
 }
 
 export class RapidRiskChecklistItemDto {
   @IsString()
+  @MaxLength(100)
   id: string;
 
   @IsString()
+  @MaxLength(2000)
   pergunta: string;
 
   @IsEnum(['basica', 'adicional'])
@@ -124,14 +137,17 @@ export class RapidRiskChecklistItemDto {
 export class CreatePtDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(80)
   numero: string;
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
   titulo: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(5000)
   descricao?: string;
 
   @IsDateString()
@@ -160,6 +176,8 @@ export class CreatePtDto {
   responsavel_id: string;
 
   @IsArray()
+  @ArrayMaxSize(200)
+  @ArrayUnique()
   @IsUUID(undefined, { each: true })
   @IsOptional()
   executantes?: string[];
@@ -208,14 +226,17 @@ export class CreatePtDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(100_000)
   evidence_photo?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(100_000)
   evidence_document?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(2000)
   control_description?: string;
 
   @IsBoolean()
@@ -273,6 +294,7 @@ export class CreatePtDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(5000)
   analise_risco_rapida_observacoes?: string;
 
   @IsOptional()
@@ -323,9 +345,11 @@ export class CreatePtDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(200)
   resultado_auditoria?: string;
 
   @IsString()
   @IsOptional()
+  @MaxLength(2000)
   notas_auditoria?: string;
 }

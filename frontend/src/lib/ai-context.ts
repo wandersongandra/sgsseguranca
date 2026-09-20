@@ -1,5 +1,7 @@
 ﻿import { type LucideIcon, AlertTriangle, Archive, ClipboardCheck, FileText, Radio, ShieldCheck, Stethoscope, Users } from 'lucide-react';
 
+import { matchesPathSegment } from './route-config';
+
 export type AiRouteContext = {
   title: string;
   subtitle: string;
@@ -28,7 +30,7 @@ const defaultContext: AiRouteContext = {
 
 const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRouteContext }> = [
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/tst'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/tst'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Suporte ao TST em campo com bloqueios, pendencias do dia, ideias rápidas e analise visual de risco.',
@@ -46,7 +48,7 @@ const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRoute
     },
   },
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/aprs'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/aprs'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Risco residual, controles e ajuda para estruturar a APR.',
@@ -63,7 +65,7 @@ const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRoute
     },
   },
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/pts'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/pts'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Liberação segura, bloqueios, ideias e evidências antes da aprovação.',
@@ -80,7 +82,7 @@ const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRoute
     },
   },
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/nonconformities'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/nonconformities'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Classificação, criticidade, contenção e plano de ação.',
@@ -97,7 +99,7 @@ const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRoute
     },
   },
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/document-registry'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/document-registry'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Pacote semanal, rastreabilidade e apoio documental.',
@@ -114,7 +116,7 @@ const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRoute
     },
   },
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/medical-exams'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/medical-exams'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Aptidão, vencimentos e bloqueios médicos operacionais.',
@@ -131,7 +133,7 @@ const contexts: Array<{ matcher: (pathname: string) => boolean; context: AiRoute
     },
   },
   {
-    matcher: (pathname) => pathname.startsWith('/dashboard/employees'),
+    matcher: (pathname) => matchesPathSegment(pathname, '/dashboard/employees'),
     context: {
       title: 'Chat da SOPHIE',
       subtitle: 'Status operacional do trabalhador e prontidão documental.',

@@ -93,6 +93,7 @@ export function BasicInfoSection({
           <input
             id="pt-numero"
             {...register('numero')}
+            maxLength={80}
             aria-invalid={errors.numero ? 'true' : undefined}
             placeholder="Ex: PT-001"
             className={cn(
@@ -136,6 +137,7 @@ export function BasicInfoSection({
           <input
             id="pt-titulo"
             {...register('titulo')}
+            maxLength={200}
             aria-invalid={errors.titulo ? 'true' : undefined}
             placeholder="Descreva o trabalho a ser executado"
             className={cn(
@@ -155,6 +157,7 @@ export function BasicInfoSection({
           <textarea
             id="pt-descricao"
             {...register('descricao')}
+            maxLength={5000}
             aria-label="Descrição da permissão de trabalho"
             rows={3}
             placeholder="Detalhe a atividade, riscos e controles"
@@ -163,6 +166,9 @@ export function BasicInfoSection({
               errors.descricao ? 'border-[var(--ds-color-danger)] bg-[color:var(--ds-color-danger-subtle)]' : 'border-[var(--ds-color-border-default)] focus:border-[var(--ds-color-focus)]',
             )}
           />
+          {errors.descricao && (
+            <p className="mt-1 text-xs text-[var(--ds-color-danger)]">{getErrorMessage('descricao')}</p>
+          )}
         </div>
 
         <div>

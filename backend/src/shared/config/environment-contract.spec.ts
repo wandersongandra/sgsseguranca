@@ -58,6 +58,18 @@ describe('environment contract', () => {
     ).not.toThrow();
   });
 
+  it('aceita configurações de produção consumidas pelo bootstrap da API', () => {
+    expect(() =>
+      assertNoUnknownSgsEnvironmentKeys({
+        ...apiEnvironment(),
+        ADMIN_IP_ALLOWLIST_REQUIRED: 'true',
+        TENANT_BACKUP_ENCRYPTION_KEY: strong('tenant-backup'),
+        DLQ_PRUNE_BATCH: '25',
+        REDIS_USERNAME: 'runtime-user',
+      }),
+    ).not.toThrow();
+  });
+
   it('aceita variáveis ambientais do runner por nome exato', () => {
     expect(() =>
       assertNoUnknownSgsEnvironmentKeys({

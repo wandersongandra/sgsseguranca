@@ -15,6 +15,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { selectedTenantStore } from '@/lib/selectedTenantStore';
 import { siteStore } from '@/lib/siteStore';
+import { resolveActiveCompanyId } from '@/lib/tenant-context';
 import { Company } from '@/services/companiesService';
 import { AlertTriangle, Building2, ChevronsUpDown, HardHat } from 'lucide-react';
 import { MobileFieldNav } from '@/components/MobileFieldNav';
@@ -67,6 +68,13 @@ function DashboardShell({
     selectedTenantStore.get(),
   );
   const [selectedSite, setSelectedSite] = useState(() => siteStore.get());
+  // companyId real do usuário: selectedTenant sozinho só existe para
+  // admin_geral (após escolher uma empresa no seletor). Para todo o resto
+  // dos perfis, o banner "Selecionar obra" abaixo (e o SiteSelectorModal que
+  // ele abre) precisam do fallback via sessionStore — sem isso, usuários
+  // fora do admin_geral nunca veem o banner e nunca conseguem selecionar
+  // uma obra, deixando siteStore permanentemente vazio para eles.
+  const activeCompanyId = resolveActiveCompanyId();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarModal, setSidebarModal] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -132,7 +140,10 @@ function DashboardShell({
 
   const handleSiteSelect = (site: { id: string; nome: string; company_id: string }) => {
     // Ao selecionar uma obra, também atualiza a empresa se necessário
-    if (selectedTenant?.companyId !== site.company_id) {
+    // (fluxo do admin_geral trocando de empresa+obra juntos). Para usuário
+    // comum, activeCompanyId já resolve via sessionStore e normalmente bate
+    // com site.company_id, então este branch não dispara para eles.
+    if (activeCompanyId !== site.company_id) {
       const company = { id: site.company_id };
       handleCompanySelect(company as Company);
     }
@@ -256,7 +267,7 @@ function DashboardShell({
           </div>
         )}
         {/* Banner de obra selecionada - para todos os usuários */}
-        {selectedTenant && !selectedSite && (
+        {activeCompanyId && !selectedSite && (
           <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-blue-200 bg-blue-50 px-5 py-2 dark:border-blue-800 dark:bg-blue-950/30">
             <div className="flex min-w-0 items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
               <span className="min-w-0 truncate font-medium">
@@ -273,7 +284,7 @@ function DashboardShell({
           </div>
         )}
         {/* Banner de obra ativa */}
-        {selectedTenant && selectedSite && (
+        {activeCompanyId && selectedSite && (
           <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-amber-200 bg-amber-50 px-5 py-2 dark:border-amber-800 dark:bg-amber-950/30">
             <div className="flex min-w-0 items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
               <HardHat className="h-4 w-4 shrink-0" />
@@ -328,7 +339,7 @@ function DashboardShell({
       <SiteSelectorModal
         open={siteSelectorOpen}
         onSelect={handleSiteSelect}
-        currentCompanyId={selectedTenant?.companyId || ''}
+        currentCompanyId={activeCompanyId || ''}
         currentSiteId={selectedSite?.siteId}
         onClose={() => setSiteSelectorOpen(false)}
       />

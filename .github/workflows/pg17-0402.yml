@@ -1,0 +1,57 @@
+name: PostgreSQL 17 Migration 0402
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: pg17-0402-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  migration-0402-pg17:
+    name: PostgreSQL 17 Migration 0402 Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-password
+          POSTGRES_DB: postgres
+        ports:
+          - 5436:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build backend migration artifact
+        run: npm run build
+
+      - name: Run real PostgreSQL 17 migration 0402 integration
+        env:
+          PG17_MIGRATION_0402_TEST_URL: postgresql://postgres:ci-postgres-password@127.0.0.1:5436/postgres
+        run: node scripts/migration-0402-pg17-integration.cjs

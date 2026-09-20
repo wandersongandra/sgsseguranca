@@ -10,6 +10,7 @@ import {
   normalizeChatCompletionBodyForProvider,
 } from './ai-llm.config';
 import { sanitizeOpenAiRequestBody } from './openai-payload-boundary.util';
+import { isAiFeatureEnabled } from '../../shared/config/ai-feature-policy';
 
 type OpenAiChatRequestInput = {
   /** Runtime inteiro e já validado; URL e credencial vêm do mesmo provedor. */
@@ -42,6 +43,9 @@ function resolveOpenAiTimeoutMs(configService: ConfigService): number {
 export async function requestOpenAiChatCompletionResponse(
   input: OpenAiChatRequestInput,
 ): Promise<Response> {
+  if (!isAiFeatureEnabled(input.configService)) {
+    throw new ServiceUnavailableException('IA desabilitada neste ambiente.');
+  }
   const timeoutMs = resolveOpenAiTimeoutMs(input.configService);
   const fetchImpl = input.fetchImpl ?? fetch;
   const model =
@@ -61,6 +65,11 @@ export async function requestOpenAiChatCompletionResponse(
     const response = await input.integration.execute(
       'llm_chat_completion',
       async () => {
+        if (!isAiFeatureEnabled(input.configService)) {
+          throw new ServiceUnavailableException(
+            'IA desabilitada neste ambiente.',
+          );
+        }
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   PT_CONDICOES_AREA,
   type Pt,
   type PtCondicaoArea,
 } from '@/services/ptsService';
+import { Button } from '@/components/ui/button';
+import { ModalBody, ModalFooter, ModalFrame, ModalHeader } from '@/components/ui/modal-frame';
 
 type PtClosureModalProps = {
   pt: Pt | null;
@@ -31,6 +33,7 @@ export function PtClosureModal({
   const [dataHoraRealFim, setDataHoraRealFim] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+  const conditionRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
     if (pt) {
@@ -77,31 +80,34 @@ export function PtClosureModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="pt-closure-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+    <ModalFrame
+      isOpen
+      onClose={onClose}
+      initialFocusRef={conditionRef}
+      shellClassName="max-w-lg"
     >
-      <div className="w-full max-w-lg rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-lg)]">
-        <h2
-          id="pt-closure-title"
-          className="text-lg font-bold text-[var(--ds-color-text-primary)]"
-        >
-          Encerrar PT {pt.numero}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Registre a devolução da área. Esses dados ficam gravados no documento
-          e no PDF final.
-        </p>
-
-        <div className="mt-4 space-y-4">
+      <ModalHeader
+        title={`Encerrar PT ${pt.numero}`}
+        description="Registre a devolução da área. Esses dados ficam gravados no documento e no PDF final."
+        onClose={onClose}
+      />
+      <ModalBody>
+        <div className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]">
+            <label
+              htmlFor="pt-closure-condition"
+              className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]"
+            >
               Condição da área <span className="text-[var(--ds-color-danger)]">*</span>
             </label>
             <select
+              ref={conditionRef}
+              id="pt-closure-condition"
               value={condicaoArea}
+              required
+              aria-required="true"
+              aria-invalid={Boolean(validationError && !condicaoArea)}
+              aria-describedby={validationError ? 'pt-closure-error' : undefined}
               onChange={(event) =>
                 setCondicaoArea(event.target.value as PtCondicaoArea | '')
               }
@@ -117,10 +123,14 @@ export function PtClosureModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]">
+            <label
+              htmlFor="pt-closure-real-end"
+              className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]"
+            >
               Data/hora real de término
             </label>
             <input
+              id="pt-closure-real-end"
               type="datetime-local"
               value={dataHoraRealFim}
               min={minDateTime}
@@ -130,10 +140,14 @@ export function PtClosureModal({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]">
+            <label
+              htmlFor="pt-closure-notes"
+              className="mb-1 block text-sm font-semibold text-[var(--ds-color-text-primary)]"
+            >
               Observações de encerramento
             </label>
             <textarea
+              id="pt-closure-notes"
               value={observacoes}
               onChange={(event) => setObservacoes(event.target.value)}
               rows={3}
@@ -144,32 +158,21 @@ export function PtClosureModal({
           </div>
 
           {validationError && (
-            <p className="text-sm text-[var(--ds-color-danger)]">
+            <p id="pt-closure-error" role="alert" className="text-sm text-[var(--ds-color-danger)]">
               {validationError}
             </p>
           )}
         </div>
-
-        <div className="mt-6 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="rounded-lg border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40 disabled:opacity-50"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={loading}
-            className="rounded-lg bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
-          >
-            {loading ? 'Encerrando...' : 'Encerrar PT'}
-          </button>
-        </div>
-      </div>
-    </div>
+      </ModalBody>
+      <ModalFooter>
+        <Button type="button" variant="ghost" onClick={onClose} disabled={loading}>
+          Cancelar
+        </Button>
+        <Button type="button" variant="primary" onClick={handleConfirm} loading={loading}>
+          Encerrar PT
+        </Button>
+      </ModalFooter>
+    </ModalFrame>
   );
 }
 
