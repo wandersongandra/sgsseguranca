@@ -3,7 +3,7 @@ import { logger } from "@/lib/logger";
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LayoutTemplate,
   Mail,
@@ -38,6 +38,7 @@ import { TableRowSkeleton } from "@/components/ui/skeleton";
 import { ResponsiveDataList } from "@/components/ui/responsive-data-list";
 import { useAuth } from "@/context/AuthContext";
 import { Permission } from "@/lib/permissions";
+import { runWithMutationLock } from "@/lib/mutation-lock";
 
 const SendMailModal = dynamic(
   () =>
@@ -77,6 +78,7 @@ export function ChecklistModelsView({
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -121,18 +123,20 @@ export function ChecklistModelsView({
       return;
     }
 
-    try {
-      await checklistsService.delete(id);
-      if (models.length === 1 && page > 1) {
-        setPage((current) => current - 1);
-      } else {
-        await loadModels();
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await checklistsService.delete(id);
+        if (models.length === 1 && page > 1) {
+          setPage((current) => current - 1);
+        } else {
+          await loadModels();
+        }
+        toast.success("Modelo excluído com sucesso!");
+      } catch (error) {
+        logger.error("Erro ao excluir modelo:", error);
+        toast.error("Erro ao excluir modelo.");
       }
-      toast.success("Modelo excluído com sucesso!");
-    } catch (error) {
-      logger.error("Erro ao excluir modelo:", error);
-      toast.error("Erro ao excluir modelo.");
-    }
+    });
   }
 
   async function handleBootstrapTemplates() {

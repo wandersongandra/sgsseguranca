@@ -46,11 +46,13 @@ function makeService(overrides: {
     jest.fn((entity: Partial<EpiAssignment>) =>
       Promise.resolve(entity as EpiAssignment),
     );
+  const assignFindOne =
+    overrides.assignmentsRepository?.findOne ?? jest.fn().mockResolvedValue(null);
 
   const assignmentsRepository = {
     create: assignCreate,
     save: assignSave,
-    findOne: jest.fn().mockResolvedValue(null),
+    findOne: assignFindOne,
     createQueryBuilder: jest.fn().mockReturnValue(makeQb()),
     // SGS-EPI-BR-007: create() now wraps stock check + save in a transaction
     manager: {
@@ -58,7 +60,11 @@ function makeService(overrides: {
         const trx = {
           getRepository: (entity: unknown) => {
             if (entity === Epi) return { findOne: epiFindOne };
-            return { create: assignCreate, save: assignSave };
+            return {
+              create: assignCreate,
+              findOne: assignFindOne,
+              save: assignSave,
+            };
           },
           query: jest.fn().mockResolvedValue(undefined),
         };
@@ -323,5 +329,86 @@ describe('EpiAssignmentsService', () => {
 
       expect(qb.andWhere).toHaveBeenCalledWith('assignment.deleted_at IS NULL');
     });
+  });
+
+  describe('update() concorrente com finalização', () => {
+    it('converte NOWAIT em conflito e não executa save após colisão', async () => {
+      const lockError = new Error('row lock unavailable') as Error & {
+        code?: string;
+      };
+      lockError.code = '55P03';
+      const repo = {
+        findOne: jest.fn().mockRejectedValue(lockError),
+        save: jest.fn(),
+      };
+      const service = makeService({
+        assignmentsRepository: {
+          manager: {
+            transaction: jest.fn(
+              (
+                callback: (trx: {
+                  getRepository: () => typeof repo;
+                }) => Promise<unknown>,
+              ) => callback({ getRepository: () => repo }),
+            ),
+          },
+        } as never,
+      });
+
+      await expect(
+        service.update('assignment-1', { observacoes: 'segunda escrita' }),
+      ).rejects.toThrow('Ficha em processamento');
+      expect(repo.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lock: { mode: 'pessimistic_write', onLocked: 'nowait' },
+        }),
+      );
+      expect(repo.save).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        label: 'assinatura',
+        assignment: {
+          assinatura_entrega: { signature_hash: 'signed-hash' },
+          pdf_file_key: null,
+        },
+      },
+      {
+        label: 'PDF final',
+        assignment: {
+          assinatura_entrega: { signature_hash: null },
+          pdf_file_key: 'documents/company-1/epi/final.pdf',
+        },
+      },
+    ])(
+      'rejeita alteração após $label dentro da transação',
+      async ({ assignment }) => {
+        const saved = {
+          id: 'assignment-1',
+          company_id: 'company-1',
+          site_id: null,
+          status: 'entregue',
+          ...assignment,
+        } as unknown as EpiAssignment;
+        const repo = {
+          findOne: jest.fn().mockResolvedValue(saved),
+          save: jest.fn(),
+        };
+        const service = makeService({
+          assignmentsRepository: {
+            manager: {
+              transaction: (callback: (trx: unknown) => Promise<unknown>) =>
+                callback({ getRepository: () => repo }),
+            },
+          } as never,
+        });
+
+        await expect(
+          service.update('assignment-1', { observacoes: 'alteração indevida' }),
+        ).rejects.toThrow(/assinada ou com PDF final/);
+        expect(repo.save).not.toHaveBeenCalled();
+      },
+    );
   });
 });

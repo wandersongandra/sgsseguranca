@@ -17,6 +17,7 @@ import { openPdfForPrint, openUrlInNewTab } from '@/lib/print-utils';
 import { buildPdfFilename } from '@/lib/pdf-system/core/format';
 import { getFormErrorMessage } from '@/lib/error-handler';
 import { safeFormatDate } from '@/lib/date/safeFormat';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 
 type UseDidsOptions = {
   canManageDids: boolean;
@@ -34,6 +35,7 @@ const timerRef = useRef<number | undefined>(undefined);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
   const [busyDidId, setBusyDidId] = useState<string | null>(null);
+  const deleteMutationLock = useRef(false);
   const [isMailModalOpen, setIsMailModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<{
     name: string;
@@ -389,21 +391,23 @@ useEffect(() => {
         return;
       }
 
-      try {
-        setBusyDidId(id);
-        await didsService.delete(id);
-        toast.success('Registro excluído com sucesso.');
-        if (dids.length === 1 && page > 1) {
-          setPage((current) => current - 1);
-          return;
+      await runWithMutationLock(deleteMutationLock, async () => {
+        try {
+          setBusyDidId(id);
+          await didsService.delete(id);
+          toast.success('Registro excluído com sucesso.');
+          if (dids.length === 1 && page > 1) {
+            setPage((current) => current - 1);
+            return;
+          }
+          await loadDids();
+        } catch (error) {
+          logger.error(error);
+          toast.error('Não foi possível excluir o registro.');
+        } finally {
+          setBusyDidId(null);
         }
-        await loadDids();
-      } catch (error) {
-        logger.error(error);
-        toast.error('Não foi possível excluir o registro.');
-      } finally {
-        setBusyDidId(null);
-      }
+      });
     },
     [canManageDids, dids.length, loadDids, page],
   );

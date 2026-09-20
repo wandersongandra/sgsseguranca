@@ -2,6 +2,7 @@ import { authRefreshHint } from "@/lib/authRefreshHint";
 import { clearCachedFetches } from "@/hooks/useCachedFetch";
 import { clearFetchAllPagesCache } from "@/services/pagination";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
+import { siteStore } from "@/lib/siteStore";
 import { sessionStore, type Session as AuthSession } from "@/lib/sessionStore";
 import { tokenStore } from "@/lib/tokenStore";
 import { clearSensitiveBrowserStorage } from "@/lib/browser-sensitive-storage";
@@ -74,12 +75,13 @@ export function persistAuthenticatedSession(params: {
   selectedTenantStore.clear();
 }
 
-export function clearAuthenticatedSession() {
-  clearSensitiveBrowserStorage();
+export async function clearAuthenticatedSession(): Promise<void> {
   clearCachedFetches();
   clearFetchAllPagesCache();
   tokenStore.clear();
   sessionStore.clear();
   authRefreshHint.clear();
   selectedTenantStore.clear();
+  siteStore.clear();
+  await clearSensitiveBrowserStorage();
 }

@@ -52,6 +52,7 @@ import {
   toInputDateValue,
 } from "@/lib/date/safeFormat";
 import { dedupeDdsUsersById } from "@/lib/dds-user-scope";
+import { isSafeImagePreviewUrl } from "@/lib/security/is-safe-image-preview-url";
 import { ddsSchema, type DdsFormData } from "@/lib/validation/ddsForm.schema";
 import {
   blobToBoundedDataUrl,
@@ -125,6 +126,16 @@ function normalizeDdsConteudoFromAi(value: string): string {
 
 function isUuidLike(value?: string | null): value is string {
   return typeof value === "string" && UUID_LIKE_REGEX.test(value.trim());
+}
+
+export function resolveSafeDdsImageUrl(
+  rawUrl: string | null | undefined,
+): string | null {
+  const value = String(rawUrl ?? "").trim();
+  if (value.toLowerCase().startsWith("data:image/svg")) {
+    return null;
+  }
+  return isSafeImagePreviewUrl(value) ? value : null;
 }
 
 function buildSignatureSnapshot(input: {
@@ -296,6 +307,8 @@ export function DdsForm({ id }: DdsFormProps) {
   const [pendingResetCallback, setPendingResetCallback] = useState<
     (() => Promise<void>) | null
   >(null);
+  const [confirmResetLoading, setConfirmResetLoading] = useState(false);
+  const confirmResetInFlightRef = useRef(false);
 
   const {
     register,
@@ -510,6 +523,8 @@ export function DdsForm({ id }: DdsFormProps) {
       return;
     }
 
+    let cancelled = false;
+
     async function loadData() {
       try {
         // Dispara todos os fetches independentes em paralelo
@@ -519,6 +534,8 @@ export function DdsForm({ id }: DdsFormProps) {
             id ? ddsService.findOne(id) : Promise.resolve(null),
             id ? ddsService.listSignatures(id) : Promise.resolve([]),
           ]);
+
+        if (cancelled) return;
 
         // Processa empresas
         let companiesData: Company[] = [];
@@ -546,7 +563,10 @@ export function DdsForm({ id }: DdsFormProps) {
           } catch {
             // ignora fallback sem permissão
           }
+          if (cancelled) return;
         }
+
+        if (cancelled) return;
 
         if (
           !id &&
@@ -651,6 +671,7 @@ export function DdsForm({ id }: DdsFormProps) {
           setInitialSignatureSnapshot(null);
         }
       } catch (error) {
+        if (cancelled) return;
         logger.error("Erro ao carregar dados:", error);
         toast.error(
           getFormErrorMessage(error, {
@@ -659,10 +680,15 @@ export function DdsForm({ id }: DdsFormProps) {
           }),
         );
       } finally {
-        setFetching(false);
+        if (!cancelled) {
+          setFetching(false);
+        }
       }
     }
     loadData();
+    return () => {
+      cancelled = true;
+    };
   }, [canViewDds, id, reset, prefillCompanyId, setValue]);
 
   // Efeito 1: dispara quando empresa muda — carrega sites da empresa.
@@ -766,6 +792,8 @@ export function DdsForm({ id }: DdsFormProps) {
       return;
     }
 
+    let cancelled = false;
+
     async function loadHistoricalPhotoHashes() {
       try {
         const nextHashes: Record<string, HistoricalPhotoReference> = {};
@@ -785,8 +813,11 @@ export function DdsForm({ id }: DdsFormProps) {
             };
           });
         });
+
+        if (cancelled) return;
         setHistoricalPhotoHashes(nextHashes);
       } catch (error) {
+        if (cancelled) return;
         logger.error(
           "Erro ao carregar hashes históricos de fotos do DDS:",
           error,
@@ -800,6 +831,10 @@ export function DdsForm({ id }: DdsFormProps) {
       setHistoricalPhotoHashes({});
       setPhotoReuseWarnings({});
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [canViewDds, selectedCompanyId, id]);
 
   useEffect(() => {
@@ -1697,14 +1732,24 @@ export function DdsForm({ id }: DdsFormProps) {
                     className="relative overflow-hidden rounded-[var(--ds-radius-md)] border"
                     title={`Hash de integridade: ${photo.hash.slice(0, 16)}...`}
                   >
-                    <NextImage
-                      src={photo.imageData}
-                      alt={`Foto da equipe ${index + 1}`}
-                      width={600}
-                      height={300}
-                      loading="lazy"
-                      className="h-36 w-full object-cover"
-                    />
+                    {resolveSafeDdsImageUrl(photo.imageData) ? (
+                      <NextImage
+                        src={resolveSafeDdsImageUrl(photo.imageData) as string}
+                        alt={`Foto da equipe ${index + 1}`}
+                        width={600}
+                        height={300}
+                        loading="lazy"
+                        className="h-36 w-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        role="img"
+                        aria-label={`Prévia indisponível da foto da equipe ${index + 1}`}
+                        className="flex h-36 items-center justify-center bg-[var(--ds-color-surface-muted)] px-3 text-center text-xs text-[var(--ds-color-text-muted)]"
+                      >
+                        Prévia indisponível por segurança.
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() =>
@@ -1868,17 +1913,26 @@ export function DdsForm({ id }: DdsFormProps) {
             setPendingResetCallback(null);
           }}
           onConfirm={async () => {
+            if (confirmResetInFlightRef.current || !pendingResetCallback) {
+              return;
+            }
+            confirmResetInFlightRef.current = true;
+            setConfirmResetLoading(true);
             try {
               await pendingResetCallback();
               setConfirmResetDialogOpen(false);
               setPendingResetCallback(null);
             } catch (error) {
               logger.error("Erro ao confirmar reset de assinaturas:", error);
+            } finally {
+              confirmResetInFlightRef.current = false;
+              setConfirmResetLoading(false);
             }
           }}
           title="Confirmar invalidação de assinaturas"
           description="Esta alteração invalida as assinaturas existentes do DDS. Deseja confirmar e reenviar as assinaturas já capturadas?"
           confirmLabel="Confirmar e continuar"
+          loading={confirmResetLoading}
           danger={true}
         />
       )}
@@ -1886,4 +1940,3 @@ export function DdsForm({ id }: DdsFormProps) {
     </div>
   );
 }
-

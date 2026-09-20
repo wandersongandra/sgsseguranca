@@ -82,10 +82,16 @@ export class WorkerHeartbeatService {
 
       const parsed = JSON.parse(raw) as Partial<WorkerHeartbeatPayload>;
       const lastSeenAt =
-        typeof parsed.updatedAt === 'string'
-          ? parsed.updatedAt
-          : new Date().toISOString();
-      const ageMs = Math.max(0, Date.now() - new Date(lastSeenAt).getTime());
+        typeof parsed.updatedAt === 'string' ? parsed.updatedAt : '';
+      const lastSeenMs = Date.parse(lastSeenAt);
+      if (!this.isFresh(lastSeenMs)) {
+        return {
+          status: 'down',
+          required,
+          message: 'Worker heartbeat is stale or invalid',
+        };
+      }
+      const ageMs = Date.now() - lastSeenMs;
 
       return {
         status: 'up',
@@ -118,6 +124,15 @@ export class WorkerHeartbeatService {
 
     return !/^false$/i.test(
       this.configService.get<string>('WORKER_HEARTBEAT_ENABLED', 'true'),
+    );
+  }
+
+  isFresh(timestamp: number): boolean {
+    const ageMs = Date.now() - timestamp;
+    return (
+      Number.isFinite(ageMs) &&
+      ageMs >= 0 &&
+      ageMs < this.getTtlSeconds() * 1000
     );
   }
 

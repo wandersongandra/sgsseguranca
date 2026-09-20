@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { handleApiError } from '@/lib/error-handler';
@@ -16,9 +16,15 @@ export function useFormSubmit<T>(
   options?: UseFormSubmitOptions
 ) {
   const [loading, setLoading] = useState(false);
+  const submittingRef = useRef(false);
   const router = useRouter();
 
   const handleSubmit = async (data: T) => {
+    if (submittingRef.current) {
+      return undefined;
+    }
+
+    submittingRef.current = true;
     setLoading(true);
     try {
       const result = await submitFn(data);
@@ -43,6 +49,7 @@ export function useFormSubmit<T>(
     } catch (error) {
       handleApiError(error, options?.context || 'Formulário');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

@@ -13,6 +13,27 @@ function config(values: Record<string, string | undefined>) {
 }
 
 describe('ai-llm.config', () => {
+  it.each(['openai', 'nvidia', 'anthropic', 'gemini'])(
+    'não carrega credenciais nem habilita runtime %s quando IA está desligada',
+    (provider) => {
+      const runtime = resolveAiLlmRuntimeConfig(
+        config({
+          FEATURE_AI_ENABLED: 'false',
+          AI_PROVIDER: provider,
+          OPENAI_API_KEY: 'synthetic-not-a-credential',
+          NVIDIA_API_KEY: 'synthetic-not-a-credential',
+          ANTHROPIC_API_KEY: 'synthetic-not-a-credential',
+          GEMINI_API_KEY: 'synthetic-not-a-credential',
+        }),
+      );
+      expect(runtime).toMatchObject({
+        configured: false,
+        apiKey: null,
+        imageAnalysisEnabled: false,
+        runtimeMode: 'degraded',
+      });
+    },
+  );
   it('resolve NVIDIA NIM com chave, modelo e endpoint próprios', () => {
     const runtime = resolveAiLlmRuntimeConfig(
       config({

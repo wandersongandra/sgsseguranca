@@ -1,7 +1,7 @@
 'use client';
 import { logger } from '@/lib/logger';
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, Pencil, Plus, Search, Trash2, Truck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import { ListPageLayout } from '@/components/layout';
 import { cn } from '@/lib/utils';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { CatalogMobileCard, catalogMobileActionClassName } from '../components/CatalogMobileCard';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 
 export default function MachinesPage() {
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -25,6 +26,7 @@ export default function MachinesPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -64,18 +66,20 @@ export default function MachinesPage() {
       return;
     }
 
-    try {
-      await machinesService.delete(id);
-      toast.success('Maquina excluida com sucesso');
-      if (machines.length === 1 && page > 1) {
-        setPage((current) => current - 1);
-        return;
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await machinesService.delete(id);
+        toast.success('Maquina excluida com sucesso');
+        if (machines.length === 1 && page > 1) {
+          setPage((current) => current - 1);
+          return;
+        }
+        void loadMachines();
+      } catch (error) {
+        logger.error('Erro ao excluir maquina:', error);
+        toast.error('Erro ao excluir maquina. Verifique dependencias e tente novamente.');
       }
-      void loadMachines();
-    } catch (error) {
-      logger.error('Erro ao excluir maquina:', error);
-      toast.error('Erro ao excluir maquina. Verifique dependencias e tente novamente.');
-    }
+    });
   }
 
   const summary = useMemo(
@@ -279,7 +283,6 @@ export default function MachinesPage() {
     </ListPageLayout>
   );
 }
-
 
 
 
