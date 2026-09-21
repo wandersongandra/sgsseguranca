@@ -7,6 +7,13 @@ import { usersService } from '@/services/usersService';
 import { handleApiError } from '@/lib/error-handler';
 
 const pushMock = jest.fn();
+const replaceMock = jest.fn();
+const refreshMock = jest.fn();
+const routerMock = {
+  push: pushMock,
+  replace: replaceMock,
+  refresh: refreshMock,
+};
 
 const sessionCompany = {
   id: 'company-tst-1',
@@ -20,9 +27,7 @@ const sessionCompany = {
 };
 
 jest.mock('next/navigation', () => ({
-  useRouter: () => ({
-    push: pushMock,
-  }),
+  useRouter: () => routerMock,
 }));
 
 jest.mock('@/context/AuthContext', () => ({
@@ -75,8 +80,17 @@ jest.mock('@/lib/error-handler', () => ({
 }));
 
 describe('UserForm', () => {
+  const waitForFormReady = async (buttonName: RegExp) => {
+    await waitFor(() => {
+      expect(screen.queryByText('Carregando cadastro...')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: buttonName })).toBeEnabled();
+    });
+  };
+
   beforeEach(() => {
     pushMock.mockReset();
+    replaceMock.mockReset();
+    refreshMock.mockReset();
     jest.mocked(companiesService.findOne).mockResolvedValue(sessionCompany);
     jest.mocked(profilesService.findAll).mockResolvedValue([
       {
@@ -152,6 +166,7 @@ describe('UserForm', () => {
     render(<UserForm />);
 
     await screen.findByRole('checkbox', { name: /Obra Central/i });
+    await waitForFormReady(/Criar usuário/i);
 
     fireEvent.change(screen.getByLabelText('Nome Completo'), {
       target: { value: 'Funcionário Teste' },
@@ -178,6 +193,7 @@ describe('UserForm', () => {
     render(<UserForm />);
 
     await screen.findByRole('checkbox', { name: /Obra Central/i });
+    await waitForFormReady(/Criar usuário/i);
 
     fireEvent.change(screen.getByLabelText('Nome Completo'), {
       target: { value: 'Funcionário Teste' },
@@ -214,6 +230,7 @@ describe('UserForm', () => {
     render(<UserForm />);
 
     await screen.findByRole('checkbox', { name: /Obra Central/i });
+    await waitForFormReady(/Criar usuário/i);
 
     fireEvent.change(screen.getByLabelText('Nome Completo'), {
       target: { value: 'Funcionário Teste' },
@@ -267,7 +284,12 @@ describe('UserForm', () => {
     const siteCheckbox = await screen.findByRole('checkbox', {
       name: /Obra Central/i,
     });
+    await waitForFormReady(/Salvar alterações/i);
+    await waitFor(() =>
+      expect(screen.getByLabelText('Nome Completo')).toHaveValue('Tecnico Existente'),
+    );
     fireEvent.click(siteCheckbox);
+    await waitFor(() => expect(siteCheckbox).toBeChecked());
 
     fireEvent.click(screen.getByRole('button', { name: /Salvar alterações/i }));
 
