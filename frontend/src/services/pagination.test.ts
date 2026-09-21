@@ -1,4 +1,8 @@
-import { clearFetchAllPagesCache, fetchAllPages } from "./pagination";
+import {
+  clearFetchAllPagesCache,
+  fetchAllPages,
+  type PaginatedResponse,
+} from "./pagination";
 
 describe("fetchAllPages", () => {
   beforeEach(() => {
@@ -98,5 +102,36 @@ describe("fetchAllPages", () => {
     expect(first).toEqual([1, 2]);
     expect(second).toEqual([1, 2]);
     expect(calls).toBe(2);
+  });
+
+  it("não repovoa o cache depois de uma limpeza de sessão durante a busca", async () => {
+    let resolveStale!: (value: PaginatedResponse<number>) => void;
+    const staleResponse = new Promise<PaginatedResponse<number>>((resolve) => {
+      resolveStale = resolve;
+    });
+
+    const staleRequest = fetchAllPages<number>({
+      cacheKey: "GET:/users?limit=1",
+      limit: 1,
+      fetchPage: async () => staleResponse,
+    });
+
+    await Promise.resolve();
+    clearFetchAllPagesCache();
+    resolveStale({ data: [1], total: 1, page: 1, lastPage: 1 });
+    await staleRequest;
+
+    let freshCalls = 0;
+    const fresh = await fetchAllPages<number>({
+      cacheKey: "GET:/users?limit=1",
+      limit: 1,
+      fetchPage: async () => {
+        freshCalls += 1;
+        return { data: [2], total: 1, page: 1, lastPage: 1 };
+      },
+    });
+
+    expect(fresh).toEqual([2]);
+    expect(freshCalls).toBe(1);
   });
 });

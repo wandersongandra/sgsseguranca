@@ -701,6 +701,21 @@ body {
     color: var(--ds-color-text-secondary);
   }
 
+  .ds-pt-form-page input:not([type="checkbox"]):not([type="radio"]),
+  .ds-pt-form-page select,
+  .ds-pt-form-page textarea {
+    min-height: 2.75rem;
+  }
+
+  /* PT em campo: mantem alvos de toque confortaveis e evita zoom automatico do iOS. */
+  @media (max-width: 767px) {
+    .ds-pt-form-page input:not([type="checkbox"]):not([type="radio"]),
+    .ds-pt-form-page select,
+    .ds-pt-form-page textarea {
+      font-size: 1rem !important;
+    }
+  }
+
   .ds-form-page .p-6 {
     padding: 1.25rem;
   }

@@ -132,6 +132,9 @@ npm run dr:protect-storage:dry-run
 # Execução real
 npm run dr:protect-storage -- --execute --trigger-source=manual
 
+# Probe sintético somente na réplica (sem Nest, banco ou objetos de clientes)
+npm run dr:protect-storage -- --execute --synthetic-probe
+
 # Execução real restrita a uma empresa e forçando overwrite
 npm run dr:protect-storage -- --execute --company-id=<uuid> --force-replace
 ```
@@ -142,6 +145,14 @@ npm run dr:protect-storage -- --execute --company-id=<uuid> --force-replace
 - não sobrescreve por padrão
 - registra hash SHA-256 do objeto replicado
 - registra execução em `disaster_recovery_executions`
+
+O modo `--execute --synthetic-probe` é uma operação separada para validar a
+réplica sem inventariar artefatos governados. Ele gera 64 KiB aleatórios,
+usa uma chave exclusiva `sgs-dr-probe/<uuid>/probe.bin`, executa `PutObject`,
+`GetObject`, compara SHA-256 e remove o objeto em `finally`. Não lê objetos
+de clientes, não grava banco e retorna código não zero em qualquer falha,
+inclusive falha de limpeza. Ele exige exclusivamente as seis variáveis
+`DR_STORAGE_REPLICA_*` abaixo; não há fallback para credenciais `AWS_*`.
 
 **Variáveis esperadas:**
 - `DR_STORAGE_REPLICA_BUCKET`

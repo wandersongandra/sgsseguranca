@@ -10,6 +10,7 @@ ENV NODE_ENV=development
 
 COPY backend/package*.json ./
 COPY backend/scripts ./scripts
+COPY backend/vendor ./vendor
 RUN npm ci --include=dev
 
 COPY backend/. .

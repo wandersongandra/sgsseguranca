@@ -143,12 +143,15 @@ export interface Apr {
   final_pdf_hash_sha256?: string | null;
   verification_code?: string | null;
   pdf_generated_at?: string | null;
-  workflowConfigId?: string | null;
   versao?: number;
   parent_apr_id?: string;
   aprovado_por_id?: string;
   aprovado_por?: User;
   aprovado_em?: string;
+  reprovado_por_id?: string;
+  reprovado_por?: User;
+  reprovado_em?: string;
+  reprovado_motivo?: string;
   classificacao_resumo?: {
     total: number;
     aceitavel: number;
@@ -361,8 +364,15 @@ export const aprsService = {
   }) => {
     const activeCompanyId = opts?.companyId;
     const activeSiteId = opts?.siteId;
-    if (!activeCompanyId || !activeSiteId) {
-      throw new Error('companyId e siteId são obrigatórios para listar APRs.');
+    // Achado real (auditoria v2, confirmado ao vivo em produção): site_id é
+    // um FILTRO opcional no backend (`@ApiQuery({ name: 'site_id', required:
+    // false, ... })` em aprs.controller.ts — "Filtra a fila por obra/
+    // unidade"), não um requisito. Exigir os dois aqui travava a listagem
+    // inteira de APRs para qualquer usuário sem uma "obra ativa" selecionada
+    // no dashboard (siteStore) — um fluxo totalmente separado e opcional,
+    // não relacionado a ver a fila de APRs da empresa.
+    if (!activeCompanyId) {
+      throw new Error('companyId é obrigatório para listar APRs.');
     }
     const normalizedFilters = normalizeQueryFilters({
       search: opts?.search,
@@ -416,8 +426,8 @@ export const aprsService = {
   },
 
   findAll: async (companyId?: string, siteId?: string) => {
-    if (!companyId || !siteId) {
-      throw new Error('companyId e siteId são obrigatórios para listar APRs.');
+    if (!companyId) {
+      throw new Error('companyId é obrigatório para listar APRs.');
     }
     const cacheKey = JSON.stringify(queryKeys.aprs.list({
       companyId,
@@ -838,49 +848,6 @@ export const aprsService = {
 
   delete: async (id: string) => {
     await api.delete(`/aprs/${id}`);
-  },
-
-  getWorkflowStatus: async (id: string) => {
-    const response = await api.get<{
-      currentStep: {
-        stepOrder: number;
-        roleName: string;
-        isRequired: boolean;
-      } | null;
-      nextStep: { stepOrder: number; roleName: string } | null;
-      history: Array<{
-        id: string;
-        aprId: string;
-        stepOrder: number;
-        roleName: string;
-        approverId: string;
-        action: "APROVADO" | "REPROVADO" | "REABERTO" | "DELEGADO";
-        reason: string | null;
-        occurredAt: string;
-        metadata?: Record<string, unknown> | null;
-      }>;
-      canEdit: boolean;
-      canApprove: boolean;
-    }>(`/aprs/${id}/workflow-status`);
-    return response.data;
-  },
-
-  workflowApprove: async (id: string, reason?: string) => {
-    const response = await api.post<Apr>(`/aprs/${id}/submit`, { reason });
-    return response.data;
-  },
-
-  workflowReject: async (id: string, reason: string) => {
-    const response = await api.patch<Apr>(`/aprs/${id}/reject`, { reason });
-    return response.data;
-  },
-
-  workflowReopen: async (id: string, reason: string) => {
-    const response = await api.post<{ id: string; status: string }>(
-      `/aprs/${id}/reopen`,
-      { reason },
-    );
-    return response.data;
   },
 
   validateCompliance: async (id: string) => {

@@ -233,7 +233,7 @@ describeE2E('RLS — semântica de guardas fail-open (PostgreSQL real)', () => {
       }
     });
 
-    it('sgs_app COM tenant no contexto conta corretamente — o problema é a ausência de tenant, não o papel', async () => {
+    it('sgs_app COM tenant e escopo global explícito conta corretamente', async () => {
       const client = asApp();
       await client.connect();
       try {
@@ -241,6 +241,9 @@ describeE2E('RLS — semântica de guardas fail-open (PostgreSQL real)', () => {
         await client.query(
           `SELECT set_config('app.current_company_id', $1, true)`,
           [companyId],
+        );
+        await client.query(
+          `SELECT set_config('app.current_site_scope', 'all', true)`,
         );
         const r = await client.query<{ n: string }>(
           `SELECT count(*)::text AS n FROM users WHERE company_id = $1`,

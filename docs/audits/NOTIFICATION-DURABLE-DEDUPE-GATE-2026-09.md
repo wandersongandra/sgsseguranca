@@ -13,7 +13,7 @@
 ```text
 Frozen Production/Cutover SHA: 03f1574ee6e82558630e82d0a50a08361f8ee6d5
 Migration 0385–0402: UNCHANGED
-Future Migration: 1709000000403
+Future Migration: 1709000000406
 Historical Backfill: NO
 Existing Notifications Modified: 0
 W4-P2-001: OPEN — pending real PostgreSQL 17 concurrency proof
@@ -64,12 +64,12 @@ não participam da identidade. Nenhuma chave é recebida do frontend.
 Todos os seis pontos de uso de `createDeduped()` foram atualizados; o método é
 interno ao backend e não é superfície de API externa.
 
-## Migration 0403
+## Migration 0406
 
 Arquivo:
 
 ```text
-backend/src/infra/database/migrations/1709000000403-add-notification-durable-dedupe-key.ts
+backend/src/infra/database/migrations/1709000000406-add-notification-durable-dedupe-key.ts
 ```
 
 `up` adiciona somente a coluna nullable e cria o índice único parcial. Em
@@ -145,7 +145,7 @@ os eventos do cenário concorrente same-key.
 
 ```text
 PostgreSQL 17 Notification Dedupe Integration: PASS
-Migration 0403 UP/DOWN/UP: PASS
+Migration 0406 UP/DOWN/UP: PASS
 Concurrent same-key calls: 25
 Concurrent same-key persisted rows: 1
 Concurrent same-key realtime events: 1

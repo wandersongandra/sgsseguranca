@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { loadBrowserSentry } from '@/lib/sentry/browser-client';
+import { logger } from '@/lib/logger';
 
 interface State {
   hasError: boolean;
@@ -27,7 +28,7 @@ export class AppErrorBoundary extends React.Component<
       });
     });
     if (process.env.NODE_ENV !== 'production') {
-      console.error('[UI Boundary Error]', error, errorInfo);
+      logger.error('[UI Boundary Error]', error, errorInfo);
     }
   }
 
