@@ -10,8 +10,8 @@ const {
   NotificationsService,
 } = require('../dist/modules/notifications/notifications.service.js');
 const {
-  AddNotificationDurableDedupeKey1709000000403,
-} = require('../dist/infra/database/migrations/1709000000403-add-notification-durable-dedupe-key.js');
+  AddNotificationDurableDedupeKey1709000000406,
+} = require('../dist/infra/database/migrations/1709000000406-add-notification-durable-dedupe-key.js');
 
 const DATABASE_URL = process.env.NOTIFICATION_DEDUPE_PG17_TEST_URL;
 const ISOLATED_GUARD = process.env.NOTIFICATION_DEDUPE_PG17_ISOLATED;
@@ -59,7 +59,7 @@ async function createFixture(client) {
 }
 
 async function applyMigration(dataSource) {
-  const migration = new AddNotificationDurableDedupeKey1709000000403();
+  const migration = new AddNotificationDurableDedupeKey1709000000406();
   const runner = dataSource.createQueryRunner();
   await runner.connect();
   try {

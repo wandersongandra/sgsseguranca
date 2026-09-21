@@ -1,41 +1,22 @@
 'use strict';
-// Verifica se o worker está vivo consultando o heartbeat no Redis.
-// Usado pelo HEALTHCHECK do Docker — exit 0 = saudável, exit 1 = falha.
-const Redis = require('ioredis');
+const http = require('node:http');
 
-const url =
-  process.env.REDIS_QUEUE_URL ||
-  process.env.REDIS_AUTH_URL ||
-  process.env.REDIS_CACHE_URL ||
-  '';
-const key =
-  process.env.WORKER_HEARTBEAT_KEY || 'worker:heartbeat:queue-runtime';
-
-if (!url) {
+const port = Number(process.env.PORT || '8080');
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
   process.exit(1);
 }
 
-const redis = new Redis(url, {
-  lazyConnect: true,
-  connectTimeout: 5000,
-  enableOfflineQueue: false,
-  maxRetriesPerRequest: 0,
-});
-
-const deadline = setTimeout(() => {
-  redis.disconnect(false);
+const deadline = setTimeout(() => process.exit(1), 8000);
+const request = http.get(
+  { hostname: '127.0.0.1', port, path: '/health/ready', timeout: 4000 },
+  (response) => {
+    response.resume();
+    clearTimeout(deadline);
+    process.exit(response.statusCode === 200 ? 0 : 1);
+  },
+);
+request.on('timeout', () => request.destroy());
+request.on('error', () => {
+  clearTimeout(deadline);
   process.exit(1);
-}, 8000);
-
-redis
-  .connect()
-  .then(() => redis.get(key))
-  .then((value) => {
-    clearTimeout(deadline);
-    redis.disconnect(false);
-    process.exit(value ? 0 : 1);
-  })
-  .catch(() => {
-    clearTimeout(deadline);
-    process.exit(1);
-  });
+});

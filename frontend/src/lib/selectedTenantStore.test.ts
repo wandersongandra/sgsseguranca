@@ -87,4 +87,16 @@ describe('selectedTenantStore isolation', () => {
     expect(siteStore.get()).toBeNull();
     expect(sessionStorage.getItem('cx_selected_site')).toBeNull();
   });
+
+  it('descarta seleção enfileirada depois de limpar o contexto', async () => {
+    const pending = selectedTenantStore.set({
+      companyId: 'tenant-stale',
+      companyName: 'Empresa stale',
+    });
+
+    selectedTenantStore.clear();
+    await pending;
+
+    expect(selectedTenantStore.get()).toBeNull();
+  });
 });

@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { ptBR } from 'date-fns/locale';
 import React from 'react';
 import { openPdfForPrint, openUrlInNewTab } from '@/lib/print-utils';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 import { isAiEnabled } from '@/lib/featureFlags';
 import { resolveGovernedPdfConsumption } from '@/lib/governedPdfFallback';
 import { safeFormatDate } from '@/lib/date/safeFormat';
@@ -40,6 +41,7 @@ const timerRef = useRef<number | undefined>(undefined);
   const [limit] = useState(20);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [printingId, setPrintingId] = useState<string | null>(null);
   const [isMailModalOpen, setIsMailModalOpen] = useState(false);
@@ -248,6 +250,7 @@ useEffect(() => {
     const uniqueIds = Array.from(new Set(ids));
     if (!uniqueIds.length) return;
 
+    await runWithMutationLock(deleteMutationLock, async () => {
     const results = await Promise.allSettled(
       uniqueIds.map((id) => checklistsService.delete(id)),
     );
@@ -270,7 +273,8 @@ useEffect(() => {
         new Error(`${failedCount} exclusões falharam.`),
         'Excluir checklists',
       );
-    }
+      }
+    });
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {

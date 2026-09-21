@@ -1,9 +1,20 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FormProvider, useForm } from 'react-hook-form';
 import ChecklistSection from './ChecklistSection';
 import type { PtFormData } from './pt-schema-and-data';
 
-function renderChecklistSection() {
+const getChecklistItemAttachmentAccess = jest.fn();
+const attachChecklistItemFile = jest.fn();
+
+jest.mock('@/services/ptsService', () => ({
+  ptsService: {
+    getChecklistItemAttachmentAccess: (...args: unknown[]) =>
+      getChecklistItemAttachmentAccess(...args),
+    attachChecklistItemFile: (...args: unknown[]) => attachChecklistItemFile(...args),
+  },
+}));
+
+function renderChecklistSection(withAttachment = false) {
   const Wrapper = () => {
     const methods = useForm<PtFormData>({
       defaultValues: {
@@ -32,6 +43,7 @@ function renderChecklistSection() {
             resposta: 'Sim',
             justificativa: '',
             anexo_nome: '',
+            anexo_ref: withAttachment ? 'attachment-ref' : '',
           },
         ],
         trabalho_eletrico_checklist: [],
@@ -55,6 +67,7 @@ function renderChecklistSection() {
           questions={[]}
           baseResponses={['Sim', 'Não', 'Não aplicável']}
           showJustificationOn={['Não', 'Não aplicável']}
+          ptId={withAttachment ? 'pt-1' : undefined}
         />
       </FormProvider>
     );
@@ -64,9 +77,54 @@ function renderChecklistSection() {
 }
 
 describe('ChecklistSection', () => {
+  beforeEach(() => {
+    getChecklistItemAttachmentAccess.mockReset();
+    attachChecklistItemFile.mockReset();
+  });
+
   it('keeps rendering legacy question text when the catalog changes', () => {
     renderChecklistSection();
 
     expect(screen.getByText('Pergunta legada preservada')).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Pergunta legada preservada' }),
+    ).toBeInTheDocument();
+  });
+
+  it('bloqueia URL de anexo com esquema inseguro', async () => {
+    getChecklistItemAttachmentAccess.mockResolvedValue({
+      url: 'javascript:alert(document.cookie)',
+    });
+    const openSpy = jest.spyOn(window, 'open').mockReturnValue(null);
+
+    renderChecklistSection(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Ver anexo' }));
+
+    await waitFor(() =>
+      expect(getChecklistItemAttachmentAccess).toHaveBeenCalledWith(
+        'pt-1',
+        'trabalho_altura_checklist',
+        0,
+      ),
+    );
+    expect(openSpy).not.toHaveBeenCalled();
+  });
+
+  it('ignora um segundo upload enquanto o primeiro ainda está pendente', async () => {
+    let resolveUpload!: (value: { anexoNome: string; anexoReference: string }) => void;
+    attachChecklistItemFile.mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpload = resolve;
+      }),
+    );
+
+    renderChecklistSection(true);
+    const input = screen.getByLabelText('Anexo (opcional)');
+    const file = new File(['conteúdo'], 'evidencia.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(attachChecklistItemFile).toHaveBeenCalledTimes(1));
+    resolveUpload({ anexoNome: 'evidencia.pdf', anexoReference: 'ref-1' });
   });
 });

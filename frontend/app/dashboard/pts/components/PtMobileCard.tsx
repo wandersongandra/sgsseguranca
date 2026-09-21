@@ -217,17 +217,25 @@ export function PtMobileCard({
           </Button>
         ) : null}
         {canManage ? (
-          <Link
-            href={`/dashboard/pts/edit/${pt.id}`}
-            aria-disabled={!pending}
-            className={cn(
-              buttonVariants({ variant: 'outline' }),
-              'min-h-11',
-              !pending && 'pointer-events-none opacity-40',
-            )}
-          >
-            <Pencil className="h-4 w-4" /> Editar
-          </Link>
+          pending ? (
+            <Link
+              href={`/dashboard/pts/edit/${pt.id}`}
+              className={cn(buttonVariants({ variant: 'outline' }), 'min-h-11')}
+            >
+              <Pencil className="h-4 w-4" /> Editar
+            </Link>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11"
+              disabled
+              aria-label="Somente PTs pendentes podem ser editadas"
+              title="Somente PTs pendentes podem ser editadas"
+            >
+              <Pencil className="h-4 w-4" /> Editar
+            </Button>
+          )
         ) : null}
         {canManage ? (
           <Button
@@ -241,7 +249,6 @@ export function PtMobileCard({
         ) : null}
         <PtSignatureActions
           ptId={pt.id}
-          companyId={pt.company_id}
           buttonClassName="min-h-11"
           onSignatureSaved={() => {
             onDismissApprovalIssue(pt.id);

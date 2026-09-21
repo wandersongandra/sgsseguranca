@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { isAiFeatureEnabled } from '../config/ai-feature-policy';
 
 /**
  * Feature flag para desativar completamente IA no ambiente.
@@ -19,9 +20,7 @@ import {
 @Injectable()
 export class FeatureAiGuard implements CanActivate {
   canActivate(_context: ExecutionContext): boolean {
-    const raw = (process.env.FEATURE_AI_ENABLED || '').trim().toLowerCase();
-    const enabled = raw === '' ? true : raw === 'true';
-    if (!enabled) {
+    if (!isAiFeatureEnabled()) {
       throw new NotFoundException();
     }
     return true;

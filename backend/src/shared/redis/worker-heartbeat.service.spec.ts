@@ -101,4 +101,20 @@ describe('WorkerHeartbeatService', () => {
       message: 'No active worker heartbeat found',
     });
   });
+
+  it.each([
+    { updatedAt: new Date(Date.now() - 120_000).toISOString() },
+    { updatedAt: 'invalid' },
+    { updatedAt: new Date(Date.now() + 120_000).toISOString() },
+    {},
+  ])(
+    'rejeita heartbeat sem timestamp recente e válido: %j',
+    async (payload) => {
+      const { service } = createService({ redisGet: JSON.stringify(payload) });
+
+      await expect(service.getStatus()).resolves.toMatchObject({
+        status: 'down',
+      });
+    },
+  );
 });

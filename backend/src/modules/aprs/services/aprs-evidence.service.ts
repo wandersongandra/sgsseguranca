@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import pLimit from 'p-limit';
 import { FindOptionsWhere, In, Repository } from 'typeorm';
 import { cleanupUploadedFile } from '../../../shared/storage/storage-compensation.util';
+import { detectMimeFromMagicBytes } from '../../../shared/utils/detect-mime.util';
 import {
   hashDeviceId,
   maskIpAddress,
@@ -229,6 +230,20 @@ export class AprsEvidenceService {
     const hashSha256 = createHash('sha256').update(file.buffer).digest('hex');
     const evidenceId = randomUUID();
 
+    // Os magic bytes já foram validados no controller (validateFileMagicBytes),
+    // mas o mime GRAVADO até aqui vinha do header enviado pelo cliente —
+    // um polyglot JPEG/HTML persistido como text/html vira XSS armazenado na
+    // origem do storage. Deriva-se o mime real do conteúdo e é ele (não o
+    // header do cliente) que é gravado e usado no upload.
+    const detectedMimeType = detectMimeFromMagicBytes(
+      file.buffer.slice(0, 4100),
+    );
+    if (detectedMimeType !== 'image/jpeg' && detectedMimeType !== 'image/png') {
+      throw new BadRequestException(
+        'Tipo de arquivo não permitido para evidência de APR.',
+      );
+    }
+
     const uploadedReference =
       await this.documentStorageService.uploadFileWithCapability(
         this.documentStorageService.createReference({
@@ -238,7 +253,7 @@ export class AprsEvidenceService {
           purpose: 'apr-evidence',
         }),
         file.buffer,
-        file.mimetype,
+        detectedMimeType,
       );
 
     try {
@@ -251,7 +266,7 @@ export class AprsEvidenceService {
         uploaded_by_id: userId ?? null,
         file_key: fileKey,
         original_name: originalName,
-        mime_type: file.mimetype,
+        mime_type: detectedMimeType,
         file_size_bytes: file.size || file.buffer.length,
         hash_sha256: hashSha256,
         watermarked_file_key: null,
