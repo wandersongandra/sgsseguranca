@@ -147,6 +147,50 @@ jobs:
           PG17_MIGRATION_TEST_URL: postgresql://postgres:ci-postgres-password@127.0.0.1:5435/postgres
         run: npm run test:migration:0392:pg17
 
+  backend-notification-dedupe-pg17:
+    name: PostgreSQL 17 Notification Dedupe Integration
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-postgres-password
+          POSTGRES_DB: postgres
+        ports:
+          - 5436:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build backend artifact
+        run: npm run build
+
+      - name: Run notification durable dedupe integration
+        env:
+          NOTIFICATION_DEDUPE_PG17_TEST_URL: postgresql://postgres:ci-postgres-password@127.0.0.1:5436/postgres
+          NOTIFICATION_DEDUPE_PG17_ISOLATED: "1"
+        run: npm run test:notification-dedupe:pg17
+
   backend-e2e:
     name: Backend E2E Critical Flows
     runs-on: ubuntu-latest

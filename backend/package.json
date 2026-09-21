@@ -27,6 +27,7 @@
     "start:worker": "node scripts/start-dist.cjs dist/worker.js",
     "migration:run": "node scripts/run-migrations.js",
     "test:migrations:0399:0400:0401:pg17": "node scripts/migration-0399-0400-0401-pg17-integration.cjs",
+    "test:notification-dedupe:pg17": "node scripts/notification-dedupe-pg17-integration.cjs",
     "test:migration:0392:pg17": "node scripts/migration-0392-pg17-integration.cjs",
     "test:migration:0392:0393:pg17": "node scripts/migration-0392-0393-pg17-integration.cjs",
     "test:migration:0392:0393:0394:pg17": "node scripts/migration-0392-0393-0394-pg17-integration.cjs",

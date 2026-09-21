@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
+import { buildPeriodicNotificationDedupeKey } from '../notifications/notification-dedupe-key.util';
 import { DashboardDocumentPendenciesResponse } from './dashboard-document-pendency.types';
 
 type PendingQueuePayload = {
@@ -44,7 +45,10 @@ export class DashboardOperationalNotifierService {
           companyId: input.companyId,
           category: 'pending-queue',
         },
-        dedupeWindowMinutes: 180,
+        dedupeKey: buildPeriodicNotificationDedupeKey(
+          'dashboard:pending-queue:degraded',
+          180,
+        ),
       });
     }
 
@@ -60,7 +64,10 @@ export class DashboardOperationalNotifierService {
           companyId: input.companyId,
           category: 'pending-queue',
         },
-        dedupeWindowMinutes: 240,
+        dedupeKey: buildPeriodicNotificationDedupeKey(
+          'dashboard:pending-queue:sla-breached',
+          240,
+        ),
       });
     }
 
@@ -76,7 +83,10 @@ export class DashboardOperationalNotifierService {
           companyId: input.companyId,
           category: 'pending-queue',
         },
-        dedupeWindowMinutes: 240,
+        dedupeKey: buildPeriodicNotificationDedupeKey(
+          'dashboard:pending-queue:critical',
+          240,
+        ),
       });
     }
   }
@@ -102,7 +112,10 @@ export class DashboardOperationalNotifierService {
           companyId: input.companyId,
           category: 'document-pendencies',
         },
-        dedupeWindowMinutes: 180,
+        dedupeKey: buildPeriodicNotificationDedupeKey(
+          'dashboard:document-pendencies:degraded',
+          180,
+        ),
       });
     }
 
@@ -118,7 +131,10 @@ export class DashboardOperationalNotifierService {
           companyId: input.companyId,
           category: 'document-pendencies',
         },
-        dedupeWindowMinutes: 240,
+        dedupeKey: buildPeriodicNotificationDedupeKey(
+          'dashboard:document-pendencies:critical',
+          240,
+        ),
       });
     }
   }

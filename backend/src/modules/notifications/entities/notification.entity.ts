@@ -20,6 +20,14 @@ import { Company } from '../../companies/entities/company.entity';
   'title',
   'createdAt',
 ])
+@Index(
+  'UQ_notifications_company_user_dedupe_active',
+  ['company_id', 'userId', 'dedupeKey'],
+  {
+    unique: true,
+    where: '"dedupe_key" IS NOT NULL AND "deleted_at" IS NULL',
+  },
+)
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -45,6 +53,14 @@ export class Notification {
 
   @Column('jsonb', { nullable: true })
   data: Record<string, unknown>;
+
+  @Column({
+    name: 'dedupe_key',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
+  dedupeKey: string | null;
 
   @Column({ default: false })
   read: boolean;

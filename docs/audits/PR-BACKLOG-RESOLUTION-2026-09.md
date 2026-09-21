@@ -70,9 +70,9 @@ não foi tratado como aprovação de revisão ou de produto. [CONFIRMED]
 | #341 | Wave 2 SST | #340 / ea530532f2dd | wave 2 / 13e1b0d942d9 | STACKED_DEPENDENCY | sim se #340 for aceito | REBUILD | P3 | none | depende da Wave 1 |
 | #342 | Wave 3 operational records | #341 / 13e1b0d942d9 | wave 3 / c9cb42c96c76 | STACKED_DEPENDENCY | sim se #341 for aceito | REBUILD | P4 | none | depende da Wave 2 |
 | #343 | Wave 4 platform hardening | #342 / c9cb42c96c76 | wave 4 / 7c564a88d71e | STACKED_DEPENDENCY | sim se #342 for aceito | REBUILD | P5 | none | package, realtime e UX cross-cutting |
-| #344 | Durable notification dedupe | #343 / 7c564a88d71e | notification / cf4668c3cfb7 | POST_CUTOVER_ONLY | sim depois do limite 0402 | POST_CUTOVER | P6 | 0403 | primeiro uso executável de 0403 |
-| #345 | Inspections product contract | #344 / cf4668c3cfb7 | inspections contract / 3fe8124618d9 | PRODUCT_DECISION_REQUIRED | sim, se contrato aprovado | DECOUPLE/REBUILD | P6a | textual 0403 apenas | docs-only; base histórica em #344 |
-| #346 | Inspections Option A | #345 / 3fe8124618d9 | inspections option / fef9c6e649b0 | PRODUCT_DECISION_REQUIRED | sim, se opção aprovada | DECOUPLE/REBUILD | P6b | textual 0403 apenas | produto, permissões e rotas |
+| #344 | Durable notification dedupe | #343 / 7c564a88d71e | notification / cf4668c3cfb7 | POST_CUTOVER_ONLY | sim depois do limite 0402 | POST_CUTOVER | P6 | 0406 | primeiro uso executável de 0406 após preservar 0403–0405 |
+| #345 | Inspections product contract | #344 / cf4668c3cfb7 | inspections contract / 3fe8124618d9 | PRODUCT_DECISION_REQUIRED | sim, se contrato aprovado | DECOUPLE/REBUILD | P6a | textual 0406 apenas | docs-only; base histórica em #344 |
+| #346 | Inspections Option A | #345 / 3fe8124618d9 | inspections option / fef9c6e649b0 | PRODUCT_DECISION_REQUIRED | sim, se opção aprovada | DECOUPLE/REBUILD | P6b | textual 0406 apenas | produto, permissões e rotas |
 
 ## Stacked PR graph
 
@@ -180,33 +180,34 @@ Não rebasear cegamente a branch histórica. [CONFIRMED]
 ### #340–#343
 
 As quatro ondas formam uma dependência sequencial real no grafo. Nenhuma
-contém a migration 0403 no inventário estático realizado. A ordem segura é
+contém a migration 0406 no inventário estático realizado. A ordem segura é
 reconstruir e validar uma camada por vez, começando no delta efetivo de #339.
 Cada camada precisa de revisão funcional, lint, typecheck, testes e build
 aplicáveis antes de virar base da seguinte. [CONFIRMED]
 
 ### #344
 
-É o primeiro PR com migration executável 0403:
+É o primeiro PR com migration executável 0406 após a consolidação da cadeia:
 
-    backend/src/infra/database/migrations/1709000000403-add-notification-durable-dedupe-key.ts
+    backend/src/infra/database/migrations/1709000000406-add-notification-durable-dedupe-key.ts
 
 Classificação obrigatória: POST_CUTOVER_ONLY. Não pode entrar no candidato cujo
-limite de migration é 0402. Não renumerar a migration.
+limite de migration é 0402. A numeração 0406 preserva as migrations 0403–0405
+já presentes na base consolidada.
 
 ### #345 e #346
 
 O diff funcional de #345 é documentação de contrato de inspeções. O diff de
 #346 é produto, rotas, permissões, páginas e testes de inspeções. Nenhum dos
 dois altera código de notification ou schema de deduplicação; as referências a
-0403 e #344 são documentais e de base. [CONFIRMED]
+0406 e #344 são documentais e de base. [CONFIRMED]
 
-Conclusão: CAN_DECOUPLE_FROM_0403=YES para o código funcional, condicionado a:
+Conclusão: CAN_DECOUPLE_FROM_0406=YES para o código funcional, condicionado a:
 
 1. decisão do produto sobre o contrato de inspeções;
 2. reconstrução de #345 a partir do estado aceito até #343;
 3. reconstrução de #346 a partir do novo #345 ou do contrato aprovado;
-4. remoção ou reescrita das referências documentais que pressupõem 0403;
+4. remoção ou reescrita das referências documentais que pressupõem 0406;
 5. validação de que não houve dependência indireta em notification/dedupe.
 
 Sem essas condições, #345/#346 permanecem PRODUCT_DECISION_REQUIRED.
@@ -214,10 +215,10 @@ Sem essas condições, #345/#346 permanecem PRODUCT_DECISION_REQUIRED.
 ## Migration boundary
 
 - Limite ativo do cutover: 0402. [CONFIRMED]
-- Migration 0403 no main atual: ausente. [CONFIRMED]
-- 0403 aparece pela primeira vez como migration executável em #344. [CONFIRMED]
-- PRs #339–#343 não introduzem 0403 no inventário revisado. [CONFIRMED]
-- Referências textuais a 0403 em #345/#346 não tornam essas PRs compatíveis
+- Migration 0406 no main atual: ausente. [CONFIRMED]
+- 0406 aparece pela primeira vez como migration executável em #344. [CONFIRMED]
+- PRs #339–#343 não introduzem 0406 no inventário revisado. [CONFIRMED]
+- Referências textuais a 0406 em #345/#346 não tornam essas PRs compatíveis
   automaticamente com o candidato ativo.
 
 Qualquer integração de #344 ou de uma dependência que exija sua migration deve
@@ -225,9 +226,9 @@ ser post-cutover. Não alterar ou renumerar migrations 0385–0402.
 
 ## Decoupling analysis #345/#346
 
-Resultado: CAN_DECOUPLE_FROM_0403=YES, com dependência de revisão documental e
+Resultado: CAN_DECOUPLE_FROM_0406=YES, com dependência de revisão documental e
 decisão de produto. A prova foi feita por comparação de paths e conteúdo dos
-patches: não há arquivo de notification, migration 0403 ou alteração de schema
+patches: não há arquivo de notification, migration 0406 ou alteração de schema
 nos deltas funcionais de #345/#346. O status não é uma autorização de merge.
 
 ## Security blockers
@@ -321,7 +322,7 @@ Rebuild condicionado a decisão de compatibilidade:
 - #325;
 - #329.
 
-Rebuild condicionado à decisão de produto e desacoplamento de 0403:
+Rebuild condicionado à decisão de produto e desacoplamento de 0406:
 
 - #345;
 - #346.
@@ -333,13 +334,13 @@ merge:
 
 - #339–#343, reconstruídas contra o estado corrente;
 - #345/#346, somente se o contrato de inspeções for aprovado e o desacoplamento
-  de 0403 for concluído;
+  de 0406 for concluído;
 - uma única mudança consolidada de segurança para #320/#322/#328/#330/#331;
 - atualizações Dependabot que passarem pela matriz de compatibilidade.
 
 ## Exact post-cutover list
 
-- #344, incluindo 0403, permanece POST_CUTOVER_ONLY.
+- #344, incluindo 0406, permanece POST_CUTOVER_ONLY.
 - Qualquer PR que dependa de schema, código ou contrato de #344 permanece
   post-cutover até existir autorização e uma nova janela de migration.
 
@@ -355,7 +356,7 @@ merge:
 6. Reconstruir as Dependabot pequenas uma por vez ou em grupos comprovadamente
    compatíveis; iniciar por updates sem falhas conhecidas.
 7. Decidir separadamente #325/#329 antes de tentar Nest 12/TypeScript 7.
-8. Decidir o contrato de inspeções e reconstruir #345/#346 sem 0403 se a
+8. Decidir o contrato de inspeções e reconstruir #345/#346 sem 0406 se a
    independência for mantida.
 9. Parar antes de #344 enquanto o teto de cutover continuar em 0402.
 10. Criar PRs focadas para SEC-WORKER-HEALTH e SEC-AI-DATA-BOUNDARY, sem
@@ -390,7 +391,7 @@ ou ausência de decisão, conforme a tabela. [CONFIRMED]
 2. Decidir quais updates Dependabot devem ser mantidos e quais linhas major
    (#325/#329) são suportadas.
 3. Aprovar o produto de #339–#343 e o contrato de inspeções #345/#346.
-4. Confirmar que #344 e 0403 permanecem fora da janela ativa.
+4. Confirmar que #344 e 0406 permanecem fora da janela ativa.
 5. Autorizar PRs separadas para worker health e AI data boundary.
 
 ### Evidence limits
@@ -425,7 +426,8 @@ focados; nenhuma alteração de produção foi autorizada ou realizada.
   política central fail-closed para `FEATURE_AI_ENABLED=false`, bloqueio na
   configuração/guard e revalidação na fronteira outbound antes de cada retry.
 - `origin/main` atual: `8cb7efdacd50686c75cfdf1d664f014884c58cb6`.
-- Migration ceiling preservado em 0402; nenhum arquivo 0403 entrou nos PRs.
+- Migration ceiling preservado em 0402; a cadeia consolidada mantém 0403–0405 e
+  #344 adiciona 0406 fora da janela ativa.
 
 ### Validation evidence
 
@@ -449,7 +451,7 @@ focados; nenhuma alteração de produção foi autorizada ou realizada.
 
 ### Remaining queue
 
-- #344 e a migration 0403 continuam `POST_CUTOVER_ONLY`.
+- #344 e a migration 0406 continuam `POST_CUTOVER_ONLY`.
 - As demais PRs abertas continuam sem merge automático; permanecem sujeitas à
   reconstrução, revisão e cobertura específica do backlog.
 - A VPS de teste `83.229.115.37` não foi validada: HTTP para
@@ -480,7 +482,8 @@ focados; nenhuma alteração de produção foi autorizada ou realizada.
   política central fail-closed para `FEATURE_AI_ENABLED=false`, bloqueio na
   configuração/guard e revalidação na fronteira outbound antes de cada retry.
 - `origin/main` atual: `8cb7efdacd50686c75cfdf1d664f014884c58cb6`.
-- Migration ceiling preservado em 0402; nenhum arquivo 0403 entrou nos PRs.
+- Migration ceiling preservado em 0402; a cadeia consolidada mantém 0403–0405 e
+  #344 adiciona 0406 fora da janela ativa.
 
 ### Validation evidence
 
@@ -504,7 +507,7 @@ focados; nenhuma alteração de produção foi autorizada ou realizada.
 
 ### Remaining queue
 
-- #344 e a migration 0403 continuam `POST_CUTOVER_ONLY`.
+- #344 e a migration 0406 continuam `POST_CUTOVER_ONLY`.
 - As demais PRs abertas continuam sem merge automático; permanecem sujeitas à
   reconstrução, revisão e cobertura específica do backlog.
 - A VPS de teste `83.229.115.37` não foi validada: HTTP para

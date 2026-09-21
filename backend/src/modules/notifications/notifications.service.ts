@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { Repository } from 'typeorm';
 import { Notification } from './entities/notification.entity';
 import { NotificationsGateway } from './notifications.gateway';
 import { TenantService } from '../../shared/tenant/tenant.service';
@@ -12,6 +13,8 @@ import { normalizeRoleName } from '../auth/role-normalization.util';
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
+
+  private static readonly DEDUPE_KEY_MAX_LENGTH = 255;
 
   private toGatewayPayload(
     notification: Notification,
@@ -65,21 +68,7 @@ export class NotificationsService {
         }),
     );
 
-    try {
-      this.gateway.sendToUser(
-        data.userId,
-        'notification',
-        this.toGatewayPayload(notification),
-      );
-    } catch (error) {
-      this.logger.warn({
-        event: 'notification_realtime_delivery_failed',
-        userId: data.userId,
-        notificationId: notification.id,
-        type: data.type,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    this.sendRealtime(notification, data.type);
 
     return notification;
   }
@@ -150,40 +139,131 @@ export class NotificationsService {
     title: string;
     message: string;
     data?: Record<string, unknown>;
-    dedupeWindowMinutes?: number;
-  }) {
-    const dedupeWindowMinutes = Math.max(1, data.dedupeWindowMinutes ?? 360);
-    const dedupeThreshold = new Date(
-      Date.now() - dedupeWindowMinutes * 60 * 1000,
-    );
-
-    const existing = await this.tenantService.run(
+    dedupeKey: string;
+  }): Promise<Notification> {
+    const dedupeKey = this.normalizeDedupeKey(data.dedupeKey);
+    const result = await this.tenantService.run(
       {
         companyId: data.companyId,
         isSuperAdmin: false,
         userId: data.userId,
         siteScope: 'all',
       },
-      () =>
-        this.repo.findOne({
-          where: {
+      async () => {
+        const insertResult = (await this.repo
+          .createQueryBuilder()
+          .insert()
+          .into(Notification)
+          .values({
             company_id: data.companyId,
             userId: data.userId,
             type: data.type,
             title: data.title,
-            createdAt: MoreThanOrEqual(dedupeThreshold),
+            message: data.message,
+            data: data.data as
+              QueryDeepPartialEntity<Record<string, unknown>> | undefined,
+            dedupeKey,
+          })
+          .onConflict(
+            '("company_id", "userId", "dedupe_key") WHERE "dedupe_key" IS NOT NULL AND "deleted_at" IS NULL DO NOTHING',
+          )
+          .returning(['id'])
+          .execute()) as unknown as {
+          identifiers?: Array<Record<string, unknown>>;
+          raw?: unknown;
+        };
+
+        const insertedId = this.readInsertedId(insertResult);
+        if (insertedId) {
+          const notification = await this.repo.findOne({
+            where: {
+              id: insertedId,
+              company_id: data.companyId,
+              userId: data.userId,
+            },
+          });
+          if (!notification) {
+            throw new Error(
+              'Notification insert returned an id that could not be read back',
+            );
+          }
+          return { notification, created: true };
+        }
+
+        const existing = await this.repo.findOne({
+          where: {
+            company_id: data.companyId,
+            userId: data.userId,
+            dedupeKey,
           },
-          order: {
-            createdAt: 'DESC',
-          },
-        }),
+        });
+        if (!existing) {
+          throw new Error(
+            'Notification dedupe conflict did not resolve to an existing row',
+          );
+        }
+        return { notification: existing, created: false };
+      },
     );
 
-    if (existing) {
-      return existing;
+    if (result.created) {
+      this.sendRealtime(result.notification, data.type);
     }
+    return result.notification;
+  }
 
-    return this.create(data);
+  private normalizeDedupeKey(value: string): string {
+    const normalized = value.trim();
+    if (!normalized) {
+      throw new Error('Notification dedupe key cannot be empty');
+    }
+    if (normalized.length > NotificationsService.DEDUPE_KEY_MAX_LENGTH) {
+      throw new Error('Notification dedupe key exceeds 255 characters');
+    }
+    if (
+      [...normalized].some((character) => {
+        const code = character.charCodeAt(0);
+        return code <= 0x1f || code === 0x7f;
+      })
+    ) {
+      throw new Error('Notification dedupe key contains control characters');
+    }
+    return normalized;
+  }
+
+  private readInsertedId(result: {
+    identifiers?: Array<Record<string, unknown>>;
+    raw?: unknown;
+  }): string | undefined {
+    const identifier = result.identifiers?.[0]?.['id'];
+    if (typeof identifier === 'string' && identifier) {
+      return identifier;
+    }
+    const rawValues: unknown[] = Array.isArray(result.raw) ? result.raw : [];
+    const raw = rawValues[0];
+    const rawId =
+      raw && typeof raw === 'object'
+        ? (raw as Record<string, unknown>)['id']
+        : undefined;
+    return typeof rawId === 'string' && rawId ? rawId : undefined;
+  }
+
+  private sendRealtime(notification: Notification, type: string): void {
+    try {
+      this.gateway.sendToUser(
+        notification.userId,
+        'notification',
+        this.toGatewayPayload(notification),
+      );
+    } catch (error) {
+      this.logger.warn({
+        event: 'notification_realtime_delivery_failed',
+        userId: notification.userId,
+        notificationId: notification.id,
+        type,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   async markAsRead(id: string, userId: string, companyId: string) {

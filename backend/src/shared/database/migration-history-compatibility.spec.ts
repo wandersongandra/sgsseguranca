@@ -94,7 +94,7 @@ describe('migration history compatibility', () => {
       executedNames,
     ).map((migration) => migration.name);
 
-    expect(pending).toHaveLength(15);
+    expect(pending).toHaveLength(16);
     expect(pending).toEqual([
       'CreateDurableIdempotencyRecords1709000000391',
       'HardenSecurityDefinerFunctions1709000000392',
@@ -111,6 +111,7 @@ describe('migration history compatibility', () => {
       'DropRedundantAprCompositeIndexes1709000000403',
       'AddMissingAprWorkflowForeignKeys1709000000404',
       'HardenSiteScopeFailClosed1709000000405',
+      'AddNotificationDurableDedupeKey1709000000406',
     ]);
   });
 

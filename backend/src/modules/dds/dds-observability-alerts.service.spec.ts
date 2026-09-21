@@ -194,6 +194,22 @@ describe('DdsObservabilityAlertsService', () => {
     });
 
     expect(notificationsService.createDeduped).toHaveBeenCalledTimes(1);
+    const calls = notificationsService.createDeduped.mock
+      .calls as unknown as Array<
+      [
+        {
+          dedupeKey?: unknown;
+          dedupeWindowMinutes?: unknown;
+        },
+      ]
+    >;
+    const payload = calls[0][0];
+    expect(payload.dedupeKey).toEqual(
+      expect.stringMatching(
+        /^dds:observability:dds_public_suspicious_spike:\d+$/,
+      ),
+    );
+    expect(payload).not.toHaveProperty('dedupeWindowMinutes');
     expect(mailService.sendMailSimple).toHaveBeenCalledTimes(1);
     expect(forensicTrail.append).toHaveBeenCalledTimes(1);
   });

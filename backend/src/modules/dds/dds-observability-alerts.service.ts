@@ -18,6 +18,7 @@ import {
   DdsObservabilityService,
 } from './dds-observability.service';
 import { Role } from '../auth/enums/roles.enum';
+import { buildPeriodicNotificationDedupeKey } from '../notifications/notification-dedupe-key.util';
 
 type DdsAlertCode =
   | 'dds_public_suspicious_spike'
@@ -176,7 +177,10 @@ export class DdsObservabilityAlertsService {
             category: 'dds-observability',
             alertCode: alert.code,
           },
-          dedupeWindowMinutes,
+          dedupeKey: buildPeriodicNotificationDedupeKey(
+            `dds:observability:${alert.code}`,
+            dedupeWindowMinutes,
+          ),
         });
         notificationsCreated += 1;
       }
