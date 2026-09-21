@@ -69,6 +69,8 @@ export function WizardStep3Review({
 }: WizardStep3Props) {
   const hasImages = (report.images?.length ?? 0) > 0;
   const isFinalized = ['Finalizado', 'Exportado'].includes(report.status);
+  const canEditReport = canManage && !isFinalized;
+  const canAnalyzeReport = canUseAi && !isFinalized;
 
   return (
     <div className="space-y-6">
@@ -76,7 +78,9 @@ export function WizardStep3Review({
         <div>
           <h2 className="text-lg font-semibold text-[var(--ds-color-text-primary)]">Revisão e exportação</h2>
           <p className="text-sm text-[var(--ds-color-text-muted)] mt-0.5">
-            Gere o resumo com IA, finalize e exporte o relatório.
+            {isFinalized
+              ? 'Documento finalizado/exportado em modo somente leitura. Gere um novo relatório para corrigir o conteúdo.'
+              : 'Gere o resumo com IA, finalize e exporte o relatório.'}
           </p>
         </div>
         <Badge variant={isFinalized ? 'success' : 'neutral'}>
@@ -121,7 +125,7 @@ export function WizardStep3Review({
             <label className="block text-sm font-medium text-[var(--ds-color-text-primary)]">
               Síntese do relatório
             </label>
-            {canUseAi && hasImages && (
+            {canAnalyzeReport && hasImages && (
               <Button
                 type="button"
                 variant="outline"
@@ -139,7 +143,7 @@ export function WizardStep3Review({
           <textarea
             value={form.ai_summary}
             onChange={(e) => onFormChange('ai_summary', e.target.value)}
-            disabled={!canManage}
+            disabled={!canEditReport}
             rows={5}
             placeholder="Síntese gerada pela IA ou escrita manualmente..."
             className="w-full resize-none rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm placeholder:text-[var(--ds-color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
@@ -153,7 +157,7 @@ export function WizardStep3Review({
           <textarea
             value={form.final_conclusion}
             onChange={(e) => onFormChange('final_conclusion', e.target.value)}
-            disabled={!canManage}
+            disabled={!canEditReport}
             rows={4}
             placeholder="Conclusão e recomendações finais..."
             className="w-full resize-none rounded-md border border-[var(--ds-color-border-input)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm placeholder:text-[var(--ds-color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] disabled:opacity-50"
@@ -165,7 +169,7 @@ export function WizardStep3Review({
           variant="outline"
           onClick={onSaveDraft}
           loading={saving}
-          disabled={!canManage}
+          disabled={!canEditReport}
           leftIcon={<Save className="h-4 w-4" />}
         >
           Salvar edição
@@ -187,7 +191,7 @@ export function WizardStep3Review({
               Finalizar relatório
             </Button>
           )}
-          {canUseAi && hasImages && (
+          {canAnalyzeReport && hasImages && (
             <Button
               type="button"
               variant="outline"

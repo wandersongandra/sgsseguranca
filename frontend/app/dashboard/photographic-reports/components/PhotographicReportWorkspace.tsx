@@ -261,6 +261,12 @@ export function PhotographicReportWorkspace({
   );
 
   const [report, setReport] = useState<PhotographicReport | null>(null);
+  const isReportReadOnly = Boolean(
+    report && ["Finalizado", "Exportado"].includes(report.status),
+  );
+  const canEditReport = canManage && !isReportReadOnly;
+  const canAnalyzeReport = canUseAi && !isReportReadOnly;
+  const canFinalizeReport = canFinalize && !isReportReadOnly;
   const [form, setForm] = useState<ReportFormState>(DEFAULT_FORM_STATE);
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState(false);
@@ -980,7 +986,9 @@ export function PhotographicReportWorkspace({
             <CardDescription>
               {isCreateMode
                 ? "Crie o relatório e depois organize fotos, datas, análises e exportações."
-                : "Edite os dados gerais, carregue fotos, gere textos com IA e exporte o documento final."}
+                : isReportReadOnly
+                  ? "Documento finalizado/exportado em modo somente leitura. Gere um novo relatório para corrigir o conteúdo."
+                  : "Edite os dados gerais, carregue fotos, gere textos com IA e exporte o documento final."}
             </CardDescription>
           </div>
 
@@ -1003,7 +1011,7 @@ export function PhotographicReportWorkspace({
                   onClick={() => void handleSaveDraft()}
                   loading={saving}
                   leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}
-                  disabled={!canManage}
+                  disabled={!canEditReport}
                 >
                   Salvar rascunho
                 </Button>
@@ -1013,7 +1021,7 @@ export function PhotographicReportWorkspace({
                   onClick={() => void handleGenerateSummary()}
                   loading={analyzing}
                   leftIcon={!analyzing ? <BrainCircuit className="h-4 w-4" /> : undefined}
-                  disabled={!canUseAi}
+                  disabled={!canAnalyzeReport}
                 >
                   Gerar relatório completo
                 </Button>
@@ -1023,7 +1031,7 @@ export function PhotographicReportWorkspace({
                   onClick={() => void handleAnalyzeAllImages()}
                   loading={analyzing}
                   leftIcon={!analyzing ? <RefreshCw className="h-4 w-4" /> : undefined}
-                  disabled={!canUseAi}
+                  disabled={!canAnalyzeReport}
                 >
                   Analisar fotos
                 </Button>
@@ -1032,7 +1040,7 @@ export function PhotographicReportWorkspace({
                   onClick={() => void handleFinalize()}
                   loading={saving}
                   leftIcon={!saving ? <Save className="h-4 w-4" /> : undefined}
-                  disabled={!canFinalize}
+                  disabled={!canFinalizeReport}
                 >
                   Finalizar relatório
                 </Button>
@@ -1076,6 +1084,10 @@ export function PhotographicReportWorkspace({
         </CardHeader>
       </Card>
 
+      <fieldset
+        disabled={!canEditReport}
+        className="m-0 min-w-0 border-0 p-0"
+      >
       <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <Card tone="default" padding="lg">
           <CardHeader>
@@ -1222,7 +1234,7 @@ export function PhotographicReportWorkspace({
                   onClick={() => void handleCreateDay()}
                   loading={saving}
                   leftIcon={<Plus className="h-4 w-4" />}
-                  disabled={!canManage}
+                  disabled={!canEditReport}
                 >
                   Adicionar data
                 </Button>
@@ -1279,7 +1291,7 @@ export function PhotographicReportWorkspace({
                           onClick={() => void handleSaveDay(day.id)}
                           loading={saving}
                           leftIcon={<Save className="h-4 w-4" />}
-                          disabled={!canManage}
+                          disabled={!canEditReport}
                         >
                           Salvar data
                         </Button>
@@ -1306,6 +1318,7 @@ export function PhotographicReportWorkspace({
                 }}
                 onDrop={(event) => {
                   event.preventDefault();
+                  if (!canEditReport) return;
                   const files = Array.from(event.dataTransfer.files || []).filter((file) =>
                     file.type.startsWith("image/"),
                   );
@@ -1338,6 +1351,7 @@ export function PhotographicReportWorkspace({
                     accept="image/jpeg,image/png,image/webp"
                     multiple
                     className="hidden"
+                    disabled={!canEditReport}
                     onChange={(event) => {
                       const files = Array.from(event.target.files || []);
                       void handleSelectedImages(files);
@@ -1425,7 +1439,7 @@ export function PhotographicReportWorkspace({
                 onClick={() => void handleUploadImages()}
                 loading={uploading}
                 leftIcon={<Upload className="h-4 w-4" />}
-                disabled={!canManage || selectedFiles.length === 0 || pendingPhotos.some((photo) => photo.status === "processing")}
+                disabled={!canEditReport || selectedFiles.length === 0 || pendingPhotos.some((photo) => photo.status === "processing")}
               >
                 Enviar fotos
               </Button>
@@ -1433,9 +1447,14 @@ export function PhotographicReportWorkspace({
           </Card>
         </div>
       </div>
+      </fieldset>
 
       {!isCreateMode && report ? (
         <>
+          <fieldset
+            disabled={!canEditReport}
+            className="m-0 min-w-0 border-0 p-0"
+          >
           <Card tone="default" padding="lg">
             <CardHeader className="gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1.5">
@@ -1627,6 +1646,7 @@ export function PhotographicReportWorkspace({
               )}
             </CardContent>
           </Card>
+          </fieldset>
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Card tone="default" padding="lg">
@@ -1641,18 +1661,20 @@ export function PhotographicReportWorkspace({
                   label="Síntese da IA"
                   value={form.ai_summary}
                   onChange={(value) => updateForm("ai_summary", value)}
+                  disabled={!canEditReport}
                 />
                 <TextAreaField
                   label="Conclusão final"
                   value={form.final_conclusion}
                   onChange={(value) => updateForm("final_conclusion", value)}
+                  disabled={!canEditReport}
                 />
                 <Button
                   type="button"
                   onClick={() => void handleSaveDraft()}
                   loading={saving}
                   leftIcon={<Save className="h-4 w-4" />}
-                  disabled={!canManage}
+                  disabled={!canEditReport}
                 >
                   Salvar edição
                 </Button>
@@ -1820,6 +1842,7 @@ function TextAreaField({
   className,
   id,
   defaultValue,
+  disabled = false,
 }: {
   label: string;
   value: string;
@@ -1827,6 +1850,7 @@ function TextAreaField({
   className?: string;
   id?: string;
   defaultValue?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className={`space-y-2 ${className || ""}`}>
@@ -1838,6 +1862,7 @@ function TextAreaField({
         rows={4}
         value={onChange ? value : undefined}
         defaultValue={onChange ? undefined : defaultValue ?? value}
+        disabled={disabled}
         onChange={
           onChange ? (event) => onChange(event.target.value) : undefined
         }

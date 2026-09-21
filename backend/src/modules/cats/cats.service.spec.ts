@@ -301,6 +301,31 @@ describe('CatsService', () => {
     expect(auditService.log).not.toHaveBeenCalled();
   });
 
+  it('bloqueia novo anexo quando a CAT está fechada', async () => {
+    catsRepository.findOne.mockResolvedValue(makeCat({ status: 'fechada' }));
+
+    await expect(
+      service.addAttachment(
+        CAT_ID,
+        {
+          fileBuffer: Buffer.from('conteudo-cat'),
+          originalName: 'evidencia-cat.pdf',
+          mimeType: 'application/pdf',
+        },
+        'user-1',
+      ),
+    ).rejects.toThrow(
+      new BadRequestException(
+        'CAT fechada ou com PDF final não aceita alteração de anexos.',
+      ),
+    );
+
+    expect(
+      documentStorageService.uploadFileWithCapability,
+    ).not.toHaveBeenCalled();
+    expect(catsRepository.save).not.toHaveBeenCalled();
+  });
+
   it('remove o arquivo do storage ao excluir anexo da CAT', async () => {
     const attachment = {
       id: 'attachment-1',
@@ -331,6 +356,36 @@ describe('CatsService', () => {
         companyId: COMPANY_ID,
       }),
     );
+  });
+
+  it('bloqueia remoção de anexo quando a CAT está fechada', async () => {
+    const attachment = {
+      id: 'attachment-1',
+      file_name: 'evidencia-cat.pdf',
+      file_key: 'cats/company-1/2026/03/file.pdf',
+      file_type: 'application/pdf',
+      category: 'geral' as const,
+      uploaded_at: new Date('2026-03-19T10:00:00Z'),
+      uploaded_by_id: 'user-1',
+    };
+    catsRepository.findOne.mockResolvedValue(
+      makeCat({ status: 'fechada', attachments: [attachment] }),
+    );
+    _lockedCatRow = makeCat({
+      status: 'fechada',
+      attachments: [attachment],
+    }) as unknown as Record<string, unknown>;
+
+    await expect(
+      service.removeAttachment(CAT_ID, attachment.id, 'user-1'),
+    ).rejects.toThrow(
+      new BadRequestException(
+        'CAT fechada ou com PDF final não aceita alteração de anexos.',
+      ),
+    );
+
+    expect(catsRepository.save).not.toHaveBeenCalled();
+    expect(documentStorageService.deleteFile).not.toHaveBeenCalled();
   });
 
   it('gera acesso ao anexo e registra auditoria de leitura', async () => {

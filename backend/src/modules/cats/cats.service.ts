@@ -435,6 +435,16 @@ export class CatsService {
     );
   }
 
+  private assertCatAttachmentsMutable(
+    cat: Pick<Cat, 'status' | 'pdf_file_key'>,
+  ): void {
+    if (cat.status === 'fechada' || cat.pdf_file_key) {
+      throw new BadRequestException(
+        'CAT fechada ou com PDF final não aceita alteração de anexos.',
+      );
+    }
+  }
+
   async addAttachment(
     id: string,
     input: {
@@ -450,6 +460,7 @@ export class CatsService {
     }
 
     const cat = await this.findOne(id);
+    this.assertCatAttachmentsMutable(cat);
     const timestamp = new Date();
     const safeName = this.sanitizeFilename(
       input.originalName || `cat-anexo-${Date.now()}.bin`,
@@ -499,6 +510,7 @@ export class CatsService {
         cat.id,
         cat.company_id,
         async (locked, manager) => {
+          this.assertCatAttachmentsMutable(locked);
           locked.attachments = [...(locked.attachments || []), attachment];
           await manager.getRepository(Cat).save(locked);
         },
@@ -533,6 +545,7 @@ export class CatsService {
     actorId?: string,
   ): Promise<void> {
     const cat = await this.findOne(id);
+    this.assertCatAttachmentsMutable(cat);
 
     // A remoção também é read-modify-write sobre o mesmo jsonb: sem lock, um
     // anexo adicionado em paralelo seria descartado junto com o removido.
@@ -540,6 +553,7 @@ export class CatsService {
       cat.id,
       cat.company_id,
       async (locked, manager) => {
+        this.assertCatAttachmentsMutable(locked);
         const current = locked.attachments || [];
         const target = current.find((item) => item.id === attachmentId);
         if (!target) {

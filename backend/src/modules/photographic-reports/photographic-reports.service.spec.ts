@@ -254,6 +254,83 @@ describe('PhotographicReportsService', () => {
     expect(reportRepository.save).not.toHaveBeenCalled();
   });
 
+  it.each([
+    PhotographicReportStatus.FINALIZADO,
+    PhotographicReportStatus.EXPORTADO,
+  ])('update() bloqueia edição de relatório %s', async (status) => {
+    const report = {
+      id: 'report-1',
+      status,
+      company_id: 'company-1',
+      deleted_at: null,
+      days: [],
+      images: [],
+      exports: [],
+      client_name: 'Cliente original',
+    } as unknown as PhotographicReport;
+    reportRepository.findOne.mockResolvedValue(report);
+
+    await expect(
+      service.update('report-1', { client_name: 'Tentativa de alteração' }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(report.client_name).toBe('Cliente original');
+    expect(reportRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('updateImage() bloqueia alteração antes de salvar imagem finalizada', async () => {
+    const image = {
+      id: 'image-1',
+      report_id: 'report-1',
+      company_id: 'company-1',
+      manual_caption: 'Legenda original',
+    } as unknown as PhotographicReportImage;
+    reportRepository.findOne.mockResolvedValue({
+      id: 'report-1',
+      status: PhotographicReportStatus.FINALIZADO,
+      company_id: 'company-1',
+      days: [],
+      images: [image],
+      exports: [],
+    } as unknown as PhotographicReport);
+
+    await expect(
+      service.updateImage('report-1', 'image-1', {
+        manual_caption: 'Tentativa de alteração',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(imageRepository.findOne).not.toHaveBeenCalled();
+    expect(imageRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('analyzeAllImages() bloqueia IA antes de acessar storage em relatório exportado', async () => {
+    const image = {
+      id: 'image-1',
+      report_id: 'report-1',
+      company_id: 'company-1',
+      image_order: 1,
+      image_url: 'key/foto.jpg',
+    } as unknown as PhotographicReportImage;
+    reportRepository.findOne.mockResolvedValue({
+      id: 'report-1',
+      status: PhotographicReportStatus.EXPORTADO,
+      company_id: 'company-1',
+      days: [],
+      images: [image],
+      exports: [],
+    } as unknown as PhotographicReport);
+
+    await expect(service.analyzeAllImages('report-1')).rejects.toThrow(
+      BadRequestException,
+    );
+
+    expect(
+      aiAnalysisService.analyzePhotographicReportImage,
+    ).not.toHaveBeenCalled();
+    expect(reportRepository.save).not.toHaveBeenCalled();
+  });
+
   it('serializa duas mutações concorrentes pelo lock pessimista do relatório', async () => {
     let firstTransactionActive = false;
     let releaseFirst!: () => void;

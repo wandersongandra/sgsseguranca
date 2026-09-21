@@ -108,4 +108,26 @@ describe("PhotographicReportWorkspace accessibility", () => {
       await screen.findByRole("button", { name: "Excluir foto 07" }),
     ).toBeInTheDocument();
   });
+
+  it("apresenta relatório finalizado como somente leitura", async () => {
+    jest.mocked(photographicReportsService.findOne).mockResolvedValue({
+      ...report,
+      status: "Finalizado",
+    });
+
+    render(<PhotographicReportWorkspace mode="edit" reportId="report-1" />);
+
+    expect(
+      await screen.findByText(
+        "Documento finalizado/exportado em modo somente leitura. Gere um novo relatório para corrigir o conteúdo.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Salvar rascunho" }),
+    ).toBeDisabled();
+    expect(screen.getByLabelText("Cliente")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Excluir foto 07" }),
+    ).toBeDisabled();
+  });
 });

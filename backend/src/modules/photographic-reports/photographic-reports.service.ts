@@ -677,16 +677,21 @@ export class PhotographicReportsService {
     report: PhotographicReport,
     nextStatus: PhotographicReportStatus,
   ): void {
+    this.assertPhotographicReportMutable(report);
+    report.status = nextStatus;
+  }
+
+  private assertPhotographicReportMutable(
+    report: Pick<PhotographicReport, 'status'>,
+  ): void {
     if (
       report.status === PhotographicReportStatus.FINALIZADO ||
       report.status === PhotographicReportStatus.EXPORTADO
     ) {
-      throw new ConflictException(
-        'Relatórios finalizados ou exportados são imutáveis. Use o fluxo formal de revisão.',
+      throw new BadRequestException(
+        'Relatórios finalizados ou exportados não aceitam alterações pelo fluxo comum. Gere um novo relatório para corrigir o documento.',
       );
     }
-
-    report.status = nextStatus;
   }
 
   /**
@@ -977,6 +982,7 @@ export class PhotographicReportsService {
       id,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         let hasMutations = false;
 
         if (dto.client_id !== undefined) {
@@ -1143,14 +1149,7 @@ export class PhotographicReportsService {
       id,
       companyId,
       async (report, manager) => {
-        if (
-          report.status === PhotographicReportStatus.FINALIZADO ||
-          report.status === PhotographicReportStatus.EXPORTADO
-        ) {
-          throw new BadRequestException(
-            'Relatórios finalizados ou exportados não podem ser revertidos para rascunho via edição direta. Use os fluxos formais de revisão.',
-          );
-        }
+        this.assertPhotographicReportMutable(report);
 
         Object.assign(report, {
           ...report,
@@ -1363,6 +1362,7 @@ export class PhotographicReportsService {
       reportId,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         const dayRepository = this.dayRepositoryFor(manager);
         const reportRepository = this.reportRepositoryFor(manager);
         const existingDay = (report.days || []).find(
@@ -1409,6 +1409,7 @@ export class PhotographicReportsService {
       reportId,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         const day = await this.ensureDayBelongsToReport(report, dayId, manager);
 
         if (dto.activity_date !== undefined) {
@@ -1446,6 +1447,7 @@ export class PhotographicReportsService {
       reportId,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         await this.ensureDayBelongsToReport(report, dayId, manager);
         await this.dayRepositoryFor(manager).delete({
           id: dayId,
@@ -1472,6 +1474,7 @@ export class PhotographicReportsService {
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
+    this.assertPhotographicReportMutable(report);
     if (!Array.isArray(files) || !files.length) {
       throw new BadRequestException('Nenhuma foto enviada.');
     }
@@ -1690,6 +1693,7 @@ export class PhotographicReportsService {
       reportId,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         const image = await this.ensureImageBelongsToReport(
           report,
           imageId,
@@ -1808,6 +1812,7 @@ export class PhotographicReportsService {
       reportId,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         const image = await this.ensureImageBelongsToReport(
           report,
           imageId,
@@ -1852,6 +1857,7 @@ export class PhotographicReportsService {
       reportId,
       companyId,
       async (report, manager) => {
+        this.assertPhotographicReportMutable(report);
         const images = this.sortImages(report.images || []);
 
         if (dto.imageIds.length !== images.length) {
@@ -1944,6 +1950,7 @@ export class PhotographicReportsService {
   ): Promise<PhotographicReportImageResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
+    this.assertPhotographicReportMutable(report);
     const image = await this.ensureImageBelongsToReport(report, imageId);
     const day = image.report_day_id
       ? (report.days || []).find((item) => item.id === image.report_day_id) ||
@@ -2012,6 +2019,7 @@ export class PhotographicReportsService {
   ): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
+    this.assertPhotographicReportMutable(report);
     const sortedImages = this.sortImages(report.images || []);
     if (sortedImages.length === 0) {
       throw new BadRequestException('Relatório sem fotos.');
@@ -2137,6 +2145,7 @@ export class PhotographicReportsService {
   async finalize(reportId: string): Promise<PhotographicReportResponse> {
     const companyId = this.getCompanyIdOrThrow();
     const report = await this.findReportEntity(reportId, companyId);
+    this.assertPhotographicReportMutable(report);
     if ((report.images || []).length === 0) {
       throw new BadRequestException('Relatório sem fotos.');
     }
