@@ -516,13 +516,13 @@ describe('MailService', () => {
         rejected: [],
         response: '250 OK',
       });
-      const smtpTransport = {
-        sendMail: smtpSendMail,
-      } as unknown as nodemailer.Transporter;
+      const smtpTransport = nodemailer.createTransport({
+        host: 'smtp.example.com',
+        port: 2525,
+      });
+      smtpTransport.sendMail = smtpSendMail;
       const createTransportSpy = jest.spyOn(nodemailer, 'createTransport');
-      createTransportSpy.mockImplementation(
-        (() => smtpTransport) as typeof nodemailer.createTransport,
-      );
+      createTransportSpy.mockReturnValue(smtpTransport);
       const smtpConfigService = {
         get: jest.fn((key: string) => {
           switch (key) {
