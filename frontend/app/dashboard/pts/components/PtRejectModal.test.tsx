@@ -10,6 +10,7 @@ describe('PtRejectModal', () => {
     expect(confirm).toBeDisabled();
 
     const reason = screen.getByRole('textbox', { name: 'Motivo da reprovação' });
+    expect(reason).toHaveAttribute('maxLength', '2000');
     fireEvent.blur(reason);
     expect(screen.getByRole('alert')).toHaveTextContent('obrigatório');
 

@@ -1,7 +1,7 @@
 'use client';
 import { logger } from '@/lib/logger';
 
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, Pencil, Plus, Search, Trash2, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { safeToLocaleDateString } from '@/lib/date/safeFormat';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { CatalogMobileCard, catalogMobileActionClassName } from '../components/CatalogMobileCard';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 
 const inputClassName =
   'w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-sm text-[var(--ds-color-text-primary)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]';
@@ -28,6 +29,7 @@ export default function ToolsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [lastPage, setLastPage] = useState(1);
+  const deleteMutationLock = useRef(false);
 
   const handlePrevPage = useCallback(() => {
     setPage((current) => Math.max(1, current - 1));
@@ -67,18 +69,20 @@ export default function ToolsPage() {
       return;
     }
 
-    try {
-      await toolsService.delete(id);
-      toast.success('Ferramenta excluida com sucesso');
-      if (tools.length === 1 && page > 1) {
-        setPage((current) => current - 1);
-        return;
+    await runWithMutationLock(deleteMutationLock, async () => {
+      try {
+        await toolsService.delete(id);
+        toast.success('Ferramenta excluida com sucesso');
+        if (tools.length === 1 && page > 1) {
+          setPage((current) => current - 1);
+          return;
+        }
+        void loadTools();
+      } catch (error) {
+        logger.error('Erro ao excluir ferramenta:', error);
+        toast.error('Erro ao excluir ferramenta. Verifique dependencias e tente novamente.');
       }
-      void loadTools();
-    } catch (error) {
-      logger.error('Erro ao excluir ferramenta:', error);
-      toast.error('Erro ao excluir ferramenta. Verifique dependencias e tente novamente.');
-    }
+    });
   }
 
   const summary = useMemo(
@@ -281,7 +285,6 @@ export default function ToolsPage() {
     </ListPageLayout>
   );
 }
-
 
 
 

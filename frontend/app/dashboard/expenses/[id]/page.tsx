@@ -1,7 +1,7 @@
 'use client';
 import { logger } from '@/lib/logger';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Download, ExternalLink, Lock, Plus, Receipt, Trash2, WalletCards } from 'lucide-react';
@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { Permission } from '@/lib/permissions';
 import { cn } from '@/lib/utils';
 import { openSafeExternalUrlInNewTab } from '@/lib/security/safe-external-url';
+import { runWithMutationLock } from '@/lib/mutation-lock';
 import {
   expensesService,
   EXPENSE_ADVANCE_METHOD_LABEL,
@@ -57,6 +58,7 @@ export default function ExpenseReportDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const destructiveMutationLock = useRef(false);
   const [advanceForm, setAdvanceForm] = useState({
     amount: '',
     advance_date: todayIso(),
@@ -189,14 +191,16 @@ export default function ExpenseReportDetailPage() {
 
   async function handleRemoveItem(itemId: string) {
     if (!report || !confirm('Remover esta despesa da prestação?')) return;
-    try {
-      const next = await expensesService.removeItem(report.id, itemId);
-      setReport(next);
-      toast.success('Despesa removida.');
-    } catch (error) {
-      logger.error('Erro ao remover despesa:', error);
-      toast.error('Erro ao remover despesa.');
-    }
+    await runWithMutationLock(destructiveMutationLock, async () => {
+      try {
+        const next = await expensesService.removeItem(report.id, itemId);
+        setReport(next);
+        toast.success('Despesa removida.');
+      } catch (error) {
+        logger.error('Erro ao remover despesa:', error);
+        toast.error('Erro ao remover despesa.');
+      }
+    });
   }
 
   async function handleOpenReceipt(itemId: string) {
@@ -230,14 +234,16 @@ export default function ExpenseReportDetailPage() {
     if (!report || !confirm('Fechar prestação? Após o fechamento não será possível alterar despesas ou adiantamentos.')) {
       return;
     }
-    try {
-      const next = await expensesService.close(report.id);
-      setReport(next);
-      toast.success('Prestação fechada.');
-    } catch (error) {
-      logger.error('Erro ao fechar prestação:', error);
-      toast.error('Erro ao fechar prestação.');
-    }
+    await runWithMutationLock(destructiveMutationLock, async () => {
+      try {
+        const next = await expensesService.close(report.id);
+        setReport(next);
+        toast.success('Prestação fechada.');
+      } catch (error) {
+        logger.error('Erro ao fechar prestação:', error);
+        toast.error('Erro ao fechar prestação.');
+      }
+    });
   }
 
   if (!canView) {

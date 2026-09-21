@@ -11,8 +11,8 @@ function isSqlite(queryRunner: QueryRunner): boolean {
   );
 }
 
-export class AddNotificationDurableDedupeKey1709000000403 implements MigrationInterface {
-  name = 'AddNotificationDurableDedupeKey1709000000403';
+export class AddNotificationDurableDedupeKey1709000000406 implements MigrationInterface {
+  name = 'AddNotificationDurableDedupeKey1709000000406';
   transaction = false;
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -57,11 +57,11 @@ export class AddNotificationDurableDedupeKey1709000000403 implements MigrationIn
 
   private async assertPreflight(queryRunner: QueryRunner): Promise<void> {
     if (!(await queryRunner.hasTable(TABLE))) {
-      throw new Error('0403 requires public.notifications');
+      throw new Error('0406 requires public.notifications');
     }
     for (const column of ['company_id', 'userId', 'deleted_at']) {
       if (!(await queryRunner.hasColumn(TABLE, column))) {
-        throw new Error(`0403 requires notifications.${column}`);
+        throw new Error(`0406 requires notifications.${column}`);
       }
     }
   }

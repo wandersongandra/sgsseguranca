@@ -5,12 +5,17 @@ import {
   HeadObjectCommand,
   ListObjectsV2Command,
   PutObjectCommand,
+  DeleteObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { NodeHttpHandler } from '@smithy/node-http-handler';
 import { Readable } from 'stream';
+import { resolveDrReplicaStorageConfig } from '../../shared/config/dr-replica-storage.config';
 import { IntegrationResilienceService } from '../../shared/resilience/integration-resilience.service';
 import { storageKeyFingerprint } from '../../shared/storage/storage-compensation.util';
+
+const SYNTHETIC_PROBE_KEY_PATTERN =
+  /^sgs-dr-probe\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/probe\.bin$/i;
 
 const toBufferChunk = (chunk: Buffer | Uint8Array | string): Buffer =>
   Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
@@ -40,45 +45,25 @@ export class DisasterRecoveryReplicaStorageService {
     private readonly configService: ConfigService,
     private readonly integration: IntegrationResilienceService,
   ) {
-    this.bucketName =
-      this.configService.get<string>('DR_STORAGE_REPLICA_BUCKET') || null;
-    this.endpoint =
-      this.configService.get<string>('DR_STORAGE_REPLICA_ENDPOINT') ||
-      this.configService.get<string>('AWS_ENDPOINT') ||
-      null;
-    this.region =
-      this.configService.get<string>('DR_STORAGE_REPLICA_REGION') ||
-      this.configService.get<string>('AWS_REGION') ||
-      'auto';
-    this.forcePathStyle =
-      /^true$/i.test(
-        this.configService.get<string>('DR_STORAGE_REPLICA_FORCE_PATH_STYLE') ||
-          '',
-      ) ||
-      /^true$/i.test(
-        this.configService.get<string>('S3_FORCE_PATH_STYLE') || '',
-      ) ||
-      Boolean(this.endpoint);
-
-    const accessKeyId =
-      this.configService.get<string>('DR_STORAGE_REPLICA_ACCESS_KEY_ID') ||
-      this.configService.get<string>('AWS_ACCESS_KEY_ID') ||
-      '';
-    const secretAccessKey =
-      this.configService.get<string>('DR_STORAGE_REPLICA_SECRET_ACCESS_KEY') ||
-      this.configService.get<string>('AWS_SECRET_ACCESS_KEY') ||
-      '';
-
-    this.configured = Boolean(
-      this.bucketName && accessKeyId && secretAccessKey,
+    // ConfigModule/Joi may already coerce booleans before ConfigService returns
+    // them. Read as unknown and let the shared resolver enforce the real
+    // runtime type contract instead of trusting a TypeScript generic cast.
+    const replica = resolveDrReplicaStorageConfig((key) =>
+      this.configService.get<unknown>(key),
     );
+
+    this.bucketName = replica.bucketName;
+    this.endpoint = replica.endpoint;
+    this.region = replica.region;
+    this.forcePathStyle = replica.forcePathStyle;
+    this.configured = replica.configured;
 
     this.client = new S3Client({
       region: this.region,
       endpoint: this.endpoint || undefined,
       credentials: {
-        accessKeyId,
-        secretAccessKey,
+        accessKeyId: replica.accessKeyId,
+        secretAccessKey: replica.secretAccessKey,
       },
       forcePathStyle: this.forcePathStyle,
       requestHandler: new NodeHttpHandler({
@@ -198,6 +183,34 @@ export class DisasterRecoveryReplicaStorageService {
     return Buffer.concat(chunks);
   }
 
+  async deleteObject(key: string): Promise<void> {
+    this.assertConfigured();
+
+    if (!SYNTHETIC_PROBE_KEY_PATTERN.test(key)) {
+      throw new Error(
+        'Exclusão na réplica é restrita a objetos do probe sintético.',
+      );
+    }
+
+    await this.integration.execute(
+      'dr_storage_replica_delete_object',
+      () =>
+        this.client.send(
+          new DeleteObjectCommand({
+            Bucket: this.bucketName!,
+            Key: key,
+          }),
+        ),
+      { timeoutMs: 10_000 },
+    );
+
+    this.logger.log({
+      event: 'dr_storage_replica_deleted',
+      bucketName: this.bucketName,
+      keyFingerprint: storageKeyFingerprint(key),
+    });
+  }
+
   async listKeys(
     prefix: string,
     options?: { maxKeys?: number },
@@ -249,7 +262,7 @@ export class DisasterRecoveryReplicaStorageService {
     }
 
     throw new Error(
-      'Storage de réplica não configurado. Defina DR_STORAGE_REPLICA_BUCKET e credenciais compatíveis.',
+      'Storage de réplica não configurado. Defina DR_STORAGE_REPLICA_BUCKET, DR_STORAGE_REPLICA_ENDPOINT e credenciais DR independentes.',
     );
   }
 }

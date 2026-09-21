@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useState,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -143,6 +144,7 @@ export function useAprInitialData({
 }: UseAprInitialDataOptions) {
   const userCompanyId = user?.company_id;
   const userProfileName = user?.profile?.nome;
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,11 +217,32 @@ export function useAprInitialData({
           setDraftPendingOfflineSync(null);
           setPersistedSignatures({});
           setSignatures({});
+          setLoadFailed(false);
 
+          // Disparado antes do await da APR (e não depois) para correr em
+          // paralelo com ela, como antes desta função ganhar o try/catch de
+          // loadFailed — sem isso, o carregamento de assinaturas passa a
+          // esperar a APR terminar primeiro, somando uma rodada de rede
+          // inteira ao tempo de abertura da tela mais visitada do módulo.
           const signaturesPromise = canViewSignatures
             ? signaturesService.findByDocument(id, "APR")
             : Promise.resolve<Signature[]>([]);
-          const apr = await aprsService.findOne(id);
+          // Evita unhandled rejection caso a APR falhe e a gente retorne
+          // antes do .then/.catch "de verdade" mais abaixo consumir a promise.
+          signaturesPromise.catch(() => undefined);
+
+          let apr: Apr;
+          try {
+            apr = await aprsService.findOne(id);
+          } catch (error) {
+            if (!cancelled) {
+              logger.error("Erro ao carregar a APR:", error);
+              toast.error("Erro ao carregar dados para o formulário.");
+              setLoadFailed(true);
+              setLoadingTimeline(false);
+            }
+            return;
+          }
           if (cancelled) {
             return;
           }
@@ -574,4 +597,6 @@ export function useAprInitialData({
     userCompanyId,
     userProfileName,
   ]);
+
+  return { loadFailed };
 }

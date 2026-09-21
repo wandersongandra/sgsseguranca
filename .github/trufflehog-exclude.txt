@@ -1,7 +1,21 @@
 # Caminhos excluídos do TruffleHog (regex por linha, casadas contra o path do arquivo).
-# Contêm DSNs/credenciais de EXEMPLO (placeholders) que o detector Postgres casa
-# estruturalmente como "unverified". Gitleaks (job separado) continua escaneando
-# 100% do repositório como backstop, então não há perda de cobertura para secrets reais.
+# As três regras amplas abaixo são políticas históricas já existentes para
+# exemplos/documentação/testes. As regras ancoradas são somente artefatos
+# documentados no manifest de findings históricos. Gitleaks continua escaneando
+# 100% do histórico como backstop independente.
 \.example$
 \.md$
 \.spec\.ts$
+^\.gitleaksignore$
+^backend/src/data-source\.ts$
+^docker-compose\.yml$
+^frontend/app/apple-icon\.svg$
+^frontend/app/icon\.svg$
+^frontend/public/icon-192\.svg$
+^frontend/public/icon-512\.svg$
+^frontend/public/icon-maskable\.svg$
+^frontend/public/logo-gst-mark\.svg$
+^frontend/public/logo-gst\.svg$
+^frontend/public/logo-sgs\.svg$
+^frontend/public/logo-white\.svg$
+^frontend/public/logo\.svg$

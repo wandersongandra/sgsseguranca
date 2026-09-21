@@ -58,7 +58,7 @@ COPY --from=builder /app/newrelic.js ./newrelic.js
 RUN chown -R node:node /app
 USER node
 
-# Verifica heartbeat do worker no Redis (chave WORKER_HEARTBEAT_KEY, TTL 90s)
+# Readiness do processo local, incluindo consumidores, dependências e heartbeat.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD node scripts/healthcheck-worker.js
 

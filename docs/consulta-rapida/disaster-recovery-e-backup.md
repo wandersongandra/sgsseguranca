@@ -177,6 +177,26 @@ npm run dr:protect-storage:dry-run
 6. registra hash SHA-256 e metadados mínimos da replicação
 7. registra a execução em `disaster_recovery_executions`
 
+### Probe sintético da réplica
+
+Para validar somente o caminho da réplica, sem selecionar ou ler objetos de
+clientes e sem inicializar o contexto da aplicação/banco:
+
+```bash
+cd backend
+npm run dr:protect-storage -- --execute --synthetic-probe
+```
+
+Esse modo gera bytes aleatórios em `sgs-dr-probe/<uuid>/probe.bin`, executa
+`PutObject` e `GetObject`, compara SHA-256 ponta a ponta e remove o objeto em
+`finally`, inclusive após falha intermediária. Qualquer falha, incluindo
+`DeleteObject`, retorna código não zero. O probe não grava banco nem bucket
+primário e resolve a configuração apenas de:
+`DR_STORAGE_REPLICA_BUCKET`, `DR_STORAGE_REPLICA_ENDPOINT`,
+`DR_STORAGE_REPLICA_REGION`, `DR_STORAGE_REPLICA_ACCESS_KEY_ID`,
+`DR_STORAGE_REPLICA_SECRET_ACCESS_KEY` e `DR_STORAGE_REPLICA_FORCE_PATH_STYLE`.
+Credenciais `AWS_*` nunca são usadas como fallback.
+
 ### Regras operacionais
 
 - não sobrescreve por padrão
