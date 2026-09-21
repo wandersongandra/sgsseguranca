@@ -250,12 +250,16 @@ export const navigationItems: readonly NavigationItem[] = [
   }),
   item({
     id: 'audits',
-    label: 'Auditorias',
+    label: 'Auditorias e Inspeções',
     href: '/dashboard/audits',
+    matchPrefixes: ['/dashboard/audits', '/dashboard/inspections'],
     icon: ClipboardX,
     section: 'operacao',
+    permission: Permission.CAN_VIEW_AUDITS,
     surfaces: S,
     priority: 35,
+    description: 'Avaliações formais de conformidade e inspeções HSE',
+    keywords: ['auditoria', 'inspeção', 'hse', 'conformidade'],
   }),
   item({
     id: 'sophie',

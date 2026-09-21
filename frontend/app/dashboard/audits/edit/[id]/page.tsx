@@ -19,8 +19,8 @@ export default function EditAuditPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-[var(--ds-color-text-primary)]">Editar Relatório de Auditoria</h1>
-          <p className="text-sm text-[var(--ds-color-text-muted)]">Atualize as informações do relatório de auditoria.</p>
+          <h1 className="text-2xl font-bold text-[var(--ds-color-text-primary)]">Editar Relatório de Auditoria ou Inspeção HSE</h1>
+          <p className="text-sm text-[var(--ds-color-text-muted)]">Atualize as informações do relatório formal no fluxo governado.</p>
         </div>
       </div>
 

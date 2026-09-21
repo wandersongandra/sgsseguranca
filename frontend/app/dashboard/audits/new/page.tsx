@@ -15,8 +15,8 @@ export default function NewAuditPage() {
           <ArrowLeft className="h-5 w-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-[var(--ds-color-text-primary)]">Novo Relatório de Auditoria HSE</h1>
-          <p className="text-sm text-[var(--ds-color-text-muted)]">Preencha os dados abaixo para criar um novo relatório de conformidade.</p>
+          <h1 className="text-2xl font-bold text-[var(--ds-color-text-primary)]">Novo Relatório de Auditoria ou Inspeção HSE</h1>
+          <p className="text-sm text-[var(--ds-color-text-muted)]">Registre uma avaliação formal de conformidade ou inspeção estruturada no fluxo governado.</p>
         </div>
       </div>
 

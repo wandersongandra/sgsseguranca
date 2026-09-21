@@ -31,6 +31,8 @@ export const ADMIN_ROUTES = [
   '/dashboard/checklists',
   '/dashboard/checklist-models',
   '/dashboard/nonconformities',
+  '/dashboard/audits',
+  '/dashboard/inspections',
 ] as const;
 
 export type AdminRoute = (typeof ADMIN_ROUTES)[number];
@@ -58,6 +60,10 @@ export const PERMISSION_ROUTE_EXCEPTIONS: Array<{
   { route: '/dashboard/checklists', permission: Permission.CAN_VIEW_CHECKLISTS },
   { route: '/dashboard/checklist-models', permission: Permission.CAN_VIEW_CHECKLISTS },
   { route: '/dashboard/nonconformities', permission: Permission.CAN_VIEW_NC },
+  { route: '/dashboard/audits/new', permission: Permission.CAN_MANAGE_AUDITS },
+  { route: '/dashboard/audits/edit', permission: Permission.CAN_MANAGE_AUDITS },
+  { route: '/dashboard/audits', permission: Permission.CAN_VIEW_AUDITS },
+  { route: '/dashboard/inspections', permission: Permission.CAN_VIEW_AUDITS },
 ];
 
 /**

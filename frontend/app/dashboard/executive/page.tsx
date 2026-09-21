@@ -145,11 +145,6 @@ export default function ExecutiveDashboardPage() {
         helper: `${kpis.leading.apr_before_task.compliant}/${kpis.leading.apr_before_task.total}`,
       },
       {
-        label: 'Inspeções concluídas',
-        value: `${kpis.leading.completed_inspections.percentage}%`,
-        helper: `${kpis.leading.completed_inspections.completed}/${kpis.leading.completed_inspections.total}`,
-      },
-      {
         label: 'Compliance treinamentos',
         value: `${kpis.leading.training_compliance.percentage}%`,
         helper: `${kpis.leading.training_compliance.compliant}/${kpis.leading.training_compliance.total}`,
@@ -192,9 +187,9 @@ export default function ExecutiveDashboardPage() {
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
         {kpisLoading
-          ? Array.from({ length: 3 }).map((_, index) => (
+          ? Array.from({ length: 2 }).map((_, index) => (
               <div
                 key={index}
                 className={`ds-kpi-card ${

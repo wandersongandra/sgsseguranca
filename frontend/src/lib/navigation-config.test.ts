@@ -58,4 +58,23 @@ describe('navigation-config', () => {
     expect(getActiveNavigationItem('/dashboard/checklist-models/operacionais/edit/1')?.id).toBe('checklist-models');
     expect(getActiveNavigationItem('/dashboarding')).toBeUndefined();
   });
+
+  it('mantém Auditorias e Inspeções em um único entry point canônico', () => {
+    const audits = navigationItems.find((item) => item.id === 'audits');
+
+    expect(audits?.label).toBe('Auditorias e Inspeções');
+    expect(audits?.href).toBe('/dashboard/audits');
+    expect(audits?.permission).toBe(Permission.CAN_VIEW_AUDITS);
+    expect(getActiveNavigationItem('/dashboard/inspections')?.id).toBe('audits');
+    expect(getActiveNavigationItem('/dashboard/inspections?site=site-a')?.id).toBe('audits');
+  });
+
+  it('não exibe a superfície para quem não tem a permissão de auditoria', () => {
+    const visible = getVisibleNavigationItems('sidebar', {
+      hasPermission: () => false,
+      isAdmin: false,
+    });
+
+    expect(visible.some((item) => item.id === 'audits')).toBe(false);
+  });
 });

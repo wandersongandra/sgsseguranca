@@ -58,6 +58,8 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { safeFormatDate } from "@/lib/date/safeFormat";
+import { useAuth } from "@/context/AuthContext";
+import { Permission } from "@/lib/permissions";
 import { ResponsiveDataList } from "@/components/ui/responsive-data-list";
 import {
   CatalogMobileCard,
@@ -93,7 +95,9 @@ const revokeObjectUrlLater = (objectUrl: string) => {
 
 export default function AuditsPage() {
   const [audits, setAudits] = useState<Audit[]>([]);
-const timerRef = useRef<number | undefined>(undefined);
+  const timerRef = useRef<number | undefined>(undefined);
+  const { hasPermission } = useAuth();
+  const canManageAudits = hasPermission(Permission.CAN_MANAGE_AUDITS);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -228,6 +232,11 @@ useEffect(() => {
     let payload = getCachedGeneratedPdf(audit.id);
 
     if (!access.hasFinalPdf) {
+      if (!canManageAudits) {
+        throw new Error(
+          "A permissão de gestão de auditorias é necessária para emitir o PDF final.",
+        );
+      }
       payload = payload || (await generateAuditPdfPayload(audit));
       const file = base64ToPdfFile(payload.base64, payload.filename);
       await auditsService.attachFile(
@@ -313,6 +322,11 @@ useEffect(() => {
   }, []);
 
   const handleDelete = async (id: string) => {
+    if (!canManageAudits) {
+      toast.error("Você não tem permissão para gerenciar auditorias e inspeções.");
+      return;
+    }
+
     if (!confirm("Tem certeza que deseja excluir esta auditoria?")) {
       return;
     }
@@ -474,6 +488,11 @@ useEffect(() => {
   };
 
   const handleCreateCapa = async (audit: Audit) => {
+    if (!canManageAudits) {
+      toast.error("Você não tem permissão para criar ações a partir deste relatório.");
+      return;
+    }
+
     try {
       await correctiveActionsService.createFromAudit(audit.id);
       toast.success("CAPA criada a partir da auditoria");
@@ -511,7 +530,7 @@ useEffect(() => {
   if (loadError) {
     return (
       <ErrorState
-        title="Falha ao carregar auditorias"
+        title="Falha ao carregar auditorias e inspeções"
         description={loadError}
         action={
           <Button type="button" onClick={fetchAudits}>
@@ -531,25 +550,27 @@ useEffect(() => {
               <ClipboardCheck className="h-5 w-5" />
             </div>
             <div className="space-y-2">
-              <CardTitle className="text-2xl">Auditorias HSE</CardTitle>
+              <CardTitle className="text-2xl">Auditorias e Inspeções HSE</CardTitle>
               <CardDescription>
-                Gerencie relatorios de auditoria, conformidades, CAPAs e
-                evidencias por unidade.
+                Avaliações formais de conformidade e inspeções estruturadas no
+                mesmo fluxo governado, com achados, CAPAs e evidências por unidade.
               </CardDescription>
             </div>
           </div>
-          <Link
-            href="/dashboard/audits/new"
-            className={cn(buttonVariants(), "inline-flex items-center")}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Novo relatorio
-          </Link>
+          {canManageAudits ? (
+            <Link
+              href="/dashboard/audits/new"
+              className={cn(buttonVariants(), "inline-flex items-center")}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Novo relatório formal
+            </Link>
+          ) : null}
         </CardHeader>
       </Card>
 
       {loading && audits.length === 0 ? (
-        <InlineLoadingState label="Carregando auditorias..." />
+        <InlineLoadingState label="Carregando auditorias e inspeções..." />
       ) : null}
 
       {!loading || audits.length > 0 ? (
@@ -557,13 +578,13 @@ useEffect(() => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <Card interactive padding="md">
               <CardHeader>
-                <CardDescription>Total de auditorias</CardDescription>
+                <CardDescription>Total de auditorias e inspeções formais</CardDescription>
                 <CardTitle className="text-3xl">{summary.total}</CardTitle>
               </CardHeader>
             </Card>
             <Card interactive padding="md">
               <CardHeader>
-                <CardDescription>Tipos presentes</CardDescription>
+                <CardDescription>Tipos de avaliação formal</CardDescription>
                 <CardTitle className="text-3xl text-[var(--ds-color-action-primary)]">
                   {summary.tipos}
                 </CardTitle>
@@ -571,7 +592,7 @@ useEffect(() => {
             </Card>
             <Card interactive padding="md">
               <CardHeader>
-                <CardDescription>Auditorias com plano de acao</CardDescription>
+                <CardDescription>Relatórios com plano de ação</CardDescription>
                 <CardTitle className="text-3xl text-[var(--ds-color-warning)]">
                   {summary.comPlano}
                 </CardTitle>
@@ -631,18 +652,18 @@ useEffect(() => {
       <Card tone="default" padding="none">
         <CardHeader className="gap-4 border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/18 px-5 py-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
-            <CardTitle>Base de auditorias</CardTitle>
+            <CardTitle>Base de auditorias e inspeções</CardTitle>
             <CardDescription>
-              {total} relatorio(s) encontrados com busca por titulo ou tipo de
-              auditoria.
+              {total} relatório(s) encontrado(s) por título ou tipo de avaliação
+              formal.
             </CardDescription>
           </div>
           <div className="relative w-full md:w-[360px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-color-text-muted)]" />
             <input
               type="text"
-              placeholder="Buscar por titulo ou tipo"
-              aria-label="Buscar auditorias por título ou tipo"
+              placeholder="Buscar por título ou tipo"
+              aria-label="Buscar auditorias e inspeções por título ou tipo"
               className={cn(inputClassName, "pl-10")}
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
@@ -653,24 +674,24 @@ useEffect(() => {
         <CardContent className="mt-0">
           {loading && audits.length === 0 ? (
             <div className="py-6">
-              <InlineLoadingState label="Carregando base de auditorias..." />
+              <InlineLoadingState label="Carregando base de auditorias e inspeções..." />
             </div>
           ) : audits.length === 0 ? (
             <EmptyState
-              title="Nenhuma auditoria encontrada"
+              title="Nenhuma auditoria ou inspeção formal encontrada"
               description={
                 deferredSearchTerm
                   ? "Nenhum resultado corresponde ao filtro aplicado."
-                  : "Ainda nao existem auditorias registradas para este tenant."
+                  : "Ainda não existem relatórios formais registrados para este tenant."
               }
               action={
-                !deferredSearchTerm ? (
+                !deferredSearchTerm && canManageAudits ? (
                   <Link
                     href="/dashboard/audits/new"
                     className={cn(buttonVariants(), "inline-flex items-center")}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Novo relatorio
+                    Novo relatório formal
                   </Link>
                 ) : undefined
               }
@@ -723,15 +744,17 @@ useEffect(() => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleCreateCapa(audit)}
-                            title="Gerar CAPA"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                          {canManageAudits ? (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleCreateCapa(audit)}
+                              title="Gerar CAPA"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          ) : null}
                           <Button
                             type="button"
                             size="icon"
@@ -772,26 +795,30 @@ useEffect(() => {
                           >
                             <Download className="h-4 w-4" />
                           </Button>
-                          <Link
-                            href={`/dashboard/audits/edit/${audit.id}`}
-                            className={buttonVariants({
-                              size: "icon",
-                              variant: "ghost",
-                            })}
-                            title="Editar"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => handleDelete(audit.id)}
-                            title="Excluir"
-                            className="text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 hover:text-[var(--ds-color-danger)]"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {canManageAudits ? (
+                            <>
+                              <Link
+                                href={`/dashboard/audits/edit/${audit.id}`}
+                                className={buttonVariants({
+                                  size: "icon",
+                                  variant: "ghost",
+                                })}
+                                title="Editar"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Link>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleDelete(audit.id)}
+                                title="Excluir"
+                                className="text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 hover:text-[var(--ds-color-danger)]"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : null}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -808,12 +835,14 @@ useEffect(() => {
                       { label: "Data", value: safeFormatDate(audit.data_auditoria, "dd/MM/yyyy", { locale: ptBR }) },
                       { label: "Auditor", value: audit.auditor?.nome || "—" },
                     ]}
-                    actionsLabel={`Ações da auditoria ${audit.titulo}`}
+                    actionsLabel={`Ações do relatório formal ${audit.titulo}`}
                     actions={
                       <>
-                        <Button type="button" size="sm" variant="outline" onClick={() => handleCreateCapa(audit)} className={cn(catalogMobileActionClassName, "min-h-11")}>
-                          <Plus className="h-4 w-4" /> Gerar CAPA
-                        </Button>
+                        {canManageAudits ? (
+                          <Button type="button" size="sm" variant="outline" onClick={() => handleCreateCapa(audit)} className={cn(catalogMobileActionClassName, "min-h-11")}>
+                            <Plus className="h-4 w-4" /> Gerar CAPA
+                          </Button>
+                        ) : null}
                         <Button type="button" size="sm" variant="outline" onClick={() => handleOpenGovernedPdf(audit)} className={cn(catalogMobileActionClassName, "min-h-11")}>
                           <ShieldCheck className="h-4 w-4 text-[var(--ds-color-success)]" /> {audit.pdf_file_key ? "Abrir PDF final" : "Emitir PDF final"}
                         </Button>
@@ -826,12 +855,16 @@ useEffect(() => {
                         <Button type="button" size="sm" variant="outline" onClick={() => handleDownloadPdf(audit)} className={cn(catalogMobileActionClassName, "min-h-11")}>
                           <Download className="h-4 w-4" /> Baixar
                         </Button>
-                        <Link href={`/dashboard/audits/edit/${audit.id}`} className={cn(buttonVariants({ size: "sm", variant: "outline" }), catalogMobileActionClassName, "min-h-11")}>
-                          <Edit className="h-4 w-4" /> Editar
-                        </Link>
-                        <Button type="button" size="sm" variant="outline" onClick={() => handleDelete(audit.id)} className={cn(catalogMobileActionClassName, "min-h-11 text-[var(--ds-color-danger)]")}>
-                          <Trash2 className="h-4 w-4" /> Excluir
-                        </Button>
+                        {canManageAudits ? (
+                          <>
+                            <Link href={`/dashboard/audits/edit/${audit.id}`} className={cn(buttonVariants({ size: "sm", variant: "outline" }), catalogMobileActionClassName, "min-h-11")}>
+                              <Edit className="h-4 w-4" /> Editar
+                            </Link>
+                            <Button type="button" size="sm" variant="outline" onClick={() => handleDelete(audit.id)} className={cn(catalogMobileActionClassName, "min-h-11 text-[var(--ds-color-danger)]")}>
+                              <Trash2 className="h-4 w-4" /> Excluir
+                            </Button>
+                          </>
+                        ) : null}
                       </>
                     }
                   />
@@ -851,7 +884,7 @@ useEffect(() => {
       </Card>
 
       <StoredFilesPanel
-        title="Arquivos Auditoria (Storage)"
+        title="Arquivos de auditorias e inspeções (Storage)"
         description="PDFs salvos automaticamente por empresa/ano/semana."
         listStoredFiles={auditsService.listStoredFiles}
         getPdfAccess={auditsService.getPdfAccess}

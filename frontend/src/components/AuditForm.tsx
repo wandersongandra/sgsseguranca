@@ -658,13 +658,13 @@ export function AuditForm({ id }: AuditFormProps) {
       ) : null}
 
       <PageHeader
-        eyebrow="Relatórios de auditoria"
-        title={id ? 'Editar auditoria' : 'Nova auditoria'}
-        description="Estruture identificação, achados, avaliação de riscos e plano de ação em um único relatório."
+        eyebrow="Relatórios de auditoria e inspeção"
+        title={id ? 'Editar relatório formal' : 'Novo relatório formal'}
+        description="Registre avaliações formais de conformidade, inspeções HSE, achados, riscos e planos de ação em um único relatório governado."
         icon={<ClipboardCheck className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
-            <StatusPill tone="info">Auditoria</StatusPill>
+            <StatusPill tone="info">Auditoria / Inspeção HSE</StatusPill>
             <StatusPill tone={id ? 'warning' : 'success'}>
               {id ? 'Edição' : 'Novo cadastro'}
             </StatusPill>
@@ -677,13 +677,13 @@ export function AuditForm({ id }: AuditFormProps) {
 
       <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-          Relatório guiado
+          Relatório formal guiado
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Registre o contexto da auditoria, consolide conformidades e feche o plano de ação com rastreabilidade.
+          Registre o contexto da auditoria ou inspeção formal, consolide conformidades e feche o plano de ação com rastreabilidade.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Revise site, auditor, tipo de auditoria e achados críticos antes de salvar para evitar retrabalho documental.
+          Revise site, responsável, tipo de avaliação e achados críticos antes de salvar para evitar retrabalho documental.
         </p>
       </div>
 
@@ -692,7 +692,7 @@ export function AuditForm({ id }: AuditFormProps) {
           role="alert"
           className="rounded-lg border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-danger-subtle)] px-4 py-3 text-sm text-[var(--ds-color-danger)]"
         >
-          <p className="font-semibold">Não foi possível salvar a auditoria</p>
+          <p className="font-semibold">Não foi possível salvar o relatório formal</p>
           <p className="mt-1 text-[color:var(--ds-color-danger)]/90">{submitError}</p>
         </div>
       )}
@@ -1430,7 +1430,7 @@ export function AuditForm({ id }: AuditFormProps) {
           ) : (
             <Save className="h-4 w-4" />
           )}
-          <span>{id ? 'Salvar Alterações' : 'Criar Relatório de Auditoria'}</span>
+          <span>{id ? 'Salvar alterações' : 'Criar relatório formal'}</span>
         </button>
       </div>
     </form>
