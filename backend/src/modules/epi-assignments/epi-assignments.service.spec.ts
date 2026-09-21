@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { TenantService } from '../../shared/tenant/tenant.service';
 import { EpiAssignment } from './entities/epi-assignment.entity';
@@ -42,19 +46,26 @@ function makeService(overrides: {
     jest.fn((entity: Partial<EpiAssignment>) =>
       Promise.resolve(entity as EpiAssignment),
     );
+  const assignFindOne =
+    overrides.assignmentsRepository?.findOne ??
+    jest.fn().mockResolvedValue(null);
 
   const assignmentsRepository = {
     create: assignCreate,
     save: assignSave,
-    findOne: jest.fn().mockResolvedValue(null),
+    findOne: assignFindOne,
     createQueryBuilder: jest.fn().mockReturnValue(makeQb()),
     // SGS-EPI-BR-007: create() now wraps stock check + save in a transaction
     manager: {
-      transaction: jest.fn(async (cb: (trx: unknown) => Promise<unknown>) => {
+      transaction: jest.fn((cb: (trx: unknown) => Promise<unknown>) => {
         const trx = {
           getRepository: (entity: unknown) => {
             if (entity === Epi) return { findOne: epiFindOne };
-            return { create: assignCreate, save: assignSave };
+            return {
+              create: assignCreate,
+              findOne: assignFindOne,
+              save: assignSave,
+            };
           },
           query: jest.fn().mockResolvedValue(undefined),
         };
@@ -242,6 +253,46 @@ describe('EpiAssignmentsService', () => {
       const result = await service.findOne('assign-1');
 
       expect(result.id).toBe('assign-1');
+    });
+  });
+
+  describe('update()', () => {
+    it('blocks generic edits after delivery signature is recorded', async () => {
+      const service = makeService({
+        assignmentsRepository: {
+          findOne: jest.fn().mockResolvedValue({
+            id: 'assign-1',
+            company_id: 'company-1',
+            status: 'entregue',
+            assinatura_entrega: { signature_hash: 'signed-hash' },
+            pdf_file_key: null,
+          }),
+          save: jest.fn(),
+        },
+      });
+
+      await expect(
+        service.update('assign-1', { quantidade: 2 }, 'actor-1'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('blocks generic edits after the final PDF is recorded', async () => {
+      const service = makeService({
+        assignmentsRepository: {
+          findOne: jest.fn().mockResolvedValue({
+            id: 'assign-1',
+            company_id: 'company-1',
+            status: 'entregue',
+            assinatura_entrega: { signature_hash: '' },
+            pdf_file_key: 'documents/epi/final.pdf',
+          }),
+          save: jest.fn(),
+        },
+      });
+
+      await expect(
+        service.update('assign-1', { observacoes: 'alteração' }, 'actor-1'),
+      ).rejects.toThrow(ConflictException);
     });
   });
 

@@ -323,7 +323,7 @@ export class EpiAssignmentsService {
           assignment.pdf_file_key
         ) {
           throw new ConflictException(
-            'Ficha EPI assinada ou com PDF final não pode ser alterada.',
+            'Ficha EPI assinada ou com PDF final anexado. A edição genérica está bloqueada; use o fluxo formal de devolução ou substituição.',
           );
         }
 
