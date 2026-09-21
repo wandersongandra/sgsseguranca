@@ -3,6 +3,7 @@ import { AxiosError } from "axios";
 
 export interface AppNotification {
   id: string;
+  company_id?: string;
   type: string;
   title: string;
   message: string;

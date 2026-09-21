@@ -43,7 +43,7 @@
     "jspdf": "^4.2.0",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.40.0",
-    "next": "^16.3.1",
+    "next": "^16.3.3",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.0.1",
     "react": "^19.2.8",
@@ -83,6 +83,7 @@
   },
   "overrides": {
     "browserslist": "4.28.8",
+    "fast-uri": "3.1.7",
     "brace-expansion": "^5.0.8",
     "ws": "^8.21.0",
     "postcss": "^8.5.22",

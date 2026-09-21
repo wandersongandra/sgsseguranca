@@ -5,6 +5,8 @@ import { io, type Socket } from 'socket.io-client';
 import { notificationsService, type AppNotification } from '@/services/notificationsService';
 import { tokenStore } from '@/lib/tokenStore';
 import { getApiBaseUrl } from '@/lib/api';
+import { selectedTenantStore } from '@/lib/selectedTenantStore';
+import { sessionStore } from '@/lib/sessionStore';
 
 const ACTIVE_INTERVAL_MS   = 15_000;
 const INACTIVE_INTERVAL_MS = 60_000;
@@ -18,6 +20,30 @@ export interface UseRealtimeNotificationsResult {
   markAllRead: () => Promise<void>;
   markRead: (id: string) => Promise<void>;
   refresh: () => void;
+}
+
+export function notificationBelongsToTenant(
+  notification: AppNotification,
+  companyId: string | null,
+): boolean {
+  return Boolean(companyId && notification.company_id === companyId);
+}
+
+export function prependUniqueNotification(
+  current: AppNotification[],
+  incoming: AppNotification,
+): AppNotification[] {
+  if (current.some((notification) => notification.id === incoming.id)) {
+    return current;
+  }
+
+  return [incoming, ...current];
+}
+
+function resolveActiveTenantId(): string | null {
+  return (
+    selectedTenantStore.get()?.companyId || sessionStore.get()?.companyId || null
+  );
 }
 
 function wsBaseUrl(): string | null {
@@ -52,18 +78,26 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isActiveRef   = useRef(true);
   const inflightRef   = useRef<Promise<void> | null>(null);
+  const inflightTenantRef = useRef<string | null>(null);
   const isPollingRef  = useRef(false);
   const wsRetryCount  = useRef(0);
   const wsRetryTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const destroyedRef  = useRef(false);
+  const activeTenantRef = useRef<string | null>(resolveActiveTenantId());
   const notificationsRef = useRef<AppNotification[]>(notifications);
-  const unreadCountRef  = useRef(unreadCount);
+  const unreadCountRef = useRef(unreadCount);
 
   useEffect(() => { notificationsRef.current = notifications; }, [notifications]);
   useEffect(() => { unreadCountRef.current = unreadCount; }, [unreadCount]);
 
   const fetchAll = useCallback(async () => {
-    if (inflightRef.current) return inflightRef.current;
+    const requestTenantId = activeTenantRef.current;
+    if (
+      inflightRef.current &&
+      inflightTenantRef.current === requestTenantId
+    ) {
+      return inflightRef.current;
+    }
 
     const req = (async () => {
       try {
@@ -71,18 +105,28 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
           notificationsService.findAll(1, 20),
           notificationsService.getUnreadCount(),
         ]);
+        if (
+          destroyedRef.current ||
+          activeTenantRef.current !== requestTenantId
+        ) {
+          return;
+        }
         notificationsRef.current = listRes.items;
-        unreadCountRef.current  = countRes.count;
+        unreadCountRef.current = countRes.count;
         setNotifications(listRes.items);
         setUnreadCount(countRes.count);
       } catch {
         // polling retentará no próximo ciclo
       } finally {
-        inflightRef.current = null;
+        if (inflightTenantRef.current === requestTenantId) {
+          inflightRef.current = null;
+          inflightTenantRef.current = null;
+        }
       }
     })();
 
     inflightRef.current = req;
+    inflightTenantRef.current = requestTenantId;
     return req;
   }, []);
 
@@ -114,11 +158,10 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
     isPollingRef.current = false;
     if (timerRef.current) clearTimeout(timerRef.current);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (inflightRef.current) { inflightRef.current = null; }
   }, []);
 
   const wsConnectRef = useRef<() => void>(() => {});
-  const wsRetryRef   = useRef<() => void>(() => {});
+  const wsRetryRef = useRef<() => void>(() => {});
   const wsDisconnect = useCallback(() => {
     if (socketRef.current) {
       socketRef.current.removeAllListeners();
@@ -155,7 +198,22 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
     });
 
     socket.on('notification', (data: AppNotification) => {
-      notificationsRef.current = [data, ...notificationsRef.current];
+      if (!notificationBelongsToTenant(data, activeTenantRef.current)) {
+        return;
+      }
+
+      if (
+        notificationsRef.current.some(
+          (notification) => notification.id === data.id,
+        )
+      ) {
+        return;
+      }
+
+      notificationsRef.current = prependUniqueNotification(
+        notificationsRef.current,
+        data,
+      );
       unreadCountRef.current += 1;
       setNotifications([...notificationsRef.current]);
       setUnreadCount(unreadCountRef.current);
@@ -199,6 +257,34 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
   };
 
   useEffect(() => {
+    const synchronizeTenant = () => {
+      const nextTenantId = resolveActiveTenantId();
+      if (nextTenantId === activeTenantRef.current) return;
+
+      activeTenantRef.current = nextTenantId;
+      notificationsRef.current = [];
+      unreadCountRef.current = 0;
+      setNotifications([]);
+      setUnreadCount(0);
+      stopPolling();
+      wsDisconnect();
+      if (wsRetryTimer.current) clearTimeout(wsRetryTimer.current);
+      wsRetryCount.current = 0;
+
+      void fetchAll().then(schedule);
+      wsConnectRef.current();
+    };
+
+    const unsubscribeTenant = selectedTenantStore.subscribe(synchronizeTenant);
+    const unsubscribeSession = sessionStore.subscribe(synchronizeTenant);
+
+    return () => {
+      unsubscribeTenant();
+      unsubscribeSession();
+    };
+  }, [fetchAll, schedule, stopPolling, wsDisconnect]);
+
+  useEffect(() => {
     destroyedRef.current = false;
     wsRetryCount.current = 0;
     wsConnectRef.current();
@@ -215,9 +301,9 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
   const markAllRead = useCallback(async () => {
     const prevNotifications = notificationsRef.current;
     const prevCount = unreadCountRef.current;
-    const ids = prevNotifications.map((n) => n.id);
+    const tenantAtStart = activeTenantRef.current;
 
-    if (ids.length === 0 || prevCount === 0) return;
+    if (prevCount === 0) return;
 
     const nextNotifications = prevNotifications.map((n) => ({ ...n, read: true }));
     notificationsRef.current = nextNotifications;
@@ -228,45 +314,55 @@ export function useRealtimeNotifications(): UseRealtimeNotificationsResult {
 
     try {
       await notificationsService.markAllAsRead();
-    } catch {
-      notificationsRef.current = prevNotifications;
-      unreadCountRef.current = prevCount;
-      setUnreadCount(prevCount);
-      setNotifications(prevNotifications);
-    }
-  }, []);
-
-  const markRead = useCallback(async (id: string) => {
-    const prevNotifications = notificationsRef.current;
-    const prevCount = unreadCountRef.current;
-
-    let changed = false;
-    const nextNotifications = prevNotifications.map((n) => {
-      if (n.id === id && !n.read) {
-        changed = true;
-        return { ...n, read: true };
+      if (activeTenantRef.current === tenantAtStart) {
+        await fetchAll();
       }
-      return n;
-    });
-
-    if (!changed) return;
-
-    const nextUnreadCount = Math.max(0, prevCount - 1);
-    notificationsRef.current = nextNotifications;
-    unreadCountRef.current = nextUnreadCount;
-
-    setNotifications(nextNotifications);
-    setUnreadCount(nextUnreadCount);
-
-    try {
-      await notificationsService.markAsRead(id);
-    } catch {
-      notificationsRef.current = prevNotifications;
-      unreadCountRef.current = prevCount;
-      setNotifications(prevNotifications);
-      setUnreadCount(prevCount);
+    } catch (error) {
+      if (activeTenantRef.current === tenantAtStart) {
+        await fetchAll();
+      }
+      throw error;
     }
-  }, []);
+  }, [fetchAll]);
+
+  const markRead = useCallback(
+    async (id: string) => {
+      const prevNotifications = notificationsRef.current;
+      const prevCount = unreadCountRef.current;
+      const tenantAtStart = activeTenantRef.current;
+
+      let changed = false;
+      const nextNotifications = prevNotifications.map((n) => {
+        if (n.id === id && !n.read) {
+          changed = true;
+          return { ...n, read: true };
+        }
+        return n;
+      });
+
+      if (!changed) return;
+
+      const nextUnreadCount = Math.max(0, prevCount - 1);
+      notificationsRef.current = nextNotifications;
+      unreadCountRef.current = nextUnreadCount;
+
+      setNotifications(nextNotifications);
+      setUnreadCount(nextUnreadCount);
+
+      try {
+        await notificationsService.markAsRead(id);
+        if (activeTenantRef.current === tenantAtStart) {
+          await fetchAll();
+        }
+      } catch (error) {
+        if (activeTenantRef.current === tenantAtStart) {
+          await fetchAll();
+        }
+        throw error;
+      }
+    },
+    [fetchAll],
+  );
 
   const refresh = useCallback(() => {
     debouncedFetch();
