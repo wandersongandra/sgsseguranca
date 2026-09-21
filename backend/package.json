@@ -225,7 +225,7 @@
     "nest-winston": "file:./vendor/nest-winston-1.10.2-nestjs12-compat.tgz",
     "newrelic": "^14.3.7",
     "nodemailer": "^9.0.0",
-    "p-limit": "^7.3.2",
+    "p-limit": "^3.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pdf-lib": "^1.17.1",
