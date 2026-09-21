@@ -47,7 +47,8 @@ function makeService(overrides: {
       Promise.resolve(entity as EpiAssignment),
     );
   const assignFindOne =
-    overrides.assignmentsRepository?.findOne ?? jest.fn().mockResolvedValue(null);
+    overrides.assignmentsRepository?.findOne ??
+    jest.fn().mockResolvedValue(null);
 
   const assignmentsRepository = {
     create: assignCreate,
@@ -56,7 +57,7 @@ function makeService(overrides: {
     createQueryBuilder: jest.fn().mockReturnValue(makeQb()),
     // SGS-EPI-BR-007: create() now wraps stock check + save in a transaction
     manager: {
-      transaction: jest.fn(async (cb: (trx: unknown) => Promise<unknown>) => {
+      transaction: jest.fn((cb: (trx: unknown) => Promise<unknown>) => {
         const trx = {
           getRepository: (entity: unknown) => {
             if (entity === Epi) return { findOne: epiFindOne };
