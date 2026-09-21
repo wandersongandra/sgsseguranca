@@ -202,7 +202,7 @@
     "axios": "^1.19.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.10.0",
-    "bullmq": "^6.3.4",
+    "bullmq": "^5.81.2",
     "cache-manager": "^7.2.8",
     "class-sanitizer": "^1.0.1",
     "class-transformer": "^0.5.1",
