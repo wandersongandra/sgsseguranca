@@ -99,7 +99,7 @@ const PROFILE_ADMIN_EMPRESA = 'Administrador da Empresa';
 const PROFILE_TST = 'Técnico de Segurança do Trabalho (TST)';
 const PROFILE_SUPERVISOR = 'Supervisor / Encarregado';
 const PROFILE_OPERADOR = 'Operador / Colaborador';
-const ARGON2_IMPORT_OPTIONS: argon2.Options & { raw?: false } = {
+const ARGON2_IMPORT_OPTIONS: argon2.HashOptions & { raw?: false } = {
   type: argon2.argon2id,
   memoryCost: 65536,
   timeCost: 3,
