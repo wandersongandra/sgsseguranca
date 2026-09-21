@@ -14,8 +14,11 @@ import { getFormErrorMessage } from '@/lib/error-handler';
 import { logger } from '@/lib/logger';
 import { isValidCnpj, formatCnpj } from '@/lib/cnpj';
 import { PageHeader } from '@/components/layout';
-import { InlineLoadingState } from '@/components/ui/state';
+import { ErrorState, InlineLoadingState } from '@/components/ui/state';
 import { StatusPill } from '@/components/ui/status-pill';
+import { useAuth } from '@/context/AuthContext';
+import { Permission } from '@/lib/permissions';
+import { canManageCompanies as hasCompanyMutationRole } from '@/lib/role-access';
 
 const fieldClassName =
   'w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 text-sm text-[var(--ds-color-text-primary)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-action-primary)] focus:outline-none focus:shadow-[var(--ds-shadow-sm)]';
@@ -46,6 +49,9 @@ interface CompanyFormProps {
 
 export function CompanyForm({ id }: CompanyFormProps) {
   const router = useRouter();
+  const { hasPermission, roles } = useAuth();
+  const canManageCompany =
+    hasPermission(Permission.CAN_MANAGE_COMPANIES) && hasCompanyMutationRole(roles);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(!!id);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -75,6 +81,11 @@ export function CompanyForm({ id }: CompanyFormProps) {
   });
 
   useEffect(() => {
+    if (!canManageCompany) {
+      setFetching(false);
+      return;
+    }
+
     async function loadCompany() {
       try {
         const data = await companiesService.findOne(id!);
@@ -101,7 +112,7 @@ export function CompanyForm({ id }: CompanyFormProps) {
     if (id) {
       loadCompany();
     }
-  }, [id, reset, router]);
+  }, [canManageCompany, id, reset, router]);
 
   function handleLogoFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -182,6 +193,23 @@ export function CompanyForm({ id }: CompanyFormProps) {
     }
     toast.error('Revise os campos obrigatórios antes de salvar.');
   };
+
+  if (!canManageCompany) {
+    return (
+      <ErrorState
+        title="Sem permissão para gerenciar empresas"
+        description="Sua função pode consultar a empresa, mas alterações exigem o perfil de administrador da plataforma."
+        action={
+          <Link
+            href="/dashboard/companies"
+            className="inline-flex min-h-11 items-center rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-semibold text-white"
+          >
+            Voltar para empresas
+          </Link>
+        }
+      />
+    );
+  }
 
   return (
     <div className="ds-form-page mx-auto max-w-2xl space-y-6">

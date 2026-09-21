@@ -43,6 +43,7 @@ export const PERMISSION_ROUTE_EXCEPTIONS: Array<{
   route: string;
   permission: AppPermission;
 }> = [
+  { route: '/dashboard/companies', permission: Permission.CAN_VIEW_COMPANIES },
   { route: '/dashboard/activities', permission: Permission.CAN_VIEW_ACTIVITIES },
   { route: '/dashboard/risks', permission: Permission.CAN_VIEW_RISKS },
   { route: '/dashboard/trainings', permission: Permission.CAN_VIEW_TRAININGS },
@@ -63,8 +64,7 @@ export const PERMISSION_ROUTE_EXCEPTIONS: Array<{
  * Prefixos de rotas temporariamente ocultadas (feature flags de rollout).
  * Redireciona silenciosamente para /dashboard ao tentar acessar.
  */
-export const HIDDEN_ROUTES = [
-] as const;
+export const HIDDEN_ROUTES = [] as const;
 
 export type HiddenRoute = (typeof HIDDEN_ROUTES)[number];
 

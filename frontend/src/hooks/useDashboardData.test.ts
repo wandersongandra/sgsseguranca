@@ -38,13 +38,13 @@ const queueInvalidateAll = jest.fn();
 
 // Objetos estáticos por chave de cache para que referências não mudem entre
 // renders e os useEffects de token funcionem corretamente no ambiente de teste.
-const cacheControllers: Record<string, { fetch: jest.Mock; invalidate: jest.Mock; invalidateAll: jest.Mock }> = {};
+const cacheControllers: Record<
+  string,
+  { fetch: jest.Mock; invalidate: jest.Mock; invalidateAll: jest.Mock }
+> = {};
 
 jest.mock('@/hooks/useCachedFetch', () => ({
-  useCachedFetch: (
-    cacheKey: string,
-    fetcher: (...args: unknown[]) => Promise<unknown>,
-  ) => {
+  useCachedFetch: (cacheKey: string, fetcher: (...args: unknown[]) => Promise<unknown>) => {
     if (!cacheControllers[cacheKey]) {
       const isSummary = cacheKey.includes('summary');
       cacheControllers[cacheKey] = {
@@ -187,10 +187,43 @@ describe('useDashboardData', () => {
     });
   });
 
+  it('não expõe dados do tenant anterior enquanto a nova leitura está pendente', async () => {
+    let resolveNextSummary!: (value: typeof SUMMARY_FIXTURE) => void;
+    getSummary.mockResolvedValueOnce(SUMMARY_FIXTURE).mockImplementationOnce(
+      () =>
+        new Promise<typeof SUMMARY_FIXTURE>((resolve) => {
+          resolveNextSummary = resolve;
+        }),
+    );
+    getPendingQueue.mockResolvedValue(QUEUE_FIXTURE);
+
+    const { result } = renderHook(() => useDashboardData());
+    await waitFor(() => expect(result.current.summary.loading).toBe(false));
+    expect(result.current.summary.data).toEqual(SUMMARY_FIXTURE);
+
+    act(() => {
+      setTenant({ companyId: 'tenant-b', companyName: 'Tenant B' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.summary.loading).toBe(true);
+      expect(result.current.summary.data).toBeNull();
+      expect(result.current.lastUpdatedAt).toBeNull();
+    });
+
+    await act(async () => {
+      resolveNextSummary(SUMMARY_FIXTURE);
+      await Promise.resolve();
+    });
+  });
+
   it('não chama setState após unmount (cancelamento via active flag)', async () => {
     let resolveSummary!: (v: typeof SUMMARY_FIXTURE) => void;
     getSummary.mockImplementation(
-      () => new Promise<typeof SUMMARY_FIXTURE>((res) => { resolveSummary = res; }),
+      () =>
+        new Promise<typeof SUMMARY_FIXTURE>((res) => {
+          resolveSummary = res;
+        }),
     );
     getPendingQueue.mockResolvedValue(QUEUE_FIXTURE);
 
