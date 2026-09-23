@@ -55,6 +55,22 @@ const resolveMailRequestTimeoutMs = (): number => {
 
 const MAIL_TEMP_UPLOAD_DIR = resolveSgsTempDirectory();
 
+function resolveManagedMailUploadPath(filename: string): string {
+  const tempDirectory = path.resolve(MAIL_TEMP_UPLOAD_DIR);
+  const resolvedPath = path.resolve(tempDirectory, path.basename(filename));
+  const relativePath = path.relative(tempDirectory, resolvedPath);
+
+  if (
+    !relativePath ||
+    relativePath.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(relativePath)
+  ) {
+    throw new BadRequestException('Caminho de upload inválido.');
+  }
+
+  return resolvedPath;
+}
+
 type RequestWithUser = {
   user?: { company_id?: string; companyId?: string; userId?: string };
 };
@@ -355,19 +371,20 @@ export class MailController {
 
     const companyId = getRequiredCompanyId(req);
     const resolvedDocName = body.docName?.trim() || file.originalname;
+    const managedUploadPath = resolveManagedMailUploadPath(file.filename);
     let pdfBuffer: Buffer;
 
     this.mailService.assertDispatchAvailable();
 
     try {
-      pdfBuffer = await readFile(file.path);
+      pdfBuffer = await readFile(managedUploadPath);
       await validatePdfMagicBytesFromPath(
-        file.path,
+        managedUploadPath,
         this.fileInspectionService,
         file.originalname,
       );
     } finally {
-      await unlink(file.path).catch(() => undefined);
+      await unlink(managedUploadPath).catch(() => undefined);
     }
 
     return this.mailService.sendUploadedPdfBuffer(pdfBuffer, email, {

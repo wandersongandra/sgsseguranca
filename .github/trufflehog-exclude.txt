@@ -1,11 +1,9 @@
 # Caminhos excluídos do TruffleHog (regex por linha, casadas contra o path do arquivo).
-# As três regras amplas abaixo são políticas históricas já existentes para
-# exemplos/documentação/testes. As regras ancoradas são somente artefatos
-# documentados no manifest de findings históricos. Gitleaks continua escaneando
-# 100% do histórico como backstop independente.
-\.example$
-\.md$
-\.spec\.ts$
+# As exclusões devem ser específicas. Gitleaks continua escaneando 100% do
+# histórico como backstop independente.
+^backend/.env\.example$
+^backend/test/load/README_EXECUCAO\.md$
+^docs/audits/dds-test-evidence\.md$
 ^\.gitleaksignore$
 ^backend/src/data-source\.ts$
 ^docker-compose\.yml$
