@@ -178,7 +178,7 @@ jobs:
     name: Generate SBOM
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     strategy:
       matrix:
         directory: ["backend", "frontend"]
