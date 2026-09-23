@@ -78,7 +78,7 @@ interface AuthContextType {
     turnstileToken?: string,
   ) => Promise<AuthLoginResult>;
   finalizeLogin: (data: AuthLoginResponse) => void;
-  logout: () => Promise<void>;
+  logout: (redirectPath?: string) => Promise<void>;
 }
 
 interface AuthStateContextType {
@@ -97,7 +97,7 @@ interface AuthActionsContextType {
     turnstileToken?: string,
   ) => Promise<AuthLoginResult>;
   finalizeLogin: (data: AuthLoginResponse) => void;
-  logout: () => Promise<void>;
+  logout: (redirectPath?: string) => Promise<void>;
 }
 
 const AuthStateContext = createContext<AuthStateContextType | undefined>(undefined);
@@ -284,16 +284,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     [applyAuthenticatedSession, router],
   );
 
-  const logout = useCallback(async () => {
-    try {
-      await authService.logout();
-    } catch {
-      // Ignora falhas de rede no logout e limpa estado local mesmo assim.
-    }
+  const logout = useCallback(
+    async (redirectPath = '/login') => {
+      try {
+        await authService.logout();
+      } catch {
+        // Ignora falhas de rede no logout e limpa estado local mesmo assim.
+      }
 
-    await clearAuthState();
-    router.push('/login');
-  }, [clearAuthState, router]);
+      await clearAuthState();
+      router.push(redirectPath);
+    },
+    [clearAuthState, router],
+  );
 
   // Logout automático por inatividade (LGPD + segurança)
   useEffect(() => {
@@ -308,8 +311,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const reset = () => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        void logout();
-        router.push('/login?expired=1');
+        void logout('/login?expired=1');
       }, IDLE_MS);
     };
 

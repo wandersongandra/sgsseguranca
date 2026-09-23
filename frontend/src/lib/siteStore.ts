@@ -76,7 +76,7 @@ export const siteStore = {
 
   set(site: SelectedSite): Promise<void> {
     const requestGeneration = transitionGeneration;
-    transition = transition.then(async () => {
+    const applySite = async () => {
       if (requestGeneration !== transitionGeneration) return;
       const previousSite = current ?? loadFromStorage();
 
@@ -89,10 +89,12 @@ export const siteStore = {
         if (requestGeneration !== transitionGeneration) return;
       }
 
+      if (requestGeneration !== transitionGeneration) return;
       current = site;
       saveToStorage(site);
       for (const l of listeners) l(current);
-    });
+    };
+    transition = transition.then(applySite, applySite);
     return transition;
   },
 

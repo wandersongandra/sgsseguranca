@@ -61,7 +61,7 @@ export const selectedTenantStore = {
 
   set(tenant: SelectedTenant): Promise<void> {
     const requestGeneration = transitionGeneration;
-    transition = transition.then(async () => {
+    const applyTenant = async () => {
       if (requestGeneration !== transitionGeneration) return;
       const previousTenant = current ?? loadFromStorage();
       if (
@@ -76,7 +76,8 @@ export const selectedTenantStore = {
       current = tenant;
       saveToStorage(tenant);
       for (const l of listeners) l(current);
-    });
+    };
+    transition = transition.then(applyTenant, applyTenant);
     return transition;
   },
 
@@ -84,6 +85,7 @@ export const selectedTenantStore = {
     transitionGeneration += 1;
     current = null;
     saveToStorage(null);
+    siteStore.clear();
     for (const l of listeners) l(null);
   },
 
