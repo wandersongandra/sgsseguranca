@@ -50,16 +50,16 @@ jobs:
           DR_ENVIRONMENT_NAME: production
         run: |
           if [ -z "$DATABASE_URL" ]; then
-            echo "DR backup skipped: DR_BACKUP_DATABASE_URL not configured." >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "DR backup failed: DR_BACKUP_DATABASE_URL is not configured." >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
           if [ -z "$JWT_SECRET" ] || [ -z "$JWT_REFRESH_SECRET" ]; then
-            echo "DR backup skipped: placeholder JWT secrets not configured." >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "DR backup failed: placeholder JWT secrets are not configured." >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "DR backup skipped: backup storage credentials are not configured." >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "DR backup failed: backup storage credentials are not configured." >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
           npm run dr:backup -- --trigger-source=github-actions --upload-to-storage
 
@@ -122,16 +122,16 @@ jobs:
           DR_DATABASE_URL: ${{ secrets.DR_BACKUP_DATABASE_URL }}
         run: |
           if [ -z "$DR_DATABASE_URL" ]; then
-            echo "Verify skipped: DR_BACKUP_DATABASE_URL not configured." >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "Verify failed: DR_BACKUP_DATABASE_URL is not configured." >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
           if [ -z "$DR_BUCKET" ]; then
-            echo "Verify skipped: DR_BACKUP_AWS_BUCKET_NAME not configured." >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "Verify failed: DR_BACKUP_AWS_BUCKET_NAME is not configured." >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-            echo "Verify skipped: backup storage credentials are not configured." >> $GITHUB_STEP_SUMMARY
-            exit 0
+            echo "Verify failed: backup storage credentials are not configured." >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
 
           ENDPOINT_ARG=""
