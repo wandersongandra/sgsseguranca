@@ -1,6 +1,6 @@
 'use client';
 
-import { type RefObject, useEffect } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 
 const FOCUSABLE = [
   'a[href]',
@@ -19,13 +19,22 @@ export function useFocusTrap(
   ref: RefObject<HTMLElement | null>,
   active: boolean,
   onClose?: () => void,
+  restoreFocusRef?: RefObject<HTMLElement | null>,
 ) {
+  const restoreFocusFrameRef = useRef<number | null>(null);
+
   useEffect(() => {
+    if (active && restoreFocusFrameRef.current !== null) {
+      cancelAnimationFrame(restoreFocusFrameRef.current);
+      restoreFocusFrameRef.current = null;
+    }
+
     if (!active || !ref.current) return;
 
     const container = ref.current;
     const previousFocus =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      restoreFocusRef?.current ??
+      (document.activeElement instanceof HTMLElement ? document.activeElement : null);
 
     const focusFrame = requestAnimationFrame(() => {
       const focusable = getFocusable(container);
@@ -77,7 +86,15 @@ export function useFocusTrap(
     return () => {
       cancelAnimationFrame(focusFrame);
       container.removeEventListener('keydown', handleKeyDown);
-      previousFocus?.focus();
+      if (!previousFocus?.isConnected) return;
+
+      // O elemento que abriu o modal pode estar sob inert até o próximo commit.
+      restoreFocusFrameRef.current = requestAnimationFrame(() => {
+        restoreFocusFrameRef.current = null;
+        if (previousFocus.isConnected && !previousFocus.hasAttribute('disabled')) {
+          previousFocus.focus();
+        }
+      });
     };
-  }, [active, onClose, ref]);
+  }, [active, onClose, ref, restoreFocusRef]);
 }

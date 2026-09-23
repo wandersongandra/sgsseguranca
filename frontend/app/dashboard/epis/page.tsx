@@ -17,6 +17,7 @@ import { safeFormatDate } from '@/lib/date/safeFormat';
 import { ResponsiveDataList } from '@/components/ui/responsive-data-list';
 import { CatalogMobileCard, catalogMobileActionClassName } from '../components/CatalogMobileCard';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 
 const panelClassName =
   'rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]';
@@ -31,6 +32,7 @@ function ValidityBadge({ status }: { status: ValidityStatus }) {
 }
 
 export default function EpisPage() {
+  const { confirmAction } = useConfirmAction();
   const [epis, setEpis] = useState<Epi[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -72,7 +74,12 @@ export default function EpisPage() {
   }, [loadEpis]);
 
   async function handleDelete(id: string) {
-    if (confirm('Tem certeza que deseja excluir este EPI?')) {
+    const confirmed = await confirmAction({
+      title: 'Excluir EPI',
+      description: 'Tem certeza que deseja excluir este EPI? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir EPI',
+    });
+    if (confirmed) {
       await runWithMutationLock(deleteMutationLock, async () => {
         try {
           await episService.delete(id);
@@ -264,6 +271,5 @@ export default function EpisPage() {
     </div>
   );
 }
-
 
 

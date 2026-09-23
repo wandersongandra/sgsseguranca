@@ -9,6 +9,22 @@ const pages = [
   'epi-fichas/page.tsx',
 ];
 
+const nativeConfirmConsumers = [
+  'activities/page.tsx',
+  'audits/page.tsx',
+  'checklist-models/components/ChecklistModelsView.tsx',
+  'checklists/hooks/useChecklists.tsx',
+  'dids/hooks/useDids.ts',
+  'epis/page.tsx',
+  'expenses/[id]/page.tsx',
+  'machines/page.tsx',
+  'photographic-reports/components/PhotographicReportWorkspace.tsx',
+  'risks/hooks/useRisks.ts',
+  'service-orders/page.tsx',
+  'sites/page.tsx',
+  'tools/page.tsx',
+];
+
 // A marcação de mobile-card pode estar inline em page.tsx ou extraída para um
 // componente irmão co-localizado (ex.: CatMobileCard.tsx, TrainingMobileCard.tsx).
 function pageAndSiblingSources(relativePath: string): string {
@@ -42,4 +58,12 @@ describe('administrative wave B responsive and accessible pattern', () => {
       expect(source).toMatch(/ModalFrame|ConfirmModal/);
     },
   );
+
+  it.each(nativeConfirmConsumers)('%s uses the shared accessible confirmation action', (relativePath) => {
+    const source = readFileSync(join(__dirname, relativePath), 'utf8');
+
+    expect(source).not.toMatch(/\bconfirm\(/);
+    expect(source).not.toContain('window.confirm');
+    expect(source).toContain('useConfirmAction');
+  });
 });

@@ -7,8 +7,10 @@ import { handleApiError } from '@/lib/error-handler';
 import { selectedTenantStore } from '@/lib/selectedTenantStore';
 import { sessionStore } from '@/lib/sessionStore';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 
 export function useRisks() {
+  const { confirmAction } = useConfirmAction();
   const [risks, setRisks] = useState<Risk[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTermState] = useState('');
@@ -72,7 +74,12 @@ export function useRisks() {
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este risco?')) {
+    const confirmed = await confirmAction({
+      title: 'Excluir risco',
+      description: 'Tem certeza que deseja excluir este risco? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir risco',
+    });
+    if (confirmed) {
       await runWithMutationLock(deleteMutationLock, async () => {
         try {
           await risksService.delete(id, activeCompanyId || undefined);
@@ -87,7 +94,7 @@ export function useRisks() {
         }
       });
     }
-  }, [activeCompanyId, loadRisks, page, risks.length]);
+  }, [activeCompanyId, confirmAction, loadRisks, page, risks.length]);
 
   return {
     risks,

@@ -286,4 +286,18 @@ describe("PublicHashVerifyPage", () => {
       await screen.findByText("Registro validado com sucesso."),
     ).toBeInTheDocument();
   });
+
+  it("announces the selected validation mode", () => {
+    render(<PublicHashVerifyPage />);
+
+    expect(screen.getByRole("group", { name: "Tipo de validação" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Código do documento" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Evidência APR" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+  });
 });

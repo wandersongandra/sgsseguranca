@@ -8,6 +8,7 @@ import { ptBR } from 'date-fns/locale';
 import React from 'react';
 import { openPdfForPrint, openUrlInNewTab } from '@/lib/print-utils';
 import { runWithMutationLock } from '@/lib/mutation-lock';
+import { useConfirmAction } from '@/components/ui/confirm-action-provider';
 import { isAiEnabled } from '@/lib/featureFlags';
 import { resolveGovernedPdfConsumption } from '@/lib/governedPdfFallback';
 import { safeFormatDate } from '@/lib/date/safeFormat';
@@ -29,6 +30,7 @@ export interface ExportCsvOptions {
 }
 
 export function useChecklists(options?: { area?: ChecklistRecordsArea }) {
+  const { confirmAction } = useConfirmAction();
   const area = options?.area;
   const [checklists, setChecklists] = useState<Checklist[]>([]);
 const timerRef = useRef<number | undefined>(undefined);
@@ -278,9 +280,14 @@ useEffect(() => {
   }, []);
 
   const handleDelete = useCallback(async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir este checklist?')) return;
+    const confirmed = await confirmAction({
+      title: 'Excluir checklist',
+      description: 'Tem certeza que deseja excluir este checklist? Esta ação não pode ser desfeita.',
+      confirmLabel: 'Excluir checklist',
+    });
+    if (!confirmed) return;
     await handleDeleteMany([id]);
-  }, [handleDeleteMany]);
+  }, [confirmAction, handleDeleteMany]);
 
   const filteredChecklists = useMemo(() => {
     return checklists.filter((checklist) => {

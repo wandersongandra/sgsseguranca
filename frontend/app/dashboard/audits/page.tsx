@@ -34,6 +34,7 @@ import { companiesService } from "@/services/companiesService";
 import { openPdfForPrint, openUrlInNewTab } from "@/lib/print-utils";
 import { selectedTenantStore } from "@/lib/selectedTenantStore";
 import { runWithMutationLock } from "@/lib/mutation-lock";
+import { useConfirmAction } from "@/components/ui/confirm-action-provider";
 import { sessionStore } from "@/lib/sessionStore";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -92,6 +93,7 @@ const revokeObjectUrlLater = (objectUrl: string) => {
 };
 
 export default function AuditsPage() {
+  const { confirmAction } = useConfirmAction();
   const [audits, setAudits] = useState<Audit[]>([]);
 const timerRef = useRef<number | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -313,7 +315,12 @@ useEffect(() => {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir esta auditoria?")) {
+    const confirmed = await confirmAction({
+      title: "Excluir auditoria",
+      description: "Tem certeza que deseja excluir esta auditoria? Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir auditoria",
+    });
+    if (!confirmed) {
       return;
     }
 

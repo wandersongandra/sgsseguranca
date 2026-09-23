@@ -30,6 +30,7 @@ import { extractApiErrorMessage } from "@/lib/error-handler";
 import { Permission } from "@/lib/permissions";
 import { openSafeExternalUrlInNewTab, safeExternalArtifactUrl } from "@/lib/security/safe-external-url";
 import { runWithMutationLock } from "@/lib/mutation-lock";
+import { useConfirmAction } from "@/components/ui/confirm-action-provider";
 import {
   processMobileImage,
   processMobileImages,
@@ -245,6 +246,7 @@ export function PhotographicReportWorkspace({
   reportId?: string;
 }) {
   const router = useRouter();
+  const { confirmAction } = useConfirmAction();
   const { hasPermission } = useAuth();
   const canManage = hasPermission(Permission.CAN_MANAGE_PHOTOGRAPHIC_REPORTS);
   const canUseAi = hasPermission(
@@ -610,7 +612,12 @@ export function PhotographicReportWorkspace({
 
   async function handleDeleteDay(dayId: string) {
     if (!report) return;
-    if (!window.confirm("Deseja excluir esta data e manter as fotos vinculadas?")) {
+    const confirmed = await confirmAction({
+      title: "Excluir data do relatório",
+      description: "Deseja excluir esta data e manter as fotos vinculadas? Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir data",
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -832,7 +839,12 @@ export function PhotographicReportWorkspace({
 
   async function handleDeleteImage(imageId: string) {
     if (!report) return;
-    if (!window.confirm("Deseja excluir esta foto do relatório?")) {
+    const confirmed = await confirmAction({
+      title: "Excluir foto do relatório",
+      description: "Deseja excluir esta foto do relatório? Esta ação não pode ser desfeita.",
+      confirmLabel: "Excluir foto",
+    });
+    if (!confirmed) {
       return;
     }
 

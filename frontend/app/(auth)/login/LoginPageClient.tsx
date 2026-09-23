@@ -259,7 +259,6 @@ function LoginPageContent({ turnstileSiteKey, nonce, supportHref }: LoginPageCli
                   type="text"
                   inputMode="numeric"
                   autoComplete="username"
-                  autoFocus
                   required
                   className={styles.formInput}
                   placeholder="Informe seu CPF"

@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import type { PhotographicReport } from "@/services/photographicReportsService";
 import { photographicReportsService } from "@/services/photographicReportsService";
 import { PhotographicReportWorkspace } from "./PhotographicReportWorkspace";
+import { ConfirmActionProvider } from "@/components/ui/confirm-action-provider";
 
 jest.mock("next/navigation", () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -102,7 +103,11 @@ describe("PhotographicReportWorkspace accessibility", () => {
   it("identifica o botão de excluir pelo índice da foto", async () => {
     jest.mocked(photographicReportsService.findOne).mockResolvedValue(report);
 
-    render(<PhotographicReportWorkspace mode="edit" reportId="report-1" />);
+    render(
+      <ConfirmActionProvider>
+        <PhotographicReportWorkspace mode="edit" reportId="report-1" />
+      </ConfirmActionProvider>,
+    );
 
     expect(
       await screen.findByRole("button", { name: "Excluir foto 07" }),
