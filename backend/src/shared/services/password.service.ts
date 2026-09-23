@@ -43,7 +43,7 @@ function parseBoundedInt(
   return normalized;
 }
 
-export const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
+export const ARGON2_OPTIONS: argon2.HashOptions & { raw?: false } = {
   type: argon2.argon2id,
   memoryCost: parseBoundedInt(
     process.env.PASSWORD_ARGON2_MEMORY_COST_KIB,
