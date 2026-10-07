@@ -110,3 +110,49 @@ Achados e correções aplicados após a implementação inicial:
 - RDO Action Modals: aderiram ao contrato de sheet mobile já usado pelo visualizador.
 - Dashboard shell: removido padding-top duplicado após banners de empresa/obra.
 - Auditoria estrutural final: CSS segue balanceado e não foram encontrados spans mobile inválidos nos arquivos críticos tocados nesta rodada.
+
+
+## Rodada cirúrgica adicional
+
+Aplicada após a primeira implementação mobile, com foco em falhas de telas estreitas e densidade de uso em campo.
+
+### Ajustes
+
+- RDO:
+  - todos os modais legados de assinatura, e-mail, exclusão, cancelamento e visualização seguem o contrato de bottom sheet;
+  - tabelas de mão de obra, equipamentos e materiais passam a leitura vertical em telas mobile, preservando tabela no desktop;
+  - rodapés de modal evitam colisão de ações longas em 320–399px.
+- Notificações:
+  - painel deixa de depender do dropdown preso ao sino no mobile e passa a flutuar acima da navegação inferior.
+- Menus de ações:
+  - trigger de 44px e menu fixo acima da bottom navigation no mobile.
+- APR:
+  - stepper horizontal compacto em telas estreitas;
+  - breadcrumb reduzido no mobile;
+  - ações do cabeçalho em duas colunas, com Salvar APR em destaque;
+  - drawer avançado usa safe area, rodapé responsivo e esconde densidade de tabela no mobile.
+- PT:
+  - stepper horizontal compacto;
+  - resumo lateral detalhado fica restrito ao desktop;
+  - copy de modo campo tornou-se operacional, sem descrever adaptação de interface.
+- DDS:
+  - remoção do bloco visual com gradiente e de copy meta;
+  - redução de padding e espaçamento em cards apenas no mobile;
+  - linguagem direta em Preparação do DDS.
+- Não conformidade:
+  - navegação das 13 seções com scroll-snap e touch target de 44px;
+  - 14 seções reduziram padding no mobile, preservando desktop;
+  - modal de câmera deixou de impor largura concorrente ao ModalFrame.
+- StatusSelect:
+  - deixou de usar formato pill como controle interativo e passou ao contrato de campo compacto.
+- ActionMenu:
+  - menu mobile não fica mais preso aos limites do card.
+- Teste de regressão:
+  - criado `frontend/app/dashboard/mobileSurgicalResponsivePattern.test.ts` para bloquear regressões dos padrões acima.
+
+### Auditoria estática desta rodada
+
+- CSS global balanceado: 561 chaves de abertura e 561 de fechamento no checkpoint da auditoria.
+- zero ocorrências do padrão antigo de modal RDO centralizado nos arquivos revisados;
+- zero ocorrências das copies meta marcadas na auditoria;
+- nenhum merge ou deploy executado.
