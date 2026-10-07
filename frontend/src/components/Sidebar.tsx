@@ -141,7 +141,7 @@ export function Sidebar({
                             onClick={onClose}
                             aria-current={active ? 'page' : undefined}
                             className={cn(
-                              'mx-2 flex items-center gap-2.5 rounded-[var(--ds-radius-md)] border px-3 py-2.25 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)]',
+                              'mx-2 flex items-center gap-2.5 rounded-[var(--ds-radius-md)] border px-3 py-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)]',
                               active ? 'border-[color:var(--chrome-sidebar-item-active-border)] bg-[var(--chrome-sidebar-item-active-bg)] text-[var(--ds-color-sidebar-text)]' : 'border-transparent text-[var(--ds-color-sidebar-muted)] hover:bg-[var(--chrome-sidebar-item-hover-bg)]',
                             )}
                           >
