@@ -2503,7 +2503,7 @@ body {
   /* Em mobile, reserva espaco para o ds-form-sticky-bar fixo no rodape */
   @media (max-width: 639px) {
     .ds-form-page:has(.ds-form-sticky-bar) {
-      padding-bottom: 5.5rem;
+      padding-bottom: calc(var(--ds-mobile-nav-total-height) + 6rem);
     }
   }
 
@@ -2572,16 +2572,13 @@ body {
 
   @media (max-width: 639px) {
     .ds-form-sticky-bar {
-      /* Em mobile o bar fica fixo no rodape da viewport */
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      border-radius: var(--ds-radius-lg) var(--ds-radius-lg) 0 0;
-      border-bottom: none;
-      padding: 0.85rem 1rem;
-      /* Garante que o conteudo nao fique sob o safe area em iOS */
-      padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+      bottom: calc(var(--ds-mobile-nav-total-height) + 0.45rem);
+      left: max(0.75rem, var(--ds-safe-area-left));
+      right: max(0.75rem, var(--ds-safe-area-right));
+      border-radius: var(--ds-radius-md);
+      padding: 0.65rem;
+      box-shadow: var(--ds-shadow-md);
     }
   }
 
@@ -2947,6 +2944,7 @@ body {
 
   .ds-segmented-control__item {
     flex: 1 1 0;
+    min-height: 2.75rem;
   }
 }
 
@@ -3297,6 +3295,55 @@ body {
   }
 
   .ds-responsive-mobile-list__item {
+    min-width: 0;
+  }
+
+  .rdo-editor-footer {
+    align-items: stretch !important;
+  }
+
+  .rdo-editor-footer > button {
+    width: 100%;
+    min-height: 2.75rem;
+  }
+
+  .rdo-editor-footer__actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.5rem !important;
+  }
+
+  .rdo-editor-footer__actions > button {
+    width: 100%;
+    min-width: 0;
+    min-height: 2.75rem;
+    justify-content: center;
+  }
+
+  .checklists-filters__primary,
+  .checklists-filters__views,
+  .checklists-filters__model {
+    width: 100%;
+  }
+
+  .checklists-filters__primary {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 0.5rem !important;
+  }
+
+  .checklists-filters__model {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .checklists-filters__views > span {
+    width: 100%;
+  }
+
+  .checklists-filters__views > button {
+    flex: 1 1 calc(50% - 0.25rem);
     min-width: 0;
   }
 
