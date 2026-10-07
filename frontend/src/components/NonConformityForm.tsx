@@ -1026,7 +1026,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       <PageHeader
         eyebrow="Gestão de não conformidades"
         title={id ? "Editar não conformidade" : "Nova não conformidade"}
-        description="Registre a origem do desvio, o risco associado, o plano de ação e as evidências em um único fluxo."
+        description="Registre a origem do desvio, classifique o risco e acompanhe as ações corretivas e evidências."
         icon={<ShieldAlert className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -1040,21 +1040,21 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
           </div>
         }
       />
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-          Fluxo guiado
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+          Preparação do registro
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Consolide o desvio, valide a criticidade e desdobre ações corretivas com evidências rastreáveis.
+          Confirme o desvio, a criticidade e as ações corretivas antes de avançar.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Revise tipo, local, risco e plano de ação antes de salvar para manter o processo de NC consistente.
+          Revise tipo, local, risco, responsáveis e prazos antes de salvar.
         </p>
       </div>
 
       <nav
         aria-label="Seções do formulário"
-        className="sticky top-16 z-10 -mx-1 overflow-x-auto rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 shadow-[var(--ds-shadow-sm)]"
+        className="sticky top-16 z-10 -mx-1 overflow-x-auto rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 shadow-[var(--ds-shadow-xs)]"
       >
         <ol className="flex min-w-max items-center gap-0.5 text-[11px]">
           {([
@@ -1129,7 +1129,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         <div className="rounded-xl border border-[var(--ds-color-action-primary)]/20 bg-[var(--ds-color-action-primary)]/8 p-6">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-action-primary)]">
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-action-primary)]">
                 NC Assistida pela SOPHIE
               </p>
               <h2 className="mt-2 text-lg font-bold text-[var(--ds-color-text-primary)]">
