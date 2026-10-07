@@ -423,8 +423,8 @@ export async function drawRdoBlueprint(
     signatures,
     code,
     url: validationUrl,
-    title: "Fechamento oficial, assinaturas e autenticidade",
+    title: "Validação e assinaturas",
     subtitle:
-      "Documento oficial de obra com validação pública por QR Code e identificador documental.",
+      "Use o QR Code ou o código do RDO para conferência no portal SGS.",
   });
 }
