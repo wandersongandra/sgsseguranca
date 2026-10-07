@@ -1171,43 +1171,40 @@ useEffect(() => {
         </Card>
       ) : null}
 
-      <section className="relative overflow-hidden rounded-[var(--ds-radius-2xl)] border border-[var(--ds-color-border-subtle)] bg-[linear-gradient(135deg,var(--ds-color-surface-base),var(--ds-color-surface-muted))] p-6 shadow-[var(--ds-shadow-sm)]">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-28 bg-[radial-gradient(circle_at_top_right,rgba(21,94,117,0.14),transparent_62%)]" />
-        <div className="pointer-events-none absolute -right-12 top-8 h-40 w-40 rounded-full bg-[color:var(--ds-color-action-primary)]/10 blur-3xl" />
-        <div className="pointer-events-none absolute left-6 top-6 h-12 w-12 rounded-full bg-[color:var(--ds-color-success)]/10 blur-2xl" />
-        <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+      <section className="rounded-[var(--ds-radius-lg)] border border-[var(--component-card-border)] bg-[var(--component-card-bg)] p-5 shadow-[var(--component-card-shadow)]">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-[color:var(--ds-color-action-primary)]/20 bg-[color:var(--ds-color-action-primary)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-action-primary)]">
-                Diálogos Diários de Segurança
+              <span className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-action-primary)]">
+                Módulo DDS
               </span>
-              <span className="rounded-full border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)]">
+              <span className="rounded-full border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                 {observability?.tenantScope === "global" ? "Escopo global" : "Escopo tenant"}
               </span>
-              <span className="rounded-full border border-[color:var(--ds-color-success)]/20 bg-[color:var(--ds-color-success)]/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-success)]">
+              <span className="rounded-full border border-[color:var(--ds-color-success)]/20 bg-[color:var(--ds-color-success)]/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-success-fg)]">
                 {observabilityLoading
                   ? "Telemetria em carga"
                   : `${observability?.publicValidation.totalLast7d ?? 0} consultas públicas`}
               </span>
             </div>
             <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--ds-color-text-primary)] sm:text-4xl">
+              <h1 className="text-2xl font-semibold tracking-[-0.025em] text-[var(--ds-color-text-primary)] sm:text-3xl">
                 Diálogo Diário de Segurança
               </h1>
               <p className="max-w-2xl text-sm leading-6 text-[var(--ds-color-text-secondary)] sm:text-[0.96rem]">
-                Gestão de registros, evidências e PDFs governados em uma superfície única, com foco em leitura rápida, rastreabilidade e emissão segura.
+                Crie, acompanhe e consulte DDS, participantes, aprovações e PDFs finais.
               </p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {moduleHighlights.map((item) => (
                 <div
                   key={item.label}
-                  className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/85 p-4 shadow-[var(--ds-shadow-sm)]"
+                  className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4"
                 >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-muted)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-muted)]">
                     {item.label}
                   </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--ds-color-text-primary)]">
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-[var(--ds-color-text-primary)]">
                     {item.value}
                   </p>
                   <p className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${item.accent}`}>
@@ -1218,9 +1215,8 @@ useEffect(() => {
             </div>
           </div>
 
-          <Card tone="elevated" padding="lg" className="relative overflow-hidden">
-            <div className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-[color:var(--ds-color-action-primary)]/10 blur-3xl" />
-            <CardHeader className="relative gap-2">
+          <Card tone="default" padding="lg">
+            <CardHeader className="gap-2">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-[var(--ds-color-action-primary)]" />
                 <CardTitle className="text-base">Ações rápidas</CardTitle>
@@ -1229,38 +1225,38 @@ useEffect(() => {
                 Entrada operacional para criar, revisar e navegar no módulo.
               </CardDescription>
             </CardHeader>
-            <CardContent className="relative mt-0 space-y-4">
+            <CardContent className="mt-0 space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/85 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-muted)]">
+                <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-muted)]">
                     Registros
                   </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--ds-color-text-primary)]">
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-[var(--ds-color-text-primary)]">
                     {ddsSummary.total}
                   </p>
                   <p className="mt-1 text-xs text-[var(--ds-color-text-secondary)]">
-                    DDS visíveis no tenant.
+                    DDS no escopo atual.
                   </p>
                 </div>
-                <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/85 p-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-muted)]">
+                <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-muted)]">
                     PDFs
                   </p>
-                  <p className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-[var(--ds-color-success)]">
+                  <p className="mt-2 text-2xl font-semibold tracking-[-0.025em] text-[var(--ds-color-success)]">
                     {ddsSummary.arquivos}
                   </p>
                   <p className="mt-1 text-xs text-[var(--ds-color-text-secondary)]">
-                    Arquivos armazenados com trilha governada.
+                    PDFs finais armazenados no SGS.
                   </p>
                 </div>
               </div>
-              <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/20 px-4 py-3">
+              <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-muted)]">
-                  Snapshot do módulo
+                  Atualização dos dados
                 </p>
                 <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
                   {observabilityLoading
-                    ? "Atualizando snapshot..."
+                    ? "Atualizando dados..."
                     : safeFormatDate(
                         observability?.generatedAt ?? new Date().toISOString(),
                         "dd/MM/yyyy HH:mm",
@@ -1268,7 +1264,7 @@ useEffect(() => {
                       )}
                 </p>
                 <p className="mt-1 text-xs text-[var(--ds-color-text-secondary)]">
-                  Visão do tenant com foco em emissão, governança e validação pública.
+                  Dados de emissão e validação pública do escopo atual.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -1971,15 +1967,15 @@ useEffect(() => {
             </CardDescription>
           </div>
         </CardHeader>
-        <div className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/10 px-5 py-4">
-          <div className="rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/90 p-3 shadow-sm">
+        <div className="border-b border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ds-color-text-muted)]">
-                  Filtros operacionais
+                <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-muted)]">
+                  Filtros
                 </p>
                 <p className="text-sm text-[var(--ds-color-text-secondary)]">
-                  Ajuste a busca e reduza o escopo da lista antes de agir.
+                  Use a busca, o tema e o tipo para reduzir a lista.
                 </p>
               </div>
               {hasActiveDdsFilters ? (
