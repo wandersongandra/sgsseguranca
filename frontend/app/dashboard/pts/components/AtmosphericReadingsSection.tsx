@@ -28,7 +28,7 @@ const READING_COLUMNS = [
 
 const cellInputClass = (hasError: boolean) =>
   cn(
-    'block w-full rounded-md border px-2 py-1.5 text-xs motion-safe:transition-all focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] focus:outline-none',
+    'block w-full rounded-md border px-2 py-1.5 text-base md:text-xs motion-safe:transition-colors focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] focus:outline-none',
     hasError
       ? 'border-[var(--ds-color-danger)] bg-[color:var(--ds-color-danger-subtle)]'
       : 'border-[var(--ds-color-border-default)] focus:border-[var(--ds-color-focus)]',
@@ -201,7 +201,7 @@ export const AtmosphericReadingsSection = ({
                   {READING_COLUMNS.map((column) => {
                     const isNumeric = column.key !== 'hora' && column.key !== 'instrumento' && column.key !== 'responsavel';
                     return (
-                      <label key={`${field.id}-${column.key}`} className={cn('min-w-0 text-xs font-semibold text-[var(--ds-color-text-secondary)]', (column.key === 'instrumento' || column.key === 'responsavel') && 'col-span-2')}>
+                      <label key={`${field.id}-${column.key}`} className={cn('min-w-0 text-xs font-semibold text-[var(--ds-color-text-secondary)]', (column.key === 'instrumento' || column.key === 'responsavel') && 'min-[360px]:col-span-2')}>
                         {column.label}
                         <input {...register(`medicoes_atmosfericas.${index}.${column.key}`, isNumeric ? { valueAsNumber: true } : undefined)} type={isNumeric ? 'number' : 'text'} step={isNumeric ? 'any' : undefined} placeholder={column.placeholder} className={cn(cellInputClass(Boolean(getCellError(index, column.key))), 'mt-1 min-h-11 text-base')} />
                         {getCellError(index, column.key) ? <span className="mt-1 block text-[10px] text-[var(--ds-color-danger)]">{getCellError(index, column.key)}</span> : null}
