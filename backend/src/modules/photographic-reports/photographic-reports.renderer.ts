@@ -190,8 +190,8 @@ function buildExecutiveSummary(
     `Relatório fotográfico de ${sanitize(report.activity_type)}, com ` +
     `${totalPhotos} foto(s) distribuída(s) em ${totalDays} data(s) de registro.`;
   const controlNote = hasReducedInterference(report)
-    ? 'O contexto operacional indica ambiente mais controlado, com menor interferência externa e melhores condições para execução segura das atividades.'
-    : 'O registro foi conduzido em contexto operacional ativo, com observação visual da frente de serviço e rastreabilidade por imagem.';
+    ? 'Área interna registrada nas imagens, com menor exposição a interferências externas.'
+    : 'Área operacional registrada durante a execução das atividades.';
   return `${base} ${controlNote}`;
 }
 
@@ -247,7 +247,7 @@ function buildConsolidatedAssessment(
   if (report.ai_summary) return sanitize(report.ai_summary);
   const plural =
     totalPhotos > 1 ? 'registros fotográficos' : 'registro fotográfico';
-  return `O conjunto apresenta ${plural} organizado(s), com rastreabilidade documental preservada e aderência ao tipo de atividade informado (${sanitize(report.activity_type)}).`;
+  return `Foram incluídos ${plural}, vinculados à atividade informada: ${sanitize(report.activity_type)}.`;
 }
 
 function buildTechnicalOpinion(
@@ -1797,8 +1797,8 @@ export function buildPhotographicReportHtml(
             <p class="gov-subtitle">
               ${
                 validationUrl
-                  ? 'Documento emitido pelo SGS e verificável publicamente pelo código abaixo ou pelo QR ao lado.'
-                  : 'Documento fotográfico emitido pelo SGS com identificador próprio para conferência interna e rastreabilidade documental.'
+                  ? 'Use o código abaixo ou o QR Code para conferir este relatório no portal SGS.'
+                  : 'Relatório emitido pelo SGS com identificador próprio para conferência interna.'
               }
             </p>
             <div class="gov-code">${escapeHtml(documentCode || '-')}</div>
