@@ -23,11 +23,9 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, rowCount, colCount, label, 'aria-label': ariaLabel, ...props }, ref) => (
     <div
       className="
-        relative w-full overflow-auto rounded-[var(--ds-radius-xl)] border
+        relative w-full overflow-auto rounded-[var(--ds-radius-lg)] border
         border-[var(--component-table-shell-border)] bg-[color:var(--component-table-bg)]
         shadow-[var(--component-table-shadow)]
-        before:pointer-events-none before:absolute before:inset-x-4 before:top-0
-        before:h-px before:content-[''] before:bg-[var(--component-table-head-accent)]
       "
     >
       <table
@@ -48,7 +46,7 @@ const TableHeader = React.forwardRef<HTMLTableSectionElement, React.HTMLAttribut
     <thead
       ref={ref}
       className={cn(
-        'sticky top-0 z-[1] supports-[backdrop-filter]:backdrop-blur-md [&_tr]:border-b',
+        'sticky top-0 z-[1] [&_tr]:border-b',
         className,
       )}
       {...props}
@@ -122,7 +120,7 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
   ({ className, ...props }, ref) => (
     <td
       ref={ref}
-      className={cn('px-4 py-3.5 align-middle text-[var(--ds-color-text-secondary)] [&:has([role=checkbox])]:pr-0', className)}
+      className={cn('px-4 py-3 align-middle text-[var(--ds-color-text-secondary)] [&:has([role=checkbox])]:pr-0', className)}
       {...props}
     />
   ),
