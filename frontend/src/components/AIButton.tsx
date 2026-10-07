@@ -311,7 +311,7 @@ export function AIButton() {
           onClick={handleClick}
           aria-expanded={isOpen}
           aria-controls={chatPanelId}
-          className="group relative flex h-14 touch-none cursor-grab select-none items-center justify-center gap-2 rounded-full border border-[var(--ds-color-primary-border)] bg-[var(--component-fab-bg)] px-3.5 text-[var(--ds-color-action-primary-foreground)] shadow-[var(--ds-shadow-sm)] transition-none active:cursor-grabbing hover:border-[var(--ds-color-primary-border)] hover:bg-[var(--component-fab-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-bg-canvas)]"
+          className="group relative flex h-14 touch-none cursor-grab select-none items-center justify-center gap-2 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-primary-border)] bg-[var(--component-fab-bg)] px-3.5 text-[var(--ds-color-action-primary-foreground)] shadow-[var(--ds-shadow-sm)] transition-none active:cursor-grabbing hover:border-[var(--ds-color-primary-border)] hover:bg-[var(--component-fab-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-bg-canvas)]"
           title={
             isOpen
               ? 'Fechar chat da SOPHIE'
@@ -322,12 +322,12 @@ export function AIButton() {
             <X className="h-6 w-6" />
           ) : (
             <>
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[color:var(--ds-color-surface-base)]/14">
+              <span className="flex h-9 w-9 items-center justify-center rounded-[var(--ds-radius-md)] bg-[color:var(--ds-color-surface-base)]/14">
                 <ContextIcon className="h-4.5 w-4.5" />
               </span>
               <span className="hidden text-left sm:block">
-                <span className="block text-[11px] font-medium uppercase tracking-[0.12em] text-[color:var(--ds-color-action-primary-foreground)]/88">
-                  Chat SST
+                <span className="block text-[11px] font-medium uppercase tracking-[0.06em] text-[color:var(--ds-color-action-primary-foreground)]/88">
+                  SOPHIE
                 </span>
                 <span className="block max-w-[11rem] truncate text-[13px] font-semibold leading-tight">
                   {context.title}
@@ -337,8 +337,8 @@ export function AIButton() {
           )}
 
           {!isOpen && (
-            <span className="absolute bottom-full right-0 mb-3 hidden w-[18rem] rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-overlay)] px-3.5 py-3 text-[11px] font-medium text-[var(--ds-color-text-primary)] shadow-[var(--ds-shadow-sm)] group-hover:block group-focus-within:block">
-              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-muted)]">
+            <span className="absolute bottom-full right-0 mb-3 hidden w-[18rem] rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-overlay)] px-3.5 py-3 text-[11px] font-medium text-[var(--ds-color-text-primary)] shadow-[var(--ds-shadow-sm)] group-hover:block group-focus-within:block">
+              <span className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-muted)]">
                 <LifeBuoy className="h-3.5 w-3.5 text-[var(--ds-color-action-primary)]" />
                 Chat da SOPHIE
               </span>
