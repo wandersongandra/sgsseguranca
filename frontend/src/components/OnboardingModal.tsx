@@ -28,34 +28,34 @@ const STEPS = [
     iconBg: 'bg-[color:var(--ds-color-action-primary)]/15',
     title: 'Bem-vindo ao SGS',
     description:
-      'Sua plataforma completa de gestão de Segurança e Saúde do Trabalho. Gerencie treinamentos, exames, EPIs, laudos e muito mais em um único lugar.',
+      'O SGS reúne documentos, registros de SST, vencimentos e indicadores no mesmo ambiente de trabalho.',
     highlight: null,
   },
   {
     icon: ClipboardList,
     iconColor: 'text-[var(--ds-color-success)]',
     iconBg: 'bg-[var(--ds-color-success-subtle)]',
-    title: 'Documentos e Registros',
+    title: 'Documentos e registros',
     description:
-      'Crie APRs, PTAs, DDS, Checklists, Ordens de Serviço e Relatórios Diários de Obra. Todos com suporte a assinatura digital e exportação em PDF.',
+      'Registre APR, PT, DDS, checklist, ordens de serviço e RDO conforme o fluxo de cada módulo.',
     highlight: 'Acesse pelo menu lateral em "Documentos Operacionais"',
   },
   {
     icon: Bell,
     iconColor: 'text-[var(--ds-color-warning)]',
     iconBg: 'bg-[var(--ds-color-warning-subtle)]',
-    title: 'Alertas Automáticos',
+    title: 'Vencimentos e alertas',
     description:
-      'O sistema monitora vencimentos de EPIs, treinamentos e exames médicos e envia alertas por e-mail antes que expirem. Configure os destinatários em Configurações.',
+      'Acompanhe vencimentos de EPIs, treinamentos e exames e consulte as notificações geradas pelo sistema.',
     highlight: 'Notificações aparecem no sino no topo da tela',
   },
   {
     icon: BarChart2,
     iconColor: 'text-[var(--ds-color-accent)]',
     iconBg: 'bg-[color:var(--ds-color-accent-subtle)]',
-    title: 'KPIs e Relatórios SST',
+    title: 'Indicadores e relatórios',
     description:
-      'Acompanhe indicadores de desempenho em segurança: acidentabilidade, não conformidades, ações corretivas e treinamentos — tudo em gráficos interativos.',
+      'Consulte indicadores de SST, não conformidades, ações corretivas, treinamentos e relatórios por empresa ou obra.',
     highlight: 'Veja em "Gestão & Controle → KPIs SST"',
   },
 ];
@@ -99,15 +99,15 @@ export function OnboardingModal({ userId }: Props) {
       />
 
       <ModalBody className="px-8 pb-8 pt-4">
-        <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl ${current.iconBg}`}>
+        <div className={`mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-[var(--ds-radius-lg)] ${current.iconBg}`}>
             <Icon className={`h-8 w-8 ${current.iconColor}`} />
         </div>
 
-        <h2 className="text-center text-xl font-bold text-[var(--ds-color-text-primary)]">{current.title}</h2>
+        <h2 className="text-center text-xl font-semibold text-[var(--ds-color-text-primary)]">{current.title}</h2>
         <p className="mt-3 text-center text-sm leading-relaxed text-[var(--ds-color-text-muted)]">{current.description}</p>
 
         {current.highlight && (
-          <div className="mt-4 rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/26 px-4 py-3">
+          <div className="mt-4 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/26 px-4 py-3">
             <StatusPill tone="success" className="mb-2">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Dica rápida
@@ -124,7 +124,7 @@ export function OnboardingModal({ userId }: Props) {
                 key={i}
                 type="button"
                 onClick={() => setStep(i)}
-                className={`h-2 rounded-full transition-all ${
+                className={`h-2 rounded-full transition-colors ${
                   i === step ? 'w-5 bg-[var(--ds-color-action-primary)]' : 'w-2 bg-[var(--ds-color-border-default)] hover:bg-[var(--ds-color-border-strong)]'
                 }`}
                 aria-label={`Passo ${i + 1}`}
