@@ -59,9 +59,9 @@ export async function drawDidBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: 'Leitura rápida do turno',
+    title: 'Resumo do turno',
     summary:
-      'Documento operacional para leitura rápida do alinhamento diário, com foco em atividade, responsável, equipe e barreiras críticas antes do início do turno.',
+      'Resumo do alinhamento diário com atividade, responsável, equipe e barreiras críticas antes do início do turno.',
     metrics: [
       {
         label: 'Atividade principal',
