@@ -36,8 +36,8 @@ function buildDossierTitle(context: DossierContext) {
 
 function buildDossierSubtitle(context: DossierContext) {
   return context.kind === "employee"
-    ? "Documento institucional consolidado de capacitação, EPI, permissões críticas e rastreabilidade laboral."
-    : "Documento institucional consolidado de efetivo, capacitação, EPI, permissões críticas e rastreabilidade operacional.";
+    ? "Resumo do colaborador: capacitações, EPIs, permissões e documentos relacionados."
+    : "Resumo do efetivo: capacitações, EPIs, permissões e documentos relacionados.";
 }
 
 function buildDossierSiteLabel(context: DossierContext) {
