@@ -40,7 +40,7 @@ export const PtsFilters = React.memo(({ searchTerm, onSearchChange, statusFilter
         aria-label="Filtrar PTs por status"
         value={statusFilter}
         onChange={(e) => onStatusChange(e.target.value)}
-        className={cn(inputClassName, 'w-full pr-8 sm:w-auto sm:min-w-[180px]')}
+        className={cn(inputClassName, 'w-full min-w-0 pr-8 sm:w-auto sm:min-w-[180px]')}
       >
         <option value="">Todos os status</option>
         {PT_STATUSES.map((s) => (
