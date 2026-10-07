@@ -19,7 +19,7 @@ import type {
  *  - variants/photographicTheme.ts → variante "photographic" (brand #18517C)
  *  - components/DocumentHeader     → faixa de marca full-bleed + caixa de código
  *  - components/DocumentIdentityRail → cartões com pílula de acento
- *  - components/ExecutiveSummaryStrip → faixa de leitura executiva + métricas
+ *  - components/ExecutiveSummaryStrip → resumo do relatório + métricas
  *  - components/MetadataGrid       → cartão com barra de título e grade 2 col.
  *  - components/NarrativeSection   → cartão de texto com acento lateral
  *  - components/EvidenceGallery    → cabeçalho + cartões de evidência
@@ -155,7 +155,7 @@ function toneLabel(tone: PhotographicReportTone): string {
 }
 
 /**
- * Contexto de menor interferência externa, na leitura executiva.
+ * Contexto de menor interferência externa considerado no resumo do relatório.
  *
  * O blueprint do frontend usa dois conjuntos ligeiramente diferentes: a leitura
  * executiva não considera "Área isolada", a descrição geral considera. A
