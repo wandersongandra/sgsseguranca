@@ -211,8 +211,8 @@ export async function drawCatBlueprint(
     code,
     url: validationUrl,
     signatures: buildResponsibilitySignatures(cat),
-    title: "Governança e autenticidade",
+    title: "Validação do documento",
     subtitle:
-      "Valide a CAT por QR Code ou código público no portal institucional.",
+      "Use o QR Code ou o código da CAT para conferência no portal SGS.",
   });
 }
