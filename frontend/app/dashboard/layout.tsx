@@ -307,11 +307,7 @@ function DashboardShell({
         <OfflineCapabilityBanner />
         <main
           id="main-content"
-          className={cn(
-            'ds-dashboard-content min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 md:px-6 md:py-5 xl:px-8',
-            isAdminGeral && 'pt-12 md:pt-12',
-            selectedSite && 'pt-10 md:pt-10',
-          )}
+          className="ds-dashboard-content min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 md:px-6 md:py-5 xl:px-8"
         >
           {tenantRequired ? (
             <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
