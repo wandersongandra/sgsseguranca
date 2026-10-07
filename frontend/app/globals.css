@@ -3648,6 +3648,7 @@ body {
 
   .ds-action-menu-panel {
     position: fixed !important;
+    z-index: 80 !important;
     left: max(0.75rem, var(--ds-safe-area-left)) !important;
     right: max(0.75rem, var(--ds-safe-area-right)) !important;
     bottom: calc(var(--ds-mobile-nav-total-height) + 0.75rem) !important;
