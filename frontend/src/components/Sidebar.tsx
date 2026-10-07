@@ -91,11 +91,11 @@ export function Sidebar({
         tabIndex={isModal ? -1 : undefined}
         inert={isHiddenMobileDrawer ? true : undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full w-64 flex-col border-r border-[color:var(--chrome-sidebar-border)] bg-[var(--chrome-sidebar-bg-solid)] text-[var(--ds-color-sidebar-text)] shadow-[var(--chrome-sidebar-shadow)] transition-transform duration-200 ease-out xl:static xl:z-auto xl:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-full w-[min(20rem,88vw)] flex-col border-r border-[color:var(--chrome-sidebar-border)] bg-[var(--chrome-sidebar-bg-solid)] text-[var(--ds-color-sidebar-text)] shadow-[var(--chrome-sidebar-shadow)] transition-transform duration-200 ease-out xl:static xl:z-auto xl:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full xl:translate-x-0',
         )}
       >
-        <div className="flex items-center gap-3 border-b border-[color:var(--chrome-sidebar-divider)] px-4 py-4">
+        <div className="flex items-center gap-3 border-b border-[color:var(--chrome-sidebar-divider)] px-4 pb-4 pt-[max(1rem,var(--ds-safe-area-top))] xl:pt-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--chrome-sidebar-logo-bg)] ring-1 ring-[var(--chrome-sidebar-logo-ring)]">
             <Image src="/logo-sgs-mark.svg?v=20260425" alt="SGS - Sistema de Gestão de Segurança" width={26} height={26} className="h-6.5 w-6.5 object-contain" priority />
           </div>
@@ -158,7 +158,7 @@ export function Sidebar({
           </nav>
         </div>
 
-        <div className="border-t border-[color:var(--chrome-sidebar-divider)] px-3.5 py-3.5">
+        <div className="border-t border-[color:var(--chrome-sidebar-divider)] px-3.5 pb-[max(0.875rem,var(--ds-safe-area-bottom))] pt-3.5">
           <div className="rounded-[var(--ds-radius-lg)] border border-[var(--chrome-sidebar-user-card-border)] bg-[var(--chrome-sidebar-user-card-bg)] p-3">
             <div className="mb-3 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--chrome-sidebar-item-active-bg)] text-xs font-bold">{user?.nome?.trim()?.slice(0, 2).toUpperCase() || 'SG'}</div>
