@@ -45,7 +45,7 @@ export async function generateDdsPdf(
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "DIÁLOGO DIÁRIO DE SEGURANÇA",
     subtitle:
-      "Documento oficial de alinhamento preventivo e participação operacional",
+      "Tema, orientações de segurança e registro de participação",
     code,
     date: formatDateTime(dds.data),
     status: sanitize(dds.status),
