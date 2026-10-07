@@ -24,7 +24,7 @@ interface Props {
 
 export function ChecklistMobileCard({ checklist, selected, canManage, canManageNc, analyzing, printing, onToggleSelect, onAiAnalysis, onPrint, onDownloadPdf, onSendEmail, onDelete }: Props) {
   return (
-    <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
+    <article className="ds-mobile-card">
       <div className="flex items-start gap-3">
         <input type="checkbox" checked={selected} onChange={() => onToggleSelect(checklist.id)} className="mt-1 h-5 w-5" aria-label={`Selecionar checklist ${checklist.titulo}`} />
         <div className="min-w-0 flex-1">
@@ -32,7 +32,7 @@ export function ChecklistMobileCard({ checklist, selected, canManage, canManageN
             <h3 className="font-semibold text-[var(--ds-color-text-primary)]">{checklist.titulo}</h3>
             <span className="rounded-full bg-[var(--ds-color-surface-muted)] px-2.5 py-1 text-xs font-semibold">{checklist.status}</span>
           </div>
-          <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+          <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
             <div><dt className="text-xs text-[var(--ds-color-text-muted)]">Data</dt><dd>{safeFormatDate(checklist.data, 'dd/MM/yyyy')}</dd></div>
             <div><dt className="text-xs text-[var(--ds-color-text-muted)]">Inspetor</dt><dd>{checklist.inspetor?.nome || '-'}</dd></div>
             <div><dt className="text-xs text-[var(--ds-color-text-muted)]">Empresa</dt><dd>{checklist.company?.razao_social || '-'}</dd></div>
@@ -40,7 +40,7 @@ export function ChecklistMobileCard({ checklist, selected, canManage, canManageN
           </dl>
         </div>
       </div>
-      <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3">
+      <div className="ds-mobile-card__actions mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3">
         {checklist.is_modelo ? <Link href={`/dashboard/checklists/new?source=model&templateId=${checklist.id}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'justify-center')} aria-label={`Preencher checklist ${checklist.titulo}`}><ClipboardList className="mr-2 h-4 w-4" />Preencher</Link> : null}
         {isAiEnabled() ? <Button type="button" size="sm" variant="outline" onClick={() => onAiAnalysis(checklist.id)} disabled={analyzing} leftIcon={<BrainCircuit className="h-4 w-4" />} aria-label={`Analisar checklist ${checklist.titulo} com SGS`}>Analisar SGS</Button> : null}
         <Button type="button" size="sm" variant="outline" onClick={() => onPrint(checklist)} disabled={printing} leftIcon={<Printer className="h-4 w-4" />}>Imprimir</Button>
