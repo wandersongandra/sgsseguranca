@@ -267,7 +267,7 @@ export default function TstFieldPage() {
       {loading ? (
         <Card tone="elevated" padding="lg">
           <InlineLoadingState
-            label="Carregando cockpit de campo"
+            label="Carregando visão de campo"
           />
         </Card>
       ) : null}
