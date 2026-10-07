@@ -121,7 +121,7 @@ describe('drawDidBlueprint', () => {
     expect(drawGovernanceClosingBlock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        title: 'Governança e autenticidade',
+        title: 'Validação do documento',
       }),
     );
   });
