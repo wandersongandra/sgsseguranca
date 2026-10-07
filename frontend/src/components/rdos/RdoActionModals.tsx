@@ -67,12 +67,12 @@ export function RdoActionModals({
       {signModal && (
         <div
           ref={signDialogRef}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          className="ds-legacy-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Assinar RDO"
         >
-          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
+          <div className="ds-legacy-modal-shell w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Assinar RDO
@@ -86,7 +86,7 @@ export function RdoActionModals({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="space-y-4 px-5 py-5">
+            <div className="ds-legacy-modal-body space-y-4 px-5 py-5">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                   Tipo de assinatura
@@ -153,7 +153,7 @@ export function RdoActionModals({
                 />
               </div>
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-[var(--ds-color-border-subtle)] px-5 py-4">
+            <div className="ds-legacy-modal-footer flex items-center justify-end gap-2 border-t border-[var(--ds-color-border-subtle)] px-5 py-4">
               <button
                 type="button"
                 onClick={() => setSignModal(null)}
@@ -178,12 +178,12 @@ export function RdoActionModals({
       {emailModal && (
         <div
           ref={emailDialogRef}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          className="ds-legacy-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-label="Enviar RDO por e-mail"
         >
-          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
+          <div className="ds-legacy-modal-shell w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Enviar RDO por E-mail
@@ -197,7 +197,7 @@ export function RdoActionModals({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="px-5 py-5">
+            <div className="ds-legacy-modal-body px-5 py-5">
               <p className="mb-3 text-xs text-[var(--ds-color-text-secondary)]">
                 Enviar <strong>{emailModal.numero}</strong> —{" "}
                 {safeToLocaleDateString(
@@ -221,6 +221,8 @@ export function RdoActionModals({
               <input
                 id="email-to"
                 type="text"
+                inputMode="email"
+                autoComplete="email"
                 value={emailTo}
                 onChange={(e) => setEmailTo(e.target.value)}
                 className={formInputClassName}
@@ -259,7 +261,7 @@ export function RdoActionModals({
                 );
               })()}
             </div>
-            <div className="flex items-center justify-end gap-2 border-t border-[var(--ds-color-border-subtle)] px-5 py-4">
+            <div className="ds-legacy-modal-footer flex items-center justify-end gap-2 border-t border-[var(--ds-color-border-subtle)] px-5 py-4">
               <button
                 type="button"
                 onClick={() => setEmailModal(null)}
