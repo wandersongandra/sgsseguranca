@@ -68,14 +68,15 @@ type AprStructuredRiskRow = {
 
 type AprParticipantLike = { id?: string; nome?: string; funcao?: string | null };
 
-const APR_TEAL: [number, number, number] = [0, 128, 128];
-const APR_TEAL_SOFT: [number, number, number] = [255, 255, 255];
-const APR_HEADER_GRAY: [number, number, number] = [217, 217, 217];
-const APR_ACCEPTABLE: [number, number, number] = [0, 176, 80];
-const APR_ATTENTION: [number, number, number] = [0, 112, 192];
-const APR_SUBSTANTIAL: [number, number, number] = [255, 192, 0];
-const APR_CRITICAL: [number, number, number] = [255, 0, 0];
-const APR_DARK: [number, number, number] = [0, 0, 0];
+const APR_TEAL: [number, number, number] = [31, 78, 121];
+const APR_TEAL_SOFT: [number, number, number] = [247, 249, 252];
+const APR_HEADER_GRAY: [number, number, number] = [238, 242, 247];
+const APR_ACCEPTABLE: [number, number, number] = [22, 101, 52];
+const APR_ATTENTION: [number, number, number] = [31, 78, 121];
+const APR_SUBSTANTIAL: [number, number, number] = [202, 138, 4];
+const APR_CRITICAL: [number, number, number] = [185, 28, 28];
+const APR_DARK: [number, number, number] = [15, 23, 42];
+const APR_BORDER: [number, number, number] = [203, 213, 225];
 const APR_WHITE: [number, number, number] = [255, 255, 255];
 
 function normalizeRiskLabel(value: unknown): string {
@@ -119,7 +120,7 @@ function drawAprOperationalHeader(
       .join(" ") || responsible;
 
   ensureSpace(ctx, 34);
-  doc.setDrawColor(0, 0, 0);
+  doc.setDrawColor(...APR_BORDER);
   doc.setLineWidth(0.18);
   doc.rect(margin, ctx.y, tableWidth + 4, titleHeight);
   doc.setFont("helvetica", "bold");
@@ -193,9 +194,9 @@ function drawAprOperationalHeader(
       font: "helvetica",
       fontSize: 8,
       cellPadding: 1.8,
-      lineColor: [0, 0, 0],
+      lineColor: APR_BORDER,
       lineWidth: 0.12,
-      textColor: [20, 20, 20],
+      textColor: APR_DARK,
       overflow: "linebreak",
       valign: "middle",
     },
@@ -268,9 +269,9 @@ function drawAprComplementaryInfo(
         font: "helvetica",
         fontSize: 7.6,
         cellPadding: 1.8,
-        lineColor: [0, 0, 0],
+        lineColor: APR_BORDER,
         lineWidth: 0.12,
-        textColor: [20, 20, 20],
+        textColor: APR_DARK,
         overflow: "linebreak",
       },
       body: [[sanitize(notes)]],
@@ -293,9 +294,9 @@ function drawAprComplementaryInfo(
         font: "helvetica",
         fontSize: 7.6,
         cellPadding: 1.8,
-        lineColor: [0, 0, 0],
+        lineColor: APR_BORDER,
         lineWidth: 0.12,
-        textColor: [20, 20, 20],
+        textColor: APR_DARK,
         overflow: "linebreak",
       },
       head: [["#", "Nome do participante", "Função"]],
@@ -333,9 +334,9 @@ function drawAprComplementaryInfo(
         font: "helvetica",
         fontSize: 7.6,
         cellPadding: 1.8,
-        lineColor: [0, 0, 0],
+        lineColor: APR_BORDER,
         lineWidth: 0.12,
-        textColor: [20, 20, 20],
+        textColor: APR_DARK,
         overflow: "linebreak",
       },
       head: [["#", "Atividade", "Descrição"]],
@@ -378,9 +379,9 @@ function drawAprComplementaryInfo(
         font: "helvetica",
         fontSize: 7.6,
         cellPadding: 1.8,
-        lineColor: [0, 0, 0],
+        lineColor: APR_BORDER,
         lineWidth: 0.12,
-        textColor: [20, 20, 20],
+        textColor: APR_DARK,
         overflow: "linebreak",
       },
       head: [["#", "EPI", "CA", "Validade CA", "Descrição"]],
@@ -422,9 +423,9 @@ function drawAprComplementaryInfo(
         font: "helvetica",
         fontSize: 7.6,
         cellPadding: 1.8,
-        lineColor: [0, 0, 0],
+        lineColor: APR_BORDER,
         lineWidth: 0.12,
-        textColor: [20, 20, 20],
+        textColor: APR_DARK,
         overflow: "linebreak",
       },
       head: [["#", "Ferramenta", "Nº de série", "Descrição"]],
@@ -469,9 +470,9 @@ function drawAprComplementaryInfo(
         font: "helvetica",
         fontSize: 7.6,
         cellPadding: 1.8,
-        lineColor: [0, 0, 0],
+        lineColor: APR_BORDER,
         lineWidth: 0.12,
-        textColor: [20, 20, 20],
+        textColor: APR_DARK,
         overflow: "linebreak",
       },
       head: [["#", "Máquina", "Placa / ID", "Requisitos de segurança"]],
@@ -535,9 +536,9 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
       font: "helvetica",
       fontSize: 7.2,
       cellPadding: 1.5,
-      lineColor: [0, 0, 0],
+      lineColor: APR_BORDER,
       lineWidth: 0.12,
-      textColor: [20, 20, 20],
+      textColor: APR_DARK,
       halign: "center",
       valign: "middle",
     },
@@ -598,9 +599,9 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
       font: "helvetica",
       fontSize: 7.2,
       cellPadding: 1.5,
-      lineColor: [0, 0, 0],
+      lineColor: APR_BORDER,
       lineWidth: 0.12,
-      textColor: [20, 20, 20],
+      textColor: APR_DARK,
       halign: "center",
       valign: "middle",
     },
@@ -654,7 +655,7 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
     ],
     columnStyles: {
       0: { cellWidth: matProbLabelW, fillColor: APR_HEADER_GRAY, fontStyle: "bold" },
-      1: { cellWidth: matDescW, fillColor: [245, 245, 245], fontStyle: "bold" },
+      1: { cellWidth: matDescW, fillColor: [248, 250, 252], fontStyle: "bold" },
       2: { cellWidth: matCellW },
       3: { cellWidth: matCellW },
       4: { cellWidth: matCellW },
@@ -678,7 +679,7 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
         hookData.cell.styles.fontStyle = "bold";
       } else if (value.includes("crit")) {
         hookData.cell.styles.fillColor = APR_CRITICAL;
-        hookData.cell.styles.textColor = APR_DARK;
+        hookData.cell.styles.textColor = APR_WHITE;
         hookData.cell.styles.fontStyle = "bold";
       }
     },
@@ -695,9 +696,9 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
       font: "helvetica",
       fontSize: 7.2,
       cellPadding: 1.5,
-      lineColor: [0, 0, 0],
+      lineColor: APR_BORDER,
       lineWidth: 0.12,
-      textColor: [20, 20, 20],
+      textColor: APR_DARK,
       overflow: "linebreak",
     },
     body: [
@@ -736,7 +737,7 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
         hookData.cell.styles.textColor = APR_DARK;
       } else if (value.includes("crit")) {
         hookData.cell.styles.fillColor = APR_CRITICAL;
-        hookData.cell.styles.textColor = APR_DARK;
+        hookData.cell.styles.textColor = APR_WHITE;
       }
     },
     didDrawPage: (hookData: HookData) => {
@@ -789,7 +790,7 @@ function drawAprParticipantRoster(
       font: "helvetica",
       fontSize: 8,
       cellPadding: 1.8,
-      lineColor: [0, 0, 0],
+      lineColor: APR_BORDER,
       lineWidth: 0.12,
       textColor: APR_DARK,
       overflow: "linebreak",
@@ -893,7 +894,7 @@ function drawAprApprovalStepsHistory(
       font: "helvetica",
       fontSize: 7.6,
       cellPadding: 1.8,
-      lineColor: [0, 0, 0],
+      lineColor: APR_BORDER,
       lineWidth: 0.12,
       textColor: APR_DARK,
       overflow: "linebreak",
