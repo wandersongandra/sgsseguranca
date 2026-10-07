@@ -72,7 +72,7 @@ export function RdoActionModals({
           aria-modal="true"
           aria-label="Assinar RDO"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
+          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Assinar RDO
@@ -157,7 +157,7 @@ export function RdoActionModals({
               <button
                 type="button"
                 onClick={() => setSignModal(null)}
-                className="rounded-xl border border-[var(--ds-color-border-subtle)] px-4 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
+                className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-4 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
               >
                 Cancelar
               </button>
@@ -165,7 +165,7 @@ export function RdoActionModals({
                 type="button"
                 onClick={onSign}
                 disabled={signing}
-                className="flex items-center gap-1.5 rounded-xl bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-50 motion-safe:transition-colors"
+                className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-50 motion-safe:transition-colors"
               >
                 <PenLine className="h-4 w-4" />{" "}
                 {signing ? "Assinando..." : "Confirmar assinatura"}
@@ -183,7 +183,7 @@ export function RdoActionModals({
           aria-modal="true"
           aria-label="Enviar RDO por e-mail"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
+          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Enviar RDO por E-mail
@@ -207,7 +207,7 @@ export function RdoActionModals({
                   "—",
                 )}
               </p>
-              <div className="mb-4 rounded-xl border border-[color:var(--ds-color-success)]/30 bg-[color:var(--ds-color-success)]/10 px-3 py-2 text-xs text-[var(--ds-color-success)]">
+              <div className="mb-4 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-success-border)] bg-[var(--ds-color-success-subtle)] px-3 py-2 text-xs text-[var(--ds-color-success-fg)]">
                 Envio oficial: o backend anexará o PDF final governado do RDO.
                 Se o documento ainda não tiver sido emitido, o envio será
                 bloqueado.
@@ -263,7 +263,7 @@ export function RdoActionModals({
               <button
                 type="button"
                 onClick={() => setEmailModal(null)}
-                className="rounded-xl border border-[var(--ds-color-border-subtle)] px-4 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
+                className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-4 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
               >
                 Cancelar
               </button>
@@ -275,7 +275,7 @@ export function RdoActionModals({
                   emailTo.trim() === "" ||
                   emailTo.split(/[,;\s]+/).map((e) => e.trim()).filter(Boolean).some((e) => !isValidEmail(e))
                 }
-                className="flex items-center gap-1.5 rounded-xl bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-50 motion-safe:transition-colors"
+                className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-50 motion-safe:transition-colors"
               >
                 <Send className="h-4 w-4" />{" "}
                 {sendingEmail ? "Enviando..." : "Enviar"}
