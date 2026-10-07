@@ -74,7 +74,7 @@ export default function CompanySelectorModal({ open, onSelect, onLogout, current
     <ModalFrame
       isOpen={open}
       onClose={canDismiss ? onClose! : () => {}}
-      shellClassName="mx-4 max-w-lg"
+      shellClassName="max-w-lg"
       overlayClassName="z-50"
     >
       <ModalHeader
