@@ -173,7 +173,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const showOfflineChip = syncingOfflineQueue || offlineQueueCount > 0;
   const userRoleLabel = user?.profile?.nome?.trim() || "Operação";
   const iconButtonClass =
-    "flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--chrome-topbar-chip-border)] bg-[var(--chrome-topbar-chip-bg)] text-[var(--ds-color-text-primary)] transition-colors duration-[120ms] hover:border-[var(--ds-color-border-strong)] hover:bg-[var(--chrome-topbar-chip-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary)] focus-visible:ring-offset-2";
+    "flex h-9 w-9 items-center justify-center rounded-[var(--ds-radius-md)] border border-[var(--chrome-topbar-chip-border)] bg-[var(--chrome-topbar-chip-bg)] text-[var(--ds-color-text-primary)] transition-colors duration-[120ms] hover:border-[var(--ds-color-border-strong)] hover:bg-[var(--chrome-topbar-chip-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary)] focus-visible:ring-offset-2";
 
   return (
     <header className="ds-topbar" data-sophie-reserved-zone="top">
@@ -190,7 +190,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
 
             <div className="hidden xl:flex min-w-0 flex-col pr-1">
               <span className="truncate text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                Cockpit operacional
+                Operação SGS
               </span>
             </div>
 
@@ -202,7 +202,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
           >
             <Search className="h-4 w-4 text-[var(--ds-color-text-muted)]" />
             <span className="min-w-0 flex-1 text-left text-[13px] text-[var(--ds-color-text-muted)]">
-              Pesquisar no sistema
+              Pesquisar módulos, registros e ações
             </span>
             <span className="ds-topbar-key text-[10px] font-semibold">
               <Command className="h-3 w-3" />
