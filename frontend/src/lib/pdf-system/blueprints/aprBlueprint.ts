@@ -223,19 +223,27 @@ function drawAprOperationalHeader(
   });
 }
 
-function drawSectionBanner(ctx: PdfContext, label: string) {
+function drawSectionBanner(
+  ctx: PdfContext,
+  label: string,
+  accent: [number, number, number] = APR_TEAL,
+) {
   const { doc, margin, contentWidth, theme } = ctx;
-  ensureSpace(ctx, 14);
-  doc.setDrawColor(120, 120, 120);
-  doc.setFillColor(...APR_TEAL_SOFT);
-  doc.roundedRect(margin, ctx.y, contentWidth, 8.6, 1.6, 1.6, "FD");
-  doc.setFillColor(...APR_TEAL);
-  doc.rect(margin, ctx.y, 2.3, 8.6, "F");
+  ensureSpace(ctx, 13);
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.headingSm);
   doc.setTextColor(...APR_DARK);
-  doc.text(label, margin + 4, ctx.y + 5.7);
-  moveY(ctx, 9.6);
+  doc.text(label, margin, ctx.y + 5.8);
+
+  doc.setDrawColor(...accent);
+  doc.setLineWidth(0.45);
+  doc.line(margin, ctx.y + 8.3, margin + 32, ctx.y + 8.3);
+  doc.setDrawColor(...APR_BORDER);
+  doc.setLineWidth(0.18);
+  doc.line(margin + 34, ctx.y + 8.3, margin + contentWidth, ctx.y + 8.3);
+
+  moveY(ctx, 10);
 }
 
 function drawAprComplementaryInfo(
@@ -517,16 +525,7 @@ function drawAprRiskMatrixReference(ctx: PdfContext, autoTable: AutoTableFn) {
   const matDescW = 45;
   const matCellW = Number(((contentWidth - matProbLabelW - matDescW) / 5).toFixed(2));
 
-  doc.setDrawColor(120, 120, 120);
-  doc.setFillColor(...APR_TEAL_SOFT);
-  doc.roundedRect(margin, ctx.y, contentWidth, 8.6, 1.6, 1.6, "FD");
-  doc.setFillColor(...APR_TEAL);
-  doc.rect(margin, ctx.y, 2.3, 8.6, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(theme.typography.headingSm);
-  doc.setTextColor(...APR_DARK);
-  doc.text("Matriz de risco e critério de ação", margin + 4, ctx.y + 5.7);
-  moveY(ctx, 9.8);
+  drawSectionBanner(ctx, "Matriz de risco e critério de ação");
 
   autoTable(doc, {
     startY: ctx.y,
@@ -757,20 +756,11 @@ function drawAprParticipantRoster(
   const showSigned = signedUserIds !== undefined && signedUserIds.size > 0;
   ensureSpace(ctx, 26);
 
-  doc.setDrawColor(120, 120, 120);
-  doc.setFillColor(...APR_TEAL_SOFT);
-  doc.roundedRect(margin, ctx.y, contentWidth, 8.6, 1.6, 1.6, "FD");
-  doc.setFillColor(...APR_ATTENTION);
-  doc.rect(margin, ctx.y, 2.3, 8.6, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(theme.typography.headingSm);
-  doc.setTextColor(...APR_DARK);
-  doc.text(
+  drawSectionBanner(
+    ctx,
     `Equipe participante (${participants.length})`,
-    margin + 4,
-    ctx.y + 5.7,
+    APR_ATTENTION,
   );
-  moveY(ctx, 9.8);
 
   const signedColW = 20;
   const roleColW = showSigned ? 40 : 52;
@@ -875,16 +865,7 @@ function drawAprApprovalStepsHistory(
   const stepTextColW = Number(((contentWidth - 70) / 2).toFixed(2)); // 70 = cols 0+3+4 fixos
   ensureSpace(ctx, 26);
 
-  doc.setDrawColor(120, 120, 120);
-  doc.setFillColor(...APR_TEAL_SOFT);
-  doc.roundedRect(margin, ctx.y, contentWidth, 8.6, 1.6, 1.6, "FD");
-  doc.setFillColor(...APR_TEAL);
-  doc.rect(margin, ctx.y, 2.3, 8.6, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(theme.typography.headingSm);
-  doc.setTextColor(...APR_DARK);
-  doc.text("Histórico de aprovação", margin + 4, ctx.y + 5.7);
-  moveY(ctx, 9.8);
+  drawSectionBanner(ctx, "Histórico de aprovação");
 
   autoTable(doc, {
     startY: ctx.y,
