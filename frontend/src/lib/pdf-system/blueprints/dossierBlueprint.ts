@@ -38,7 +38,7 @@ function buildExecutiveSummary(context: DossierContext) {
     return {
       title: "Leitura executiva do dossiê do colaborador",
       summary:
-        "Consolidação institucional de capacitações, entregas de EPI, liberações críticas, CATs e rastreabilidade documental do trabalhador.",
+        "Resumo das capacitações, entregas de EPI, liberações, CATs e documentos do colaborador.",
       metrics: [
         {
           label: "Colaborador",
@@ -448,8 +448,8 @@ export async function drawDossierBlueprint(
             image: null,
           },
         ],
-    title: "Governança e autenticidade",
+    title: "Validação do documento",
     subtitle:
-      "Valide o código público do dossiê para confirmar o escopo institucional desta emissão sob demanda.",
+      "Use o código do dossiê para conferir esta emissão no portal SGS.",
   });
 }
