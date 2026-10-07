@@ -3193,7 +3193,11 @@ body {
   }
 
   .ds-dashboard-shell:has(.ds-mobile-action-bar) .ds-sophie-launcher {
-    bottom: calc(var(--ds-mobile-nav-total-height) + 6.25rem);
+    display: none;
+  }
+
+  .ds-mobile-step-nav {
+    top: 0.5rem !important;
   }
 
   .ds-modal-shell {
@@ -3636,6 +3640,21 @@ body {
 
   .apr-advanced-filters-footer__actions > button {
     width: auto;
+  }
+}
+
+@media (max-width: 359px) {
+  .ds-mobile-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .ds-pagination__actions {
+    grid-template-columns: 1fr 2.75rem 1fr;
+    gap: 0.35rem;
+  }
+
+  .ds-pagination__actions button {
+    padding-inline: 0.5rem;
   }
 }
 
