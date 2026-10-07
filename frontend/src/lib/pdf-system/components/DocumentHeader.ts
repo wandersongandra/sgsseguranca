@@ -172,10 +172,13 @@ export function drawDocumentHeader(
   doc.text(subtitleLines, textX, top + 6.5 + titleHeight);
 
   doc.setDrawColor(...theme.tone.borderStrong);
-  doc.setLineWidth(0.3);
+  doc.setLineWidth(0.26);
   doc.rect(codeX, top, codeW, 19, "S");
-  doc.setFillColor(...theme.tone.surfaceMuted);
-  doc.rect(codeX, top, codeW, 5.2, "F");
+  doc.setFillColor(...theme.tone.brand);
+  doc.rect(codeX, top, codeW, 1.2, "F");
+  doc.setDrawColor(...theme.tone.border);
+  doc.setLineWidth(0.16);
+  doc.line(codeX, top + 5.4, codeX + codeW, top + 5.4);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.caption);
@@ -183,7 +186,7 @@ export function drawDocumentHeader(
   doc.text(
     sanitize(options.codeLabel || "IDENTIFICADOR").toUpperCase(),
     codeX + 3,
-    top + 3.5,
+    top + 4.1,
   );
 
   doc.setFontSize(theme.typography.headingSm);
@@ -191,7 +194,7 @@ export function drawDocumentHeader(
   doc.text(
     clampLines(doc.splitTextToSize(sanitize(options.code), codeW - 6) as string[], 2),
     codeX + 3,
-    top + 9.6,
+    top + 10.1,
   );
 
   doc.setFont("helvetica", "normal");
@@ -200,7 +203,7 @@ export function drawDocumentHeader(
   doc.text(
     `${sanitize(options.status)} · v${sanitize(options.version || "1")}`,
     codeX + 3,
-    top + 16.2,
+    top + 16.4,
   );
 
   const metadata = [
@@ -218,13 +221,16 @@ export function drawDocumentHeader(
   const metaH = 14;
   if (metadata.length > 0) {
     const width = contentWidth / metadata.length;
+    doc.setDrawColor(...theme.tone.borderStrong);
+    doc.setLineWidth(0.2);
+    doc.line(margin, metaY, margin + contentWidth, metaY);
     doc.setDrawColor(...theme.tone.border);
-    doc.setLineWidth(0.22);
-    doc.rect(margin, metaY, contentWidth, metaH, "S");
+    doc.setLineWidth(0.16);
+    doc.line(margin, metaY + metaH, margin + contentWidth, metaY + metaH);
 
     metadata.forEach((entry, index) => {
       const x = margin + index * width;
-      if (index > 0) doc.line(x, metaY, x, metaY + metaH);
+      if (index > 0) doc.line(x, metaY + 2, x, metaY + metaH - 2);
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(theme.typography.caption);
