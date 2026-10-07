@@ -1054,9 +1054,9 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
 
       <nav
         aria-label="Seções do formulário"
-        className="sticky top-16 z-10 -mx-1 overflow-x-auto rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2.5 shadow-[var(--ds-shadow-xs)]"
+        className="ds-mobile-step-nav sticky top-16 z-10 -mx-1 overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-2 py-2 shadow-[var(--ds-shadow-xs)] sm:px-3 sm:py-2.5"
       >
-        <ol className="flex min-w-max items-center gap-0.5 text-[11px]">
+        <ol className="flex min-w-max snap-x snap-mandatory items-center gap-0.5 text-[11px]">
           {([
             { n: 1, label: "Identificação", anchor: "secao-1" },
             { n: 2, label: "Classificação", anchor: "secao-2" },
@@ -1075,7 +1075,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
             <li key={n} className="flex shrink-0 items-center">
               <a
                 href={`#${anchor}`}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 font-semibold text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)]"
+                className="flex min-h-11 snap-start items-center gap-1.5 rounded-[var(--ds-radius-sm)] px-2 py-1.5 font-semibold text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)]"
               >
                 <span className="inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-[var(--ds-color-surface-muted)] text-[10px] font-bold text-[var(--ds-color-text-secondary)]">
                   {n}
