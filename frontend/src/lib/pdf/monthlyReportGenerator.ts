@@ -245,7 +245,7 @@ export function generateMonthlyReportPdf(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva do período",
+    title: "Resumo do período",
     summary: statusSignal.message,
     metrics: [
       { label: "Período", value: buildReportPeriod(report), tone: "info" },
@@ -286,7 +286,7 @@ export function generateMonthlyReportPdf(
     title: "Indicadores consolidados do período",
     tone: "action",
     autoTable,
-    head: [["Indicador", "Quantidade", "Leitura executiva"]],
+    head: [["Indicador", "Quantidade", "Situação"]],
     body: buildIndicatorRows(report).map((row) => [
       row.indicador,
       String(row.quantidade),
