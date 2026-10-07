@@ -286,7 +286,7 @@ function DashboardShell({
         {/* Banner de obra ativa */}
         {activeCompanyId && selectedSite && (
           <div className="ds-context-banner ds-context-banner--warning sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-2">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
+            <div className="ds-context-banner__content flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
               <HardHat className="h-4 w-4 shrink-0" />
               <span className="ds-context-banner__label min-w-0">
                 Obra:{' '}
