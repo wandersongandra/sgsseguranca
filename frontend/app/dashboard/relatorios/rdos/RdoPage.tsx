@@ -104,13 +104,13 @@ const StoredFilesPanel = dynamic(
 const loadRdoPdfGenerator = async () => import("@/lib/pdf/rdoGenerator");
 
 const inputClassName =
-  "h-11 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 text-base text-[var(--ds-color-text-primary)] motion-safe:transition-all motion-safe:duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]";
+  "h-11 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 text-base text-[var(--ds-color-text-primary)] motion-safe:transition-colors focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)]";
 
 const formInputClassName =
-  "w-full min-h-[2.875rem] rounded-xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-2.5 text-base leading-6 text-[var(--ds-color-text-primary)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] motion-safe:transition-all";
+  "w-full min-h-[2.875rem] rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-2.5 text-base leading-6 text-[var(--ds-color-text-primary)] focus:border-[var(--ds-color-focus)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-color-focus-ring)] motion-safe:transition-all";
 
 const formInputSmClassName =
-  "w-full min-h-[2.625rem] rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-base text-[var(--ds-color-text-primary)] focus:border-[var(--ds-color-focus)] focus:outline-none motion-safe:transition-all";
+  "w-full min-h-[2.625rem] rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-base text-[var(--ds-color-text-primary)] focus:border-[var(--ds-color-focus)] focus:outline-none motion-safe:transition-all";
 
 const STEPS = [
   { label: "Dados Básicos", icon: ClipboardList },
@@ -2405,7 +2405,7 @@ useEffect(() => {
           aria-labelledby="rdo-delete-title"
           aria-describedby="rdo-delete-desc"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
+          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 id="rdo-delete-title" className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Excluir RDO
@@ -2431,14 +2431,14 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() => setDeleteConfirmId(null)}
-                className="rounded-xl border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40"
+                className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={() => void confirmDelete()}
-                className="rounded-xl bg-[var(--ds-color-danger)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
+                className="rounded-[var(--ds-radius-md)] bg-[var(--ds-color-danger)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90"
               >
                 Excluir RDO
               </button>
@@ -2455,7 +2455,7 @@ useEffect(() => {
           aria-modal="true"
           aria-labelledby="rdo-cancel-title"
         >
-          <div className="w-full max-w-sm rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
+          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 id="rdo-cancel-title" className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Cancelar RDO
@@ -2487,7 +2487,7 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() => { setCancelTarget(null); setCancelReason(""); }}
-                className="rounded-xl border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40"
+                className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40"
               >
                 Voltar
               </button>
@@ -2495,7 +2495,7 @@ useEffect(() => {
                 type="button"
                 disabled={!cancelReason.trim() || isCancelling}
                 onClick={() => void confirmCancelRdo()}
-                className="rounded-xl bg-[var(--ds-color-warning)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-[var(--ds-radius-md)] bg-[var(--ds-color-warning)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isCancelling ? "Cancelando…" : "Confirmar cancelamento"}
               </button>
