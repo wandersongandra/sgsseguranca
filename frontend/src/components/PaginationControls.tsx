@@ -63,7 +63,7 @@ function PaginationControlsComponent(props: PaginationControlsProps) {
           aria-label="Próxima página"
           rightIcon={<ChevronRight className="h-4 w-4" aria-hidden="true" />}
         >
-          Proxima
+          Próxima
         </Button>
       </div>
     </nav>
