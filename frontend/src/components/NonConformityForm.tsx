@@ -1254,7 +1254,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         aria-readonly={formIsReadOnly}
         className="contents border-0 p-0"
       >
-      <div id="secao-1" className="sst-card p-6">
+      <div id="secao-1" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           1. Identificação da Não Conformidade
         </h2>
@@ -1441,7 +1441,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-2" className="sst-card p-6">
+      <div id="secao-2" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           2. Classificação da Não Conformidade
         </h2>
@@ -1460,7 +1460,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-3" className="sst-card p-6">
+      <div id="secao-3" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           3. Descrição da Não Conformidade
         </h2>
@@ -1542,7 +1542,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-4" className="sst-card p-6">
+      <div id="secao-4" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           4. Requisito Não Atendido
         </h2>
@@ -1612,7 +1612,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-5" className="sst-card p-6">
+      <div id="secao-5" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           5. Análise de Risco Associada
         </h2>
@@ -1731,7 +1731,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-6" className="sst-card p-6">
+      <div id="secao-6" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           6. Causa da Não Conformidade
         </h2>
@@ -1763,7 +1763,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-7" className="sst-card p-6">
+      <div id="secao-7" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           7. Ação Corretiva Imediata
         </h2>
@@ -1829,7 +1829,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-8" className="sst-card p-6">
+      <div id="secao-8" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           8. Ação Corretiva Definitiva
         </h2>
@@ -1884,7 +1884,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-9" className="sst-card p-6">
+      <div id="secao-9" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           9. Ação Preventiva
         </h2>
@@ -1937,7 +1937,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-10" className="sst-card p-6">
+      <div id="secao-10" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           10. Verificação de Eficácia
         </h2>
@@ -1987,7 +1987,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       </div>
 
-      <div id="secao-11" className="sst-card p-6">
+      <div id="secao-11" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           11. Status da Não Conformidade
         </h2>
@@ -2006,7 +2006,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       </fieldset>
 
       {id ? (
-        <div className="sst-card p-6">
+        <div className="sst-card p-4 sm:p-6">
           <h2 className="mb-2 text-lg font-bold text-[var(--ds-color-text-primary)]">
             Documento oficial
           </h2>
@@ -2037,7 +2037,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         </div>
       ) : null}
 
-      <div id="secao-12" className="sst-card p-6">
+      <div id="secao-12" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           12. Observações e Anexos
         </h2>
@@ -2202,7 +2202,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
         isOpen={isCameraOpen}
         onClose={stopCamera}
         initialFocusRef={cameraCancelButtonRef}
-        shellClassName="w-[calc(100vw-2rem)] max-w-lg overflow-hidden p-0"
+        shellClassName="max-w-lg overflow-hidden p-0"
       >
         <ModalHeader
           title="Capturar foto"
@@ -2247,7 +2247,7 @@ export function NonConformityForm({ id }: NonConformityFormProps) {
       </ModalFrame>
 
       <fieldset disabled={formIsReadOnly} aria-readonly={formIsReadOnly} className="contents border-0 p-0">
-      <div id="secao-13" className="sst-card p-6">
+      <div id="secao-13" className="sst-card p-4 sm:p-6">
         <h2 className="mb-4 text-lg font-bold text-[var(--ds-color-text-primary)]">
           13. Assinaturas
         </h2>
