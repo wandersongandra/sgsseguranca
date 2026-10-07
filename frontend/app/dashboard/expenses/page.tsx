@@ -428,13 +428,13 @@ export default function ExpensesPage() {
           />
         </div>}
         mobile={(report) => (
-          <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
+          <article className="ds-mobile-card">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0"><h3 className="font-semibold text-[var(--ds-color-text-primary)]">{report.site?.nome || report.site_id}</h3><p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">{report.responsible?.nome || report.responsible_id}</p></div>
               <span className="rounded-full bg-[var(--ds-color-surface-muted)] px-2.5 py-1 text-xs font-semibold">{EXPENSE_STATUS_LABEL[report.status]}</span>
             </div>
             <p className="mt-3 flex items-center gap-1 text-sm text-[var(--ds-color-text-secondary)]"><CalendarDays className="h-4 w-4" />{report.period_start} a {report.period_end}</p>
-            <dl className="mt-3 grid grid-cols-3 gap-2 text-sm"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Adiantado</dt><dd className="font-medium">{formatMoney(report.totals?.totalAdvances)}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Despesas</dt><dd className="font-medium">{formatMoney(report.totals?.totalExpenses)}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Saldo</dt><dd className="font-medium">{formatMoney(report.totals?.balance)}</dd></div></dl>
+            <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-1 gap-2 text-sm min-[360px]:grid-cols-3"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Adiantado</dt><dd className="font-medium">{formatMoney(report.totals?.totalAdvances)}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Despesas</dt><dd className="font-medium">{formatMoney(report.totals?.totalExpenses)}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Saldo</dt><dd className="font-medium">{formatMoney(report.totals?.balance)}</dd></div></dl>
             <Link href={`/dashboard/expenses/${report.id}`} className={cn(buttonVariants({ variant: 'outline' }), 'mt-4 flex min-h-11 w-full items-center justify-center')}><Receipt className="mr-2 h-4 w-4" />Abrir prestação</Link>
           </article>
         )}
