@@ -39,7 +39,7 @@ export async function generateAuditPdf(
 
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "RELATÓRIO DE AUDITORIA",
-    subtitle: "Documento oficial de conformidade, achados e parecer técnico",
+    subtitle: "Achados, evidências e conclusão da auditoria",
     code,
     date: audit.data_auditoria,
     status: "Emitido",
