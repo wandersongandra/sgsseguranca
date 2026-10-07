@@ -135,7 +135,7 @@ export function RdoEditorModal({
     <ModalFrame
       isOpen={open}
       onClose={onClose}
-      shellClassName="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col"
+      shellClassName="flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col md:w-[calc(100%-1rem)]"
     >
         <ModalHeader
           title={editingId ? "Editar RDO" : "Novo Relatório Diário de Obra"}
@@ -154,7 +154,7 @@ export function RdoEditorModal({
                   type="button"
                   onClick={() => setCurrentStep(idx)}
                   className={cn(
-                    "min-h-11 shrink-0 snap-start items-center gap-2 rounded-[var(--ds-radius-md)] px-3 py-2 text-sm font-medium transition-colors",
+                    "flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-[var(--ds-radius-md)] px-3 py-2 text-sm font-medium transition-colors",
                     idx === currentStep
                       ? "bg-[var(--ds-color-action-primary)] text-white"
                       : idx < currentStep
