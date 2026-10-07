@@ -153,8 +153,8 @@ export function RdoViewerModal({
       aria-label={`Visualizar RDO ${viewRdo.numero}`}
     >
       <div className="ds-legacy-modal-shell flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-6 py-4">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-shrink-0 flex-col gap-3 border-b border-[var(--ds-color-border-subtle)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             <span className="font-mono text-sm font-bold text-[var(--ds-color-action-primary)]">
               {viewRdo.numero}
             </span>
@@ -183,7 +183,7 @@ export function RdoViewerModal({
               </select>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
             {canManageRdo ? (
               <button
                 type="button"
@@ -204,7 +204,7 @@ export function RdoViewerModal({
           </div>
         </div>
 
-        <div className="ds-legacy-modal-body overflow-y-auto space-y-5 px-6 py-5">
+        <div className="ds-legacy-modal-body space-y-5 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {[
               {
