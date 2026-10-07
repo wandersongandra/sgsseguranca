@@ -3213,16 +3213,25 @@ body {
   }
 
   .ds-modal-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
     padding: 0.75rem 1rem max(0.75rem, var(--ds-safe-area-bottom));
   }
 
   .ds-modal-footer > div {
+    grid-column: 1 / -1;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
+    gap: 0.5rem !important;
   }
 
   .ds-modal-footer button,
   .ds-modal-footer a {
+    min-width: 0;
     min-height: 2.75rem;
+    width: 100%;
   }
 
   .ds-legacy-modal-overlay {
@@ -3482,6 +3491,8 @@ body {
   }
 
   .ds-mobile-form-actions__buttons,
+  .ds-modal-footer,
+  .ds-modal-footer > div,
   .ds-legacy-modal-footer > div {
     grid-template-columns: 1fr;
   }
