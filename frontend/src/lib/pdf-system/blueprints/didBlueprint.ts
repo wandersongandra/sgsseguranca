@@ -165,7 +165,7 @@ export async function drawDidBlueprint(
     signatures: [],
     code,
     url: validationUrl,
-    title: 'Governança e autenticidade',
-    subtitle: 'Valide o documento pelo QR Code ou pelo código público.',
+    title: 'Validação do documento',
+    subtitle: 'Use o QR Code ou o código do DID para conferência no portal SGS.',
   });
 }
