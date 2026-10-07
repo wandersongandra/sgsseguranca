@@ -275,15 +275,14 @@ export default function TstFieldPage() {
       <Card tone="elevated" padding="lg">
         <CardHeader className="gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--ds-color-success-border)] bg-[color:var(--ds-color-success-subtle)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-success)]">
+            <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-success-fg)]">
               {isOffline ? <WifiOff className="h-3.5 w-3.5" /> : <Wifi className="h-3.5 w-3.5" />}
               operação de campo
             </div>
             <div>
               <CardTitle className="text-2xl">TST em campo</CardTitle>
               <CardDescription className="mt-2 max-w-2xl">
-                Pendências do dia, decisão operacional por CPF, fila offline e atalhos de execução
-                para APR, PT e documentos semanais.
+                Pendências do dia, consulta por CPF, fila offline e acessos rápidos para APR, PT e documentos de campo.
               </CardDescription>
             </div>
           </div>
@@ -306,29 +305,29 @@ export default function TstFieldPage() {
           </div>
         </CardHeader>
         <CardContent className="mt-0 grid gap-3 lg:grid-cols-[1.4fr_1fr]">
-          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-overlay)]/55 p-3.5">
+          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5">
             <p className="text-sm font-medium text-[var(--ds-color-text-secondary)]">
-              Próximas ações de maior impacto
+              Ações de campo
             </p>
             <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               {fieldActionCards.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-overlay)]/45 p-4 motion-safe:transition-colors hover:border-[color:var(--ds-color-success-border)] hover:bg-[color:var(--ds-color-surface-overlay)]"
+                  className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 motion-safe:transition-colors hover:border-[color:var(--ds-color-success-border)] hover:bg-[color:var(--ds-color-surface-overlay)]"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[color:var(--ds-color-success-subtle)] text-[var(--ds-color-success-fg)]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-[var(--ds-radius-md)] bg-[color:var(--ds-color-success-subtle)] text-[var(--ds-color-success-fg)]">
                       <item.icon className="h-5 w-5" />
                     </div>
-                    <span className="rounded-full border border-[color:var(--ds-color-success-border)] bg-[color:var(--ds-color-success-subtle)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-success-fg)]">
+                    <span className="rounded-full border border-[color:var(--ds-color-success-border)] bg-[color:var(--ds-color-success-subtle)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-success-fg)]">
                       {item.badge}
                     </span>
                   </div>
                   <p className="mt-4 text-[15px] font-semibold text-[var(--ds-color-text-primary)]">{item.title}</p>
                   <p className="mt-2 text-[13px] text-[var(--ds-color-text-secondary)]">{item.description}</p>
                   <span className="mt-4 inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--ds-color-success)]">
-                    Abrir fluxo
+                    Abrir
                     <ArrowRight className="h-3.5 w-3.5" />
                   </span>
                 </Link>
@@ -336,7 +335,7 @@ export default function TstFieldPage() {
             </div>
           </div>
 
-          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-overlay)]/55 p-3.5">
+          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5">
             <p className="text-sm font-medium text-[var(--ds-color-text-secondary)]">
               Modo operacional
             </p>
@@ -373,14 +372,14 @@ export default function TstFieldPage() {
               ) : null}
               {recentOfflineQueueItems.length > 0 ? (
                 <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] p-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-warning)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-warning-fg)]">
                     Últimos itens na fila
                   </p>
                   <div className="mt-3 space-y-2">
                     {recentOfflineQueueItems.map((item) => (
                       <div
                         key={item.id}
-                        className="flex items-start justify-between gap-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-overlay)]/55 px-3 py-2"
+                        className="flex items-start justify-between gap-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2"
                       >
                         <div>
                           <p className="text-sm font-medium text-[var(--ds-color-text-primary)]">{item.label}</p>
@@ -475,7 +474,7 @@ export default function TstFieldPage() {
 
             {workerStatus ? (
               <div className="space-y-4">
-                <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 p-3.5">
+                <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3.5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -501,9 +500,9 @@ export default function TstFieldPage() {
                   {workerQuickFacts.map((fact) => (
                     <div
                       key={fact.label}
-                      className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5"
+                      className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5"
                     >
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         {fact.label}
                       </p>
                       <p className="mt-2 text-sm font-medium text-[var(--ds-color-text-primary)]">
@@ -559,7 +558,7 @@ export default function TstFieldPage() {
                 offlineQueueItems.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5"
+                    className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5"
                   >
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
@@ -694,8 +693,8 @@ function OperationalChip({
   };
 
   return (
-    <div className={`rounded-[var(--ds-radius-lg)] border px-3.5 py-2.5 ${tones[tone]}`}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-80">{label}</p>
+    <div className={`rounded-[var(--ds-radius-md)] border px-3.5 py-2.5 ${tones[tone]}`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.05em] opacity-90">{label}</p>
       <p className="mt-1.5 text-base font-semibold">{value}</p>
     </div>
   );
@@ -736,7 +735,7 @@ function OperationalListCard({
           items.map((item) => (
             <div
               key={item.id}
-              className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5"
+              className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3.5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
