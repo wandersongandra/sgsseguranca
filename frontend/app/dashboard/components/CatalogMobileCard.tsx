@@ -27,7 +27,7 @@ export function CatalogMobileCard({
   return (
     <article
       className={cn(
-        'min-w-0 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-[var(--ds-shadow-sm)]',
+        'ds-mobile-card min-w-0',
         className,
       )}
     >
@@ -43,7 +43,7 @@ export function CatalogMobileCard({
       </div>
 
       {fields.length > 0 ? (
-        <dl className="mt-4 grid min-w-0 grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        <dl className="ds-mobile-detail-grid mt-4 grid min-w-0 grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
           {fields.map((field) => (
             <div key={field.label} className="min-w-0">
               <dt className="text-xs font-medium uppercase tracking-wide text-[var(--ds-color-text-muted)]">
@@ -58,7 +58,7 @@ export function CatalogMobileCard({
       ) : null}
 
       <div
-        className="mt-4 flex min-w-0 flex-wrap gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3"
+        className="ds-mobile-card__actions mt-4 flex min-w-0 flex-wrap gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3"
         role="group"
         aria-label={actionsLabel}
       >
