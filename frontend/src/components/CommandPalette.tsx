@@ -183,8 +183,8 @@ export function CommandPalette() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-[color:var(--component-command-overlay)] px-4 pt-[10vh] backdrop-blur-sm" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Paleta de comandos" className="w-full max-w-[42rem] overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--component-command-border)] bg-[color:var(--component-command-bg)] shadow-[var(--ds-shadow-lg)]">
+    <div className="fixed inset-0 z-[70] flex items-start justify-center bg-[color:var(--component-command-overlay)] px-[max(0.75rem,var(--ds-safe-area-left))] pb-[max(0.75rem,var(--ds-safe-area-bottom))] pt-[max(0.75rem,var(--ds-safe-area-top))] backdrop-blur-sm sm:px-4 sm:pt-[10vh]" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Paleta de comandos" className="flex max-h-[calc(100dvh-max(1.5rem,var(--ds-safe-area-top)+var(--ds-safe-area-bottom)))] w-full max-w-[42rem] flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--component-command-border)] bg-[color:var(--component-command-bg)] shadow-[var(--ds-shadow-lg)]">
         <div className="flex items-center gap-3 border-b border-[var(--color-border-subtle)] px-4 py-3.5">
           {searching ? <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin" /> : <Search aria-hidden="true" className="h-5 w-5" />}
           <input
@@ -207,16 +207,16 @@ export function CommandPalette() {
           />
           <button type="button" onClick={close} aria-label="Fechar busca" className="flex h-9 w-9 items-center justify-center rounded-[var(--ds-radius-md)] hover:bg-[var(--ds-color-surface-muted)]"><X aria-hidden="true" className="h-4 w-4" /></button>
         </div>
-        <div id={LISTBOX_ID} role="listbox" aria-label="Resultados" className="max-h-[28rem] space-y-2 overflow-y-auto p-2.5">
+        <div id={LISTBOX_ID} role="listbox" aria-label="Resultados" className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain p-2.5 sm:max-h-[28rem]">
           {choices.length === 0 && !searching ? <div className="p-7 text-center"><Command aria-hidden="true" className="mx-auto h-9 w-9" /><p>Nenhum resultado encontrado</p></div> : null}
           {visibleResults.map((result, index) => {
             const Icon = result.group === 'APR' ? FileText : UserRound;
-            return <button id={`command-palette-option-${result.id}`} role="option" aria-selected={selected === index} key={result.id} type="button" onClick={() => choose(result.href)} className={cn('flex w-full items-center gap-3 rounded-[var(--ds-radius-md)] border px-3.5 py-2.5 text-left', selected === index ? 'border-[var(--ds-color-primary-border)] bg-[var(--ds-color-primary-subtle)]' : 'border-transparent hover:bg-[var(--ds-color-surface-muted)]')}><Icon aria-hidden="true" className="h-4 w-4" /><span><strong className="block text-[13px]">{result.title}</strong><span className="text-[11px]">{result.subtitle}</span></span></button>;
+            return <button id={`command-palette-option-${result.id}`} role="option" aria-selected={selected === index} key={result.id} type="button" onClick={() => choose(result.href)} className={cn('flex w-full items-center gap-3 rounded-[var(--ds-radius-md)] border px-3.5 py-2.5 text-left', selected === index ? 'border-[var(--ds-color-primary-border)] bg-[var(--ds-color-primary-subtle)]' : 'border-transparent hover:bg-[var(--ds-color-surface-muted)]')}><Icon aria-hidden="true" className="h-4 w-4" /><span className="min-w-0"><strong className="block break-words text-[13px]">{result.title}</strong><span className="block break-words text-[11px]">{result.subtitle}</span></span></button>;
           })}
           {commands.map((entry, index) => {
             const Icon = entry.icon;
             const choiceIndex = visibleResults.length + index;
-            return <button id={`command-palette-option-${entry.id}`} role="option" aria-selected={selected === choiceIndex} key={entry.id} type="button" onClick={() => choose(entry.href)} className={cn('flex w-full items-center gap-3 rounded-[var(--ds-radius-md)] border px-3.5 py-2.5 text-left', selected === choiceIndex ? 'border-[var(--ds-color-primary-border)] bg-[var(--ds-color-primary-subtle)]' : 'border-transparent hover:bg-[var(--ds-color-surface-muted)]')}><Icon aria-hidden="true" className="h-4 w-4" /><span><strong className="block text-[13px]">Abrir {entry.label}</strong><span className="text-[11px]">{entry.description ?? entry.section}</span></span></button>;
+            return <button id={`command-palette-option-${entry.id}`} role="option" aria-selected={selected === choiceIndex} key={entry.id} type="button" onClick={() => choose(entry.href)} className={cn('flex w-full items-center gap-3 rounded-[var(--ds-radius-md)] border px-3.5 py-2.5 text-left', selected === choiceIndex ? 'border-[var(--ds-color-primary-border)] bg-[var(--ds-color-primary-subtle)]' : 'border-transparent hover:bg-[var(--ds-color-surface-muted)]')}><Icon aria-hidden="true" className="h-4 w-4" /><span className="min-w-0"><strong className="block break-words text-[13px]">Abrir {entry.label}</strong><span className="block break-words text-[11px]">{entry.description ?? entry.section}</span></span></button>;
           })}
         </div>
       </div>
