@@ -133,9 +133,9 @@ export async function drawChecklistBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Resumo executivo de conformidade",
+    title: "Resumo do checklist",
     summary:
-      "Leitura rápida para operação e gestão, com destaque para score, pendências e não conformidades.",
+      "Resumo dos itens avaliados, pendências e não conformidades identificadas.",
     metrics: [
       {
         label: "Status",
