@@ -195,7 +195,7 @@ export async function drawArrBlueprint(
     code,
     url: validationUrl,
     hash: arr.final_pdf_hash_sha256 || undefined,
-    title: 'Governança e autenticidade',
-    subtitle: 'Valide o documento pelo QR Code ou pelo código público.',
+    title: 'Validação do documento',
+    subtitle: 'Use o QR Code ou o código da ARR para conferência no portal SGS.',
   });
 }
