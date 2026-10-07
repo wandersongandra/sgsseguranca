@@ -197,7 +197,7 @@ export const AtmosphericReadingsSection = ({
             )}
             mobile={(field, index) => (
               <article className="min-w-0 rounded-lg border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-3" aria-label={`Medição atmosférica ${index + 1}`}>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
                   {READING_COLUMNS.map((column) => {
                     const isNumeric = column.key !== 'hora' && column.key !== 'instrumento' && column.key !== 'responsavel';
                     return (
@@ -221,7 +221,7 @@ export const AtmosphericReadingsSection = ({
           <button
             type="button"
             onClick={() => append(buildEmptyReading())}
-            className="rounded-lg border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40"
+            className="min-h-11 w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] px-4 py-2 text-sm font-semibold sm:w-auto text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)]/40"
           >
             + Adicionar medição
           </button>
@@ -231,7 +231,7 @@ export const AtmosphericReadingsSection = ({
           <p className="mb-3 text-sm font-semibold text-[var(--ds-color-text-primary)]">
             Registrar nova medição (a PT aprovada aceita apenas acréscimos)
           </p>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-4">
             {READING_COLUMNS.map((column) => (
               <div key={column.key}>
                 <label htmlFor={`pt-draft-${column.key}`} className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
@@ -270,7 +270,7 @@ export const AtmosphericReadingsSection = ({
             type="button"
             onClick={() => void submitAppendOnly()}
             disabled={appending}
-            className="mt-4 rounded-lg bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            className="mt-4 min-h-11 w-full rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-semibold sm:w-auto text-white hover:opacity-90 disabled:opacity-50"
           >
             {appending ? 'Registrando...' : 'Registrar medição'}
           </button>
