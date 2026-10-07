@@ -146,7 +146,7 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[var(--ds-color-surface-muted)] px-4 py-10">
+      <main className="min-h-[100dvh] bg-[var(--ds-color-surface-muted)] px-4 py-10">
         <div className="mx-auto max-w-3xl rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-6">
           <InlineLoadingState label="Validando convite" />
         </div>
@@ -156,7 +156,7 @@ export default function OnboardingPage() {
 
   if (completedTrialEndsAt) {
     return (
-      <main className="min-h-screen bg-[var(--ds-color-surface-muted)] px-4 py-10">
+      <main className="min-h-[100dvh] bg-[var(--ds-color-surface-muted)] px-4 py-10">
         <section className="mx-auto max-w-2xl rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-8 shadow-[var(--ds-shadow-sm)]">
           <CheckCircle2 className="h-10 w-10 text-[var(--ds-color-success)]" />
           <h1 className="mt-5 text-2xl font-semibold text-[var(--ds-color-text-primary)]">
@@ -179,7 +179,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--ds-color-surface-muted)] px-4 py-8">
+    <main className="min-h-[100dvh] bg-[var(--ds-color-surface-muted)] px-4 py-8">
       <section className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
