@@ -85,7 +85,7 @@ export function PtMobileCard({
 
   return (
     <article
-      className="min-w-0 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm"
+      className="ds-mobile-card min-w-0"
       aria-label={`PT ${pt.numero}`}
     >
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -102,7 +102,7 @@ export function PtMobileCard({
           {pt.status}
         </span>
       </div>
-      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+      <dl className="ds-mobile-detail-grid mt-4 grid grid-cols-2 gap-3 text-sm">
         <div>
           <dt className="text-xs text-[var(--ds-color-text-secondary)]">Início</dt>
           <dd>{safeFormatDate(pt.data_hora_inicio, 'dd/MM/yyyy HH:mm', { locale: ptBR })}</dd>
@@ -148,7 +148,7 @@ export function PtMobileCard({
       ) : null}
 
       <div
-        className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3"
+        className="ds-mobile-card__actions mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3"
         aria-label={`Ações da PT ${pt.numero}`}
       >
         <Button type="button" variant="outline" className="min-h-11" onClick={() => onPrint(pt.id)}>
