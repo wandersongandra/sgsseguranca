@@ -2787,10 +2787,10 @@ export function AprForm({ id }: AprFormProps) {
               >
                 <ArrowLeft className="h-4 w-4" />
               </Link>
-              <span>SGS</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span>Segurança</span>
-              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">SGS</span>
+              <ChevronRight className="hidden h-3.5 w-3.5 sm:block" />
+              <span className="hidden sm:inline">Segurança</span>
+              <ChevronRight className="hidden h-3.5 w-3.5 sm:block" />
               <span>APR</span>
               <ChevronRight className="h-3.5 w-3.5" />
               <span className="font-bold text-[var(--ds-color-text-primary)]">
@@ -2864,7 +2864,7 @@ export function AprForm({ id }: AprFormProps) {
                   Uso
                 </p>
                 <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                  Obra / celular
+                  Operação em campo
                 </p>
               </div>
             </div>
