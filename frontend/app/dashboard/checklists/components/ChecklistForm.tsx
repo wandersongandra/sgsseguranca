@@ -2871,6 +2871,7 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
 
         {/* Rodapé de Ações */}
         <div
+          data-sophie-reserved-zone="bottom"
           className={`ds-mobile-form-actions print:hidden ${isFieldMode ? "sticky bottom-4 z-10 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-strong)] bg-[var(--ds-color-surface-elevated)]/95 p-4 shadow-[var(--ds-shadow-lg)] backdrop-blur" : "flex items-center justify-end gap-3"}`}
         >
           {isFieldMode ? (
