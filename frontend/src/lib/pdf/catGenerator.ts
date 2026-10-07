@@ -48,7 +48,7 @@ export async function generateCatPdf(
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "COMUNICAÇÃO DE ACIDENTE DE TRABALHO",
     subtitle:
-      "Documento institucional de registro, apuração, fechamento e rastreabilidade de acidente ocupacional.",
+      "Registro do acidente de trabalho e dados da apuração.",
     code,
     date: formatDate(cat.data_ocorrencia),
     status: sanitize(cat.status),
