@@ -196,7 +196,7 @@ export default function ValidarPage({ params }: ValidarPageProps) {
 
   if (!shouldRenderDds) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[var(--ds-color-bg-subtle)] px-4">
+      <main className="flex min-h-[100dvh] items-center justify-center bg-[var(--ds-color-bg-subtle)] px-4">
         <div className="rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]">
           <p className="text-sm text-[var(--ds-color-text-secondary)]">
             Redirecionando para validação do documento...
@@ -207,7 +207,7 @@ export default function ValidarPage({ params }: ValidarPageProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[var(--ds-color-bg-subtle)] px-4 py-10">
+    <main className="min-h-[100dvh] bg-[var(--ds-color-bg-subtle)] px-4 py-10">
       <div className="mx-auto max-w-5xl space-y-6">
         <PageHeader
           eyebrow="Validação pública DDS"
