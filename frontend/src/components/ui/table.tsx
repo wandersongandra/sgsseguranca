@@ -23,7 +23,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
   ({ className, rowCount, colCount, label, 'aria-label': ariaLabel, ...props }, ref) => (
     <div
       className="
-        relative w-full overflow-auto rounded-[var(--ds-radius-lg)] border
+        ds-table-scroll relative w-full overflow-auto rounded-[var(--ds-radius-lg)] border
         border-[var(--component-table-shell-border)] bg-[color:var(--component-table-bg)]
         shadow-[var(--component-table-shadow)]
       "
