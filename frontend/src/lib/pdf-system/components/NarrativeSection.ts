@@ -7,13 +7,16 @@ type NarrativeSectionOptions = {
   content?: string | null;
 };
 
-export function drawNarrativeSection(ctx: PdfContext, options: NarrativeSectionOptions) {
+export function drawNarrativeSection(
+  ctx: PdfContext,
+  options: NarrativeSectionOptions,
+) {
   if (!options.content) return;
   const { doc, margin, contentWidth, theme } = ctx;
 
-  const lines = doc
-    .splitTextToSize(sanitize(options.content), contentWidth - 8)
-    .map((line: unknown) => String(line));
+  const lines = (
+    doc.splitTextToSize(sanitize(options.content), contentWidth - 10) as unknown[]
+  ).map((line) => String(line));
   const lineHeight = 4.6;
   const titleGap = 11.2;
   const bottomPadding = 4.2;
@@ -36,30 +39,29 @@ export function drawNarrativeSection(ctx: PdfContext, options: NarrativeSectionO
 
     doc.setFillColor(...theme.tone.surface);
     doc.setDrawColor(...theme.tone.border);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(margin, ctx.y, contentWidth, height, 2, 2, "FD");
-    doc.setFillColor(...theme.tone.surfaceMuted);
-    doc.roundedRect(
-      margin + 1.2,
-      ctx.y + 1.1,
-      contentWidth - 2.4,
-      7.1,
-      1.4,
-      1.4,
-      "F",
-    );
+    doc.setLineWidth(0.22);
+    doc.rect(margin, ctx.y, contentWidth, height, "FD");
     doc.setFillColor(...theme.tone.brand);
-    doc.rect(margin, ctx.y, 2.5, 10, "F");
+    doc.rect(margin, ctx.y, 1.5, height, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(theme.typography.headingSm);
     doc.setTextColor(...theme.tone.textPrimary);
-    doc.text(title, margin + 5, ctx.y + 6.2);
+    doc.text(title, margin + 4.5, ctx.y + 6.1);
+
+    doc.setDrawColor(...theme.tone.border);
+    doc.setLineWidth(0.16);
+    doc.line(
+      margin + 4.5,
+      ctx.y + 8.7,
+      margin + contentWidth - 4,
+      ctx.y + 8.7,
+    );
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(theme.typography.body);
     doc.setTextColor(...theme.tone.textPrimary);
-    doc.text(chunk, margin + 4, ctx.y + 14.1);
+    doc.text(chunk, margin + 4.5, ctx.y + 14.1);
 
     moveY(ctx, height + theme.spacing.sectionGap);
     cursor += chunk.length;
