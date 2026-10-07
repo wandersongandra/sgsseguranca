@@ -1291,7 +1291,7 @@ export function DdsForm({ id }: DdsFormProps) {
         {ddsReadOnlyMessage ? (
           <div
             role="alert"
-            className="rounded-xl border border-[color:var(--ds-color-warning)]/25 bg-[color:var(--ds-color-warning-subtle)] px-5 py-4 text-sm text-[color:var(--ds-color-warning)]"
+            className="rounded-[var(--ds-radius-md)] border border-[color:var(--ds-color-warning)]/25 bg-[color:var(--ds-color-warning-subtle)] px-4 py-3 text-sm text-[color:var(--ds-color-warning)] sm:px-5 sm:py-4"
           >
             <p className="font-semibold text-[color:var(--ds-color-warning)]">
               Documento travado para edição
@@ -1301,7 +1301,7 @@ export function DdsForm({ id }: DdsFormProps) {
             </p>
           </div>
         ) : null}
-        <div className="grid gap-3 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.2))] px-5 py-4 backdrop-blur-sm">
+        <div className="grid gap-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-4 shadow-none sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
