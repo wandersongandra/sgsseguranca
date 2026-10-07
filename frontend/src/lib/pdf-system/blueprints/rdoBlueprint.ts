@@ -177,7 +177,7 @@ export async function drawRdoBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva do dia",
+    title: "Resumo do dia",
     summary:
       "Painel sintético para acompanhamento rápido da obra, com status, liderança responsável e volume operacional registrado no período.",
     metrics: [
