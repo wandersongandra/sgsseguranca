@@ -43,9 +43,9 @@ export const ChecklistsFilters = React.memo(({
   onDeleteActiveView,
 }: ChecklistsFiltersProps) => {
   return (
-    <div className="space-y-3 border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/18 p-5">
+    <div className="checklists-filters space-y-3 border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/18 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="relative max-w-sm flex-1">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-color-text-muted)]" />
           <input
             type="text"
@@ -56,8 +56,8 @@ export const ChecklistsFilters = React.memo(({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
+        <div className="checklists-filters__primary flex flex-wrap items-center gap-3">
+          <div className="checklists-filters__model flex items-center gap-2">
             <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--ds-color-text-muted)]">
               Filtro
             </span>
@@ -72,12 +72,12 @@ export const ChecklistsFilters = React.memo(({
               <option value="all">Todos</option>
             </select>
           </div>
-          <details className="relative">
+          <details className="checklists-filters__columns relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:text-[var(--ds-color-text-primary)]">
               <Columns3 className="h-4 w-4" />
               Colunas
             </summary>
-            <div className="absolute right-0 z-20 mt-2 w-64 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3 shadow-[var(--ds-shadow-lg)]">
+            <div className="checklists-filters__columns-menu absolute right-0 z-20 mt-2 w-64 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-3 shadow-[var(--ds-shadow-lg)]">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--ds-color-text-muted)]">
                   Exibição
@@ -118,13 +118,13 @@ export const ChecklistsFilters = React.memo(({
           </Button>
         </div>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="checklists-filters__views flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium uppercase tracking-[0.08em] text-[var(--ds-color-text-muted)]">
           Vistas
         </span>
         <select
           aria-label="Vistas salvas de checklist"
-          className={cn(inputClassName, 'max-w-[260px] py-2')}
+          className={cn(inputClassName, 'w-full py-2 sm:max-w-[260px]')}
           value={activeViewId || ''}
           onChange={(event) => onApplyView(event.target.value)}
         >
