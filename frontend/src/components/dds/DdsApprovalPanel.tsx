@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, RotateCcw, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { StatusPill, type StatusTone } from "@/components/ui/status-pill";
 import { useApprovalWorkflow } from "@/hooks/useApprovalWorkflow";
-import { useFocusTrap } from "@/hooks/useFocusTrap";
 import { logger } from "@/lib/logger";
+import { ModalFrame, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/modal-frame";
 
 type DdsApprovalPanelProps = {
   dds: Dds | null;
@@ -65,12 +65,6 @@ export function DdsApprovalPanel({
   const [reason, setReason] = useState("");
   const [pin, setPin] = useState("");
   const [pendingAction, setPendingAction] = useState<"approve" | "reject" | "reopen" | null>(null);
-  const confirmDialogRef = useRef<HTMLDivElement>(null);
-
-  useFocusTrap(confirmDialogRef, pendingAction !== null, () =>
-    setPendingAction(null),
-  );
-
   const ddsId = dds?.id;
   const locked = Boolean(
     !ddsId ||
@@ -519,60 +513,62 @@ export function DdsApprovalPanel({
       ) : null}
       {/* Modal de confirmação de segurança para ações irreversíveis */}
       {pendingAction ? (
-        <div
-          ref={confirmDialogRef}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirmar ação de aprovação"
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+        <ModalFrame
+          isOpen
+          onClose={() => setPendingAction(null)}
+          shellClassName="max-w-sm"
         >
-          <div className="mx-4 w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-2xl">
-            <div className="mb-4">
-              <h3 className="text-base font-bold text-[var(--ds-color-text-primary)]">
-                {pendingAction === "approve"
-                  ? "Confirmar aprovação"
+          <ModalHeader
+            title={
+              pendingAction === "approve"
+                ? "Confirmar aprovação"
+                : pendingAction === "reject"
+                  ? "Confirmar reprovação"
+                  : "Confirmar reabertura de ciclo"
+            }
+            description={
+              pendingAction === "approve"
+                ? "A decisão será registrada na trilha de auditoria com sua assinatura HMAC."
+                : pendingAction === "reject"
+                  ? "O fluxo será marcado como reprovado e precisará ser reaberto para nova tentativa."
+                  : "Um novo ciclo de aprovação será criado com os passos configurados."
+            }
+            onClose={() => setPendingAction(null)}
+          />
+          <ModalBody>
+            <p className="text-sm leading-6 text-[var(--ds-color-text-secondary)]">
+              Confira a decisão antes de confirmar. Esta ação altera o estado do fluxo do DDS.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPendingAction(null)}
+              disabled={acting !== null}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant={
+                pendingAction === "approve"
+                  ? "success"
                   : pendingAction === "reject"
-                    ? "Confirmar reprovação"
-                    : "Confirmar reabertura de ciclo"}
-              </h3>
-              <p className="mt-2 text-sm text-[var(--ds-color-text-secondary)]">
-                {pendingAction === "approve"
-                  ? "Você está prestes a aprovar esta etapa do fluxo DDS. Esta ação será registrada na trilha de auditoria com sua assinatura HMAC."
-                  : pendingAction === "reject"
-                    ? "Você está prestes a reprovar esta etapa. O fluxo será marcado como reprovado e deverá ser reaberto para nova tentativa."
-                    : "Você está prestes a reabrir o ciclo de aprovação do DDS. Um novo ciclo será criado com os passos configurados."}
-              </p>
-            </div>
-            <div className="flex justify-end gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPendingAction(null)}
-                disabled={acting !== null}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant={
-                  pendingAction === "approve"
-                    ? "success"
-                    : pendingAction === "reject"
-                      ? "destructive"
-                      : "warning"
-                }
-                loading={acting !== null}
-                onClick={() => void confirmAction()}
-              >
-                {pendingAction === "approve"
-                  ? "Confirmar aprovação"
-                  : pendingAction === "reject"
-                    ? "Confirmar reprovação"
-                    : "Confirmar reabertura"}
-              </Button>
-            </div>
-          </div>
-        </div>
+                    ? "danger"
+                    : "warning"
+              }
+              loading={acting !== null}
+              onClick={() => void confirmAction()}
+            >
+              {pendingAction === "approve"
+                ? "Confirmar aprovação"
+                : pendingAction === "reject"
+                  ? "Confirmar reprovação"
+                  : "Confirmar reabertura"}
+            </Button>
+          </ModalFooter>
+        </ModalFrame>
       ) : null}
     </Card>
   );
