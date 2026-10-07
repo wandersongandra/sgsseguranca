@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 const inputVariants = cva(
   [
     'flex h-11 w-full rounded-[var(--ds-radius-md)] border px-3 md:h-10',
-    'text-base font-semibold outline-none md:text-[13px]',
+    'text-base font-medium outline-none md:text-[13px]',
     'placeholder:text-[var(--component-field-placeholder)]',
     'transition-colors duration-[120ms]',
     // Estados disabled
