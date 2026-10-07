@@ -186,7 +186,7 @@ export function AprListingToolbar({
               aria-label="Ordenar APRs"
               value={sortBy}
               onChange={(event) => onSortChange(event.target.value as AprSortOption)}
-              className={cn(inputClassName, "min-w-[210px]")}
+              className={cn(inputClassName, "w-full sm:min-w-[210px]")}
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
