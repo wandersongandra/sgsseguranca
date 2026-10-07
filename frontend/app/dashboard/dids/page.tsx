@@ -171,7 +171,7 @@ export default function DidsPage() {
             />
           </div>
           <select
-            className={cn(inputClassName, 'min-w-[180px]')}
+            className={cn(inputClassName, 'w-full sm:w-auto sm:min-w-[180px]')}
             value={statusFilter}
             onChange={(event) =>
               setStatusFilter(event.target.value as 'all' | DidStatus)
@@ -246,14 +246,14 @@ export default function DidsPage() {
               hasStatusTransitions: transitions.length > 0,
             });
             return (
-              <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
+              <article className="ds-mobile-card">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0"><h3 className="font-semibold text-[var(--ds-color-text-primary)]">{did.titulo}</h3><p className="mt-1 text-sm text-[var(--ds-color-text-muted)]">{safeFormatDate(did.data, 'dd/MM/yyyy', { locale: ptBR })} · {did.site?.nome || did.site_id}</p></div>
                   <span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold', DID_STATUS_COLORS[did.status])}>{DID_STATUS_LABEL[did.status]}</span>
                 </div>
-                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Atividade</dt><dd>{did.atividade_principal}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Participantes</dt><dd>{did.participants?.length || 0} · {did.responsavel?.nome || 'Sem responsável'}</dd></div></dl>
+                <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-1 gap-3 text-sm min-[360px]:grid-cols-2"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Atividade</dt><dd>{did.atividade_principal}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Participantes</dt><dd>{did.participants?.length || 0} · {did.responsavel?.nome || 'Sem responsável'}</dd></div></dl>
                 {actions.canChangeStatus ? <select aria-label={`Mover status de ${did.titulo}`} className={cn(inputClassName, 'mt-3')} value="" disabled={isBusy} onChange={(event) => event.target.value && void handleStatusChange(did, event.target.value as DidStatus)}><option value="">Mover para...</option>{transitions.map((status) => <option key={status} value={status}>{DID_STATUS_LABEL[status]}</option>)}</select> : null}
-                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3">
+                <div className="ds-mobile-card__actions mt-4 grid grid-cols-1 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3 min-[360px]:grid-cols-2">
                   <Button type="button" size="sm" variant="outline" onClick={() => void handleOpenGovernedPdf(did)} disabled={isBusy || !actions.canOpenOrEmitFinalPdf} leftIcon={<ShieldCheck className="h-4 w-4" />}>{did.pdf_file_key ? 'Abrir PDF final' : 'Emitir PDF final'}</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => void handlePrint(did)} disabled={isBusy || !actions.canPrintPdf} leftIcon={<Printer className="h-4 w-4" />}>Imprimir</Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => void handleEmail(did)} disabled={isBusy || !actions.canEmailPdf} leftIcon={<Mail className="h-4 w-4" />}>Enviar</Button>
