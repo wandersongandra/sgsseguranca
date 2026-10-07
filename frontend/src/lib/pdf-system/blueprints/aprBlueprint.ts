@@ -1126,8 +1126,8 @@ export async function drawAprBlueprint(
     })),
     code,
     url: validationUrl,
-    title: "Governança, autenticidade e rastreabilidade",
-    subtitle: "Valide por QR Code ou código no portal público.",
+    title: "Validação do documento",
+    subtitle: "Use o QR Code ou o código do documento para conferência no portal SGS.",
     accentColor: APR_TEAL,
     accentSoftColor: [240, 249, 248],
   });
