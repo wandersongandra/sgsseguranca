@@ -2799,7 +2799,7 @@ export function AprForm({ id }: AprFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex lg:items-center">
             <button
               type="button"
               onClick={handleHeaderPdfAction}
@@ -2825,7 +2825,7 @@ export function AprForm({ id }: AprFormProps) {
               type="button"
               onClick={handleHeaderSave}
               disabled={loading || isReadOnly}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--component-button-primary-bg)] px-4 py-2.5 text-sm font-bold text-[var(--color-text-inverse)] shadow-[var(--ds-shadow-sm)] transition-none hover:translate-y-0 hover:shadow-[var(--ds-shadow-sm)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="col-span-2 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--component-button-primary-bg)] px-4 py-2.5 text-sm font-bold text-[var(--color-text-inverse)] shadow-[var(--ds-shadow-sm)] transition-none hover:translate-y-0 hover:shadow-[var(--ds-shadow-sm)] disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-1"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4" />
