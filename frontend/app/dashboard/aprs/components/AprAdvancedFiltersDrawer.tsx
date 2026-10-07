@@ -144,7 +144,7 @@ export function AprAdvancedFiltersDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-[120] bg-[color:var(--component-overlay)]/45" onClick={onClose}>
+    <div className="apr-advanced-filters-overlay fixed inset-0 z-[120] bg-[color:var(--component-overlay)]/45" onClick={onClose}>
       <aside
         ref={drawerRef}
         role="dialog"
@@ -174,7 +174,7 @@ export function AprAdvancedFiltersDrawer({
           </button>
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+        <div className="apr-advanced-filters-body flex-1 space-y-5 overflow-y-auto px-5 py-5 overscroll-contain">
           <div className="space-y-2">
             <label htmlFor="apr-advanced-search">Busca operacional</label>
             <input
