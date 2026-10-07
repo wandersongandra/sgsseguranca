@@ -3269,6 +3269,31 @@ body {
     min-width: 0;
   }
 
+  .ds-table-scroll {
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+  }
+
+  .ds-dashboard-status-metric {
+    min-width: 0;
+    padding: 0.62rem 0.65rem;
+  }
+
+  .ds-dashboard-status-metric strong {
+    font-size: 1.2rem;
+  }
+
+  .ds-dashboard-status-metric span {
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+  }
+
+  .ds-dashboard-action-link {
+    min-height: 2.75rem;
+    touch-action: manipulation;
+  }
+
   .ds-mobile-card {
     border-radius: var(--ds-radius-md);
     padding: 0.9rem;
@@ -3392,6 +3417,10 @@ body {
   .ds-page-header__actions,
   .ds-crud-hero__actions,
   .ds-list-toolbar__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-dashboard-actions-list {
     grid-template-columns: 1fr;
   }
 
