@@ -58,7 +58,6 @@ export function drawDocumentIdentityRail(
 
   if (!fields.length) return;
 
-  const gap = 0;
   const colWidth = contentWidth / fields.length;
   const lineHeight = 4.1;
   const wrapped = fields.map((field) => ({
