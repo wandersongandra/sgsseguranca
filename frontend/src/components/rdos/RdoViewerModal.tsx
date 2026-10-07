@@ -152,7 +152,7 @@ export function RdoViewerModal({
       aria-modal="true"
       aria-label={`Visualizar RDO ${viewRdo.numero}`}
     >
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)]">
+      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
         <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="font-mono text-sm font-bold text-[var(--ds-color-action-primary)]">
@@ -222,7 +222,7 @@ export function RdoViewerModal({
             ].map((item) => (
               <div
                 key={item.label}
-                className="rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 px-4 py-3"
+                className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3"
               >
                 <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                   {item.label}
@@ -310,7 +310,7 @@ export function RdoViewerModal({
                 <Users className="h-3.5 w-3.5" /> Mão de Obra ({totalTrabalhadores}{" "}
                 trabalhadores)
               </p>
-              <div className="overflow-x-auto rounded-xl border border-[var(--ds-color-border-subtle)]">
+              <div className="overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)]">
                 <table className="min-w-[620px] w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/40">
@@ -359,7 +359,7 @@ export function RdoViewerModal({
               <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                 <Wrench className="h-3.5 w-3.5" /> Equipamentos
               </p>
-              <div className="overflow-x-auto rounded-xl border border-[var(--ds-color-border-subtle)]">
+              <div className="overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)]">
                 <table className="min-w-[760px] w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/40">
@@ -408,7 +408,7 @@ export function RdoViewerModal({
               <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                 <Package className="h-3.5 w-3.5" /> Materiais Recebidos
               </p>
-              <div className="overflow-x-auto rounded-xl border border-[var(--ds-color-border-subtle)]">
+              <div className="overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)]">
                 <table className="min-w-[520px] w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/40">
@@ -468,7 +468,7 @@ export function RdoViewerModal({
                           aria-hidden="true"
                         >
                           <div
-                            className="h-full rounded-full bg-[var(--ds-color-success)] motion-safe:transition-all"
+                            className="h-full rounded-[var(--ds-radius-sm)] bg-[var(--ds-color-success)] motion-safe:transition-[width]"
                             style={{ width: `${service.percentual_concluido}%` }}
                           />
                         </div>
@@ -496,7 +496,7 @@ export function RdoViewerModal({
                               href={resolveActivityPhotoSrc(photo) || "#"}
                               target="_blank"
                               rel="noreferrer"
-                              className="relative block h-20 w-20 overflow-hidden rounded-xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
+                              className="relative block h-20 w-20 overflow-hidden rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
                             >
                               <Image
                                 src={
@@ -553,7 +553,7 @@ export function RdoViewerModal({
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                 Observações gerais
               </p>
-              <p className="whitespace-pre-wrap rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 px-4 py-3 text-sm text-[var(--ds-color-text-primary)]">
+              <p className="whitespace-pre-wrap rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3 text-sm text-[var(--ds-color-text-primary)]">
                 {viewRdo.observacoes}
               </p>
             </div>
@@ -564,7 +564,7 @@ export function RdoViewerModal({
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
                 Programa para amanhã
               </p>
-              <p className="whitespace-pre-wrap rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 px-4 py-3 text-sm text-[var(--ds-color-text-primary)]">
+              <p className="whitespace-pre-wrap rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3 text-sm text-[var(--ds-color-text-primary)]">
                 {viewRdo.programa_servicos_amanha}
               </p>
             </div>
@@ -583,7 +583,7 @@ export function RdoViewerModal({
                 return (
                   <div
                     key={item.label}
-                    className={`rounded-xl border px-4 py-3 ${sig ? "border-[color:var(--ds-color-success)]/30 bg-[color:var(--ds-color-success)]/8" : "border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/20"}`}
+                    className={`rounded-[var(--ds-radius-md)] border px-4 py-3 ${sig ? "border-[color:var(--ds-color-success)]/30 bg-[color:var(--ds-color-success)]/8" : "border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/20"}`}
                   >
                     <p className="text-xs font-semibold text-[var(--ds-color-text-secondary)]">
                       {item.label}
@@ -640,7 +640,7 @@ export function RdoViewerModal({
             <button
               type="button"
               onClick={() => onPrint(viewRdo)}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
+              className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
             >
               <Printer className="h-3.5 w-3.5" /> Imprimir
             </button>
@@ -648,7 +648,7 @@ export function RdoViewerModal({
               <button
                 type="button"
                 onClick={() => onOpenGovernedPdf(viewRdo)}
-                className="flex items-center gap-1.5 rounded-xl border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-action-primary)]/10 hover:text-[var(--ds-color-action-primary)] motion-safe:transition-colors"
+                className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-action-primary)]/10 hover:text-[var(--ds-color-action-primary)] motion-safe:transition-colors"
               >
                 <Download className="h-3.5 w-3.5" />{" "}
                 {viewRdo.pdf_file_key ? "Abrir PDF final" : "Emitir PDF final"}
@@ -660,7 +660,7 @@ export function RdoViewerModal({
                   <button
                     type="button"
                     onClick={() => onCancelRdo(viewRdo)}
-                    className="flex items-center gap-1.5 rounded-xl border border-[color:var(--ds-color-danger)]/30 px-3 py-2 text-xs font-medium text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 motion-safe:transition-colors"
+                    className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-danger-border)] px-3 py-2 text-xs font-medium text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 motion-safe:transition-colors"
                   >
                     <X className="h-3.5 w-3.5" /> Cancelar RDO
                   </button>
@@ -668,14 +668,14 @@ export function RdoViewerModal({
                 <button
                   type="button"
                   onClick={() => onOpenSign(viewRdo)}
-                  className="flex items-center gap-1.5 rounded-xl border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-action-primary)]/10 hover:text-[var(--ds-color-action-primary)] motion-safe:transition-colors"
+                  className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-action-primary)]/10 hover:text-[var(--ds-color-action-primary)] motion-safe:transition-colors"
                 >
                   <PenLine className="h-3.5 w-3.5" /> Assinar
                 </button>
                 <button
                   type="button"
                   onClick={() => onOpenEmail(viewRdo)}
-                  className="flex items-center gap-1.5 rounded-xl border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-action-primary)]/10 hover:text-[var(--ds-color-action-primary)] motion-safe:transition-colors"
+                  className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-action-primary)]/10 hover:text-[var(--ds-color-action-primary)] motion-safe:transition-colors"
                 >
                   <Mail className="h-3.5 w-3.5" /> Enviar e-mail
                 </button>
@@ -686,7 +686,7 @@ export function RdoViewerModal({
             <button
               type="button"
               onClick={() => onEdit(viewRdo)}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
+              className="flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-3 py-2 text-xs font-medium text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
             >
               <Pencil className="h-3.5 w-3.5" /> Editar
             </button>
