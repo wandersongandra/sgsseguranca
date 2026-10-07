@@ -984,7 +984,7 @@ export class DossiersService {
                 referencia: candidate.referencia,
                 status_atual: candidate.statusAtual || null,
                 pendencia:
-                  'Documento oficial ainda não possui PDF final governado emitido.',
+                  'Documento oficial ainda não possui PDF final emitido.',
               },
             };
           }
@@ -1126,7 +1126,7 @@ export class DossiersService {
     drawBackendSectionTitle(
       doc,
       getBackendLastTableY(doc) + 4,
-      'Documentos oficiais governados',
+      'Documentos oficiais',
     );
     autoTable(doc, {
       startY: getBackendLastTableY(doc) + 6,
@@ -1166,7 +1166,7 @@ export class DossiersService {
     drawBackendSectionTitle(
       doc,
       getBackendLastTableY(doc) + 4,
-      'Pendencias documentais oficiais',
+      'Pendências de documentos oficiais',
     );
     autoTable(doc, {
       startY: getBackendLastTableY(doc) + 6,
