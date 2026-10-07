@@ -93,3 +93,20 @@ Implementado nesta rodada:
 - Conteúdo recebe clearance para navegação inferior e barras sticky.
 - Listagens mobile montam somente a árvore interativa ativa.
 - Desktop preservado por regras responsivas e breakpoints existentes.
+
+
+## Rodada cirúrgica adicional
+
+Achados e correções aplicados após a implementação inicial:
+
+- RDO Editor: removidos `col-span-2` inválidos em grids de uma coluna no mobile; agora os spans começam somente no breakpoint apropriado.
+- RDO Editor: altura mínima de 28rem deixou de ser forçada em telefones pequenos.
+- RDO Editor: rodapé reorganizado para uma ou duas colunas conforme largura útil.
+- PT / Medições Atmosféricas: corrigido span implícito abaixo de 360px e inputs mantidos em tamanho seguro para iOS.
+- Checklist Filters: campo de busca ganhou `min-width: 0`; controles foram reorganizados para largura estreita.
+- Checklist Filters: o seletor de colunas, que só afeta a tabela desktop, deixou de aparecer no mobile.
+- Checklist Mobile Card: ação destrutiva não força duas colunas quando o card já colapsou para uma.
+- Command Palette: passou a respeitar safe areas, altura dinâmica da viewport e teclado virtual; resultados longos quebram linha sem overflow.
+- RDO Action Modals: aderiram ao contrato de sheet mobile já usado pelo visualizador.
+- Dashboard shell: removido padding-top duplicado após banners de empresa/obra.
+- Auditoria estrutural final: CSS segue balanceado e não foram encontrados spans mobile inválidos nos arquivos críticos tocados nesta rodada.
