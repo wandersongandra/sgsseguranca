@@ -204,7 +204,7 @@ export default function ExecutiveDashboardPage() {
                       : 'ds-kpi-card--primary'
                 }`}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-current opacity-80">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-current opacity-80">
                   Carregando indicador
                 </p>
                 <div className="mt-1 h-8 w-20 animate-pulse rounded bg-current/20" />
@@ -222,7 +222,7 @@ export default function ExecutiveDashboardPage() {
                       : 'ds-kpi-card--primary'
                 }`}
               >
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-current opacity-80">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-current opacity-80">
                   {card.label}
                 </p>
                 <p className="mt-1 text-[1.6rem] font-bold text-current">
@@ -248,7 +248,7 @@ export default function ExecutiveDashboardPage() {
                     : 'ds-kpi-card--accent'
               }`}
             >
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-current opacity-85">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-current opacity-85">
                 Carregando métrica
               </p>
               <div className="mt-2 h-8 w-20 animate-pulse rounded bg-current/20" />
@@ -258,7 +258,7 @@ export default function ExecutiveDashboardPage() {
       ) : kpis ? (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="ds-kpi-card ds-kpi-card--danger">
-            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-current opacity-85">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-current opacity-85">
               <ShieldAlert className="h-4 w-4" /> NC recorrente
             </p>
             <p className="mt-2 text-[1.6rem] font-bold text-current">
@@ -266,7 +266,7 @@ export default function ExecutiveDashboardPage() {
             </p>
           </div>
           <div className="ds-kpi-card ds-kpi-card--warning">
-            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-current opacity-85">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-current opacity-85">
               <Siren className="h-4 w-4" /> Incidentes
             </p>
             <p className="mt-2 text-[1.6rem] font-bold text-current">
@@ -274,7 +274,7 @@ export default function ExecutiveDashboardPage() {
             </p>
           </div>
           <div className="ds-kpi-card ds-kpi-card--accent">
-            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-current opacity-85">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.05em] text-current opacity-85">
               <Timer className="h-4 w-4" /> PT bloqueadas
             </p>
             <p className="mt-2 text-[1.6rem] font-bold text-current">
@@ -424,7 +424,7 @@ function ExecutivePill({
 
   return (
     <div className={`rounded-full border px-3 py-1.5 ${tone}`}>
-      <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.04em]">
         {label}
       </span>
       <span className="ml-2 text-[13px] font-semibold">{value}</span>
