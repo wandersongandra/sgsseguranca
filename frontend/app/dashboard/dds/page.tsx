@@ -1179,7 +1179,7 @@ useEffect(() => {
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-[color:var(--ds-color-action-primary)]/20 bg-[color:var(--ds-color-action-primary)]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-action-primary)]">
-                Cockpit DDS
+                Diálogos Diários de Segurança
               </span>
               <span className="rounded-full border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)]">
                 {observability?.tenantScope === "global" ? "Escopo global" : "Escopo tenant"}
