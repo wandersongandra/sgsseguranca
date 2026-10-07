@@ -49,7 +49,7 @@ export function ChecklistMobileCard({ checklist, selected, canManage, canManageN
         {canManage ? <Link href={`/dashboard/checklists/edit/${checklist.id}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'justify-center')}><Pencil className="mr-2 h-4 w-4" />Editar</Link> : null}
         {canManageNc ? <Link href={getChecklistSophieNcHref(checklist)} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'justify-center')} aria-label={`Abrir não conformidade com SOPHIE para checklist ${checklist.titulo}`}><Bot className="mr-2 h-4 w-4" />NC SOPHIE</Link> : null}
         {canManageNc ? <Link href={getChecklistManualNcHref(checklist)} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'justify-center')} aria-label={`Criar não conformidade manual para checklist ${checklist.titulo}`}><AlertTriangle className="mr-2 h-4 w-4" />NC manual</Link> : null}
-        {canManage ? <Button type="button" size="sm" variant="destructive" className="col-span-2" onClick={() => onDelete(checklist.id)} leftIcon={<Trash2 className="h-4 w-4" />} aria-label={`Excluir checklist ${checklist.titulo}`}>Excluir</Button> : null}
+        {canManage ? <Button type="button" size="sm" variant="destructive" className="min-[400px]:col-span-2" onClick={() => onDelete(checklist.id)} leftIcon={<Trash2 className="h-4 w-4" />} aria-label={`Excluir checklist ${checklist.titulo}`}>Excluir</Button> : null}
       </div>
     </article>
   );
