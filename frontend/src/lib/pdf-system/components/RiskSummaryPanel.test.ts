@@ -16,6 +16,7 @@ function createMockContext(): {
     setFontSize: jest.Mock;
     setTextColor: jest.Mock;
     text: jest.Mock;
+    line: jest.Mock;
   };
 } {
   const doc = {
@@ -39,6 +40,7 @@ function createMockContext(): {
     setFontSize: jest.fn(),
     setTextColor: jest.fn(),
     text: jest.fn(),
+    line: jest.fn(),
   };
 
   return {
@@ -73,17 +75,15 @@ describe("drawRiskSummaryPanel", () => {
     });
 
     expect(doc.addPage).toHaveBeenCalled();
-    expect(doc.roundedRect).toHaveBeenCalledWith(
+    expect(doc.rect).toHaveBeenCalledWith(
       expect.any(Number),
       expect.any(Number),
       expect.any(Number),
       expect.any(Number),
-      2,
-      2,
       "FD",
     );
 
-    const panelHeight = (doc.roundedRect.mock.calls[0] || [])[3] as number;
+    const panelHeight = (doc.rect.mock.calls[0] || [])[3] as number;
     expect(panelHeight).toBeGreaterThan(26);
     expect(ctx.y).toBeGreaterThan(22);
   });
