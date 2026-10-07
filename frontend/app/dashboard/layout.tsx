@@ -199,7 +199,7 @@ function DashboardShell({
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--ds-color-bg-canvas)] px-6 text-center text-[var(--ds-color-text-primary)]">
-        <div className="max-w-md rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-5 shadow-[var(--ds-shadow-sm)]">
+        <div className="max-w-md rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-5 shadow-[var(--ds-shadow-xs)]">
           <h2 className="text-lg font-bold text-[var(--ds-color-text-primary)]">
             Sessão não encontrada
           </h2>
@@ -210,7 +210,7 @@ function DashboardShell({
           <button
             type="button"
             onClick={handleLoginRedirect}
-            className="mt-4 w-full rounded-xl bg-[var(--ds-color-action-primary)] px-4 py-2 text-[13px] font-semibold text-white motion-safe:transition-colors hover:bg-[var(--ds-color-action-primary-hover)]"
+            className="mt-4 w-full rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-[13px] font-semibold text-white motion-safe:transition-colors hover:bg-[var(--ds-color-action-primary-hover)]"
           >
             Ir para login
           </button>
@@ -235,7 +235,7 @@ function DashboardShell({
         {isAdminGeral && (
           <div className="sticky top-0 z-40 flex min-h-12 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-3">
             <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] shadow-[var(--ds-shadow-xs)]">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)]">
                 <Building2 className="h-4 w-4 text-[var(--ds-color-warning-fg)]" />
               </span>
               {selectedTenant ? (
@@ -259,7 +259,7 @@ function DashboardShell({
             <button
               type="button"
               onClick={() => setSelectorOpen(true)}
-              className="ml-3 flex shrink-0 items-center gap-1.5 rounded-xl border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ds-color-warning-fg)] shadow-[var(--ds-shadow-xs)] motion-safe:transition-all hover:brightness-95"
+              className="ml-3 flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ds-color-warning-fg)] motion-safe:transition-colors hover:bg-[var(--ds-color-warning-subtle)]"
             >
               <ChevronsUpDown className="h-3.5 w-3.5" />
               Trocar empresa
@@ -268,8 +268,8 @@ function DashboardShell({
         )}
         {/* Banner de obra selecionada - para todos os usuários */}
         {activeCompanyId && !selectedSite && (
-          <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-blue-200 bg-blue-50 px-5 py-2 dark:border-blue-800 dark:bg-blue-950/30">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+          <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-info-border)] bg-[var(--ds-color-info-subtle)] px-5 py-2">
+            <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-info-fg)]">
               <span className="min-w-0 truncate font-medium">
                 Nenhuma obra selecionada
               </span>
@@ -277,7 +277,7 @@ function DashboardShell({
             <button
               type="button"
               onClick={() => setSiteSelectorOpen(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-blue-700"
+              className="flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-info-border)] bg-[var(--ds-color-info)] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-color-info-hover)]"
             >
               Selecionar obra
             </button>
@@ -285,8 +285,8 @@ function DashboardShell({
         )}
         {/* Banner de obra ativa */}
         {activeCompanyId && selectedSite && (
-          <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-amber-200 bg-amber-50 px-5 py-2 dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-amber-800 dark:text-amber-200">
+          <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-2">
+            <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
               <HardHat className="h-4 w-4 shrink-0" />
               <span className="min-w-0 whitespace-nowrap">
                 Obra:{' '}
@@ -296,7 +296,7 @@ function DashboardShell({
             <button
               type="button"
               onClick={() => setSiteSelectorOpen(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-700 shadow-sm transition-colors hover:bg-amber-50 dark:border-amber-700 dark:bg-amber-900/50 dark:text-amber-300 dark:hover:bg-amber-900"
+              className="flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1 text-xs font-semibold text-[var(--ds-color-warning-fg)] transition-colors hover:bg-[var(--ds-color-warning-subtle)]"
             >
               <ChevronsUpDown className="h-3 w-3" />
               Trocar obra
