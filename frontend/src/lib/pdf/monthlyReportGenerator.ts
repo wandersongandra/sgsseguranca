@@ -66,7 +66,7 @@ function resolveStatusSignal(report: MonthlyReportPdfSource) {
       tone: "danger" as MetricTone,
       criticality: "moderate",
       message:
-        "Há itens vencidos que exigem tratamento prioritário e acompanhamento executivo.",
+        "Há itens vencidos que exigem tratamento prioritário e acompanhamento.",
     };
   }
 
@@ -226,7 +226,7 @@ export function generateMonthlyReportPdf(
     report.estatisticas.checklists_count;
 
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
-    title: "RELATÓRIO EXECUTIVO MENSAL",
+    title: "RELATÓRIO MENSAL DE SST",
     subtitle:
       "Documento institucional de desempenho documental, conformidade e leitura gerencial do período.",
     code,
@@ -238,10 +238,10 @@ export function generateMonthlyReportPdf(
   });
 
   drawDocumentIdentityRail(ctx, {
-    documentType: "Relatório Executivo",
+    documentType: "Relatório Mensal",
     criticality: statusSignal.criticality,
     validity: buildReportPeriod(report),
-    documentClass: "executive",
+    documentClass: "mensal",
   });
 
   drawExecutiveSummaryStrip(ctx, {
@@ -303,7 +303,7 @@ export function generateMonthlyReportPdf(
   });
 
   drawNarrativeSection(ctx, {
-    title: "Análise executiva",
+    title: "Análise e recomendações",
     content: report.analise_gandra,
   });
 
