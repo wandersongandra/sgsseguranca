@@ -147,12 +147,12 @@ export function RdoViewerModal({
   return (
     <div
       ref={viewerDialogRef}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="ds-legacy-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"
       aria-label={`Visualizar RDO ${viewRdo.numero}`}
     >
-      <div className="flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
+      <div className="ds-legacy-modal-shell flex max-h-[90vh] w-full max-w-3xl flex-col rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
         <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-6 py-4">
           <div className="flex items-center gap-3">
             <span className="font-mono text-sm font-bold text-[var(--ds-color-action-primary)]">
@@ -204,7 +204,7 @@ export function RdoViewerModal({
           </div>
         </div>
 
-        <div className="overflow-y-auto space-y-5 px-6 py-5">
+        <div className="ds-legacy-modal-body overflow-y-auto space-y-5 px-6 py-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
             {[
               {
@@ -635,7 +635,7 @@ export function RdoViewerModal({
           />
         </div>
 
-        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--ds-color-border-subtle)] px-6 py-4">
+        <div className="ds-legacy-modal-footer flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-t border-[var(--ds-color-border-subtle)] px-6 py-4">
           <div className="flex items-center gap-2">
             <button
               type="button"
