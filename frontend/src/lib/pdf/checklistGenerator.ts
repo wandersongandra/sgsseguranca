@@ -45,7 +45,7 @@ export async function generateChecklistPdf(
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "CHECKLIST DE INSPEÇÃO",
     subtitle:
-      "Documento oficial de conformidade operacional e rastreabilidade de campo",
+      "Itens verificados e resultado da inspeção",
     code,
     date: checklist.data,
     status: sanitize(checklist.status),
