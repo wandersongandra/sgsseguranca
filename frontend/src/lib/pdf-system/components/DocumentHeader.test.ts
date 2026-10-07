@@ -16,6 +16,7 @@ function createMockContext(): {
     setFontSize: jest.Mock;
     setTextColor: jest.Mock;
     text: jest.Mock;
+    line: jest.Mock;
   };
 } {
   const doc = {
@@ -30,6 +31,7 @@ function createMockContext(): {
     setFontSize: jest.fn(),
     setTextColor: jest.fn(),
     text: jest.fn(),
+    line: jest.fn(),
   };
 
   return {
