@@ -145,7 +145,7 @@ export function RdoEditorModal({
         />
 
         <ModalBody className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6">
-          <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="ds-table-scroll mb-5 flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-2 sm:mb-6">
             {steps.map((step, idx) => {
               const Icon = step.icon;
               return (
@@ -154,7 +154,7 @@ export function RdoEditorModal({
                   type="button"
                   onClick={() => setCurrentStep(idx)}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    "min-h-11 shrink-0 snap-start items-center gap-2 rounded-[var(--ds-radius-md)] px-3 py-2 text-sm font-medium transition-colors",
                     idx === currentStep
                       ? "bg-[var(--ds-color-action-primary)] text-white"
                       : idx < currentStep
