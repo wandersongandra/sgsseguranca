@@ -90,7 +90,7 @@ export const KpiCard = memo(function KpiCard({
       )}
     >
       <div className="relative z-[1] flex items-center justify-between gap-4">
-        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--ds-color-text-secondary)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
           {label}
         </p>
         <span
@@ -103,7 +103,7 @@ export const KpiCard = memo(function KpiCard({
         </span>
       </div>
       <div className="relative z-[1] flex items-end gap-2">
-        <div className={cn('text-[26px] font-extrabold leading-none tabular-nums', t.value)}>
+        <div className={cn('text-[26px] font-bold leading-none tabular-nums', t.value)}>
           {value == null ? (
             <Skeleton className="h-8 w-20" />
           ) : (
