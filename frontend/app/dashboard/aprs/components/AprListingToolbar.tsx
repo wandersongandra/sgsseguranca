@@ -92,10 +92,10 @@ export function AprListingToolbar({
   const hasFilters = activeFilters.length > 0;
 
   return (
-    <div className="space-y-0">
+    <div className="apr-listing-toolbar space-y-0">
       <div className="border-b border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap xl:items-center">
+          <div className="apr-listing-toolbar__filters grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap xl:items-center">
             <div className="relative min-w-0 sm:col-span-2 lg:col-span-1 xl:w-[340px]">
               <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--ds-color-text-muted)]">
                 <Search className="h-4 w-4" />
@@ -180,7 +180,7 @@ export function AprListingToolbar({
             </Button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(210px,1fr)_auto_auto] sm:items-center xl:w-auto xl:justify-end">
+          <div className="apr-listing-toolbar__actions grid grid-cols-1 gap-3 sm:grid-cols-[minmax(210px,1fr)_auto_auto] sm:items-center xl:w-auto xl:justify-end">
             <select
               title="Ordenar APRs"
               aria-label="Ordenar APRs"
