@@ -92,7 +92,7 @@ export function DashboardHero({
   return (
     <section
       aria-label="Resumo operacional do dashboard"
-      className="ds-dashboard-hero rounded-lg border border-[var(--ds-color-border-default)] bg-[var(--component-card-bg)] px-4 py-4 shadow-[var(--ds-shadow-xs)] sm:px-5"
+      className="ds-dashboard-hero rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--component-card-bg)] px-3.5 py-3.5 shadow-none sm:rounded-lg sm:px-5 sm:py-4 sm:shadow-[var(--ds-shadow-xs)]"
     >
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] xl:items-start">
         <div className="min-w-0 space-y-3">
@@ -110,7 +110,7 @@ export function DashboardHero({
 
           <div
             className={cn(
-              "rounded-lg border px-4 py-3",
+              "rounded-[var(--ds-radius-md)] border px-3 py-3 sm:rounded-lg sm:px-4",
               statusConfig.container,
             )}
             aria-live="polite"
@@ -157,7 +157,7 @@ export function DashboardHero({
           </div>
 
           <div
-            className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-2"
+            className="grid grid-cols-2 gap-1.5 min-[390px]:gap-2 sm:grid-cols-4 xl:grid-cols-2"
             role="list"
             aria-label="Indicadores operacionais"
           >
