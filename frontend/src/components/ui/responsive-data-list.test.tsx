@@ -83,6 +83,8 @@ describe('ResponsiveDataList', () => {
     const { container } = renderList();
 
     expect(screen.queryByRole('table', { name: 'Lista desktop' })).not.toBeInTheDocument();
+    expect(screen.getByRole('list')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
     expect(screen.getAllByRole('article')).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Abrir Primeiro' })).toHaveLength(1);
 
