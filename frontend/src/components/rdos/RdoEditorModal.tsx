@@ -169,7 +169,7 @@ export function RdoEditorModal({
             })}
           </div>
 
-          <div className="min-h-[28rem]">
+          <div className="min-h-0 sm:min-h-[28rem]">
             {currentStep === 0 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -486,7 +486,7 @@ export function RdoEditorModal({
                     key={item.__rowKey}
                     className="grid grid-cols-1 items-end gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3 sm:grid-cols-2 lg:grid-cols-4"
                   >
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-[var(--ds-color-text-secondary)]">
                         Equipamento
                       </label>
@@ -568,7 +568,7 @@ export function RdoEditorModal({
                     key={item.__rowKey}
                     className="grid grid-cols-1 items-end gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3 sm:grid-cols-2 lg:grid-cols-4"
                   >
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-[var(--ds-color-text-secondary)]">
                         Descrição
                       </label>
@@ -855,7 +855,7 @@ export function RdoEditorModal({
           </div>
         </ModalBody>
 
-        <ModalFooter className="flex flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6">
+        <ModalFooter className="rdo-editor-footer flex flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6">
           <button
             type="button"
             onClick={onClose}
@@ -863,7 +863,7 @@ export function RdoEditorModal({
           >
             Cancelar
           </button>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="rdo-editor-footer__actions flex flex-wrap items-center justify-end gap-2">
             {currentStep > 0 && (
               <button
                 type="button"
