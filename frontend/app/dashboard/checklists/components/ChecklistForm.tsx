@@ -2081,11 +2081,10 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
                 Modo campo
               </p>
               <h2 className="mt-2 text-lg font-semibold text-[var(--ds-color-text-primary)]">
-                Checklist rápido para celular
+                Checklist em campo
               </h2>
               <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-                Fluxo com botões maiores, câmera pronta e fila offline para uso
-                em obra, rua e áreas industriais.
+                Registre respostas e evidências no local da inspeção. Se a conexão cair, o envio fica na fila para sincronização posterior.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-center md:w-[260px]">
