@@ -98,10 +98,10 @@ export function DashboardHero({
         <div className="min-w-0 space-y-3">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)]">
-              Painel operacional
+              Visão geral
             </p>
-            <h1 className="mt-1 text-[22px] font-black leading-tight text-[var(--title)] sm:text-[26px]">
-              Cockpit SST
+            <h1 className="mt-1 text-[22px] font-bold leading-tight text-[var(--title)] sm:text-[26px]">
+              Segurança do Trabalho
             </h1>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
               {greeting}, {firstName} · {dateLabel}
@@ -128,7 +128,7 @@ export function DashboardHero({
                 />
               </span>
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.1em] opacity-90">
+                <p className="text-xs font-semibold tracking-[0.02em] opacity-90">
                   {statusConfig.label}
                 </p>
                 <p className="mt-1 text-sm font-semibold">{statusTitle}</p>
