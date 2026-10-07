@@ -1467,7 +1467,7 @@ export class AprsPdfService {
             </table>`
                 : `<p style="margin-top:6px;font-size:9px;color:#4a6572;">Nenhuma advertência registrada no momento da aprovação.</p>`
             }
-            <p style="margin-top:6px;font-size:7px;color:#7a8f9c;">Validado pelo motor de regras SST — SGS ${ruleVersions}</p>
+            <p style="margin-top:6px;font-size:7px;color:#7a8f9c;">Regras SST aplicadas: ${ruleVersions}</p>
           </div>
         </section>`;
     })();
@@ -2186,7 +2186,7 @@ export class AprsPdfService {
             </section>
 
             <div class="footer">
-              Documento técnico governado — emitido pela esteira oficial do SGS ·
+              APR emitida pelo SGS ·
               Código: ${this.escapeHtml(documentCode)} ·
               Última atualização: ${this.escapeHtml(this.formatAprDisplayDateTime(apr.updated_at, '-'))}
             </div>
