@@ -3298,55 +3298,6 @@ body {
     min-width: 0;
   }
 
-  .rdo-editor-footer {
-    align-items: stretch !important;
-  }
-
-  .rdo-editor-footer > button {
-    width: 100%;
-    min-height: 2.75rem;
-  }
-
-  .rdo-editor-footer__actions {
-    display: grid !important;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-    gap: 0.5rem !important;
-  }
-
-  .rdo-editor-footer__actions > button {
-    width: 100%;
-    min-width: 0;
-    min-height: 2.75rem;
-    justify-content: center;
-  }
-
-  .checklists-filters__primary,
-  .checklists-filters__views,
-  .checklists-filters__model {
-    width: 100%;
-  }
-
-  .checklists-filters__primary {
-    display: grid !important;
-    grid-template-columns: 1fr;
-    gap: 0.5rem !important;
-  }
-
-  .checklists-filters__model {
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .checklists-filters__views > span {
-    width: 100%;
-  }
-
-  .checklists-filters__views > button {
-    flex: 1 1 calc(50% - 0.25rem);
-    min-width: 0;
-  }
-
   .ds-table-scroll {
     overscroll-behavior-inline: contain;
     -webkit-overflow-scrolling: touch;
@@ -3818,6 +3769,42 @@ body {
   .checklists-filters__views > select {
     flex-basis: 100%;
   }
+
+  .pending-queue-filters {
+    width: 100%;
+  }
+
+  .pending-queue-site-filter {
+    min-width: 0;
+    flex: 1 1 11rem;
+  }
+
+  .pending-queue-site-filter > button {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .pending-site-menu {
+    position: fixed !important;
+    z-index: 80 !important;
+    right: max(0.75rem, var(--ds-safe-area-right)) !important;
+    left: max(0.75rem, var(--ds-safe-area-left)) !important;
+    top: auto !important;
+    bottom: calc(var(--ds-mobile-nav-total-height) + 0.75rem) !important;
+    width: auto !important;
+    max-height: min(26rem, calc(100dvh - var(--ds-mobile-nav-total-height) - 6rem)) !important;
+    margin-top: 0 !important;
+    overscroll-behavior: contain;
+  }
+
+  .apr-listing-toolbar__filters,
+  .apr-listing-toolbar__actions {
+    min-width: 0;
+  }
+
+  .apr-listing-toolbar__actions .ds-segmented-control {
+    width: 100%;
+  }
 }
 
 @media (max-width: 399px) {
@@ -3834,6 +3821,16 @@ body {
   .checklists-filters__views > button {
     width: 100%;
     flex-basis: 100%;
+  }
+
+  .pending-queue-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pending-queue-site-filter {
+    width: 100%;
+    flex-basis: auto;
   }
 }
 
