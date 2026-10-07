@@ -2808,22 +2808,22 @@ body {
     padding: 0.35rem max(0.25rem, var(--ds-safe-area-right)) var(--ds-safe-area-bottom)
       max(0.25rem, var(--ds-safe-area-left));
     border-top: 1px solid var(--ds-color-border-default);
-    background: color-mix(in srgb, var(--ds-color-surface-overlay) 96%, transparent);
-    box-shadow: 0 -8px 24px rgb(15 23 42 / 10%);
-    backdrop-filter: blur(14px);
+    background: color-mix(in srgb, var(--ds-color-surface-overlay) 98%, transparent);
+    box-shadow: 0 -2px 10px rgb(15 23 42 / 7%);
+    backdrop-filter: blur(8px);
   }
 
   .ds-mobile-nav__item {
     display: flex;
     min-width: 0;
-    min-height: 3.5rem;
+    min-height: 3.35rem;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.2rem;
-    border-radius: var(--ds-radius-md);
+    gap: 0.18rem;
+    border-radius: var(--ds-radius-sm);
     color: var(--ds-color-text-muted);
-    font-size: 0.6875rem;
+    font-size: 0.675rem;
     font-weight: 600;
     text-align: center;
   }
