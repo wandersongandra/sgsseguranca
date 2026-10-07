@@ -70,7 +70,7 @@ export async function drawArrBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: 'Síntese executiva',
+    title: 'Resumo da análise',
     summary:
       'Registro enxuto para formalizar uma análise rápida de risco, a condição observada em campo e o tratamento imediato definido pela equipe.',
     metrics: [
