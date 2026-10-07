@@ -251,7 +251,7 @@ export async function drawChecklistBlueprint(
     })),
     code,
     url: validationUrl,
-    title: "Governança e autenticidade",
-    subtitle: "Valide por QR Code ou código no portal público.",
+    title: "Validação do documento",
+    subtitle: "Use o QR Code ou o código do documento para conferência no portal SGS.",
   });
 }
