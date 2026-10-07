@@ -207,7 +207,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
     <div
       id="sophie-chat-panel"
       aria-label="Painel do chat da SOPHIE"
-      className="fixed bottom-[8.5rem] left-4 right-4 z-50 flex h-[min(40rem,calc(100vh-10rem))] flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-strong)] bg-[var(--component-chat-shell-bg)] shadow-[var(--ds-shadow-sm)] animate-fade-in sm:bottom-24 sm:left-auto sm:right-6 sm:w-[430px]"
+      className="fixed bottom-[calc(var(--ds-mobile-nav-total-height)+0.5rem)] left-[max(0.75rem,var(--ds-safe-area-left))] right-[max(0.75rem,var(--ds-safe-area-right))] z-50 flex h-[min(40rem,calc(100dvh-var(--ds-mobile-nav-total-height)-5rem))] flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-strong)] bg-[var(--component-chat-shell-bg)] shadow-[var(--ds-shadow-sm)] animate-fade-in sm:bottom-24 sm:left-auto sm:right-6 sm:w-[430px]"
     >
       <div className="flex items-center justify-between border-b border-[var(--ds-color-border-strong)] bg-[var(--component-chat-header-bg)] px-4 py-3 text-[var(--ds-color-action-primary-foreground)]">
         <div className="flex items-center space-x-2">
@@ -265,7 +265,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
           >
             <div
               className={cn(
-                "max-w-[80%] rounded-[var(--ds-radius-md)] px-4 py-2 text-sm",
+                "max-w-[88%] rounded-[var(--ds-radius-md)] px-3.5 py-2 text-sm sm:max-w-[80%] sm:px-4",
                 message.role === 'user'
                   ? "bg-[var(--component-chat-user-bubble-bg)] text-[var(--component-chat-user-bubble-text)]"
                   : "border border-[var(--ds-color-border-subtle)] bg-[var(--component-chat-assistant-bubble-bg)] text-[var(--ds-color-text-primary)]"
@@ -295,7 +295,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/95 p-4">
+      <div className="border-t border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/95 p-3 pb-[max(0.75rem,var(--ds-safe-area-bottom))] sm:p-4">
         {selectedImagePreview ? (
           <div className="mb-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/32 p-3">
             <div className="mb-2 flex items-center justify-between">
