@@ -254,7 +254,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
                 disabled={syncingOfflineQueue || offlineQueueCount === 0}
                 className="ds-topbar-chip disabled:cursor-not-allowed disabled:opacity-60"
                 title="Sincronizar itens salvos offline"
-                aria-label={syncingOfflineQueue ? "Sincronizando itens offline" : `${offlineQueueCount} item(ns) offline. Sincronizar`}
+                aria-label={
+                  syncingOfflineQueue
+                    ? "Sincronizando itens offline"
+                    : `${offlineQueueCount} ${offlineQueueCount === 1 ? "item offline" : "itens offline"}. Sincronizar`
+                }
               >
                 {syncingOfflineQueue ? (
                   <RefreshCw className="h-4 w-4 text-[var(--ds-color-warning)]" />
