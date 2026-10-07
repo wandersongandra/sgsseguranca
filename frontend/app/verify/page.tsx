@@ -319,7 +319,7 @@ export default function PublicHashVerifyPage() {
         : Boolean(codeResult?.valid);
 
   return (
-    <main className="min-h-screen bg-[var(--ds-color-bg-subtle)] px-4 py-10">
+    <main className="min-h-[100dvh] bg-[var(--ds-color-bg-subtle)] px-4 py-10">
       <div className="mx-auto max-w-4xl space-y-6">
         <PageHeader
           eyebrow="Validação pública"
