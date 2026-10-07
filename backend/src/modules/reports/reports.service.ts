@@ -914,7 +914,7 @@ export class ReportsService {
     const statusTone =
       expiredEpis > 0 ? 'danger' : operationalTotal >= 25 ? 'success' : 'info';
     const trainingTone = trainingsCount > 0 ? 'success' : 'warning';
-    const governanceNote = `Documento emitido para ${companyName} com fechamento mensal de ${String(month).padStart(2, '0')}/${year}, preservando rastreabilidade executiva dos indicadores de SST.`;
+    const governanceNote = `Relatório emitido para ${companyName}, referente a ${String(month).padStart(2, '0')}/${year}.`;
     const replaceToken = (source: string, token: string, value: string) =>
       source.split(`{{${token}}}`).join(value);
 
