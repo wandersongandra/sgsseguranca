@@ -8,10 +8,10 @@ export type PdfSpacingScale = {
 };
 
 export const pdfSpacing: PdfSpacingScale = {
-  pageMargin: 16,
-  sectionGap: 8,
+  pageMargin: 15,
+  sectionGap: 7,
   blockGap: 4.5,
   inset: 4.5,
-  radius: 2.5,
+  radius: 1.4,
   baseline: 4,
 };
