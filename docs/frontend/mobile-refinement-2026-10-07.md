@@ -156,3 +156,33 @@ Aplicada após a primeira implementação mobile, com foco em falhas de telas es
 - zero ocorrências do padrão antigo de modal RDO centralizado nos arquivos revisados;
 - zero ocorrências das copies meta marcadas na auditoria;
 - nenhum merge ou deploy executado.
+
+
+## Rodada cirúrgica — 2026-10-07
+
+A segunda passada focou somente em defeitos que aparecem em telas estreitas ou em interação real:
+
+- corrigido grid implícito no editor de RDO: campos `col-span-2` agora só expandem a partir de `sm`;
+- corrigido o mesmo risco nas medições atmosféricas da PT abaixo de 360px;
+- editor de RDO deixa de impor altura mínima excessiva no celular e o rodapé passa a reorganizar ações em 2 colunas / 1 coluna abaixo de 400px;
+- modais de assinatura e envio por e-mail do RDO migrados para o `ModalFrame` compartilhado;
+- Command Palette recebeu safe-area, altura dinâmica, scroll interno e alvos de toque de 44px;
+- SOPHIE recebeu alvos de toque maiores em fechar/anexar/enviar e sugestões deixaram de usar pills pequenas;
+- Checklist e DDS agora declaram suas barras sticky como zonas reservadas para a SOPHIE;
+- filtros do Checklist reorganizados para largura estreita;
+- seletor de obra da fila do dashboard passa a bottom-sheet/floating sheet no mobile e nomes longos não expandem a viewport;
+- filtros e controles da fila passam a respeitar 44px;
+- resumo da APR reduz densidade visual em 320–430px e evita duas métricas comprimidas abaixo de 360px;
+- toolbar da APR recebeu marcadores próprios para comportamento mobile;
+- contrato `.ds-form-sticky-bar` corrigido para ficar acima da bottom navigation;
+- regras duplicadas de RDO/Checklist foram consolidadas no bloco cirúrgico;
+- teste do Command Palette atualizado para o rótulo acessível atual `Fechar busca`.
+
+Auditoria estática final desta rodada:
+- `globals.css`: 569 chaves de abertura / 569 de fechamento;
+- principais arquivos TSX tocados: blocos JSX balanceados na inspeção textual;
+- zero referências aos overlays legados dentro de `RdoActionModals`;
+- Checklist e DDS expõem `data-sophie-reserved-zone="bottom"`;
+- zero resíduos encontrados de `Fechar palette`, `Proxima`, `item(ns)` ou caractere de substituição nos arquivos auditados.
+
+A execução real de Jest/Playwright e a validação visual em navegador continuam pendentes enquanto o ambiente de CI/runtime não executar os jobs.
