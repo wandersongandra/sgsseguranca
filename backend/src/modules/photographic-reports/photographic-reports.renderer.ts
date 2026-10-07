@@ -1653,7 +1653,7 @@ export function buildPhotographicReportHtml(
   ]);
 
   const execHtml = renderExecutiveSummary({
-    title: 'Leitura executiva',
+    title: 'Resumo do relatório',
     summary: buildExecutiveSummary(report, totalPhotos, totalDays || 1),
     metrics: [
       {
@@ -1793,7 +1793,7 @@ export function buildPhotographicReportHtml(
       <section class="gov">
         <div class="gov-main">
           <div class="gov-text">
-            <div class="gov-title">Governança e autenticidade</div>
+            <div class="gov-title">Validação do documento</div>
             <p class="gov-subtitle">
               ${
                 validationUrl
