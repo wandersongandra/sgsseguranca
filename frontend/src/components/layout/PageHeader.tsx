@@ -45,7 +45,7 @@ export function PageHeader({
           </div>
         </div>
         {actions ? (
-          <div className="ds-page-header__actions" role="group" aria-label="Acoes da pagina">
+          <div className="ds-page-header__actions" role="group" aria-label="Ações da página">
             {actions}
           </div>
         ) : null}
