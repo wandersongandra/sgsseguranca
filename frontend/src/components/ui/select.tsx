@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 const selectVariants = cva(
   [
     'peer flex h-10 w-full appearance-none rounded-[var(--ds-radius-md)] border px-3 pr-9',
-    'text-[13px] font-semibold outline-none',
+    'text-[13px] font-medium outline-none',
     'transition-colors duration-[120ms]',
     // Estados disabled
     'disabled:cursor-not-allowed disabled:border-[var(--disabled-border)]',
