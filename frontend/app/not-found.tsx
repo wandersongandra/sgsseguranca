@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[color:var(--color-background)] px-6 text-center">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[color:var(--color-background)] px-6 text-center">
       <div className="max-w-md rounded-2xl border border-[var(--color-border-subtle)] bg-[color:var(--component-card-bg-elevated)] p-8 shadow-[var(--ds-shadow-lg)]">
         <p className="text-5xl font-bold text-[var(--ds-color-action-primary)]">404</p>
         <h1 className="mt-3 text-lg font-bold text-[var(--color-text)]">
