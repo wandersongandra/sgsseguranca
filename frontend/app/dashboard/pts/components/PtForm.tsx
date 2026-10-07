@@ -1988,7 +1988,7 @@ export function PtForm({ id }: PtFormProps) {
         title={id ? 'Editar PT' : isFieldMode ? 'Nova PT em campo' : 'Nova PT'}
         description={
           isFieldMode
-            ? 'Liberação operacional adaptada para obra, com rascunho automático e navegação reduzida para celular.'
+            ? 'Liberação operacional para uso em campo, com rascunho automático e preenchimento por etapas.'
             : `Preencha os campos abaixo para ${id ? 'atualizar' : 'criar'} a Permissão de Trabalho.`
         }
         icon={<ShieldCheck className="h-5 w-5" />}
