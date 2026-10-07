@@ -430,7 +430,7 @@ export default function MedicalExamsPage() {
                 setFilterResultado(event.target.value);
                 setPage(1);
               }}
-              className={cn(fieldClassName, 'min-w-[220px]')}
+              className={cn(fieldClassName, 'w-full md:w-auto md:min-w-[220px]')}
             >
               <option value="">Todos os resultados</option>
               {Object.entries(RESULTADO_LABEL).map(([key, label]) => (
