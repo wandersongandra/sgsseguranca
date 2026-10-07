@@ -45,7 +45,7 @@ export async function generateNonConformityPdf(
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "RELATÓRIO DE NÃO CONFORMIDADE",
     subtitle:
-      "Documento oficial de registro, tratativa e encerramento de desvio",
+      "Registro do desvio, ações corretivas e encerramento",
     code,
     date: nc.data_identificacao,
     status: sanitize(nc.status),
