@@ -36,7 +36,7 @@ const cardVariants = cva(
         true: [
           'cursor-pointer select-none transition-colors duration-[120ms]',
           'hover:border-[var(--component-card-hover-border)]',
-          'hover:bg-[color:var(--component-card-bg-elevated)]',
+          'hover:bg-[color:var(--ds-color-surface-muted)]',
           // Focus ring para cards clicáveis via teclado
           'focus-visible:outline-none focus-visible:ring-2',
           'focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-2',
