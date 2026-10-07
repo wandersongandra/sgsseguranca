@@ -2888,8 +2888,8 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
           <div
             className={
               isFieldMode
-                ? "grid grid-cols-2 gap-3"
-                : "flex items-center justify-end gap-3"
+                ? "ds-mobile-form-actions__buttons grid grid-cols-2 gap-3"
+                : "ds-mobile-form-actions__buttons flex items-center justify-end gap-3"
             }
           >
             <Link
