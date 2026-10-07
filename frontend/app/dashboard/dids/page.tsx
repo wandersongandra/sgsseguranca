@@ -52,7 +52,7 @@ const SendMailModal = dynamic(
 );
 
 const inputClassName =
-  'w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border-subtle)] bg-[color:var(--component-field-bg-subtle)] px-3 py-2.5 text-sm text-[var(--component-field-text)] motion-safe:transition-all motion-safe:duration-[var(--ds-motion-base)] focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';
+  'w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border-subtle)] bg-[color:var(--component-field-bg-subtle)] px-3 py-2.5 text-sm text-[var(--component-field-text)] motion-safe:transition-colors focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';
 
 export default function DidsPage() {
   const { hasPermission } = usePermissions();
@@ -150,13 +150,13 @@ export default function DidsPage() {
         {
           label: 'PDFs finais',
           value: summary.pdfs,
-          note: 'governados e disponíveis',
+          note: 'emitidos e disponíveis',
           tone: 'neutral',
         },
       ]}
       toolbarTitle="Registros operacionais"
       toolbarDescription={formattedToolbarDescription}
-      toolbarActions={<span className="ds-badge ds-badge--info">Leitura rápida</span>}
+      toolbarActions={<span className="ds-badge ds-badge--info">Filtros</span>}
       toolbarContent={
         <>
           <div className="ds-list-search">
@@ -214,7 +214,7 @@ export default function DidsPage() {
             description={
               deferredSearchTerm || statusFilter !== 'all'
                 ? 'Nenhum resultado corresponde aos filtros aplicados.'
-                : 'Ainda não existem Diálogos do Início do Dia para este tenant.'
+                : 'Ainda não existem Diálogos do Início do Dia no escopo atual.'
             }
             action={
               !deferredSearchTerm && statusFilter === 'all' && canManageDids ? (
