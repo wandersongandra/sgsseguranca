@@ -2062,8 +2062,8 @@ export function PtForm({ id }: PtFormProps) {
             </div>
           ) : null}
           <aside className="space-y-3 xl:sticky xl:top-28 xl:self-start">
-            <div className="ds-form-section overflow-hidden p-0">
-              <div className="border-b border-[var(--ds-color-border-default)] bg-[color:var(--ds-color-surface-muted)]/16 px-5 py-4">
+            <div className="pt-stepper-card ds-form-section overflow-hidden p-0">
+              <div className="pt-stepper-intro border-b border-[var(--ds-color-border-default)] bg-[color:var(--ds-color-surface-muted)]/16 px-5 py-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[color:var(--ds-color-text-secondary)]">
                   Etapas da PT
                 </p>
@@ -2075,7 +2075,7 @@ export function PtForm({ id }: PtFormProps) {
                 </p>
               </div>
               <nav aria-label="Etapas da PT">
-              <div className="space-y-2.5 px-4 py-4" role="list">
+              <div className="pt-stepper-list space-y-2.5 px-4 py-4" role="list">
                 {PT_STEPS.map((step) => {
                   const Icon = step.icon;
                   const isActive = currentStep === step.id;
@@ -2093,7 +2093,7 @@ export function PtForm({ id }: PtFormProps) {
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }
                         }}
-                        className={`w-full rounded-[var(--ds-radius-md)] border px-4 py-3 text-left motion-safe:transition-colors ${
+                        className={`pt-stepper-item w-full rounded-[var(--ds-radius-md)] border px-4 py-3 text-left motion-safe:transition-colors ${
                           isActive
                             ? 'border-[var(--ds-color-action-primary)] bg-[var(--ds-color-action-primary)]/12 shadow-[var(--ds-shadow-sm)]'
                             : isCompleted
@@ -2117,7 +2117,7 @@ export function PtForm({ id }: PtFormProps) {
                           <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
                             {step.title}
                           </p>
-                          <p className="mt-1 text-xs text-[var(--ds-color-text-secondary)]">{step.description}</p>
+                          <p className="pt-stepper-description mt-1 text-xs text-[var(--ds-color-text-secondary)]">{step.description}</p>
                         </div>
                       </div>
                       </button>
@@ -2128,7 +2128,7 @@ export function PtForm({ id }: PtFormProps) {
               </nav>
             </div>
 
-            <div className="ds-form-section px-5 py-4">
+            <div className="hidden ds-form-section px-5 py-4 xl:block">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
