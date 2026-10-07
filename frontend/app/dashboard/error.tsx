@@ -1,7 +1,9 @@
 'use client';
-import { logger } from '@/lib/logger';
 
 import { useEffect } from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/logger';
 
 export default function DashboardError({
   error,
@@ -11,34 +13,30 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') logger.error('[DashboardError]', error);
+    if (process.env.NODE_ENV !== 'production') {
+      logger.error('[DashboardError]', error);
+    }
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[color:var(--color-background)] px-6 text-center text-[var(--color-text)]">
-      <div className="max-w-md rounded-2xl border border-[var(--color-border-subtle)] bg-[color:var(--component-card-bg-elevated)] p-6 shadow-[var(--ds-shadow-lg)]">
-        <h2 className="text-lg font-bold text-[var(--color-text)]">Erro ao carregar o Dashboard</h2>
-        <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          Recarregue a página. Se continuar, abra o console (F12) e envie o erro para correção.
+    <div className="flex min-h-screen items-center justify-center bg-[var(--ds-color-bg-canvas)] px-6 text-center text-[var(--ds-color-text-primary)]">
+      <div className="w-full max-w-md rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-xs)]">
+        <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-[var(--ds-radius-md)] bg-[var(--ds-color-danger-subtle)] text-[var(--ds-color-danger)]">
+          <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <h2 className="mt-4 text-lg font-semibold">Não foi possível carregar esta área</h2>
+        <p className="mt-2 text-sm leading-6 text-[var(--ds-color-text-secondary)]">
+          Tente carregar novamente. Se o problema continuar, informe ao suporte o horário em que ocorreu.
         </p>
-        <div className="mt-5 flex gap-3">
-          <button
-            type="button"
-            onClick={() => reset()}
-            className="flex-1 rounded-xl border border-[var(--color-border-subtle)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--color-text)] hover:bg-[color:var(--color-card-muted)]"
-          >
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+          <Button type="button" variant="secondary" className="flex-1" onClick={reset}>
             Tentar novamente
-          </button>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="flex-1 rounded-xl bg-[color:var(--component-button-primary-bg)] px-4 py-2 text-sm font-semibold text-[var(--component-button-primary-text)] hover:bg-[color:var(--component-button-primary-hover-bg)]"
-          >
-            Recarregar
-          </button>
+          </Button>
+          <Button type="button" className="flex-1" onClick={() => window.location.reload()}>
+            Recarregar página
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-
