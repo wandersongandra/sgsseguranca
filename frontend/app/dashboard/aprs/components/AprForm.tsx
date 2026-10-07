@@ -239,7 +239,7 @@ const APR_STEPS = [
 ] as const;
 
 const aprBackButtonClass =
-  "group rounded-full p-2 text-[var(--ds-color-text-secondary)] transition-none hover:bg-transparent hover:text-[var(--ds-color-text-secondary)]";
+  "group rounded-[var(--ds-radius-md)] p-2 text-[var(--ds-color-text-secondary)] transition-none hover:bg-transparent hover:text-[var(--ds-color-text-secondary)]";
 const aprSectionTitleClass =
   "mb-3 text-sm font-bold text-[var(--ds-color-text-primary)]";
 const aprLabelClass =
@@ -250,15 +250,15 @@ const AprRequiredMark = () => (
 const aprLabelCompactClass =
   "mb-1 block text-[11px] font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]";
 const aprFieldClass =
-  "w-full min-h-[2.875rem] rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-4 py-2.5 text-base leading-6 text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] motion-safe:transition-all focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]";
+  "w-full min-h-[2.875rem] rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-4 py-2.5 text-base leading-6 text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] motion-safe:transition-colors focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]";
 const aprFileFieldClass =
-  "block w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-4 py-2.5 text-base text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] motion-safe:transition-all focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)] file:mr-4 file:rounded-[var(--ds-radius-sm)] file:border-0 file:bg-[color:var(--color-card-muted)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[var(--color-text-secondary)] hover:file:bg-[color:var(--ds-color-primary-subtle)]";
+  "block w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border)] bg-[color:var(--component-field-bg)] px-4 py-2.5 text-base text-[var(--component-field-text)] shadow-[var(--component-field-shadow)] motion-safe:transition-colors focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)] file:mr-4 file:rounded-[var(--ds-radius-sm)] file:border-0 file:bg-[color:var(--color-card-muted)] file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-[var(--color-text-secondary)] hover:file:bg-[color:var(--ds-color-primary-subtle)]";
 const aprFieldErrorClass =
   "border-[var(--ds-color-danger-border)] bg-[color:var(--ds-color-danger-subtle)]";
 const aprFieldDisabledClass =
   "disabled:bg-[color:var(--color-card-muted)]/60 disabled:cursor-not-allowed disabled:opacity-60";
 const aprCheckboxClass =
-  "h-5 w-5 rounded border-[var(--component-field-border)] text-[var(--ds-color-action-primary)] motion-safe:transition-all focus:ring-[var(--ds-color-action-primary)]";
+  "h-5 w-5 rounded border-[var(--component-field-border)] text-[var(--ds-color-action-primary)] motion-safe:transition-colors focus:ring-[var(--ds-color-action-primary)]";
 const aprErrorTextClass = "mt-1 text-xs text-[var(--ds-color-danger)]";
 const aprSuccessButtonCompactClass =
   "rounded-[var(--ds-radius-md)] bg-[var(--component-button-success-bg)] px-3 py-2 text-xs font-semibold text-[var(--component-button-success-text)] shadow-[var(--ds-shadow-sm)] transition-none hover:translate-y-0 hover:shadow-[var(--ds-shadow-sm)] disabled:opacity-60";
@@ -2842,7 +2842,7 @@ export function AprForm({ id }: AprFormProps) {
         <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-success-border)] bg-[var(--ds-color-success-subtle)] p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-success)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-success)]">
                 APR em campo
               </p>
               <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
@@ -2852,7 +2852,7 @@ export function AprForm({ id }: AprFormProps) {
             </div>
             <div className="grid grid-cols-2 gap-2 text-center md:w-[260px]">
               <div className={aprFieldStatCardClass}>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                   Rascunho
                 </p>
                 <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -2860,7 +2860,7 @@ export function AprForm({ id }: AprFormProps) {
                 </p>
               </div>
               <div className={aprFieldStatCardClass}>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                   Uso
                 </p>
                 <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -3255,7 +3255,7 @@ export function AprForm({ id }: AprFormProps) {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-2xl font-black tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
+                    <h2 className="text-2xl font-bold tracking-[-0.01em] text-[var(--ds-color-text-primary)]">
                       {aprDocumentNumber}
                     </h2>
                     <StatusPill tone={aprDocumentStatusTone}>
@@ -3350,11 +3350,11 @@ export function AprForm({ id }: AprFormProps) {
               <div className="mt-6 border-t border-[var(--ds-color-border-subtle)] pt-5">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                       Matriz de riscos
                     </p>
-                    <h2 className="mt-1 text-lg font-black text-[var(--ds-color-text-primary)]">
-                      Análise operacional simples, auditável e direta
+                    <h2 className="mt-1 text-lg font-bold text-[var(--ds-color-text-primary)]">
+                      Identifique, avalie e trate os riscos da atividade
                     </h2>
                   </div>
                   {!isReadOnly ? (
@@ -3443,7 +3443,7 @@ export function AprForm({ id }: AprFormProps) {
                         }
                       }}
                       className={cn(
-                        "min-h-[76px] rounded-lg border px-4 py-3 text-left motion-safe:transition-all",
+                        "min-h-[76px] rounded-lg border px-4 py-3 text-left motion-safe:transition-colors",
                         isActive
                           ? "border-[var(--ds-color-action-primary)] bg-[color:var(--ds-color-info-subtle)] shadow-[var(--ds-shadow-xs)]"
                           : isCompleted
@@ -3471,7 +3471,7 @@ export function AprForm({ id }: AprFormProps) {
                           )}
                         </span>
                         <span className="min-w-0">
-                          <span className="block text-sm font-black text-[var(--ds-color-text-primary)]">
+                          <span className="block text-sm font-bold text-[var(--ds-color-text-primary)]">
                             {step.title}
                           </span>
                           <span className="mt-0.5 block text-xs leading-5 text-[var(--ds-color-text-secondary)]">
@@ -3488,10 +3488,10 @@ export function AprForm({ id }: AprFormProps) {
             <aside className="border-t border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/16 px-5 py-5 xl:border-l xl:border-t-0">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                     Resumo de riscos
                   </p>
-                  <p className="mt-1 text-sm font-black text-[var(--ds-color-text-primary)]">
+                  <p className="mt-1 text-sm font-bold text-[var(--ds-color-text-primary)]">
                     {aprDocumentRiskSummary.highestLabel}
                   </p>
                 </div>
@@ -3513,7 +3513,7 @@ export function AprForm({ id }: AprFormProps) {
               />
 
               <div className="mt-6 border-t border-[var(--ds-color-border-subtle)] pt-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                   EPI requeridos
                 </p>
                 {requiredEpiLabels.length > 0 ? (
@@ -3537,7 +3537,7 @@ export function AprForm({ id }: AprFormProps) {
               </div>
 
               <div className="mt-6 border-t border-[var(--ds-color-border-subtle)] pt-5">
-                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                <p className="text-[11px] font-bold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                   Informações
                 </p>
                 <dl className="mt-3 space-y-2 text-sm">
@@ -3595,7 +3595,7 @@ export function AprForm({ id }: AprFormProps) {
           >
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="space-y-2">
-                <span className="inline-flex rounded-full border border-[var(--ds-color-warning-border)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.12em]">
+                <span className="inline-flex rounded-full border border-[var(--ds-color-warning-border)] px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.04em]">
                   {pendingOfflineSyncUi.badge}
                 </span>
                 <p className="font-semibold">{pendingOfflineSyncUi.summary}</p>
@@ -3669,7 +3669,7 @@ export function AprForm({ id }: AprFormProps) {
             <div className="ds-dashboard-panel overflow-hidden">
               <div className="flex flex-col gap-3 border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/12 px-5 py-3 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                     Fluxo operacional
                   </p>
                   <h2 className="mt-1 text-base font-bold text-[var(--ds-color-text-primary)]">
@@ -3707,7 +3707,7 @@ export function AprForm({ id }: AprFormProps) {
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }
                         }}
-                        className={`w-full rounded-[var(--ds-radius-lg)] border px-3.5 py-3 text-left motion-safe:transition-all ${
+                        className={`w-full rounded-[var(--ds-radius-lg)] border px-3.5 py-3 text-left motion-safe:transition-colors ${
                           isActive
                             ? "border-[var(--ds-color-action-primary)] bg-[color:var(--ds-color-info-subtle)] shadow-[var(--ds-shadow-xs)]"
                             : isCompleted
@@ -3736,7 +3736,7 @@ export function AprForm({ id }: AprFormProps) {
                               <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
                                 {step.title}
                               </p>
-                              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                              <span className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                                 {isCompleted
                                   ? "Concluída"
                                   : isActive
@@ -3768,7 +3768,7 @@ export function AprForm({ id }: AprFormProps) {
               <div className="ds-dashboard-panel px-4 py-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                       Contexto da APR
                     </p>
                     <p className="mt-1 truncate text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -3776,7 +3776,7 @@ export function AprForm({ id }: AprFormProps) {
                     </p>
                   </div>
                   {draftStorageKey && draftRestored ? (
-                    <span className="shrink-0 rounded-full border border-[var(--ds-color-warning-border)] bg-[color:var(--ds-color-warning-subtle)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-warning)]">
+                    <span className="shrink-0 rounded-full border border-[var(--ds-color-warning-border)] bg-[color:var(--ds-color-warning-subtle)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.04em] text-[var(--color-warning)]">
                       Rascunho
                     </span>
                   ) : null}
@@ -3837,7 +3837,7 @@ export function AprForm({ id }: AprFormProps) {
                 {selectedParticipantIds.length > 0 ? (
                   <div className="mt-3 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-3 py-2.5">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Participantes no fluxo
                       </p>
                       <span className="text-[11px] font-semibold text-[var(--ds-color-text-secondary)]">
@@ -3910,7 +3910,7 @@ export function AprForm({ id }: AprFormProps) {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-[var(--ds-color-warning-border)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]">
+                          <span className="rounded-full border border-[var(--ds-color-warning-border)] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em]">
                             {pendingOfflineSyncUi.badge}
                           </span>
                           <span className="text-xs uppercase tracking-[0.1em] text-[var(--color-warning)]/80">
@@ -4017,7 +4017,7 @@ export function AprForm({ id }: AprFormProps) {
             <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-[var(--ds-shadow-sm)]">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                     Ações seguras em somente leitura
                   </p>
                   <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
@@ -4292,7 +4292,7 @@ export function AprForm({ id }: AprFormProps) {
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-primary-subtle)]/45 px-4 py-3">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--color-primary)]">
                             Template técnico
                           </p>
                           <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -4431,14 +4431,11 @@ export function AprForm({ id }: AprFormProps) {
 
                   <div className="md:col-span-2">
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-primary-subtle)]/45 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--color-primary)]">
-                        Governança documental
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--color-primary)]">
+                        PDF final
                       </p>
                       <p className="mt-2 text-sm text-[var(--ds-color-text-secondary)]">
-                        O PDF final não faz parte do preenchimento básico desta
-                        etapa. Depois da aprovação, use o fluxo oficial da APR
-                        para emitir, abrir ou compartilhar o documento
-                        governado.
+                        O PDF final é emitido depois da aprovação. Use as ações abaixo para emitir, abrir ou compartilhar o documento.
                       </p>
                       {hasFinalPdf ? (
                         <p className="mt-2 text-sm font-semibold text-[var(--color-success)]">
@@ -4447,8 +4444,7 @@ export function AprForm({ id }: AprFormProps) {
                         </p>
                       ) : isApproved ? (
                         <p className="mt-2 text-sm font-semibold text-[var(--color-warning)]">
-                          APR aprovada. O próximo passo é emitir o PDF final
-                          governado antes do encerramento.
+                          APR aprovada. Emita o PDF final antes do encerramento.
                         </p>
                       ) : null}
                       <div className="mt-3 flex flex-wrap gap-2">
@@ -4734,7 +4730,7 @@ export function AprForm({ id }: AprFormProps) {
                     <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-primary-subtle)]/45 p-5">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-primary)]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--color-primary)]">
                             Sugestões da SOPHIE
                           </p>
                           <h3 className="mt-2 text-lg font-bold text-[var(--color-text)]">
@@ -4759,7 +4755,7 @@ export function AprForm({ id }: AprFormProps) {
 
                       {sophieSuggestedRisks.length > 0 ? (
                         <div className="mt-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)]">
                             Riscos sugeridos
                           </p>
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -4798,7 +4794,7 @@ export function AprForm({ id }: AprFormProps) {
 
                       {sophieMandatoryChecklists.length > 0 ? (
                         <div className="mt-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--color-text-secondary)]">
                             Checklists de apoio recomendados
                           </p>
                           <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -4855,7 +4851,7 @@ export function AprForm({ id }: AprFormProps) {
                 </div>
 
                 <div className="space-y-6">
-                  <div className="overflow-hidden rounded-[calc(var(--ds-radius-xl)+4px)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
+                  <div className="overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
                     <input
                       ref={excelInputRef}
                       type="file"
@@ -4863,18 +4859,17 @@ export function AprForm({ id }: AprFormProps) {
                       className="hidden"
                       onChange={handleExcelFileSelection}
                     />
-                    <div className="sticky top-24 z-20 border-b border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/96 px-4 py-3 backdrop-blur">
+                    <div className="sticky top-24 z-20 border-b border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-3">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="max-w-3xl">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                             Grade operacional da APR
                           </p>
-                          <h2 className="mt-1 text-xl font-black leading-tight text-[var(--ds-color-text-primary)]">
-                            Matriz operacional de riscos e governança
+                          <h2 className="mt-1 text-xl font-bold leading-tight text-[var(--ds-color-text-primary)]">
+                            Matriz de riscos e controles
                           </h2>
                           <p className="mt-1 text-xs leading-5 text-[var(--ds-color-text-secondary)]">
-                            Lance riscos, revise pendências e mantenha a
-                            rastreabilidade sem sair da grade principal.
+                            Registre os riscos, avalie a criticidade e defina controles e responsáveis.
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 xl:justify-end">
@@ -4970,7 +4965,7 @@ export function AprForm({ id }: AprFormProps) {
                       <div className="mx-5 mt-5 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 p-4 shadow-[var(--ds-shadow-xs)]">
                         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                           <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                               Preview da planilha
                             </p>
                             <h3 className="mt-1 text-sm font-bold text-[var(--ds-color-text-primary)]">
@@ -5009,10 +5004,10 @@ export function AprForm({ id }: AprFormProps) {
                       </div>
                     ) : null}
 
-                    <div className="mx-5 mt-3 overflow-hidden rounded-[calc(var(--ds-radius-xl)+2px)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/68">
+                    <div className="mx-5 mt-3 overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/68">
                       <div className="flex flex-col gap-2 border-b border-[var(--ds-color-border-subtle)] px-4 py-2.5 md:flex-row md:items-center md:justify-between">
                         <div className="min-w-0">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                             Contexto da APR
                           </p>
                           <p className="mt-1 truncate text-sm font-bold text-[var(--ds-color-text-primary)]">
@@ -5082,7 +5077,7 @@ export function AprForm({ id }: AprFormProps) {
                         </div>
                       )}
 
-                      <div className="overflow-hidden rounded-[calc(var(--ds-radius-xl)+2px)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]">
+                      <div className="overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]">
                         {riskFields.length === 0 ? (
                           <div className="px-6 py-10 text-center">
                             <p className="text-base font-semibold text-[var(--ds-color-text-primary)]">
@@ -5168,12 +5163,12 @@ export function AprForm({ id }: AprFormProps) {
                     <AprRiskReferencePanel
                       getActionCriteriaText={getActionCriteriaText}
                     />
-                    <div className="rounded-[calc(var(--ds-radius-xl)+2px)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-[var(--ds-shadow-xs)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-                        Feedback visual
+                    <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-[var(--ds-shadow-xs)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+                        Legenda da matriz
                       </p>
-                      <h3 className="mt-1.5 text-sm font-black text-[var(--ds-color-text-primary)]">
-                        Leitura rápida da grade
+                      <h3 className="mt-1.5 text-sm font-bold text-[var(--ds-color-text-primary)]">
+                        Como interpretar a matriz
                       </h3>
                       <div className="mt-3 space-y-1.5 text-sm text-[var(--ds-color-text-secondary)]">
                         <LegendItem
@@ -5220,7 +5215,7 @@ export function AprForm({ id }: AprFormProps) {
                   const allOk = items.every((i) => i.ok);
                   return (
                     <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-5 py-4 shadow-[var(--ds-shadow-sm)]">
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Checklist de completude
                       </p>
                       <ul className="mt-3 space-y-2">
@@ -5247,7 +5242,7 @@ export function AprForm({ id }: AprFormProps) {
                 })()}
 
                 <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-5 shadow-[var(--ds-shadow-sm)]">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--ds-color-text-secondary)]">
+                  <p className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
                     Revisão operacional
                   </p>
                   <h3 className="mt-2 text-lg font-bold text-[var(--ds-color-text-primary)]">
@@ -5259,7 +5254,7 @@ export function AprForm({ id }: AprFormProps) {
                   </p>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Matriz de risco
                       </p>
                       <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -5269,7 +5264,7 @@ export function AprForm({ id }: AprFormProps) {
                       </p>
                     </div>
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Participantes
                       </p>
                       <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -5287,7 +5282,7 @@ export function AprForm({ id }: AprFormProps) {
                       )}
                     </div>
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Evidência documental
                       </p>
                       <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -5302,7 +5297,7 @@ export function AprForm({ id }: AprFormProps) {
 
                   <div className="mt-4 grid gap-3 xl:grid-cols-3">
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Contexto SST
                       </p>
                       <div className="mt-3 space-y-1.5 text-sm text-[var(--ds-color-text-secondary)]">
@@ -5343,7 +5338,7 @@ export function AprForm({ id }: AprFormProps) {
                     </div>
 
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Fluxo de aprovação
                       </p>
                       <div className="mt-3 space-y-2">
@@ -5363,7 +5358,7 @@ export function AprForm({ id }: AprFormProps) {
                               </div>
                               <span
                                 className={cn(
-                                  "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em]",
+                                  "shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.04em]",
                                   step.status === "approved" &&
                                     "border-[var(--ds-color-success-border)] bg-[color:var(--ds-color-success-subtle)] text-[var(--color-success)]",
                                   step.status === "pending" &&
@@ -5394,7 +5389,7 @@ export function AprForm({ id }: AprFormProps) {
                     </div>
 
                     <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
+                      <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
                         Autenticidade
                       </p>
                       <div className="mt-3 space-y-1.5 text-sm text-[var(--ds-color-text-secondary)]">
@@ -5506,7 +5501,7 @@ export function AprForm({ id }: AprFormProps) {
                 </Link>
               )}
               {(isApproved || hasFinalPdf) && (
-                <span className="hidden rounded-full border border-[var(--ds-color-border-subtle)] bg-[color:var(--color-card-muted)]/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)] sm:inline-flex sm:items-center sm:gap-1">
+                <span className="hidden rounded-full border border-[var(--ds-color-border-subtle)] bg-[color:var(--color-card-muted)]/20 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--ds-color-text-secondary)] sm:inline-flex sm:items-center sm:gap-1">
                   <Lock className="h-3 w-3" />
                   {hasFinalPdf ? "PDF emitido" : "Aprovada"}
                 </span>
