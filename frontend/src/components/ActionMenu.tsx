@@ -95,7 +95,7 @@ export function ActionMenu({ items, triggerAriaLabel = "Ações" }: ActionMenuPr
 
       {open && (
         <div
-          className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-elevated)] shadow-[var(--ds-shadow-md)]"
+          className="absolute right-0 z-50 mt-1 max-h-[min(60dvh,20rem)] w-[min(13rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-elevated)] shadow-[var(--ds-shadow-md)]"
           role="menu"
           aria-label={triggerAriaLabel}
           onKeyDown={handleMenuKeyDown}
