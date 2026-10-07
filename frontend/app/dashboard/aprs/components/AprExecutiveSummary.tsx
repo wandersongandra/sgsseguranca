@@ -105,7 +105,7 @@ export function AprExecutiveSummary({
 
   if (variant === "breakdown") {
     return (
-      <div className="mt-3 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3 shadow-[var(--ds-shadow-xs)]">
+      <div className="mt-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-3 py-3 shadow-none sm:px-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-muted)]">
@@ -120,7 +120,7 @@ export function AprExecutiveSummary({
             {riskSummary.prontas} linha(s) pronta(s)
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-7">
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 lg:grid-cols-7">
           <MetricCard
             density="compact"
             label="Total"
@@ -182,7 +182,7 @@ export function AprExecutiveSummary({
     riskSummary.semMedidasPreventivas > 0;
 
   return (
-    <div className="mb-3 overflow-hidden rounded-[calc(var(--ds-radius-xl)+2px)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] shadow-[var(--ds-shadow-xs)]">
+    <div className="mb-3 overflow-hidden rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] shadow-none">
       <div className="flex flex-col gap-2 border-b border-[var(--ds-color-border-subtle)] px-4 py-2.5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--ds-color-text-muted)]">
@@ -209,7 +209,7 @@ export function AprExecutiveSummary({
             <button
               type="button"
               onClick={onToggleCompactMode}
-              className="inline-flex items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs font-semibold text-[var(--ds-color-text-secondary)] motion-safe:transition-colors hover:bg-[var(--ds-color-surface-muted)]"
+              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs font-semibold text-[var(--ds-color-text-secondary)] motion-safe:transition-colors hover:bg-[var(--ds-color-surface-muted)]"
               title={isCompact ? "Expandir todas as linhas" : "Modo compacto"}
             >
               {isCompact ? (
