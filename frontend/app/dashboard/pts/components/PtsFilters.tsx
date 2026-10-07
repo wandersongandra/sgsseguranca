@@ -20,8 +20,8 @@ export const PtsFilters = React.memo(({ searchTerm, onSearchChange, statusFilter
   const hasFilters = searchTerm || statusFilter;
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-3">
-      <div className="relative flex-1 min-w-48">
+    <div className="grid w-full min-w-0 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
+      <div className="relative min-w-0">
         <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
           <Search className="h-4 w-4 text-[var(--ds-color-text-muted)]" />
         </span>
@@ -40,7 +40,7 @@ export const PtsFilters = React.memo(({ searchTerm, onSearchChange, statusFilter
         aria-label="Filtrar PTs por status"
         value={statusFilter}
         onChange={(e) => onStatusChange(e.target.value)}
-        className={cn(inputClassName, 'min-w-[180px] pr-8')}
+        className={cn(inputClassName, 'w-full pr-8 sm:w-auto sm:min-w-[180px]')}
       >
         <option value="">Todos os status</option>
         {PT_STATUSES.map((s) => (
