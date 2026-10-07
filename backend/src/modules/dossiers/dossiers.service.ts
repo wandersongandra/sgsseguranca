@@ -799,7 +799,7 @@ export class DossiersService {
     const tableTheme = createBackendPdfTableTheme();
 
     drawBackendPdfHeader(doc, {
-      title: 'Dossie de SST - Colaborador',
+      title: 'Dossiê de SST — Colaborador',
       subtitle: `Gerado em: ${new Date().toLocaleString('pt-BR')}`,
       metaRight: [`ID do colaborador: ${user.id}`],
       marginX,
@@ -807,15 +807,13 @@ export class DossiersService {
       logoFormat,
     });
 
-    doc.setFontSize(12);
-    doc.setTextColor(...backendPdfTheme.text);
-    doc.text('Dados do colaborador', marginX, 35);
+    drawBackendSectionTitle(doc, 35, 'Dados do colaborador', marginX);
     autoTable(doc, {
       startY: 40,
       head: [['Campo', 'Valor']],
       body: [
         ['Nome', user.nome],
-        ['Funcao', user.funcao || '-'],
+        ['Função', user.funcao || '-'],
         ['Perfil', user.profile?.nome || '-'],
         ['Obra/Setor', user.site?.nome || '-'],
         ['Status', user.status ? 'Ativo' : 'Inativo'],
@@ -824,8 +822,12 @@ export class DossiersService {
     });
 
     autoTable(doc, {
-      startY: getBackendLastTableY(doc) + 6,
-      head: [['Treinamento', 'NR', 'Conclusao', 'Vencimento', 'Status']],
+      startY: (() => {
+        const y = getBackendLastTableY(doc) + 12;
+        drawBackendSectionTitle(doc, y - 5, 'Treinamentos', marginX);
+        return y;
+      })(),
+      head: [['Treinamento', 'NR', 'Conclusão', 'Vencimento', 'Status']],
       body:
         trainings.length > 0
           ? trainings.map((item: Training) => [
@@ -835,15 +837,19 @@ export class DossiersService {
               new Date(item.data_vencimento).toLocaleDateString('pt-BR'),
               new Date(item.data_vencimento) < new Date()
                 ? 'Vencido'
-                : 'Valido',
+                : 'Válido',
             ])
           : [['-', '-', '-', '-', 'Nenhum treinamento encontrado']],
       ...tableTheme,
     });
 
     autoTable(doc, {
-      startY: getBackendLastTableY(doc) + 6,
-      head: [['EPI', 'CA', 'Validade CA', 'Status', 'Entrega', 'Devolucao']],
+      startY: (() => {
+        const y = getBackendLastTableY(doc) + 12;
+        drawBackendSectionTitle(doc, y - 5, 'Equipamentos de proteção individual', marginX);
+        return y;
+      })(),
+      head: [['EPI', 'CA', 'Validade CA', 'Status', 'Entrega', 'Devolução']],
       body:
         assignments.length > 0
           ? assignments.map((item: EpiAssignment) => [
