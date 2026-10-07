@@ -275,7 +275,7 @@ export class ReportsService {
 
       <div class="strip">
         <div class="strip-summary">
-          <div class="t">Leitura executiva do período</div>
+          <div class="t">Resumo do período</div>
           <div class="b">{{executive_summary_text}}</div>
         </div>
         <div class="pill {{operational_tone}}">
@@ -303,7 +303,7 @@ export class ReportsService {
       </div>
 
       <div class="governance">
-        <div class="k">Governança documental</div>
+        <div class="k">Emissão do relatório</div>
         <div class="v">{{governance_note}}</div>
       </div>
     </div>
