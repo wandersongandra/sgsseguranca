@@ -204,36 +204,36 @@ export class ReportsService {
   <style>
     @page { size: A4 landscape; margin: 0; }
     *, *::before, *::after { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; color: #25221f; margin: 0; padding: 0; background: #fff; }
+    body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #fff; }
     .page { width: 297mm; min-height: 210mm; padding: 12mm 14mm; display: flex; flex-direction: column; }
-    .header { margin: -14mm -14mm 0; padding: 14mm 14mm 10mm; background: #2c2825; color: #fff; border-bottom: 2.6mm solid #3e3935; position: relative; min-height: 38mm; display: flex; align-items: flex-start; gap: 14px; }
-    .header-logo { flex-shrink: 0; width: 42mm; height: 18mm; background: rgba(255,255,255,0.05); border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+    .header { margin: -14mm -14mm 0; padding: 10mm 14mm 8mm; background: #fff; color: #0f172a; border-top: 3mm solid #102033; border-bottom: .3mm solid #d6dce4; position: relative; min-height: 38mm; display: flex; align-items: flex-start; gap: 14px; }
+    .header-logo { flex-shrink: 0; width: 42mm; height: 18mm; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .header-logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
     .header-content { flex-grow: 1; }
     .title { font-size: 16pt; font-weight: 700; margin: 0; }
-    .subtitle { color: #c4bcb6; font-size: 9.5pt; margin: 4px 0 0; }
-    .document-chip { position: absolute; top: 10mm; right: 14mm; width: 52mm; background: #fff; color: #25221f; border-radius: 6px; padding: 8px 10px; }
-    .document-chip .k { font-size: 7pt; text-transform: uppercase; letter-spacing: .08em; color: #8f8882; font-weight: 700; }
-    .document-chip .v { margin-top: 6px; font-size: 11pt; font-weight: 700; }
-    .document-chip .m { margin-top: 4px; font-size: 7.5pt; color: #67615b; }
+    .subtitle { color: #334155; font-size: 9pt; margin: 4px 0 0; }
+    .document-chip { position: absolute; top: 8mm; right: 14mm; width: 52mm; background: #fff; color: #0f172a; border: 1px solid #94a3b8; border-top: 3px solid #1f4e79; padding: 8px 10px; }
+    .document-chip .k { font-size: 7pt; text-transform: uppercase; letter-spacing: .05em; color: #64748b; font-weight: 700; }
+    .document-chip .v { margin-top: 6px; font-size: 11pt; font-weight: 700; color:#0f172a; }
+    .document-chip .m { margin-top: 4px; font-size: 7.5pt; color: #64748b; }
     .body { flex-grow: 1; padding-top: 8mm; }
-    .meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
-    .meta { background: #f6f5f3; border: 1px solid #d5cec7; border-radius: 6px; padding: 10px 12px; }
-    .meta .k { color: #8f8882; font-size: 7.3pt; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; margin-bottom: 5px; display: block; }
-    .meta .v { font-weight: 700; font-size: 10pt; color: #25221f; display: block; line-height: 1.35; }
-    .strip { display: grid; grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr)); gap: 10px; background: #f6f5f3; border: 1px solid #d5cec7; border-radius: 8px; margin-bottom: 12px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
-    .strip-summary { border-left: 4px solid #1d6b43; padding: 12px 14px; }
-    .strip-summary .t { font-size: 10.5pt; font-weight: 700; color: #25221f; margin-bottom: 4px; }
-    .strip-summary .b { font-size: 8.6pt; line-height: 1.45; color: #57534e; }
-    .pill { background: #fff; border-left: 4px solid #3e3935; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; }
+    .meta-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-bottom: 12px; border:1px solid #d6dce4; border-top:2px solid #94a3b8; break-inside: avoid; page-break-inside: avoid; }
+    .meta { background: #fff; border-right: 1px solid #d6dce4; padding: 10px 12px; }
+    .meta .k { color: #64748b; font-size: 7.3pt; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; margin-bottom: 5px; display: block; }
+    .meta .v { font-weight: 700; font-size: 10pt; color: #0f172a; display: block; line-height: 1.35; }
+    .strip { display: grid; grid-template-columns: 1.3fr repeat(3, minmax(0, 1fr)); gap: 0; background: #fff; border: 1px solid #d6dce4; border-top:3px solid #102033; margin-bottom: 12px; overflow: hidden; break-inside: avoid; page-break-inside: avoid; }
+    .strip-summary { padding: 12px 14px; }
+    .strip-summary .t { font-size: 10.5pt; font-weight: 700; color: #0f172a; margin-bottom: 4px; }
+    .strip-summary .b { font-size: 8.6pt; line-height: 1.45; color: #334155; }
+    .pill { background: #fff; border-left: 1px solid #d6dce4; border-top:2px solid #1f4e79; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; }
     .pill.success { border-left-color: #1d6b43; }
     .pill.warning { border-left-color: #9a5a00; }
     .pill.danger { border-left-color: #b3261e; }
-    .pill .k { font-size: 7pt; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: #8f8882; margin-bottom: 5px; }
-    .pill .v { font-size: 13pt; font-weight: 700; color: #25221f; }
-    h2 { margin: 14px 0 8px; font-size: 11pt; color: #25221f; }
-    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
-    .stat-card { background: #fff; border: 1px solid #d5cec7; border-radius: 6px; padding: 12px 14px; min-height: 72px; position: relative; overflow: hidden; }
+    .pill .k { font-size: 7pt; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: #64748b; margin-bottom: 5px; }
+    .pill .v { font-size: 13pt; font-weight: 700; color: #0f172a; }
+    h2 { margin: 14px 0 8px; font-size: 11pt; color: #0f172a; border-bottom:1px solid #d6dce4; padding-bottom:5px; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; border:1px solid #d6dce4; margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+    .stat-card { background: #fff; border-right: 1px solid #d6dce4; padding: 12px 14px; min-height: 72px; position: relative; overflow: hidden; }
     .stat-card::after { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #18517C; }
     .stat-card.primary::after { background: #18517C; }
     .stat-card.success::after { background: #166534; }
@@ -241,13 +241,13 @@ export class ReportsService {
     .stat-card.danger::after { background: #991b1b; }
     .stat-value { display: block; font-size: 19pt; font-weight: 800; color: #111827; margin-top: 5px; margin-bottom: 4px; line-height: 1; }
     .stat-label { display: block; font-size: 8pt; color: #6B7280; font-weight: 600; line-height: 1.35; }
-    .analysis { margin-top: 0; border: 1px solid #d5cec7; border-radius: 6px; background: #f6f5f3; padding: 14px; overflow-wrap: anywhere; word-break: break-word; }
-    .analysis .t { font-size: 10.5pt; font-weight: 700; margin-bottom: 8px; color: #25221f; }
+    .analysis { margin-top: 0; border: 1px solid #d6dce4; border-top:3px solid #102033; background: #fff; padding: 14px; overflow-wrap: anywhere; word-break: break-word; }
+    .analysis .t { font-size: 10.5pt; font-weight: 700; margin-bottom: 8px; color: #0f172a; }
     .analysis pre { white-space: pre-wrap; font-family: inherit; margin: 0; line-height: 1.65; font-size: 9.6pt; overflow-wrap: anywhere; word-break: break-word; }
-    .governance { margin-top: 12px; background: #f0ede9; border: 1px solid #d5cec7; border-radius: 6px; padding: 10px 12px; break-inside: avoid; page-break-inside: avoid; }
-    .governance .k { font-size: 7.2pt; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: #8f8882; margin-bottom: 4px; }
-    .governance .v { font-size: 8.5pt; color: #57534e; line-height: 1.45; }
-    .footer { margin-top: auto; display: flex; justify-content: space-between; border-top: 1px solid #d5cec7; padding-top: 10mm; font-size: 8pt; color: #8f8882; break-inside: avoid; page-break-inside: avoid; }
+    .governance { margin-top: 12px; background: #fff; border: 1px solid #d6dce4; border-left:3px solid #1f4e79; padding: 10px 12px; break-inside: avoid; page-break-inside: avoid; }
+    .governance .k { font-size: 7.2pt; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+    .governance .v { font-size: 8.5pt; color: #334155; line-height: 1.45; }
+    .footer { margin-top: auto; display: flex; justify-content: space-between; border-top: 1px solid #d6dce4; padding-top: 6mm; font-size: 8pt; color: #64748b; break-inside: avoid; page-break-inside: avoid; }
   </style>
 </head>
 <body>
@@ -256,7 +256,7 @@ export class ReportsService {
       {{logo_block}}
       <div class="header-content">
         <h1 class="title">Relatório SGS - {{periodo}}</h1>
-        <div class="subtitle">Relatório executivo de desempenho documental e conformidade</div>
+        <div class="subtitle">Consolidado mensal de registros, vencimentos, treinamentos e conformidade de SST</div>
       </div>
       <div class="document-chip">
         <div class="k">Emissão documental</div>
@@ -275,7 +275,7 @@ export class ReportsService {
 
       <div class="strip">
         <div class="strip-summary">
-          <div class="t">Leitura executiva do período</div>
+          <div class="t">Resumo do período</div>
           <div class="b">{{executive_summary_text}}</div>
         </div>
         <div class="pill {{operational_tone}}">
@@ -303,14 +303,14 @@ export class ReportsService {
       </div>
 
       <div class="governance">
-        <div class="k">Governança documental</div>
+        <div class="k">Emissão do relatório</div>
         <div class="v">{{governance_note}}</div>
       </div>
     </div>
 
     <div class="footer">
       <span>SGS — Sistema de Gestão de Segurança</span>
-      <span>Documento confidencial · Emissão digital institucional</span>
+      <span>Documento eletrônico · Emissão SGS</span>
     </div>
   </div>
 </body>
@@ -914,7 +914,7 @@ export class ReportsService {
     const statusTone =
       expiredEpis > 0 ? 'danger' : operationalTotal >= 25 ? 'success' : 'info';
     const trainingTone = trainingsCount > 0 ? 'success' : 'warning';
-    const governanceNote = `Documento emitido para ${companyName} com fechamento mensal de ${String(month).padStart(2, '0')}/${year}, preservando rastreabilidade executiva dos indicadores de SST.`;
+    const governanceNote = `Relatório emitido para ${companyName}, referente a ${String(month).padStart(2, '0')}/${year}.`;
     const replaceToken = (source: string, token: string, value: string) =>
       source.split(`{{${token}}}`).join(value);
 
@@ -946,7 +946,7 @@ export class ReportsService {
 
     const reportPeriod = `${String(month).padStart(2, '0')}/${year}`;
     const generatedAt = new Date().toLocaleString('pt-BR');
-    const executiveSummaryText = `Visão rápida do fechamento de ${reportPeriod}: ${operationalTotal} registros operacionais, ${trainingsCount} treinamento(s)${expiredEpis > 0 ? ` e ${expiredEpis} EPI(s) com CA vencido` : ''}.`;
+    const executiveSummaryText = `No período ${reportPeriod}, foram registrados ${operationalTotal} documento(s) operacional(is) e ${trainingsCount} treinamento(s)${expiredEpis > 0 ? `; ${expiredEpis} EPI(s) apresentam CA vencido` : ''}.`;
     const escapedCompanyName = this.escapeHtml(companyName);
     const escapedPeriod = this.escapeHtml(reportPeriod);
     const escapedGeneratedAt = this.escapeHtml(generatedAt);

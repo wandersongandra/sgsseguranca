@@ -1262,12 +1262,12 @@ export function DdsForm({ id }: DdsFormProps) {
         }
       />
 
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
+      <div className="dds-mobile-context rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-4 py-3 sm:px-5 sm:py-4">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-          Condução guiada
+          Preparação do DDS
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Estruture o DDS com contexto e evidências visuais no mesmo fluxo.
+          Confirme os dados principais antes de registrar participantes e evidências.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
           O ideal é fechar tema, facilitador e participantes antes de subir as
@@ -1276,7 +1276,7 @@ export function DdsForm({ id }: DdsFormProps) {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-8">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="dds-form-stack space-y-8">
         {submitError && (
           <div
             role="alert"
@@ -1291,7 +1291,7 @@ export function DdsForm({ id }: DdsFormProps) {
         {ddsReadOnlyMessage ? (
           <div
             role="alert"
-            className="rounded-xl border border-[color:var(--ds-color-warning)]/25 bg-[color:var(--ds-color-warning-subtle)] px-5 py-4 text-sm text-[color:var(--ds-color-warning)]"
+            className="rounded-[var(--ds-radius-md)] border border-[color:var(--ds-color-warning)]/25 bg-[color:var(--ds-color-warning-subtle)] px-4 py-3 text-sm text-[color:var(--ds-color-warning)] sm:px-5 sm:py-4"
           >
             <p className="font-semibold text-[color:var(--ds-color-warning)]">
               Documento travado para edição
@@ -1301,7 +1301,7 @@ export function DdsForm({ id }: DdsFormProps) {
             </p>
           </div>
         ) : null}
-        <div className="grid gap-3 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[linear-gradient(180deg,rgba(255,255,255,0.6),rgba(255,255,255,0.2))] px-5 py-4 backdrop-blur-sm">
+        <div className="grid gap-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-4 shadow-none sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
@@ -1365,9 +1365,9 @@ export function DdsForm({ id }: DdsFormProps) {
         </div>
         <fieldset
           disabled={ddsReadOnly}
-          className={`space-y-8 ${ddsReadOnly ? "opacity-80" : ""}`}
+          className={`dds-form-stack space-y-8 ${ddsReadOnly ? "opacity-80" : ""}`}
         >
-          <Card tone="default" padding="lg">
+          <Card tone="default" padding="lg" className="dds-mobile-card">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
@@ -1612,7 +1612,7 @@ export function DdsForm({ id }: DdsFormProps) {
             </div>
           </Card>
 
-          <Card tone="default" padding="lg">
+          <Card tone="default" padding="lg" className="dds-mobile-card">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
@@ -1690,7 +1690,7 @@ export function DdsForm({ id }: DdsFormProps) {
             )}
           </Card>
 
-          <Card tone="default" padding="lg">
+          <Card tone="default" padding="lg" className="dds-mobile-card">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
               <div className="space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ds-color-text-secondary)]">
@@ -1814,7 +1814,7 @@ export function DdsForm({ id }: DdsFormProps) {
             onDdsChanged={setCurrentDds}
           />
 
-          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/20 px-4 py-4">
+          <div data-sophie-reserved-zone="bottom" className="ds-mobile-form-actions rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/20 px-4 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
                 <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -1825,7 +1825,7 @@ export function DdsForm({ id }: DdsFormProps) {
                   gravação governada do documento.
                 </p>
               </div>
-              <div className="flex flex-wrap justify-end gap-3">
+              <div className="ds-mobile-form-actions__buttons flex flex-wrap justify-end gap-3">
                 <Button
                   type="button"
                   variant="outline"

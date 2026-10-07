@@ -106,7 +106,7 @@ export function ModalFrame({
             aria-modal="true"
             aria-describedby={hasDescription ? descriptionId : undefined}
             aria-labelledby={titleId}
-            className={cn('ds-modal-shell max-h-[calc(100dvh-2rem)]', shellClassName)}
+            className={cn('ds-modal-shell max-h-[calc(100dvh-2rem)] overscroll-contain', shellClassName)}
             onCloseAutoFocus={(event) => {
               const restoreTarget = restoreFocusRef.current;
 

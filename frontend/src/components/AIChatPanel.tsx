@@ -106,11 +106,11 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
     }
 
     if (status === 403) {
-      return 'Seu perfil nao possui permissao para usar a SOPHIE neste ambiente.';
+      return 'Seu perfil não possui permissão para usar a SOPHIE neste ambiente.';
     }
 
     if (status === 404) {
-      return 'A SOPHIE esta desativada no backend deste ambiente no momento.';
+      return 'A SOPHIE está desativada neste ambiente no momento.';
     }
 
     if (status === 429) {
@@ -121,7 +121,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
       return 'A SOPHIE está demorando mais do que o esperado para responder. Aguarde alguns segundos e tente novamente.';
     }
 
-    return 'Nao consegui responder agora. Tente novamente em instantes.';
+    return 'Não consegui responder agora. Tente novamente em instantes.';
   };
 
   const handleSelectImage = (event: ChangeEvent<HTMLInputElement>) => {
@@ -206,26 +206,28 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
   return (
     <div
       id="sophie-chat-panel"
+      role="dialog"
+      aria-modal="false"
       aria-label="Painel do chat da SOPHIE"
-      className="fixed bottom-[8.5rem] left-4 right-4 z-50 flex h-[min(40rem,calc(100vh-10rem))] flex-col overflow-hidden rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-strong)] bg-[var(--component-chat-shell-bg)] shadow-[var(--ds-shadow-lg)] transition-all animate-in slide-in-from-bottom-4 sm:bottom-24 sm:left-auto sm:right-6 sm:w-[430px]"
+      className="fixed bottom-[calc(var(--ds-mobile-nav-total-height)+0.5rem)] left-[max(0.75rem,var(--ds-safe-area-left))] right-[max(0.75rem,var(--ds-safe-area-right))] z-50 flex h-[min(40rem,calc(100dvh-var(--ds-mobile-nav-total-height)-5rem))] flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-strong)] bg-[var(--component-chat-shell-bg)] shadow-[var(--ds-shadow-sm)] animate-fade-in sm:bottom-24 sm:left-auto sm:right-6 sm:w-[430px]"
     >
       <div className="flex items-center justify-between border-b border-[var(--ds-color-border-strong)] bg-[var(--component-chat-header-bg)] px-4 py-3 text-[var(--ds-color-action-primary-foreground)]">
-        <div className="flex items-center space-x-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-surface-base)]/12 text-[var(--ds-color-action-primary-foreground)]">
+        <div className="flex min-w-0 items-center space-x-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[var(--ds-radius-md)] border border-[var(--ds-color-primary-border)] bg-[color:var(--ds-color-surface-base)]/12 text-[var(--ds-color-action-primary-foreground)]">
             <ContextIcon className="h-4.5 w-4.5" />
           </div>
-          <div>
-            <h3 className="text-sm font-bold">{context.title}</h3>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-bold">{context.title}</h3>
             <div className="flex items-center space-x-1">
               <span className="h-1.5 w-1.5 rounded-full bg-[var(--ds-color-accent)] animate-pulse"></span>
-              <span className="text-[10px] text-[color:var(--ds-color-action-primary-foreground)]/88">{context.subtitle}</span>
+              <span className="truncate text-[10px] text-[color:var(--ds-color-action-primary-foreground)]/88">{context.subtitle}</span>
             </div>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full p-1 transition-colors hover:bg-[color:var(--ds-color-surface-base)]/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary-foreground)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--component-chat-header-bg)]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--ds-radius-md)] transition-colors hover:bg-[color:var(--ds-color-surface-base)]/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary-foreground)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--component-chat-header-bg)]"
           title="Fechar chat"
           aria-label="Fechar chat"
         >
@@ -235,12 +237,12 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
 
       {/* Messages */}
       <div className="flex-1 space-y-4 overflow-y-auto bg-[color:var(--ds-color-surface-muted)]/18 p-4">
-        <div className="rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/95 p-3 text-xs text-[var(--ds-color-text-secondary)] shadow-[var(--ds-shadow-xs)]">
+        <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)] p-3 text-xs text-[var(--ds-color-text-secondary)] shadow-[var(--ds-shadow-xs)]">
           <p className="font-semibold text-[var(--ds-color-text-primary)]">
             Chat da SOPHIE
           </p>
           <p className="mt-1 leading-relaxed">
-            Use este chat para pedir ideias, montar documentos assistidos e analisar fotos do ambiente, equipamento ou frente de serviço.
+            Pergunte sobre a tela atual, peça apoio para um documento ou envie uma foto para análise de risco.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -249,7 +251,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
               key={suggestion}
               type="button"
               onClick={() => setInput(suggestion)}
-              className="rounded-full border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/92 px-3 py-1.5 text-xs font-medium text-[var(--ds-color-text-secondary)] transition-colors hover:border-[var(--ds-color-border-default)] hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-surface-muted)]"
+              className="min-h-11 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/92 px-3 py-2 text-left text-xs font-medium text-[var(--ds-color-text-secondary)] transition-colors hover:border-[var(--ds-color-border-default)] hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-surface-muted)]"
             >
               {suggestion}
             </button>
@@ -265,10 +267,10 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
           >
             <div
               className={cn(
-                "max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-[var(--ds-shadow-xs)]",
+                "max-w-[88%] rounded-[var(--ds-radius-md)] px-3.5 py-2 text-sm sm:max-w-[80%] sm:px-4",
                 message.role === 'user'
-                  ? "rounded-tr-none bg-[var(--component-chat-user-bubble-bg)] text-[var(--component-chat-user-bubble-text)]"
-                  : "rounded-tl-none border border-[var(--ds-color-border-subtle)] bg-[var(--component-chat-assistant-bubble-bg)] text-[var(--ds-color-text-primary)]"
+                  ? "bg-[var(--component-chat-user-bubble-bg)] text-[var(--component-chat-user-bubble-text)]"
+                  : "border border-[var(--ds-color-border-subtle)] bg-[var(--component-chat-assistant-bubble-bg)] text-[var(--ds-color-text-primary)]"
               )}
             >
               {message.content}
@@ -285,9 +287,9 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
         ))}
         {isLoading && (
           <div className="flex justify-start">
-            <div className="flex items-center space-x-2 rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/95 px-4 py-2 shadow-[var(--ds-shadow-xs)]">
+            <div className="flex items-center space-x-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-4 py-2">
               <Loader2 className="h-4 w-4 animate-spin text-[var(--ds-color-action-primary)]" />
-              <span className="text-xs italic text-[var(--ds-color-text-muted)]">SOPHIE analisando contexto...</span>
+              <span className="text-xs italic text-[var(--ds-color-text-muted)]">SOPHIE analisando...</span>
             </div>
           </div>
         )}
@@ -295,9 +297,9 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/95 p-4">
+      <div className="border-t border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)]/95 p-3 pb-[max(0.75rem,var(--ds-safe-area-bottom))] sm:p-4">
         {selectedImagePreview ? (
-          <div className="mb-3 rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/32 p-3">
+          <div className="mb-3 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/32 p-3">
             <div className="mb-2 flex items-center justify-between">
               <Badge variant="warning" className="text-[11px]">
                 <TriangleAlert className="h-3.5 w-3.5" />
@@ -306,7 +308,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
               <button
                 type="button"
                 onClick={clearSelectedImage}
-                className="rounded-full p-1 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-surface-muted)]"
+                className="flex h-11 w-11 items-center justify-center rounded-[var(--ds-radius-sm)] text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-surface-muted)]"
                 title="Remover imagem"
               >
                 <X className="h-4 w-4" />
@@ -317,7 +319,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
               alt="Pré-visualização da imagem enviada para a SOPHIE"
               width={640}
               height={224}
-              className="h-28 w-full rounded-xl object-cover"
+              className="h-28 w-full rounded-[var(--ds-radius-sm)] object-cover"
               unoptimized
             />
           </div>
@@ -335,7 +337,7 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
-            className="absolute left-1 rounded-full p-2 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-action-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-surface-base)] disabled:border-transparent disabled:bg-transparent disabled:text-[var(--disabled-text)]"
+            className="absolute left-0.5 flex h-11 w-11 items-center justify-center rounded-[var(--ds-radius-sm)] text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-surface-muted)] hover:text-[var(--ds-color-action-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-color-surface-base)] disabled:border-transparent disabled:bg-transparent disabled:text-[var(--disabled-text)]"
             title="Anexar foto para análise"
             aria-label="Anexar foto para análise"
           >
@@ -345,15 +347,20 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Peça ideias ou ajuda para montar um documento..."
-            className="rounded-full bg-[color:var(--ds-color-surface-muted)]/26 py-2 pl-11 pr-10"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            placeholder="Pergunte sobre a tela atual..."
+            className="min-h-11 rounded-[var(--ds-radius-md)] bg-[color:var(--ds-color-surface-muted)]/26 py-2 pl-12 pr-12"
           />
           <Button
             onClick={handleSend}
             disabled={(!input.trim() && !selectedImage) || isLoading}
             size="icon"
-            className="absolute right-1 h-8 w-8 rounded-full"
+            className="absolute right-0.5 h-11 w-11 rounded-[var(--ds-radius-sm)]"
             title="Enviar mensagem"
             aria-label="Enviar mensagem"
           >
@@ -362,8 +369,8 @@ export function AIChatPanel({ isOpen, onClose, context }: AIChatPanelProps) {
         </div>
         <div className="mt-2 flex items-center justify-center space-x-1">
           <Sparkles className="h-3 w-3 text-[var(--ds-color-accent)]" />
-          <span className="text-[10px] text-[var(--ds-color-text-muted)]">
-            Chat da SOPHIE com contexto da tela, apoio a documentos e análise de fotos
+          <span className="text-center text-[10px] leading-4 text-[var(--ds-color-text-muted)]">
+            SOPHIE usa o contexto da tela atual e pode analisar imagens enviadas por você
           </span>
         </div>
       </div>

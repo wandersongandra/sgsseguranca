@@ -78,8 +78,8 @@ function buildExecutiveSummary(report: PhotographicReport, totalPhotos: number, 
     `Relatório fotográfico de ${activity}, com ${totalPhotos} foto(s) distribuída(s) em ${totalDays} data(s) de registro.`;
   const controlNote =
     areaStatus === "Loja fechada" || areaStatus === "Área controlada" || shift === "Noturno"
-      ? "O contexto operacional indica ambiente mais controlado, com menor interferência externa e melhores condições para execução segura das atividades."
-      : "O registro foi conduzido em contexto operacional ativo, com observação visual da frente de serviço e rastreabilidade por imagem.";
+      ? "Área interna registrada nas imagens, com menor exposição a interferências externas."
+      : "Área operacional registrada durante a execução das atividades.";
 
   return `${base} ${controlNote}`;
 }
@@ -132,7 +132,7 @@ function buildConsolidatedAssessment(report: PhotographicReport, totalPhotos: nu
   }
 
   const plural = totalPhotos > 1 ? "registros fotográficos" : "registro fotográfico";
-  return `O conjunto apresenta ${plural} organizado(s), com rastreabilidade documental preservada e aderência ao tipo de atividade informado (${sanitize(report.activity_type)}).`;
+  return `Foram incluídos ${plural}, vinculados à atividade informada: ${sanitize(report.activity_type)}.`;
 }
 
 function buildTechnicalOpinion(report: PhotographicReport) {
@@ -242,7 +242,7 @@ export async function drawPhotographicReportBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva",
+    title: "Resumo do relatório",
     summary: buildExecutiveSummary(report, totalPhotos, totalDays || 1),
     metrics: [
       { label: "Cliente", value: sanitize(report.client_name), tone: "info" },
@@ -345,8 +345,8 @@ export async function drawPhotographicReportBlueprint(
   await drawGovernanceClosingBlock(ctx, {
     code,
     url: validationUrl,
-    title: "Governança e autenticidade",
+    title: "Validação do documento",
     subtitle:
-      "Documento fotográfico validado por código e QR Code para conferência pública e rastreabilidade.",
+      "Use o QR Code ou o código do relatório para conferência no portal SGS.",
   });
 }

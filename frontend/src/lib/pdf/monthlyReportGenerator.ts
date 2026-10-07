@@ -66,7 +66,7 @@ function resolveStatusSignal(report: MonthlyReportPdfSource) {
       tone: "danger" as MetricTone,
       criticality: "moderate",
       message:
-        "Há itens vencidos que exigem tratamento prioritário e acompanhamento executivo.",
+        "Há itens vencidos que exigem tratamento prioritário e acompanhamento.",
     };
   }
 
@@ -226,7 +226,7 @@ export function generateMonthlyReportPdf(
     report.estatisticas.checklists_count;
 
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
-    title: "RELATÓRIO EXECUTIVO MENSAL",
+    title: "RELATÓRIO MENSAL DE SST",
     subtitle:
       "Documento institucional de desempenho documental, conformidade e leitura gerencial do período.",
     code,
@@ -238,14 +238,14 @@ export function generateMonthlyReportPdf(
   });
 
   drawDocumentIdentityRail(ctx, {
-    documentType: "Relatório Executivo",
+    documentType: "Relatório Mensal",
     criticality: statusSignal.criticality,
     validity: buildReportPeriod(report),
-    documentClass: "executive",
+    documentClass: "mensal",
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva do período",
+    title: "Resumo do período",
     summary: statusSignal.message,
     metrics: [
       { label: "Período", value: buildReportPeriod(report), tone: "info" },
@@ -286,7 +286,7 @@ export function generateMonthlyReportPdf(
     title: "Indicadores consolidados do período",
     tone: "action",
     autoTable,
-    head: [["Indicador", "Quantidade", "Leitura executiva"]],
+    head: [["Indicador", "Quantidade", "Situação"]],
     body: buildIndicatorRows(report).map((row) => [
       row.indicador,
       String(row.quantidade),
@@ -303,13 +303,13 @@ export function generateMonthlyReportPdf(
   });
 
   drawNarrativeSection(ctx, {
-    title: "Análise executiva",
+    title: "Análise e recomendações",
     content: report.analise_gandra,
   });
 
   drawNarrativeSection(ctx, {
-    title: "Governança documental",
-    content: `Documento ${code} emitido pelo sistema SGS para ${companyName}, consolidando o período ${buildReportPeriod(report)} com leitura executiva e rastreabilidade institucional.`,
+    title: "Emissão do relatório",
+    content: `Relatório ${code} emitido para ${companyName}, referente ao período ${buildReportPeriod(report)}.`,
   });
 
   applyFooterGovernance(ctx, {

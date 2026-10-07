@@ -14,19 +14,20 @@ const PAGE = {
   safeBottom: 24,
 };
 const TONE = {
-  pageBg: [246, 248, 251] as Rgb,
+  pageBg: [255, 255, 255] as Rgb,
   surface: [255, 255, 255] as Rgb,
-  surfaceMuted: [238, 243, 248] as Rgb,
-  border: [211, 220, 230] as Rgb,
-  borderStrong: [134, 148, 166] as Rgb,
-  textPrimary: [17, 24, 39] as Rgb,
-  textSecondary: [55, 65, 81] as Rgb,
-  textMuted: [107, 114, 128] as Rgb,
-  brand: [24, 81, 124] as Rgb,
-  brandStrong: [15, 32, 54] as Rgb,
+  surfaceMuted: [247, 249, 252] as Rgb,
+  border: [214, 220, 228] as Rgb,
+  borderStrong: [148, 163, 184] as Rgb,
+  textPrimary: [15, 23, 42] as Rgb,
+  textSecondary: [51, 65, 85] as Rgb,
+  textMuted: [100, 116, 139] as Rgb,
+  brand: [31, 78, 121] as Rgb,
+  brandStrong: [16, 32, 51] as Rgb,
   success: [27, 94, 62] as Rgb,
   warning: [180, 95, 20] as Rgb,
-  info: [24, 101, 176] as Rgb,
+  danger: [185, 28, 28] as Rgb,
+  info: [31, 78, 121] as Rgb,
 };
 
 const STATUS: Record<string, string> = {
@@ -146,7 +147,7 @@ function rounded(
   h: number,
   mode: 'F' | 'S' | 'FD',
 ) {
-  doc.roundedRect(x, y, w, h, 2.8, 2.8, mode);
+  doc.rect(x, y, w, h, mode);
 }
 
 function pageBackground(ctx: PdfContext) {
@@ -169,20 +170,20 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
   const codeX = margin + width - codeW;
   const topH = 35;
 
-  fill(doc, TONE.brand);
-  doc.rect(0, 0, PAGE.width, topH, 'F');
   fill(doc, TONE.brandStrong);
-  doc.rect(0, topH - 1.4, PAGE.width, 1.4, 'F');
+  doc.rect(0, 0, PAGE.width, 2.8, 'F');
+  fill(doc, TONE.brand);
+  doc.rect(0, 2.8, PAGE.width, 0.8, 'F');
 
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(15.2);
-  text(doc, [255, 255, 255]);
+  text(doc, TONE.textPrimary);
   doc.text('ANÁLISE DE RISCO RÁPIDA', margin, 10.2);
   doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(8.3);
-  text(doc, [223, 231, 239]);
+  text(doc, TONE.textSecondary);
   doc.text(
-    'Registro simplificado para formalização de condição observada, risco e ação imediata em campo',
+    'Registro de condição observada, avaliação de risco e ação imediata em campo',
     margin,
     17,
   );
@@ -190,25 +191,27 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
   fill(doc, TONE.surface);
   rounded(doc, codeX, 5.5, codeW, 20, 'F');
   stroke(doc, TONE.borderStrong);
-  doc.setLineWidth(0.35);
+  doc.setLineWidth(0.26);
   rounded(doc, codeX, 5.5, codeW, 20, 'S');
-  fill(doc, TONE.info);
-  rounded(doc, codeX + 1.8, 7.1, codeW - 3.6, 4.2, 'F');
+  fill(doc, TONE.brand);
+  doc.rect(codeX, 5.5, codeW, 1.2, 'F');
+  stroke(doc, TONE.border);
+  doc.setLineWidth(0.16);
+  doc.line(codeX, 11, codeX + codeW, 11);
   doc.setFont(PDF_FONT, 'bold');
-  doc.setFontSize(7);
-  text(doc, [255, 255, 255]);
-  doc.text('IDENTIFICADOR', codeX + codeW / 2, 10, { align: 'center' });
-  doc.setFontSize(9.5);
+  doc.setFontSize(6.8);
+  text(doc, TONE.textMuted);
+  doc.text('IDENTIFICADOR', codeX + 3, 9.4);
+  doc.setFontSize(9.2);
   text(doc, TONE.textPrimary);
-  doc.text(clean(code), codeX + codeW / 2, 16.4, { align: 'center' });
+  doc.text(clean(code), codeX + 3, 16.3);
   doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(7);
   text(doc, TONE.textSecondary);
   doc.text(
-    `Status: ${clean(STATUS[arr.status] || arr.status)} | V1`,
-    codeX + codeW / 2,
+    `Status: ${clean(STATUS[arr.status] || arr.status)} · v1`,
+    codeX + 3,
     21.5,
-    { align: 'center' },
   );
 
   const metadata = [
@@ -216,8 +219,8 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
     ['Site/Obra', arr.site?.nome || arr.site_id],
     ['Data de referência', dateOnly(arr.data)],
   ] as const;
-  const gap = 2.4;
-  const cardW = (width - gap * 2) / 3;
+  const gap = 0;
+  const cardW = width / 3;
   const y = topH + 2.6;
   metadata.forEach(([label, value], index) => {
     const x = margin + index * (cardW + gap);
@@ -225,15 +228,17 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
     stroke(doc, TONE.border);
     doc.setLineWidth(0.24);
     rounded(doc, x, y, cardW, 15, 'FD');
-    fill(doc, TONE.brand);
-    doc.rect(x, y, 2.2, 15, 'F');
+    if (index === 0) {
+      fill(doc, TONE.brand);
+      doc.rect(x, y, 1.6, 15, 'F');
+    }
     doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
-    doc.text(label.toUpperCase(), x + 4.5, y + 4.7);
+    doc.text(label.toUpperCase(), x + (index === 0 ? 4.5 : 3), y + 4.7);
     doc.setFontSize(8.3);
     text(doc, TONE.textPrimary);
-    doc.text(splitText(doc, value, cardW - 8).slice(0, 2), x + 4.5, y + 9.1);
+    doc.text(splitText(doc, value, cardW - 7).slice(0, 2), x + (index === 0 ? 4.5 : 3), y + 9.1);
   });
   ctx.y = 58;
 }
@@ -252,8 +257,8 @@ function drawIdentity(ctx: PdfContext, arr: Arr) {
     ],
     ['Classe', 'Operacional'],
   ];
-  const gap = 3;
-  const cardW = (width - gap * 2) / 3;
+  const gap = 0;
+  const cardW = width / 3;
   ensure(ctx, 24);
   fields.forEach(([label, value], index) => {
     const x = margin + index * (cardW + gap);
@@ -261,19 +266,32 @@ function drawIdentity(ctx: PdfContext, arr: Arr) {
     stroke(doc, TONE.border);
     doc.setLineWidth(0.24);
     rounded(doc, x, ctx.y, cardW, 20, 'FD');
-    fill(doc, [
-      index === 0 ? 24 : index === 1 ? 180 : 27,
-      index === 0 ? 81 : index === 1 ? 95 : 94,
-      index === 0 ? 124 : index === 1 ? 20 : 62,
-    ]);
-    rounded(doc, x + 1.6, ctx.y + 1.4, cardW - 3.2, 3.2, 'F');
+    if (index === 0) {
+      fill(doc, TONE.brand);
+      doc.rect(x, ctx.y, 1.6, 20, 'F');
+    }
     doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
-    doc.text(label.toUpperCase(), x + 3.4, ctx.y + 9);
+    doc.text(label.toUpperCase(), x + (index === 0 ? 4.5 : 3), ctx.y + 7);
     doc.setFontSize(8.3);
-    text(doc, TONE.textPrimary);
-    doc.text(splitText(doc, value, cardW - 8).slice(0, 2), x + 3.4, ctx.y + 14);
+    text(
+      doc,
+      label === 'Criticidade' &&
+        (String(value).toLowerCase().includes('alto') ||
+          String(value).toLowerCase().includes('crít'))
+        ? TONE.danger
+        : label === 'Criticidade' &&
+            (String(value).toLowerCase().includes('médio') ||
+              String(value).toLowerCase().includes('moder'))
+          ? TONE.warning
+          : TONE.textPrimary,
+    );
+    doc.text(
+      splitText(doc, value, cardW - 7).slice(0, 2),
+      x + (index === 0 ? 4.5 : 3),
+      ctx.y + 12,
+    );
   });
   ctx.y += 25;
 }
@@ -312,28 +330,28 @@ function drawExecutiveSummary(ctx: PdfContext, arr: Arr) {
       arr.participants?.length ? TONE.success : TONE.warning,
     ],
   ] as const;
-  const gap = 3;
-  const inner = 4;
+  const gap = 0;
+  const inner = 0;
   const columns = 3;
-  const cardW = (width - inner * 2 - gap * 2) / columns;
+  const cardW = width / columns;
   const rows = Math.ceil(metrics.length / columns);
   const height = 14 + 9 + rows * 18 + (rows - 1) * 2.2 + 2;
   ensure(ctx, height + 5);
-  fill(doc, TONE.surfaceMuted);
+  fill(doc, TONE.surface);
   stroke(doc, TONE.border);
-  doc.setLineWidth(0.3);
+  doc.setLineWidth(0.24);
   rounded(doc, margin, ctx.y, width, height, 'FD');
-  fill(doc, TONE.brand);
-  rounded(doc, margin + 1.8, ctx.y + 1.6, 30, 3.1, 'F');
+  fill(doc, TONE.brandStrong);
+  doc.rect(margin, ctx.y, width, 2.1, 'F');
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(11.6);
   text(doc, TONE.textPrimary);
-  doc.text('Síntese executiva', margin + 4, ctx.y + 8.2);
+  doc.text('Resumo da análise', margin + 4, ctx.y + 8.2);
   doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(8.3);
   text(doc, TONE.textSecondary);
   doc.text(
-    'Registro enxuto para formalizar uma análise rápida de risco, a condição observada em campo e o tratamento imediato definido pela equipe.',
+    'Resumo do risco observado, da avaliação realizada e da ação imediata definida em campo.',
     margin + 4,
     ctx.y + 13.5,
     { maxWidth: width - 8 },
@@ -346,17 +364,17 @@ function drawExecutiveSummary(ctx: PdfContext, arr: Arr) {
     const y = baseY + row * 20.2;
     fill(doc, TONE.surface);
     stroke(doc, TONE.border);
-    doc.setLineWidth(0.22);
+    doc.setLineWidth(0.18);
     rounded(doc, x, y, cardW, 18, 'FD');
     fill(doc, tone);
-    rounded(doc, x + 1.4, y + 1.3, cardW - 2.8, 3.1, 'F');
+    doc.rect(x + 2.2, y + 3, 1.2, 12, 'F');
     doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textMuted);
-    doc.text(label.toUpperCase(), x + 2.6, y + 8.4);
+    doc.text(label.toUpperCase(), x + 5.5, y + 7);
     doc.setFontSize(9.5);
     text(doc, TONE.textPrimary);
-    doc.text(splitText(doc, value, cardW - 7).slice(0, 2), x + 2.6, y + 14);
+    doc.text(splitText(doc, value, cardW - 9).slice(0, 2), x + 5.5, y + 12.5);
   });
   ctx.y += height + 9;
 }
@@ -376,13 +394,14 @@ function drawMetadata(
   const height = titleH + Math.ceil(fields.length / cols) * rowH;
   ensure(ctx, height + 5);
   fill(doc, TONE.surface);
-  stroke(doc, TONE.border);
-  doc.setLineWidth(0.3);
+  stroke(doc, TONE.borderStrong);
+  doc.setLineWidth(0.24);
   rounded(doc, margin, ctx.y, width, height, 'FD');
-  fill(doc, TONE.surfaceMuted);
-  rounded(doc, margin + 1.2, ctx.y + 1.2, width - 2.4, titleH - 2.4, 'F');
-  fill(doc, TONE.brand);
-  doc.rect(margin, ctx.y, 2.4, titleH, 'F');
+  fill(doc, TONE.brandStrong);
+  doc.rect(margin, ctx.y, width, 2.1, 'F');
+  stroke(doc, TONE.border);
+  doc.setLineWidth(0.18);
+  doc.line(margin, ctx.y + titleH, margin + width, ctx.y + titleH);
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
@@ -432,12 +451,10 @@ function drawNarrative(ctx: PdfContext, title: string, value: unknown) {
     ensure(ctx, height + 4);
     fill(doc, TONE.surface);
     stroke(doc, TONE.border);
-    doc.setLineWidth(0.3);
+    doc.setLineWidth(0.22);
     rounded(doc, margin, ctx.y, width, height, 'FD');
-    fill(doc, TONE.surfaceMuted);
-    rounded(doc, margin + 1.2, ctx.y + 1.1, width - 2.4, 7.1, 'F');
     fill(doc, TONE.brand);
-    doc.rect(margin, ctx.y, 2.5, 10, 'F');
+    doc.rect(margin, ctx.y, 1.4, height, 'F');
     doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(9.5);
     text(doc, TONE.textPrimary);
@@ -459,7 +476,7 @@ function drawParticipants(ctx: PdfContext, arr: Arr) {
   ensure(ctx, 28);
   const { doc } = ctx;
   const margin = PAGE.margin;
-  fill(doc, TONE.surfaceMuted);
+  fill(doc, TONE.surface);
   stroke(doc, TONE.border);
   rounded(doc, margin, ctx.y, PAGE.width - margin * 2, 10, 'FD');
   fill(doc, TONE.brand);
@@ -492,8 +509,8 @@ function drawParticipants(ctx: PdfContext, arr: Arr) {
       cellPadding: 2.2,
     },
     headStyles: {
-      fillColor: TONE.surfaceMuted,
-      textColor: TONE.textMuted,
+      fillColor: TONE.brandStrong,
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 7,
     },
@@ -517,15 +534,15 @@ async function drawGovernance(
   ensure(ctx, height + 4);
   fill(doc, TONE.surface);
   stroke(doc, TONE.borderStrong);
-  doc.setLineWidth(0.32);
+  doc.setLineWidth(0.24);
   rounded(doc, margin, ctx.y, width, height, 'FD');
   fill(doc, TONE.brand);
-  doc.rect(margin, ctx.y, 2.5, 10, 'F');
+  doc.rect(margin, ctx.y, 1.8, height, 'F');
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
-  doc.text('Governança e autenticidade', margin + 5, ctx.y + 6.5);
-  fill(doc, TONE.surfaceMuted);
+  doc.text('Validação do documento', margin + 5, ctx.y + 6.5);
+  fill(doc, TONE.surface);
   stroke(doc, TONE.border);
   rounded(doc, margin + 3, ctx.y + 12, width - 6, height - 15, 'FD');
   const qr = await QRCode.toDataURL(validationUrl, {
@@ -554,11 +571,11 @@ async function drawGovernance(
     doc.text(`Hash: ${clean(hash).slice(0, 32)}...`, margin + 34, ctx.y + 40);
   }
   fill(doc, TONE.success);
-  rounded(doc, margin + width - 20, ctx.y + height - 10.5, 14, 6.4, 'F');
+  doc.rect(margin + width - 37, ctx.y + height - 10.5, 31, 6.4, 'F');
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(7);
   text(doc, [255, 255, 255]);
-  doc.text('VÁLIDO', margin + width - 13, ctx.y + height - 6, {
+  doc.text('DOCUMENTO VÁLIDO', margin + width - 21.5, ctx.y + height - 6, {
     align: 'center',
   });
   ctx.y += height + 9;
@@ -573,22 +590,27 @@ function drawFooter(
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page += 1) {
     doc.setPage(page);
+    stroke(doc, TONE.brand);
+    doc.setLineWidth(0.4);
+    doc.line(PAGE.margin, 283.5, PAGE.margin + 24, 283.5);
     stroke(doc, TONE.border);
-    doc.setLineWidth(0.25);
-    doc.line(PAGE.margin, 283.5, PAGE.width - PAGE.margin, 283.5);
+    doc.setLineWidth(0.16);
+    doc.line(PAGE.margin + 26, 283.5, PAGE.width - PAGE.margin, 283.5);
     doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(7);
     text(doc, TONE.textSecondary);
     doc.text(
-      clean(issuer || 'SGS - Sistema de Gestão de Segurança'),
+      clean(issuer || 'SGS · Segurança do Trabalho'),
       PAGE.margin,
       288.7,
     );
     doc.setFont(PDF_FONT, 'normal');
     doc.text(`Gerado em ${dateOnly(generatedAt)}`, PAGE.margin, 292.7);
-    doc.setFont(PDF_FONT, 'bold');
-    doc.text(`ID: ${clean(code)}`, PAGE.width - PAGE.margin, 288.7, {
-      align: 'right',
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(6.5);
+    text(doc, TONE.textMuted);
+    doc.text(`ID ${clean(code)}`, PAGE.width / 2, 288.7, {
+      align: 'center',
     });
     doc.setFont(PDF_FONT, 'normal');
     doc.text(`Página ${page} de ${pages}`, PAGE.width - PAGE.margin, 292.7, {

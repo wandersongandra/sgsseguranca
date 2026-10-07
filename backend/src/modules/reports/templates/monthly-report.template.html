@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Relatório Executivo Mensal — SGS</title>
+  <title>Relatório Mensal de SST — SGS</title>
   <style>
     @page {
       size: A4 landscape;
@@ -14,7 +14,7 @@
     body {
       margin: 0;
       padding: 0;
-      background: #EBF0F7;
+      background: #FFFFFF;
       color: #111827;
       font-family: Arial, Helvetica, sans-serif;
       font-size: 10pt;
@@ -30,16 +30,18 @@
       min-height: 210mm;
       display: flex;
       flex-direction: column;
-      background: #EBF0F7;
+      background: #FFFFFF;
     }
 
     /* ─────────────────────────────────────────────
        HEADER
     ───────────────────────────────────────────── */
     .page-header {
-      background: linear-gradient(110deg, #091929 0%, #0F2036 45%, #163450 100%);
-      color: #FFFFFF;
-      padding: 10mm 16mm 10mm 16mm;
+      background: #FFFFFF;
+      color: #111827;
+      padding: 7mm 16mm 6mm 16mm;
+      border-top: 3mm solid #0F2036;
+      border-bottom: .3mm solid #D3DCE6;
       position: relative;
       overflow: hidden;
       display: flex;
@@ -48,27 +50,8 @@
       min-height: 38mm;
     }
 
-    /* Decorative circle */
-    .page-header::before {
-      content: "";
-      position: absolute;
-      top: -18mm;
-      right: 68mm;
-      width: 72mm;
-      height: 72mm;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(24,81,124,0.45) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    /* Bottom accent bar */
-    .page-header::after {
-      content: "";
-      position: absolute;
-      left: 0; right: 0; bottom: 0;
-      height: 3px;
-      background: linear-gradient(90deg, #1865B0 0%, #18517C 50%, #0F2036 100%);
-    }
+    .page-header::before,
+    .page-header::after { display: none; }
 
     .header-logo {
       position: relative;
@@ -92,25 +75,16 @@
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      background: rgba(24, 101, 176, 0.28);
-      border: 1px solid rgba(255,255,255,0.18);
-      color: #A8CDE8;
+      color: #64748B;
       font-size: 6.2pt;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.13em;
-      padding: 3px 9px;
-      border-radius: 999px;
-      margin-bottom: 7px;
+      padding: 0;
+      margin-bottom: 6px;
     }
 
-    .header-badge-dot {
-      width: 5px;
-      height: 5px;
-      border-radius: 50%;
-      background: #4DB8E8;
-      flex-shrink: 0;
-    }
+    .header-badge-dot { display: none; }
 
     .header-title {
       margin: 0;
@@ -118,13 +92,13 @@
       font-weight: 800;
       letter-spacing: -0.01em;
       line-height: 1.1;
-      color: #FFFFFF;
+      color: #111827;
     }
 
     .header-subtitle {
       margin: 5px 0 0;
       font-size: 8.5pt;
-      color: #8BBDD8;
+      color: #374151;
       line-height: 1.5;
       max-width: 170mm;
     }
@@ -134,18 +108,19 @@
       z-index: 2;
       flex-shrink: 0;
       width: 62mm;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.16);
-      border-radius: 10px;
+      background: #FFFFFF;
+      border: 1px solid #94A3B8;
+      border-top: 3px solid #18517C;
       overflow: hidden;
     }
 
     .header-id-card-top {
-      background: #1865B0;
+      background: #FFFFFF;
+      border-bottom: 1px solid #D3DCE6;
       padding: 5px 11px;
       font-size: 6pt;
       font-weight: 800;
-      color: #FFFFFF;
+      color: #111827;
       text-transform: uppercase;
       letter-spacing: 0.13em;
     }
@@ -157,14 +132,14 @@
     .header-id-period {
       font-size: 13pt;
       font-weight: 800;
-      color: #FFFFFF;
+      color: #111827;
       line-height: 1.1;
       margin-bottom: 5px;
     }
 
     .header-id-meta {
       font-size: 7pt;
-      color: #8BBDD8;
+      color: #374151;
       line-height: 1.5;
     }
 
@@ -198,26 +173,21 @@
     .meta-strip {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 0;
     }
 
     .meta-card {
       background: #FFFFFF;
       border: 1px solid #D3DCE6;
-      border-radius: 8px;
-      padding: 8px 12px 8px 15px;
+      padding: 8px 12px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.05);
+      border-right: 0;
+      border-top: 2px solid #94A3B8;
     }
 
-    .meta-card::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0;
-      width: 3px; height: 100%;
-      background: linear-gradient(180deg, #1865B0, #18517C);
-    }
+    .meta-card::before { display: none; }
+    .meta-card + .meta-card { border-left: 0; }
 
     .meta-label {
       display: block;
@@ -243,31 +213,25 @@
     .pulse-strip {
       background: #FFFFFF;
       border: 1px solid #D3DCE6;
-      border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.05);
+      border-top: 3px solid #0F2036;
     }
 
     .pulse-strip-header {
-      background: linear-gradient(90deg, #0F2036 0%, #18517C 100%);
-      padding: 6px 14px;
+      background: #FFFFFF;
+      padding: 7px 14px;
+      border-bottom: 1px solid #D3DCE6;
       display: flex;
       align-items: center;
       gap: 7px;
     }
 
-    .pulse-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #4DB8E8;
-      flex-shrink: 0;
-    }
+    .pulse-dot { width: 24px; height: 2px; background: #18517C; flex-shrink: 0; }
 
     .pulse-header-text {
       font-size: 6.3pt;
       font-weight: 800;
-      color: #FFFFFF;
+      color: #111827;
       text-transform: uppercase;
       letter-spacing: 0.12em;
     }
@@ -276,8 +240,8 @@
       padding: 10px 14px;
       display: grid;
       grid-template-columns: 1fr repeat(3, auto);
-      gap: 10px;
-      align-items: center;
+      gap: 0;
+      align-items: stretch;
     }
 
     .pulse-summary {
@@ -287,17 +251,16 @@
     }
 
     .pulse-kpi {
-      text-align: center;
+      text-align: left;
       padding: 7px 11px;
-      border-radius: 8px;
-      background: #EFF6FF;
-      border: 1px solid #BFDBFE;
-      min-width: 50px;
+      background: #FFFFFF;
+      border-left: 1px solid #D3DCE6;
+      min-width: 58px;
     }
 
-    .pulse-kpi.success { background: #F0FDF4; border-color: #86EFAC; }
-    .pulse-kpi.warning { background: #FFFBEB; border-color: #FDE68A; }
-    .pulse-kpi.danger  { background: #FEF2F2; border-color: #FCA5A5; }
+    .pulse-kpi.success { border-top: 2px solid #166534; }
+    .pulse-kpi.warning { border-top: 2px solid #92400E; }
+    .pulse-kpi.danger  { border-top: 2px solid #991B1B; }
 
     .pulse-kpi-label {
       display: block;
@@ -324,9 +287,8 @@
       flex: 1;
       background: #FFFFFF;
       border: 1px solid #D3DCE6;
-      border-radius: 10px;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.05);
+      border-top: 3px solid #0F2036;
     }
 
     .block-header {
@@ -341,7 +303,7 @@
     .block-header-bar {
       width: 3px;
       height: 14px;
-      border-radius: 999px;
+      border-radius: 0;
       background: #18517C;
       flex-shrink: 0;
     }
@@ -372,9 +334,9 @@
        GOVERNANCE
     ───────────────────────────────────────────── */
     .governance-block {
-      background: #EFF6FF;
-      border: 1px solid #BFDBFE;
-      border-radius: 8px;
+      background: #FFFFFF;
+      border: 1px solid #D3DCE6;
+      border-left: 3px solid #18517C;
       padding: 9px 14px;
     }
 
@@ -397,26 +359,21 @@
        STATS PANEL (RIGHT COLUMN)
     ───────────────────────────────────────────── */
     .stats-panel-header {
-      background: linear-gradient(90deg, #18517C 0%, #1865B0 100%);
+      background: #FFFFFF;
       padding: 7px 12px;
-      border-radius: 8px;
+      border: 1px solid #D3DCE6;
+      border-top: 3px solid #0F2036;
       display: flex;
       align-items: center;
       gap: 7px;
     }
 
-    .stats-panel-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.7);
-      flex-shrink: 0;
-    }
+    .stats-panel-dot { width: 24px; height: 2px; background: #18517C; flex-shrink: 0; }
 
     .stats-panel-title {
       font-size: 6.3pt;
       font-weight: 800;
-      color: #FFFFFF;
+      color: #111827;
       text-transform: uppercase;
       letter-spacing: 0.1em;
     }
@@ -424,17 +381,20 @@
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 7px;
+      gap: 0;
+      border: 1px solid #D3DCE6;
+      border-top: 0;
     }
 
     .stat-card {
       background: #FFFFFF;
       border: 1px solid #D3DCE6;
-      border-radius: 8px;
       padding: 10px 12px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(9,30,66,0.04);
+      border: 0;
+      border-right: 1px solid #D3DCE6;
+      border-bottom: 1px solid #D3DCE6;
     }
 
     .stat-card::after {
@@ -442,13 +402,13 @@
       position: absolute;
       top: 0; left: 0; right: 0;
       height: 3px;
-      background: linear-gradient(90deg, #18517C, #1865B0);
+      background: #18517C;
     }
 
-    .stat-card.primary::after { background: linear-gradient(90deg, #18517C, #1865B0); }
-    .stat-card.success::after { background: linear-gradient(90deg, #166534, #16A34A); }
-    .stat-card.warning::after { background: linear-gradient(90deg, #92400E, #D97706); }
-    .stat-card.danger::after  { background: linear-gradient(90deg, #991B1B, #DC2626); }
+    .stat-card.primary::after { background: #18517C; }
+    .stat-card.success::after { background: #166534; }
+    .stat-card.warning::after { background: #92400E; }
+    .stat-card.danger::after  { background: #991B1B; }
 
     .stat-value {
       display: block;
@@ -518,8 +478,8 @@
           <span class="header-badge-dot"></span>
           Sistema de Gestão de Segurança · Conformidade SST
         </div>
-        <h1 class="header-title">RELATÓRIO EXECUTIVO MENSAL</h1>
-        <p class="header-subtitle">Documento institucional de desempenho documental, conformidade e leitura gerencial do período.</p>
+        <h1 class="header-title">RELATÓRIO MENSAL DE SST</h1>
+        <p class="header-subtitle">Consolidado mensal de registros, vencimentos, treinamentos e conformidade de SST.</p>
       </div>
       <div class="header-id-card">
         <div class="header-id-card-top">Identificação do documento</div>
@@ -552,7 +512,7 @@
         <div class="pulse-strip">
           <div class="pulse-strip-header">
             <span class="pulse-dot"></span>
-            <span class="pulse-header-text">Leitura executiva do período</span>
+            <span class="pulse-header-text">Resumo do período</span>
           </div>
           <div class="pulse-body">
             <p class="pulse-summary">{{executive_summary_text}}</p>
@@ -575,7 +535,7 @@
         <div class="analysis-block">
           <div class="block-header">
             <div class="block-header-bar"></div>
-            <span class="block-header-title">Análise executiva · Leitura e recomendação gerencial</span>
+            <span class="block-header-title">Análise e recomendações</span>
           </div>
           <div class="block-content">
             <p class="analysis-text">{{analise_executiva}}</p>
@@ -584,7 +544,7 @@
 
         <!-- Governance -->
         <div class="governance-block">
-          <div class="governance-label">Governança documental</div>
+          <div class="governance-label">Emissão do relatório</div>
           <div class="governance-text">{{governance_note}}</div>
         </div>
 
@@ -594,7 +554,7 @@
       <div class="col-right">
         <div class="stats-panel-header">
           <span class="stats-panel-dot"></span>
-          <span class="stats-panel-title">Indicadores consolidados do período</span>
+          <span class="stats-panel-title">Indicadores do período</span>
         </div>
         <div class="stats-grid">
           {{stats_cards}}
@@ -612,7 +572,7 @@
         <span class="footer-sep">·</span>
         <span>{{companyName}}</span>
       </div>
-      <span class="footer-confidential">Documento confidencial · Emissão digital institucional</span>
+      <span class="footer-confidential">Documento eletrônico · Emissão SGS</span>
     </footer>
 
   </div>

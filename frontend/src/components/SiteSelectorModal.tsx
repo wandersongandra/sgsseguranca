@@ -47,6 +47,7 @@ export default function SiteSelectorModal({
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const deferredSearch = useDeferredValue(search);
 
@@ -87,7 +88,7 @@ export default function SiteSelectorModal({
     return () => {
       cancelled = true;
     };
-  }, [open, currentCompanyId]);
+  }, [open, currentCompanyId, reloadKey]);
 
   const filteredSites = useMemo(() => {
     if (!deferredSearch) return sites;
@@ -112,17 +113,17 @@ export default function SiteSelectorModal({
     onSelect(site);
     onClose?.();
 
-    // Feedback visual
-    toast.success(`Obra "${site.nome}" selecionada`, {
-      description: 'Contexto de trabalho atualizado',
+    toast.success('Obra selecionada', {
+      description: site.nome,
     });
   };
 
   return (
     <ModalFrame isOpen={open} onClose={() => onClose?.()}>
       <ModalHeader
-        title="Selecionar Obra"
-        icon={<HardHat className="h-5 w-5 text-amber-600" />}
+        title="Selecionar obra"
+        description="Escolha a obra usada como contexto para registros e indicadores."
+        icon={<HardHat className="h-5 w-5 text-[var(--ds-color-action-primary)]" />}
       />
 
       <ModalBody className="max-h-[60vh]">
@@ -150,7 +151,7 @@ export default function SiteSelectorModal({
               <p>Não foi possível carregar as obras.</p>
               <Button
                 variant="link"
-                onClick={() => setLoadFailed(false)}
+                onClick={() => setReloadKey((value) => value + 1)}
                 className="mt-2"
               >
                 Tentar novamente
@@ -172,11 +173,11 @@ export default function SiteSelectorModal({
                     type="button"
                     onClick={() => handleSelect(site)}
                     className={`
-                      w-full text-left p-3 rounded-lg border transition-colors
+                      w-full rounded-[var(--ds-radius-md)] border p-3 text-left transition-colors
                       ${
                         currentSiteId === site.id
-                          ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30'
-                          : 'border-[var(--ds-color-border-subtle)] hover:bg-[var(--ds-color-surface-muted)]/50'
+                          ? 'border-[var(--ds-color-primary-border)] bg-[var(--ds-color-primary-subtle)]'
+                          : 'border-[var(--ds-color-border-subtle)] hover:border-[var(--ds-color-border-default)] hover:bg-[var(--ds-color-surface-muted)]'
                       }
                     `}
                   >
@@ -184,10 +185,10 @@ export default function SiteSelectorModal({
                       <div className="flex items-start gap-3">
                         <div
                           className={`
-                            p-2 rounded-lg
+                            rounded-[var(--ds-radius-sm)] p-2
                             ${
                               currentSiteId === site.id
-                                ? 'bg-amber-100 dark:bg-amber-900'
+                                ? 'bg-[var(--ds-color-surface-base)]'
                                 : 'bg-[var(--ds-color-surface-muted)]'
                             }
                           `}
@@ -197,7 +198,7 @@ export default function SiteSelectorModal({
                               h-4 w-4
                               ${
                                 currentSiteId === site.id
-                                  ? 'text-amber-600'
+                                  ? 'text-[var(--ds-color-action-primary)]'
                                   : 'text-[var(--ds-color-text-muted)]'
                               }
                             `}

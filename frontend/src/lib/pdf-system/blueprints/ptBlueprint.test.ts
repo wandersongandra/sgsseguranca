@@ -336,7 +336,7 @@ describe("drawPtBlueprint", () => {
       expect.objectContaining({
         draft: true,
         subtitle:
-          "Prévia local para revisão interna. A emissão oficial exige fluxo governado no SGS.",
+          "Prévia para revisão. O documento oficial é emitido pelo backend do SGS.",
       }),
     );
   });

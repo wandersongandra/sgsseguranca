@@ -82,7 +82,7 @@ test.describe("DDS - certificação autenticada no ambiente sintético", () => {
     });
   });
 
-  test("autentica, abre o Cockpit DDS e cria um registro governado", async ({ page }) => {
+  test("autentica, abre o módulo de DDS e cria um registro governado", async ({ page }) => {
     await page.goto("/login");
     await page.getByLabel("CPF").fill("00000000000");
     await page.locator("#senha").fill("senha-sintetica");

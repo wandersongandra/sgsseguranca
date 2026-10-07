@@ -135,7 +135,7 @@ export function RdoEditorModal({
     <ModalFrame
       isOpen={open}
       onClose={onClose}
-      shellClassName="flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl flex-col"
+      shellClassName="flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col md:w-[calc(100%-1rem)]"
     >
         <ModalHeader
           title={editingId ? "Editar RDO" : "Novo Relatório Diário de Obra"}
@@ -145,7 +145,7 @@ export function RdoEditorModal({
         />
 
         <ModalBody className="min-h-0 overflow-y-auto px-4 py-5 sm:px-6">
-          <div className="mb-6 flex items-center gap-2 overflow-x-auto pb-1">
+          <div className="ds-table-scroll mb-5 flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-2 sm:mb-6">
             {steps.map((step, idx) => {
               const Icon = step.icon;
               return (
@@ -154,7 +154,7 @@ export function RdoEditorModal({
                   type="button"
                   onClick={() => setCurrentStep(idx)}
                   className={cn(
-                    "flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                    "flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-[var(--ds-radius-md)] px-3 py-2 text-sm font-medium transition-colors",
                     idx === currentStep
                       ? "bg-[var(--ds-color-action-primary)] text-white"
                       : idx < currentStep
@@ -169,7 +169,7 @@ export function RdoEditorModal({
             })}
           </div>
 
-          <div className="min-h-[28rem]">
+          <div className="min-h-0 sm:min-h-[28rem]">
             {currentStep === 0 && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -387,7 +387,7 @@ export function RdoEditorModal({
                 {form.mao_de_obra.map((item, i) => (
                   <div
                     key={item.__rowKey}
-                    className="grid grid-cols-1 items-end gap-2 rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 p-3 sm:grid-cols-2 lg:grid-cols-4"
+                    className="grid grid-cols-1 items-end gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3 sm:grid-cols-2 lg:grid-cols-4"
                   >
                     <div>
                       <label htmlFor={`rdo-work-role-${i}`} className="mb-1 block text-xs font-medium text-[var(--ds-color-text-secondary)]">
@@ -484,9 +484,9 @@ export function RdoEditorModal({
                 {form.equipamentos.map((item, i) => (
                   <div
                     key={item.__rowKey}
-                    className="grid grid-cols-1 items-end gap-2 rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 p-3 sm:grid-cols-2 lg:grid-cols-4"
+                    className="grid grid-cols-1 items-end gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3 sm:grid-cols-2 lg:grid-cols-4"
                   >
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-[var(--ds-color-text-secondary)]">
                         Equipamento
                       </label>
@@ -566,9 +566,9 @@ export function RdoEditorModal({
                 {form.materiais_recebidos.map((item, i) => (
                   <div
                     key={item.__rowKey}
-                    className="grid grid-cols-1 items-end gap-2 rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 p-3 sm:grid-cols-2 lg:grid-cols-4"
+                    className="grid grid-cols-1 items-end gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3 sm:grid-cols-2 lg:grid-cols-4"
                   >
-                    <div className="col-span-2">
+                    <div className="sm:col-span-2">
                       <label className="mb-1 block text-xs font-medium text-[var(--ds-color-text-secondary)]">
                         Descrição
                       </label>
@@ -684,7 +684,7 @@ export function RdoEditorModal({
                 {form.ocorrencias.map((item, i) => (
                   <div
                     key={item.__rowKey}
-                    className="grid gap-2 rounded-xl border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/30 p-3 md:grid-cols-[180px_minmax(0,1fr)_120px_auto]"
+                    className="grid gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-3 md:grid-cols-[180px_minmax(0,1fr)_120px_auto]"
                   >
                     <div>
                       <label className="mb-1 block text-xs font-medium text-[var(--ds-color-text-secondary)]">
@@ -755,7 +755,7 @@ export function RdoEditorModal({
                 </button>
 
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2 rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4">
+                  <div className="space-y-2 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-4">
                     <label className="flex items-center gap-2 text-sm font-medium text-[var(--ds-color-text-primary)]">
                       <input
                         type="checkbox"
@@ -855,20 +855,20 @@ export function RdoEditorModal({
           </div>
         </ModalBody>
 
-        <ModalFooter className="flex flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6">
+        <ModalFooter className="rdo-editor-footer flex flex-wrap items-center justify-between gap-2 px-4 py-4 sm:px-6">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-[var(--ds-color-border-subtle)] px-4 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)] motion-safe:transition-colors"
+            className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-4 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] hover:text-[var(--ds-color-text-primary)] motion-safe:transition-colors"
           >
             Cancelar
           </button>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="rdo-editor-footer__actions flex flex-wrap items-center justify-end gap-2">
             {currentStep > 0 && (
               <button
                 type="button"
                 onClick={() => setCurrentStep((step) => step - 1)}
-                className="flex items-center gap-1 rounded-xl border border-[var(--ds-color-border-subtle)] px-3 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
+                className="flex items-center gap-1 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-3 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)] motion-safe:transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" /> Anterior
               </button>
@@ -877,7 +877,7 @@ export function RdoEditorModal({
               <button
                 type="button"
                 onClick={() => setCurrentStep((step) => step + 1)}
-                className="flex items-center gap-1 rounded-xl bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] motion-safe:transition-colors"
+                className="flex items-center gap-1 rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] motion-safe:transition-colors"
               >
                 Próximo <ChevronRight className="h-4 w-4" />
               </button>
@@ -888,7 +888,7 @@ export function RdoEditorModal({
                   data-offline-action="write"
                   onClick={() => onSave({ printAfterSave: true })}
                   disabled={saving}
-                  className="rounded-xl border border-[var(--ds-color-border-subtle)] px-5 py-2 text-sm font-medium text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)] disabled:opacity-50 motion-safe:transition-colors"
+                  className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] px-5 py-2 text-sm font-medium text-[var(--ds-color-text-primary)] hover:bg-[color:var(--ds-color-surface-muted)] disabled:opacity-50 motion-safe:transition-colors"
                 >
                   {saving
                     ? "Salvando..."
@@ -901,7 +901,7 @@ export function RdoEditorModal({
                   data-offline-action="write"
                   onClick={() => onSave()}
                   disabled={saving}
-                  className="rounded-xl bg-[var(--ds-color-action-primary)] px-5 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-50 motion-safe:transition-colors"
+                  className="rounded-[var(--ds-radius-md)] bg-[var(--ds-color-action-primary)] px-5 py-2 text-sm font-medium text-white hover:bg-[var(--ds-color-action-primary-hover)] disabled:opacity-50 motion-safe:transition-colors"
                 >
                   {saving
                     ? "Salvando..."

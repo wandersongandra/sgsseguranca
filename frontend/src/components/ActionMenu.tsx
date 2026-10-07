@@ -84,7 +84,7 @@ export function ActionMenu({ items, triggerAriaLabel = "Ações" }: ActionMenuPr
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="rounded-md p-2 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[color:var(--ds-color-surface-muted)]/72 hover:text-[var(--ds-color-text-primary)]"
+        className="flex h-11 w-11 items-center justify-center rounded-[var(--ds-radius-md)] text-[var(--ds-color-text-muted)] transition-colors hover:bg-[color:var(--ds-color-surface-muted)]/72 hover:text-[var(--ds-color-text-primary)] md:h-9 md:w-9"
         title="Ações"
         aria-label={triggerAriaLabel}
         aria-haspopup="menu"
@@ -95,7 +95,7 @@ export function ActionMenu({ items, triggerAriaLabel = "Ações" }: ActionMenuPr
 
       {open && (
         <div
-          className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-elevated)] shadow-[var(--ds-shadow-md)]"
+          className="ds-action-menu-panel absolute right-0 z-50 mt-1 max-h-[min(60dvh,20rem)] w-[min(13rem,calc(100vw-1.5rem))] overflow-y-auto overscroll-contain rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-elevated)] shadow-[var(--ds-shadow-md)]"
           role="menu"
           aria-label={triggerAriaLabel}
           onKeyDown={handleMenuKeyDown}
@@ -114,7 +114,7 @@ export function ActionMenu({ items, triggerAriaLabel = "Ações" }: ActionMenuPr
                 item.onClick();
               }}
               className={cn(
-                'flex w-full items-center gap-2 px-4 py-2.5 text-sm transition-colors',
+                'flex min-h-11 w-full items-center gap-2 px-4 py-2.5 text-sm transition-colors',
                 item.variant === 'danger'
                   ? 'text-[var(--ds-color-danger)] hover:bg-[color:var(--ds-color-danger)]/10 hover:text-[var(--ds-color-danger)]'
                   : 'text-[var(--ds-color-text-secondary)] hover:bg-[color:var(--ds-color-surface-muted)]/76 hover:text-[var(--ds-color-text-primary)]',

@@ -415,7 +415,7 @@ export default function MedicalExamsPage() {
                 setFilterTipo(event.target.value);
                 setPage(1);
               }}
-              className={cn(fieldClassName, 'min-w-[220px]')}
+              className={cn(fieldClassName, 'w-full md:w-auto md:min-w-[220px]')}
             >
               <option value="">Todos os tipos</option>
               {Object.entries(TIPO_EXAME_LABEL).map(([key, label]) => (
@@ -430,7 +430,7 @@ export default function MedicalExamsPage() {
                 setFilterResultado(event.target.value);
                 setPage(1);
               }}
-              className={cn(fieldClassName, 'min-w-[220px]')}
+              className={cn(fieldClassName, 'w-full md:w-auto md:min-w-[220px]')}
             >
               <option value="">Todos os resultados</option>
               {Object.entries(RESULTADO_LABEL).map(([key, label]) => (
@@ -488,10 +488,10 @@ export default function MedicalExamsPage() {
               mobileClassName="space-y-3 p-3"
               mobile={(exam) => {
                 const expiry = getMedicalExamExpiryTone(exam.data_vencimento);
-                return <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{exam.user?.nome ?? 'Colaborador'}</h3><p className="text-sm text-[var(--ds-color-text-secondary)]">{TIPO_EXAME_LABEL[exam.tipo_exame] ?? exam.tipo_exame}</p></div><StatusPill tone={getResultTone(exam.resultado)}>{RESULTADO_LABEL[exam.resultado] ?? exam.resultado}</StatusPill></div>
-                  <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Realização</dt><dd>{formatMedicalExamDateOnly(exam.data_realizacao)}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Vencimento</dt><dd>{exam.data_vencimento ? formatMedicalExamDateOnly(exam.data_vencimento) : 'Sem vencimento'}<span className="block text-xs text-[var(--ds-color-text-muted)]">{expiry.label}</span></dd></div><div className="col-span-2"><dt className="text-xs text-[var(--ds-color-text-muted)]">Médico</dt><dd>{exam.medico_responsavel ?? '-'}</dd></div></dl>
-                  <div className="mt-4 grid grid-cols-2 gap-2 border-t pt-3"><Button variant="outline" size="sm" data-offline-action="write" onClick={() => openEdit(exam)} leftIcon={<Pencil className="h-4 w-4" />}>Editar</Button><Button variant="danger" size="sm" data-offline-action="write" onClick={() => setDeleteTarget(exam)} leftIcon={<Trash2 className="h-4 w-4" />}>Excluir</Button></div>
+                return <article className="ds-mobile-card">
+                  <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold">{exam.user?.nome ?? 'Colaborador'}</h3><p className="text-sm text-[var(--ds-color-text-secondary)]">{TIPO_EXAME_LABEL[exam.tipo_exame] ?? exam.tipo_exame}</p></div><StatusPill tone={getResultTone(exam.resultado)}>{RESULTADO_LABEL[exam.resultado] ?? exam.resultado}</StatusPill></div>
+                  <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-1 gap-3 text-sm min-[360px]:grid-cols-2"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Realização</dt><dd>{formatMedicalExamDateOnly(exam.data_realizacao)}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Vencimento</dt><dd>{exam.data_vencimento ? formatMedicalExamDateOnly(exam.data_vencimento) : 'Sem vencimento'}<span className="block text-xs text-[var(--ds-color-text-muted)]">{expiry.label}</span></dd></div><div className="col-span-2"><dt className="text-xs text-[var(--ds-color-text-muted)]">Médico</dt><dd>{exam.medico_responsavel ?? '-'}</dd></div></dl>
+                  <div className="ds-mobile-card__actions mt-4 grid grid-cols-1 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3 min-[360px]:grid-cols-2"><Button variant="outline" size="sm" data-offline-action="write" onClick={() => openEdit(exam)} leftIcon={<Pencil className="h-4 w-4" />}>Editar</Button><Button variant="danger" size="sm" data-offline-action="write" onClick={() => setDeleteTarget(exam)} leftIcon={<Trash2 className="h-4 w-4" />}>Excluir</Button></div>
                 </article>;
               }}
               desktop={() => (

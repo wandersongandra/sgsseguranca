@@ -47,7 +47,7 @@ const statusPillVariants = cva(
 
 const statusSelectVariants = cva(
   [
-    'rounded-full border px-3 py-1 text-xs font-semibold outline-none',
+    'min-h-10 rounded-[var(--ds-radius-md)] border px-3 py-2 text-sm font-semibold outline-none',
     'transition-colors duration-[120ms]',
     'focus:border-[var(--ds-color-focus)]',
     'focus-visible:outline-none focus-visible:ring-2',

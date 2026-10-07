@@ -18,15 +18,15 @@ export function DashboardPrimaryActions({
 }: DashboardPrimaryActionsProps) {
   return (
     <section
-      aria-label="Ações prioritárias do dashboard"
+      aria-label="Ações principais do dashboard"
       className="ds-dashboard-actions-strip"
     >
       <div className="min-w-0">
-        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--ds-color-text-secondary)]">
-          Trabalho imediato
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
+          Atalhos
         </p>
         <h2 className="text-sm font-bold text-[var(--title)]">
-          Ações prioritárias
+          Ações principais
         </h2>
       </div>
 

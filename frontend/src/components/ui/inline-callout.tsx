@@ -77,7 +77,7 @@ export function InlineCallout({
       role={resolvedRole}
       aria-live={tone === 'danger' ? 'assertive' : tone === 'warning' ? 'polite' : undefined}
       className={cn(
-        'mx-4 mt-4 flex flex-wrap items-start justify-between gap-3 rounded-[var(--ds-radius-lg)] border px-4 py-3.5',
+        'mx-4 mt-4 flex flex-wrap items-start justify-between gap-3 rounded-[var(--ds-radius-md)] border px-4 py-3',
         styles.shell,
         className,
       )}
@@ -87,7 +87,7 @@ export function InlineCallout({
           <div
             aria-hidden="true"
             className={cn(
-              'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
+              'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-sm)] border',
               styles.icon,
             )}
           >

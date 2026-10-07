@@ -74,7 +74,7 @@ export default function CompanySelectorModal({ open, onSelect, onLogout, current
     <ModalFrame
       isOpen={open}
       onClose={canDismiss ? onClose! : () => {}}
-      shellClassName="mx-4 max-w-lg"
+      shellClassName="max-w-lg"
       overlayClassName="z-50"
     >
       <ModalHeader
@@ -99,7 +99,7 @@ export default function CompanySelectorModal({ open, onSelect, onLogout, current
           </div>
         </div>
 
-        <div className="max-h-72 overflow-y-auto">
+        <div className="max-h-[min(50dvh,24rem)] overflow-y-auto overscroll-contain">
           {loading ? (
             <div className="flex items-center justify-center py-10 text-[var(--ds-color-text-muted)]">
               <Loader2 className="mr-2 h-6 w-6 animate-spin" />
@@ -124,7 +124,7 @@ export default function CompanySelectorModal({ open, onSelect, onLogout, current
                         await selectedTenantStore.set({ companyId: company.id, companyName: company.razao_social });
                         onSelect(company);
                       }}
-                      className={`flex w-full items-center justify-between rounded-[var(--ds-radius-lg)] border px-4 py-3 text-left transition-colors ${
+                      className={`flex min-h-11 w-full items-center justify-between rounded-[var(--ds-radius-md)] border px-3.5 py-3 text-left transition-colors sm:px-4 ${
                         isActive
                           ? 'border-[color:var(--ds-color-action-primary)]/18 bg-[var(--ds-color-primary-subtle)]'
                           : 'border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] hover:border-[var(--ds-color-border-default)] hover:bg-[var(--ds-color-surface-muted)]/18'

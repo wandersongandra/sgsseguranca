@@ -111,20 +111,20 @@ async function drawOneEvidence(
 
   doc.setFillColor(...theme.tone.surface);
   doc.setDrawColor(...theme.tone.border);
-  doc.setLineWidth(0.28);
-  doc.roundedRect(cardX, ctx.y, cardW, cardH, 2, 2, "FD");
+  doc.setLineWidth(0.22);
+  doc.rect(cardX, ctx.y, cardW, cardH, "FD");
 
   doc.setFillColor(...theme.tone.surfaceMuted);
-  doc.roundedRect(cardX + 5, ctx.y + 6, imageWrapW, cardInnerH, 1.5, 1.5, "F");
+  doc.rect(cardX + 5, ctx.y + 6, imageWrapW, cardInnerH, "F");
   doc.setDrawColor(...theme.tone.borderStrong);
   doc.setLineWidth(0.18);
-  doc.roundedRect(cardX + 5, ctx.y + 6, imageWrapW, cardInnerH, 1.5, 1.5, "S");
+  doc.rect(cardX + 5, ctx.y + 6, imageWrapW, cardInnerH, "S");
 
   const textX = cardX + imageWrapW + 11;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.caption);
   doc.setTextColor(...theme.tone.textMuted);
-  doc.text(`EVIDENCIA ${index + 1}`, textX, ctx.y + 12);
+  doc.text(`EVIDÊNCIA ${index + 1}`, textX, ctx.y + 12);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.headingSm);
@@ -218,17 +218,17 @@ export async function drawEvidenceGallery(ctx: PdfContext, options: EvidenceGall
   // Keep the gallery heading together with the first evidence row and away from the footer.
   ensureSpace(ctx, useDoubleColumn ? 102 : 82);
 
-  doc.setFillColor(...theme.tone.surface);
-  doc.setDrawColor(...theme.tone.border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(margin, ctx.y, contentWidth, 10, 2, 2, "FD");
-  doc.setFillColor(...theme.tone.info);
-  doc.rect(margin, ctx.y, 2.5, 10, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.headingSm);
   doc.setTextColor(...theme.tone.textPrimary);
-  doc.text(options.title, margin + 5, ctx.y + 6.5);
-  moveY(ctx, 12);
+  doc.text(options.title, margin, ctx.y + 5.8);
+  doc.setDrawColor(...theme.tone.info);
+  doc.setLineWidth(0.45);
+  doc.line(margin, ctx.y + 8.4, margin + 30, ctx.y + 8.4);
+  doc.setDrawColor(...theme.tone.border);
+  doc.setLineWidth(0.16);
+  doc.line(margin + 32, ctx.y + 8.4, margin + contentWidth, ctx.y + 8.4);
+  moveY(ctx, 11);
 
   // Use 2-per-row layout when 2+ items to maximise page space and produce a
   // polished grid view consistent with the document design system.

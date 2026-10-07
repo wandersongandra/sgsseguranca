@@ -202,7 +202,7 @@ export const AprCard = React.memo(
           )}
         />
 
-        <CardHeader className="gap-4 p-5">
+        <CardHeader className="gap-3 p-4 sm:gap-4 sm:p-5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -235,7 +235,7 @@ export const AprCard = React.memo(
           </div>
         </CardHeader>
 
-        <CardContent className="mt-0 flex flex-1 flex-col px-5 pb-5">
+        <CardContent className="mt-0 flex flex-1 flex-col px-4 pb-4 sm:px-5 sm:pb-5">
           <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <AprCardMetric
               icon={<Building2 className="h-4 w-4" />}
@@ -270,7 +270,7 @@ export const AprCard = React.memo(
             />
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:gap-3">
             <button
               type="button"
               onClick={handleOpenSignaturesPanel}
@@ -305,7 +305,7 @@ export const AprCard = React.memo(
                 )}
                 {pdf.label}
               </span>
-              <span className="mt-1 block truncate text-[11px] font-medium opacity-85">
+              <span className="mt-1 block break-words text-[11px] font-medium opacity-85 sm:truncate">
                 {pdf.detail}
               </span>
             </button>
@@ -326,7 +326,7 @@ export const AprCard = React.memo(
             </div>
           ) : null}
 
-          <div className="mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-[var(--ds-color-border-subtle)] pt-4">
+          <div className="ds-mobile-card__actions mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-[var(--ds-color-border-subtle)] pt-4 sm:flex">
             {isApproved && canUpdateApr ? (
               <>
                 <Button
@@ -468,11 +468,11 @@ function AprCardMetric({
           {label}
         </span>
       </div>
-      <p className="mt-1 truncate text-sm font-semibold text-[var(--ds-color-text-primary)]">
+      <p className="mt-1 break-words text-sm font-semibold text-[var(--ds-color-text-primary)] sm:truncate">
         {value}
       </p>
       {detail ? (
-        <p className="mt-0.5 truncate text-xs text-[var(--ds-color-text-secondary)]">
+        <p className="mt-0.5 break-words text-xs text-[var(--ds-color-text-secondary)] sm:truncate">
           {detail}
         </p>
       ) : null}

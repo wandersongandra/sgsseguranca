@@ -15,6 +15,7 @@ function createMockContext(): {
     setFontSize: jest.Mock;
     setTextColor: jest.Mock;
     text: jest.Mock;
+    line: jest.Mock;
     lastAutoTable?: { finalY?: number };
   };
   autoTable: jest.Mock;
@@ -30,6 +31,7 @@ function createMockContext(): {
     setFontSize: jest.fn(),
     setTextColor: jest.fn(),
     text: jest.fn(),
+    line: jest.fn(),
     lastAutoTable: undefined as { finalY?: number } | undefined,
   };
 

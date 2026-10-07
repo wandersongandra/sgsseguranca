@@ -335,7 +335,7 @@ export function WizardStep1BasicData({
               type="date"
               disabled={!canManage}
             />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2">
               <Field
                 label="Horário início"
                 value={form.start_time}

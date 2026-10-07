@@ -74,7 +74,7 @@ export function DdsThemeLibraryModal({
             />
           </div>
 
-          <div className="max-h-[400px] overflow-y-auto pr-1">
+          <div className="max-h-[min(60dvh,400px)] overflow-y-auto overscroll-contain pr-1">
             {loading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-[var(--ds-color-action-primary)]" />
@@ -96,7 +96,7 @@ export function DdsThemeLibraryModal({
                       onSelect(theme);
                       onClose();
                     }}
-                    className="flex flex-col rounded-lg border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 text-left transition-colors hover:border-[var(--ds-color-action-primary)] hover:bg-[var(--ds-color-action-primary)]/5"
+                    className="flex min-h-11 flex-col rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 text-left transition-colors hover:border-[var(--ds-color-action-primary)] hover:bg-[var(--ds-color-action-primary)]/5"
                   >
                     <span className="font-semibold text-[var(--ds-color-text-primary)]">
                       {theme.tema}

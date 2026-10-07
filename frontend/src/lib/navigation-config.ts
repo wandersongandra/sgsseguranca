@@ -89,8 +89,8 @@ export const navigationItems: readonly NavigationItem[] = [
     section: 'estrutura',
     surfaces: all,
     priority: 1,
-    description: 'Cockpit executivo e visão geral',
-    keywords: ['home', 'cockpit'],
+    description: 'Visão geral de indicadores e pendências',
+    keywords: ['home', 'visão geral', 'indicadores'],
   }),
   item({
     id: 'companies',

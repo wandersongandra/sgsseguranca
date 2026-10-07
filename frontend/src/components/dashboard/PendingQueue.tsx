@@ -348,7 +348,7 @@ function PendingQueueFiltersComponent({
   return (
     <>
       <div
-        className="flex flex-wrap items-center gap-2"
+        className="pending-queue-filters flex min-w-0 flex-wrap items-center gap-2"
         role="group"
         aria-label="Filtros do dashboard"
       >
@@ -372,7 +372,7 @@ function PendingQueueFiltersComponent({
           ))}
         </div>
 
-        <div className="relative" ref={dropdownRef}>
+        <div className="pending-queue-site-filter relative min-w-0" ref={dropdownRef}>
           <button
             type="button"
             onClick={() => setSiteDropdownOpen((v) => !v)}
@@ -384,10 +384,12 @@ function PendingQueueFiltersComponent({
                 ? `Obra selecionada: ${selectedSite.nome}. Clique para trocar`
                 : "Filtrar por obra"
             }
-            className="flex items-center gap-2 rounded-lg border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ds-color-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary)]"
+            className="flex min-h-11 max-w-full min-w-0 items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-[12px] font-semibold text-[var(--ds-color-text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary)]"
           >
             <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
-            {selectedSite ? selectedSite.nome : "Todas as obras"}
+            <span className="min-w-0 truncate">
+              {selectedSite ? selectedSite.nome : "Todas as obras"}
+            </span>
             <ChevronDown
               className={cn(
                 "h-3.5 w-3.5",
@@ -399,7 +401,7 @@ function PendingQueueFiltersComponent({
           {siteDropdownOpen && (
             <div
               id={siteDropdownId}
-              className="absolute left-0 top-full z-50 mt-1 max-h-80 min-w-[240px] overflow-hidden rounded-xl border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)] focus:outline-none"
+              className="pending-site-menu absolute left-0 top-full z-50 mt-1 max-h-[min(50dvh,20rem)] w-[min(20rem,calc(100vw-2rem))] min-w-0 overflow-hidden rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)] focus:outline-none"
             >
               <div className="border-b border-[var(--ds-color-border-subtle)] p-2 bg-[var(--ds-color-surface-muted)]/30">
                 <input
@@ -426,7 +428,7 @@ function PendingQueueFiltersComponent({
                       setSiteSearchQuery("");
                     }}
                     className={cn(
-                      "w-full px-4 py-2.5 text-left text-[13px] hover:bg-[var(--ds-color-surface-muted)] focus-visible:bg-[var(--ds-color-surface-muted)] focus-visible:outline-none",
+                      "min-h-11 w-full px-4 py-2.5 text-left text-[13px] hover:bg-[var(--ds-color-surface-muted)] focus-visible:bg-[var(--ds-color-surface-muted)] focus-visible:outline-none",
                       !selectedSite
                         ? "font-bold text-[var(--ds-color-action-primary)]"
                         : "text-[var(--ds-color-text-secondary)]",
@@ -454,7 +456,7 @@ function PendingQueueFiltersComponent({
                           setSiteSearchQuery("");
                         }}
                         className={cn(
-                          "w-full px-4 py-2.5 text-left text-[13px] hover:bg-[var(--ds-color-surface-muted)] focus-visible:bg-[var(--ds-color-surface-muted)] focus-visible:outline-none",
+                          "min-h-11 w-full px-4 py-2.5 text-left text-[13px] hover:bg-[var(--ds-color-surface-muted)] focus-visible:bg-[var(--ds-color-surface-muted)] focus-visible:outline-none",
                           selectedSite?.id === site.id
                             ? "font-bold text-[var(--ds-color-action-primary)]"
                             : "text-[var(--ds-color-text-secondary)]",
@@ -478,7 +480,7 @@ function PendingQueueFiltersComponent({
               setSelectedSite(null);
             }}
             aria-label="Remover todos os filtros ativos"
-            className="flex items-center gap-1.5 rounded-lg border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ds-color-warning-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-warning)]"
+            className="flex min-h-11 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-3 py-2 text-[12px] font-semibold text-[var(--ds-color-warning-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-warning)]"
           >
             Limpar filtros ×
           </button>
@@ -543,7 +545,7 @@ function PendingQueueFiltersComponent({
           <a
             href="#priority-table"
             aria-label="Ir para a fila de prioridades"
-            className="flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs font-bold text-[var(--ds-color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-danger)] focus-visible:ring-offset-2"
+            className="flex min-h-11 shrink-0 items-center justify-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-xs font-bold text-[var(--ds-color-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-danger)] focus-visible:ring-offset-2"
           >
             Ver agora <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
           </a>

@@ -64,6 +64,7 @@ import { computeChecklistBarrierSummary } from "../barrier-viva";
 import { safeToLocaleString, toInputDateValue } from "@/lib/date/safeFormat";
 import { PageHeader } from "@/components/layout";
 import { StatusPill } from "@/components/ui/status-pill";
+import { ModalFrame, ModalHeader, ModalBody, ModalFooter } from "@/components/ui/modal-frame";
 import {
   getSensitiveDraftExpiresAt,
   isSensitiveDraftExpired,
@@ -2080,11 +2081,10 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
                 Modo campo
               </p>
               <h2 className="mt-2 text-lg font-semibold text-[var(--ds-color-text-primary)]">
-                Checklist rápido para celular
+                Checklist em campo
               </h2>
               <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-                Fluxo com botões maiores, câmera pronta e fila offline para uso
-                em obra, rua e áreas industriais.
+                Registre respostas e evidências no local da inspeção. Se a conexão cair, o envio fica na fila para sincronização posterior.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-2 text-center md:w-[260px]">
@@ -2871,7 +2871,8 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
 
         {/* Rodapé de Ações */}
         <div
-          className={`print:hidden ${isFieldMode ? "sticky bottom-4 z-10 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-strong)] bg-[var(--ds-color-surface-elevated)]/95 p-4 shadow-[var(--ds-shadow-lg)] backdrop-blur" : "flex items-center justify-end gap-3"}`}
+          data-sophie-reserved-zone="bottom"
+          className={`ds-mobile-form-actions print:hidden ${isFieldMode ? "sticky bottom-4 z-10 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-strong)] bg-[var(--ds-color-surface-elevated)]/95 p-4 shadow-[var(--ds-shadow-lg)] backdrop-blur" : "flex items-center justify-end gap-3"}`}
         >
           {isFieldMode ? (
             <div className="mb-3">
@@ -2887,8 +2888,8 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
           <div
             className={
               isFieldMode
-                ? "grid grid-cols-2 gap-3"
-                : "flex items-center justify-end gap-3"
+                ? "ds-mobile-form-actions__buttons grid grid-cols-2 gap-3"
+                : "ds-mobile-form-actions__buttons flex items-center justify-end gap-3"
             }
           >
             <Link
@@ -3008,56 +3009,54 @@ export function ChecklistForm({ id, mode = "checklist" }: ChecklistFormProps) {
       />
 
       {/* Modal de Email */}
-      {emailModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--component-overlay)] p-4">
-          <div
-            className={`${panelClassName} w-full max-w-md p-6 shadow-[var(--ds-shadow-lg)]`}
+      <ModalFrame
+        isOpen={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        shellClassName="max-w-md"
+      >
+        <ModalHeader
+          title="Enviar checklist por e-mail"
+          description="Informe o endereço que receberá o PDF do checklist."
+          onClose={() => setEmailModalOpen(false)}
+        />
+        <ModalBody>
+          <label
+            htmlFor="checklist-form-email-destino"
+            className={labelClassName}
           >
-            <h3 className="mb-2 text-lg font-bold text-[var(--ds-color-text-primary)]">
-              Enviar Documento
-            </h3>
-            <p className="mb-4 text-sm text-[var(--ds-color-text-muted)]">
-              Digite o endereço de email para receber este checklist em PDF.
-            </p>
-
-            <div className="mb-6">
-              <label
-                htmlFor="checklist-form-email-destino"
-                className={labelClassName}
-              >
-                Email de Destino
-              </label>
-              <input
-                id="checklist-form-email-destino"
-                type="email"
-                value={emailTo}
-                onChange={(e) => setEmailTo(e.target.value)}
-                placeholder="exemplo@empresa.com"
-                className={fieldClassName}
-                autoFocus
-              />
-            </div>
-
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="secondary"
-                onClick={() => setEmailModalOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSendEmail}
-                loading={sendingEmail}
-                disabled={!emailTo}
-                className="gap-2"
-              >
-                <Send className="h-4 w-4" />
-                Enviar
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+            E-mail de destino
+          </label>
+          <input
+            id="checklist-form-email-destino"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            value={emailTo}
+            onChange={(e) => setEmailTo(e.target.value)}
+            placeholder="exemplo@empresa.com"
+            className={fieldClassName}
+            autoFocus
+          />
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => setEmailModalOpen(false)}
+            disabled={sendingEmail}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleSendEmail}
+            loading={sendingEmail}
+            disabled={!emailTo}
+            className="gap-2"
+          >
+            <Send className="h-4 w-4" />
+            Enviar
+          </Button>
+        </ModalFooter>
+      </ModalFrame>
     </div>
   );
 }

@@ -17,10 +17,7 @@ export type DocumentHeaderOptions = {
 };
 
 function clampLines(lines: string[], maxLines: number) {
-  if (lines.length <= maxLines) {
-    return lines;
-  }
-
+  if (lines.length <= maxLines) return lines;
   const limited = lines.slice(0, Math.max(1, maxLines));
   limited[limited.length - 1] = `${limited[limited.length - 1]}...`;
   return limited;
@@ -44,99 +41,72 @@ function drawCompactDocumentHeader(
   options: DocumentHeaderOptions,
 ) {
   const { doc, margin, contentWidth, theme } = ctx;
-  const compactHeight = 14.5;
-  const infoY = compactHeight + 2.1;
-  const codeW = 52;
+  const top = 6;
+  const codeW = 50;
   const codeX = margin + contentWidth - codeW;
-  const textMaxWidth = codeX - margin - 5;
-  const compactMeta = [
-    sanitize(options.company),
-    sanitize(options.site),
-    sanitize(options.date),
-  ]
-    .filter((value) => value !== "-")
-    .join("  |  ");
+  const copyW = Math.max(40, codeX - margin - 6);
 
-  doc.setFillColor(...theme.tone.brand);
-  doc.rect(0, 0, ctx.pageWidth, compactHeight, "F");
   doc.setFillColor(...theme.tone.brandStrong);
-  doc.rect(0, compactHeight - 1.1, ctx.pageWidth, 1.1, "F");
+  doc.rect(0, 0, ctx.pageWidth, 2.4, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.headingSm);
-  doc.setTextColor(...theme.tone.brandOn);
-  doc.text(clampLines(doc.splitTextToSize(options.title, textMaxWidth) as string[], 1), margin, 7.4);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(theme.typography.caption);
-  doc.setTextColor(223, 231, 239);
-  doc.text(
-    clampLines(doc.splitTextToSize(options.subtitle, textMaxWidth) as string[], 1),
-    margin,
-    11.4,
-  );
-
-  doc.setFillColor(...theme.tone.surface);
-  doc.setDrawColor(...theme.tone.borderStrong);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(
-    codeX,
-    3.1,
-    codeW,
-    8.4,
-    theme.spacing.radius / 1.4,
-    theme.spacing.radius / 1.4,
-    "FD",
-  );
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(theme.typography.caption);
   doc.setTextColor(...theme.tone.textPrimary);
   doc.text(
-    clampLines(doc.splitTextToSize(sanitize(options.code), codeW - 8) as string[], 1),
-    codeX + codeW / 2,
-    7.4,
-    { align: "center" },
-  );
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(theme.typography.caption);
-  doc.setTextColor(...theme.tone.textSecondary);
-  doc.text(
-    clampLines(
-      doc.splitTextToSize(
-        `${sanitize(options.codeLabel || "ID")} | ${sanitize(options.status)}`,
-        codeW - 8,
-      ) as string[],
-      1,
-    ),
-    codeX + codeW / 2,
-    10.3,
-    { align: "center" },
+    clampLines(doc.splitTextToSize(sanitize(options.title), copyW) as string[], 1),
+    margin,
+    top + 4,
   );
 
-  if (compactMeta) {
-    doc.setFillColor(...theme.tone.surface);
-    doc.setDrawColor(...theme.tone.border);
-    doc.setLineWidth(0.22);
-    doc.roundedRect(
-      margin,
-      infoY,
-      contentWidth,
-      6.8,
-      theme.spacing.radius / 1.8,
-      theme.spacing.radius / 1.8,
-      "FD",
-    );
+  const context = [sanitize(options.company), sanitize(options.site), sanitize(options.date)]
+    .filter((value) => value !== "-")
+    .join("  ·  ");
+
+  if (context) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(theme.typography.caption);
     doc.setTextColor(...theme.tone.textMuted);
     doc.text(
-      clampLines(doc.splitTextToSize(compactMeta, contentWidth - 8) as string[], 1),
-      margin + 3,
-      infoY + 4.4,
+      clampLines(doc.splitTextToSize(context, copyW) as string[], 1),
+      margin,
+      top + 8.3,
     );
   }
 
-  ctx.y = Math.max(ctx.y, infoY + 10.2);
+  doc.setDrawColor(...theme.tone.borderStrong);
+  doc.setLineWidth(0.28);
+  doc.rect(codeX, top - 1.5, codeW, 11.5, "S");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(theme.typography.caption);
+  doc.setTextColor(...theme.tone.textMuted);
+  doc.text(
+    sanitize(options.codeLabel || "IDENTIFICADOR").toUpperCase(),
+    codeX + 3,
+    top + 2,
+  );
+
+  doc.setFontSize(theme.typography.bodySm);
+  doc.setTextColor(...theme.tone.textPrimary);
+  doc.text(
+    clampLines(doc.splitTextToSize(sanitize(options.code), codeW - 6) as string[], 1),
+    codeX + 3,
+    top + 6.2,
+  );
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(theme.typography.caption);
+  doc.setTextColor(...theme.tone.textSecondary);
+  doc.text(
+    `${sanitize(options.status)} · v${sanitize(options.version || "1")}`,
+    codeX + 3,
+    top + 9.2,
+  );
+
+  doc.setDrawColor(...theme.tone.border);
+  doc.setLineWidth(0.2);
+  doc.line(margin, top + 13.5, margin + contentWidth, top + 13.5);
+  ctx.y = Math.max(ctx.y, top + 17.5);
 }
 
 export function drawDocumentHeader(
@@ -149,30 +119,91 @@ export function drawDocumentHeader(
   }
 
   const { doc, margin, contentWidth, theme } = ctx;
-  const codeW = 58;
+  const top = 6;
+  const codeW = 52;
   const codeX = margin + contentWidth - codeW;
-
+  const logoW = 29;
+  const logoH = 15;
   const hasLogo = Boolean(options.logoUrl);
-  const logoMaxW = 32;
-  const logoMaxH = 20;
-  const logoMarginRight = 6;
+  const textX = hasLogo ? margin + logoW + 5 : margin;
+  const textW = Math.max(45, codeX - textX - 7);
 
-  const textX = hasLogo ? margin + logoMaxW + logoMarginRight : margin;
-  const textMaxWidth = codeX - textX - 5;
-  const boxY = 5.5;
+  doc.setFillColor(...theme.tone.brandStrong);
+  doc.rect(0, 0, ctx.pageWidth, 2.8, "F");
+  doc.setFillColor(...theme.tone.brand);
+  doc.rect(0, 2.8, ctx.pageWidth, 0.8, "F");
+
+  if (hasLogo && options.logoUrl) {
+    try {
+      const imgProps = doc.getImageProperties(options.logoUrl);
+      const ratio = Math.min(logoW / imgProps.width, logoH / imgProps.height);
+      const w = imgProps.width * ratio;
+      const h = imgProps.height * ratio;
+      doc.addImage(
+        options.logoUrl,
+        imgProps.fileType,
+        margin + (logoW - w) / 2,
+        top + (logoH - h) / 2,
+        w,
+        h,
+      );
+    } catch {
+      logger.warn("[PDF] Failed to add logo to header.");
+    }
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(theme.typography.headingLg);
+  doc.setTextColor(...theme.tone.textPrimary);
   const titleLines = clampLines(
-    doc.splitTextToSize(options.title, textMaxWidth) as string[],
+    doc.splitTextToSize(sanitize(options.title), textW) as string[],
     2,
+  );
+  doc.text(titleLines, textX, top + 5.5);
+
+  const titleHeight = titleLines.length * 5.2;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(theme.typography.bodySm);
+  doc.setTextColor(...theme.tone.textSecondary);
+  const subtitleLines = clampLines(
+    doc.splitTextToSize(sanitize(options.subtitle), textW) as string[],
+    2,
+  );
+  doc.text(subtitleLines, textX, top + 6.5 + titleHeight);
+
+  doc.setDrawColor(...theme.tone.borderStrong);
+  doc.setLineWidth(0.26);
+  doc.rect(codeX, top, codeW, 19, "S");
+  doc.setFillColor(...theme.tone.brand);
+  doc.rect(codeX, top, codeW, 1.2, "F");
+  doc.setDrawColor(...theme.tone.border);
+  doc.setLineWidth(0.16);
+  doc.line(codeX, top + 5.4, codeX + codeW, top + 5.4);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(theme.typography.caption);
+  doc.setTextColor(...theme.tone.textSecondary);
+  doc.text(
+    sanitize(options.codeLabel || "IDENTIFICADOR").toUpperCase(),
+    codeX + 3,
+    top + 4.1,
+  );
+
+  doc.setFontSize(theme.typography.headingSm);
+  doc.setTextColor(...theme.tone.textPrimary);
+  doc.text(
+    clampLines(doc.splitTextToSize(sanitize(options.code), codeW - 6) as string[], 2),
+    codeX + 3,
+    top + 10.1,
   );
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(theme.typography.bodySm);
-  const subtitleLines = clampLines(
-    doc.splitTextToSize(options.subtitle, textMaxWidth) as string[],
-    2,
+  doc.setFontSize(theme.typography.caption);
+  doc.setTextColor(...theme.tone.textSecondary);
+  doc.text(
+    `${sanitize(options.status)} · v${sanitize(options.version || "1")}`,
+    codeX + 3,
+    top + 16.4,
   );
 
   const metadata = [
@@ -186,160 +217,43 @@ export function drawDocumentHeader(
       String(entry.value).trim().length > 0,
   );
 
-  const titleHeight = titleLines.length * 5.2;
-  const subtitleHeight = subtitleLines.length * 3.8;
-  const topBandHeight = Math.max(24.5, 7 + titleHeight + subtitleHeight + 4);
-  const statusText = `Status: ${sanitize(options.status)} | V${sanitize(options.version || "1")}`;
-  const codeLines = doc.splitTextToSize(options.code, codeW - 4) as string[];
-  const statusLines = doc.splitTextToSize(statusText, codeW - 4) as string[];
-  const boxH = Math.max(
-    20,
-    7 + codeLines.length * 4.2 + statusLines.length * 3.2 + 3.5,
-  );
+  const metaY = top + 24;
+  const metaH = 14;
+  if (metadata.length > 0) {
+    const width = contentWidth / metadata.length;
+    doc.setDrawColor(...theme.tone.borderStrong);
+    doc.setLineWidth(0.2);
+    doc.line(margin, metaY, margin + contentWidth, metaY);
+    doc.setDrawColor(...theme.tone.border);
+    doc.setLineWidth(0.16);
+    doc.line(margin, metaY + metaH, margin + contentWidth, metaY + metaH);
 
-  const metaColumns = Math.max(1, metadata.length);
-  const metaGap = 2.4;
-  const metaWidth =
-    metaColumns > 0
-      ? (contentWidth - metaGap * Math.max(0, metaColumns - 1)) / metaColumns
-      : contentWidth;
-  const metaHeight =
-    metadata.length > 0
-      ? Math.max(
-          ...metadata.map((entry) => {
-            const valueLines = clampLines(
-              doc.splitTextToSize(
-                sanitize(entry.value),
-                metaWidth - 8,
-              ) as string[],
-              2,
-            );
-            return 6 + valueLines.length * 4;
-          }),
-          12,
-        )
-      : 0;
-  const metaY = topBandHeight + 2.6;
-  const headerHeight = Math.max(
-    topBandHeight + (metadata.length > 0 ? metaHeight + 7.2 : 4.5),
-    boxY + boxH + 6,
-  );
+    metadata.forEach((entry, index) => {
+      const x = margin + index * width;
+      if (index > 0) doc.line(x, metaY + 2, x, metaY + metaH - 2);
 
-  doc.setFillColor(...theme.tone.brand);
-  doc.rect(0, 0, ctx.pageWidth, topBandHeight, "F");
-  doc.setFillColor(...theme.tone.brandStrong);
-  doc.rect(0, topBandHeight - 1.4, ctx.pageWidth, 1.4, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(theme.typography.caption);
+      doc.setTextColor(...theme.tone.textMuted);
+      doc.text(entry.label.toUpperCase(), x + 3.5, metaY + 4);
 
-  // Draw Logo if available
-  if (hasLogo && options.logoUrl) {
-    try {
-      const imgProps = doc.getImageProperties(options.logoUrl);
-      const ratio = Math.min(logoMaxW / imgProps.width, logoMaxH / imgProps.height);
-      const w = imgProps.width * ratio;
-      const h = imgProps.height * ratio;
-      const lx = margin + (logoMaxW - w) / 2;
-      const ly = 6 + (logoMaxH - h) / 2;
-
-      doc.addImage(options.logoUrl, imgProps.fileType, lx, ly, w, h);
-    } catch {
-      logger.warn("[PDF] Failed to add logo to header.");
-    }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(theme.typography.bodySm);
+      doc.setTextColor(...theme.tone.textPrimary);
+      doc.text(
+        clampLines(
+          doc.splitTextToSize(sanitize(entry.value), width - 7) as string[],
+          2,
+        ),
+        x + 3.5,
+        metaY + 8.6,
+      );
+    });
   }
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(theme.typography.headingLg);
-  doc.setTextColor(...theme.tone.brandOn);
-  doc.text(titleLines, textX, 10.2);
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(theme.typography.bodySm);
-  doc.setTextColor(223, 231, 239);
-  const subtitleY = 10.5 + titleHeight + 0.5;
-  doc.text(subtitleLines, textX, subtitleY);
-
-  doc.setFillColor(...theme.tone.surface);
-  doc.roundedRect(
-    codeX,
-    boxY,
-    codeW,
-    boxH,
-    theme.spacing.radius,
-    theme.spacing.radius,
-    "F",
-  );
-  doc.setDrawColor(...theme.tone.borderStrong);
-  doc.setLineWidth(0.35);
-  doc.roundedRect(
-    codeX,
-    boxY,
-    codeW,
-    boxH,
-    theme.spacing.radius,
-    theme.spacing.radius,
-    "S",
-  );
-  doc.setFillColor(...theme.tone.info);
-  doc.roundedRect(
-    codeX + 1.8,
-    boxY + 1.6,
-    codeW - 3.6,
-    4.2,
-    theme.spacing.radius / 2,
-    theme.spacing.radius / 2,
-    "F",
-  );
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(theme.typography.caption);
-  doc.setTextColor(...theme.tone.brandOn);
-  doc.text(sanitize(options.codeLabel || "IDENTIFICADOR").toUpperCase(), codeX + codeW / 2, boxY + 4.8, {
-    align: "center",
-  });
-
-  doc.setFontSize(theme.typography.headingSm);
-  doc.setTextColor(...theme.tone.textPrimary);
-  doc.text(codeLines, codeX + codeW / 2, boxY + 11.6, { align: "center" });
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(theme.typography.caption);
-  doc.text(statusLines, codeX + codeW / 2, boxY + boxH - 5, {
-    align: "center",
-    maxWidth: codeW - 4,
-  });
-
-  metadata.forEach((entry, index) => {
-    const cardX = margin + index * (metaWidth + metaGap);
-    const valueLines = clampLines(
-      doc.splitTextToSize(sanitize(entry.value), metaWidth - 8) as string[],
-      2,
-    );
-
-    doc.setFillColor(...theme.tone.surface);
-    doc.setDrawColor(...theme.tone.border);
-    doc.setLineWidth(0.24);
-    doc.roundedRect(
-      cardX,
-      metaY,
-      metaWidth,
-      metaHeight,
-      theme.spacing.radius,
-      theme.spacing.radius,
-      "FD",
-    );
-    doc.setFillColor(...theme.tone.brand);
-    doc.rect(cardX, metaY, 2.2, metaHeight, "F");
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(theme.typography.caption);
-    doc.setTextColor(...theme.tone.textMuted);
-    doc.text(entry.label.toUpperCase(), cardX + 4.5, metaY + 4.7);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(theme.typography.bodySm);
-    doc.setTextColor(...theme.tone.textPrimary);
-    doc.text(valueLines, cardX + 4.5, metaY + 9.1);
-  });
-
-  // headerHeight is measured from the page top, so do not add the page margin twice.
-  ctx.y = Math.max(ctx.y, headerHeight + 4.5);
+  const endY = metadata.length > 0 ? metaY + metaH : top + 22;
+  doc.setDrawColor(...theme.tone.border);
+  doc.setLineWidth(0.2);
+  doc.line(margin, endY + 3.2, margin + contentWidth, endY + 3.2);
+  ctx.y = Math.max(ctx.y, endY + 7);
 }

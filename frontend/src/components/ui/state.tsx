@@ -71,7 +71,7 @@ function StateCard({
       <CardHeader className="items-center gap-2.5">
         <div
           className={cn(
-            'mb-1 inline-flex h-12 w-12 items-center justify-center rounded-[0.95rem] border',
+            'mb-1 inline-flex h-12 w-12 items-center justify-center rounded-[var(--ds-radius-md)] border',
             styles.icon,
           )}
         >
@@ -139,7 +139,7 @@ export function InlineLoadingState({
 
 export function PageLoadingState({
   title = 'Carregando conteudo',
-  description = 'Preparando dados e componentes desta tela.',
+  description = 'Carregando as informações desta tela.',
   cards = 4,
   tableRows = 5,
 }: {

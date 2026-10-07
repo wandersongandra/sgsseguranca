@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 const textareaVariants = cva(
   [
     'flex min-h-24 w-full rounded-[var(--ds-radius-md)] border px-3 py-2.5',
-    'text-[13px] font-semibold outline-none',
+    'text-base font-medium outline-none md:text-[13px]',
     'placeholder:text-[var(--component-field-placeholder)]',
     'transition-colors duration-[120ms]',
     'resize-y',

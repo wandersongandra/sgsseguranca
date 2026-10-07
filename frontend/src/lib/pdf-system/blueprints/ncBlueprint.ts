@@ -143,7 +143,7 @@ export async function drawNcBlueprint(
     ],
     code,
     url: validationUrl,
-    title: "Governança e autenticidade",
-    subtitle: "Valide por QR Code ou código no portal público.",
+    title: "Validação do documento",
+    subtitle: "Use o QR Code ou o código da NC para conferência no portal SGS.",
   });
 }

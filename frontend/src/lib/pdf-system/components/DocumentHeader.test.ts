@@ -16,6 +16,7 @@ function createMockContext(): {
     setFontSize: jest.Mock;
     setTextColor: jest.Mock;
     text: jest.Mock;
+    line: jest.Mock;
   };
 } {
   const doc = {
@@ -30,6 +31,7 @@ function createMockContext(): {
     setFontSize: jest.fn(),
     setTextColor: jest.fn(),
     text: jest.fn(),
+    line: jest.fn(),
   };
 
   return {
@@ -66,8 +68,8 @@ describe("drawDocumentHeader", () => {
       site: "Unidade Norte",
     });
 
-    expect(ctx.y).toBeGreaterThan(43);
-    expect(ctx.y).toBeLessThan(50);
+    expect(ctx.y).toBeGreaterThan(48);
+    expect(ctx.y).toBeLessThan(54);
   });
 
   it("usa cabecalho compacto nas paginas seguintes quando compactOnRepeat=true", () => {
@@ -86,7 +88,7 @@ describe("drawDocumentHeader", () => {
       compactOnRepeat: true,
     });
 
-    expect(ctx.y).toBeGreaterThan(26);
-    expect(ctx.y).toBeLessThan(34);
+    expect(ctx.y).toBeGreaterThan(22);
+    expect(ctx.y).toBeLessThan(28);
   });
 });

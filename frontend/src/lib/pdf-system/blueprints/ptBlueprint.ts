@@ -898,10 +898,10 @@ export async function drawPtBlueprint(
     code,
     hash: options?.finalPdfHash ?? undefined,
     url: validationUrl,
-    title: "Governança, autenticidade e autorização",
+    title: "Validação e autorização",
     subtitle: ctx.isDraft
-      ? "Prévia local para revisão interna. A emissão oficial exige fluxo governado no SGS."
-      : "Documento válido para auditoria por QR code e identificador público.",
+      ? "Prévia para revisão. O documento oficial é emitido pelo backend do SGS."
+      : "Use o QR Code ou o código da PT para conferência no portal SGS.",
     draft: Boolean(ctx.isDraft),
   });
 }

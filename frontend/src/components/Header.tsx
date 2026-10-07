@@ -173,7 +173,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
   const showOfflineChip = syncingOfflineQueue || offlineQueueCount > 0;
   const userRoleLabel = user?.profile?.nome?.trim() || "Operação";
   const iconButtonClass =
-    "flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--chrome-topbar-chip-border)] bg-[var(--chrome-topbar-chip-bg)] text-[var(--ds-color-text-primary)] transition-colors duration-[120ms] hover:border-[var(--ds-color-border-strong)] hover:bg-[var(--chrome-topbar-chip-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary)] focus-visible:ring-offset-2";
+    "flex h-9 w-9 items-center justify-center rounded-[var(--ds-radius-md)] border border-[var(--chrome-topbar-chip-border)] bg-[var(--chrome-topbar-chip-bg)] text-[var(--ds-color-text-primary)] transition-colors duration-[120ms] hover:border-[var(--ds-color-border-strong)] hover:bg-[var(--chrome-topbar-chip-hover-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-action-primary)] focus-visible:ring-offset-2";
 
   return (
     <header className="ds-topbar" data-sophie-reserved-zone="top">
@@ -190,7 +190,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
 
             <div className="hidden xl:flex min-w-0 flex-col pr-1">
               <span className="truncate text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                Cockpit operacional
+                Operação SGS
               </span>
             </div>
 
@@ -202,7 +202,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
           >
             <Search className="h-4 w-4 text-[var(--ds-color-text-muted)]" />
             <span className="min-w-0 flex-1 text-left text-[13px] text-[var(--ds-color-text-muted)]">
-              Pesquisar no sistema
+              Pesquisar módulos, registros e ações
             </span>
             <span className="ds-topbar-key text-[10px] font-semibold">
               <Command className="h-3 w-3" />
@@ -217,10 +217,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
               type="button"
               onClick={openCommandPalette}
               className="ds-topbar-chip lg:hidden"
-              title="Abrir command palette"
+              title="Abrir pesquisa"
+              aria-label="Abrir pesquisa"
             >
               <Command className="h-4 w-4 text-[var(--ds-color-info)]" />
-              Buscar
+              <span className="hidden min-[400px]:inline">Buscar</span>
             </button>
 
             {aiEnabled ? (
@@ -253,15 +254,22 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
                 disabled={syncingOfflineQueue || offlineQueueCount === 0}
                 className="ds-topbar-chip disabled:cursor-not-allowed disabled:opacity-60"
                 title="Sincronizar itens salvos offline"
+                aria-label={
+                  syncingOfflineQueue
+                    ? "Sincronizando itens offline"
+                    : `${offlineQueueCount} ${offlineQueueCount === 1 ? "item offline" : "itens offline"}. Sincronizar`
+                }
               >
                 {syncingOfflineQueue ? (
                   <RefreshCw className="h-4 w-4 text-[var(--ds-color-warning)]" />
                 ) : (
                   <WifiOff className="h-4 w-4 text-[var(--ds-color-warning)]" />
                 )}
-                {syncingOfflineQueue
-                  ? "Sincronizando"
-                  : `${offlineQueueCount} offline`}
+                <span className="hidden min-[430px]:inline">
+                  {syncingOfflineQueue
+                    ? "Sincronizando"
+                    : `${offlineQueueCount} offline`}
+                </span>
               </button>
             ) : null}
 
@@ -302,7 +310,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
                     aria-label="Notificações"
                     aria-describedby="notifications-desc"
                     tabIndex={-1}
-                    className="absolute right-0 z-50 mt-3 w-[calc(100vw-2rem)] max-w-[320px] origin-top-right overflow-hidden rounded-[1rem] border border-[var(--chrome-topbar-border)] bg-[var(--chrome-topbar-bg)] shadow-[var(--ds-shadow-md)]"
+                    className="ds-notification-panel absolute right-0 z-50 mt-3 flex max-h-[calc(100dvh-var(--ds-safe-area-top)-var(--ds-mobile-nav-total-height)-1rem)] w-[calc(100vw-1.5rem)] max-w-[320px] origin-top-right flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--chrome-topbar-border)] bg-[var(--chrome-topbar-bg)] shadow-[var(--ds-shadow-md)] sm:w-[calc(100vw-2rem)]"
                   >
                     <p id="notifications-desc" className="sr-only">
                       {unreadCount > 0
@@ -332,7 +340,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
                       </button>
                     </div>
 
-                    <div className="max-h-96 overflow-y-auto">
+                    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                       {notifications.length > 0 ? (
                         notifications.map((notification) => (
                           <button

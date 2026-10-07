@@ -97,7 +97,7 @@ test.describe("DDS - Axe autenticado no ambiente sintético", () => {
     await assertAxe(page, "dashboard");
 
     await page.goto("/dashboard/dds");
-    await expect(page.getByText("Cockpit DDS", { exact: true })).toBeVisible();
+    await expect(page.getByText("Diálogos Diários de Segurança", { exact: true })).toBeVisible();
     const onboardingClose = page.getByRole("button", { name: "Fechar modal" });
     await onboardingClose.waitFor({ state: "visible", timeout: 3_000 }).then(() => onboardingClose.click()).catch(() => undefined);
     await assertAxe(page, "dds-list");

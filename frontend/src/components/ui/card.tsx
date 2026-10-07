@@ -36,7 +36,7 @@ const cardVariants = cva(
         true: [
           'cursor-pointer select-none transition-colors duration-[120ms]',
           'hover:border-[var(--component-card-hover-border)]',
-          'hover:bg-[color:var(--component-card-bg-elevated)]',
+          'hover:bg-[color:var(--ds-color-surface-muted)]',
           // Focus ring para cards clicáveis via teclado
           'focus-visible:outline-none focus-visible:ring-2',
           'focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-2',
@@ -90,13 +90,13 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardHeader.displayName = 'CardHeader';
 
-/** Eyebrow — label de contexto acima do título (ex: "COCKPIT OPERACIONAL") */
+/** Eyebrow — rótulo curto de contexto acima do título. */
 const CardEyebrow = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => (
     <p
       ref={ref}
       className={cn(
-        'text-[0.6875rem] font-semibold uppercase tracking-[0.04em] text-[var(--ds-color-action-primary)]',
+        'text-[0.6875rem] font-semibold uppercase tracking-[0.03em] text-[var(--ds-color-action-primary)]',
         className,
       )}
       {...props}

@@ -157,7 +157,7 @@ export function ActivityForm({ id }: ActivityFormProps) {
         icon={
           <Link
             href="/dashboard/activities"
-            className="rounded-full p-2 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-primary)]"
+            className="rounded-[var(--ds-radius-md)] p-2 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-primary)]"
             title="Voltar"
             aria-label="Voltar para a lista de atividades"
           >
@@ -173,19 +173,19 @@ export function ActivityForm({ id }: ActivityFormProps) {
           </div>
         }
       />
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-          Cadastro guiado
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+          Dados da atividade
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Estruture a atividade com vínculo empresarial e descrição objetiva para uso em APR, DID e relatórios.
+          Informe a empresa, o nome e a descrição usada nos documentos de SST.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Revise empresa e nome da atividade antes de salvar para evitar duplicidade operacional.
+          Confira se a atividade já está cadastrada antes de salvar.
         </p>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5 rounded-xl border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]">
         {submitError && (
           <div
             role="alert"
@@ -201,7 +201,7 @@ export function ActivityForm({ id }: ActivityFormProps) {
               Contexto e identificação
             </p>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-              Defina tenant, nome e descrição base para reaproveitar a atividade em diferentes fluxos do sistema.
+              Defina empresa, nome e descrição para reutilizar a atividade nos módulos do SGS.
             </p>
           </div>
         <div className="space-y-4">

@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils';
 
 const selectVariants = cva(
   [
-    'peer flex h-10 w-full appearance-none rounded-[var(--ds-radius-md)] border px-3 pr-9',
-    'text-[13px] font-semibold outline-none',
+    'peer flex h-11 w-full appearance-none rounded-[var(--ds-radius-md)] border px-3 pr-9 md:h-10',
+    'text-base font-medium outline-none md:text-[13px]',
     'transition-colors duration-[120ms]',
     // Estados disabled
     'disabled:cursor-not-allowed disabled:border-[var(--disabled-border)]',

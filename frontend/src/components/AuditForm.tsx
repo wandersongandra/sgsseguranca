@@ -660,7 +660,7 @@ export function AuditForm({ id }: AuditFormProps) {
       <PageHeader
         eyebrow="Relatórios de auditoria"
         title={id ? 'Editar auditoria' : 'Nova auditoria'}
-        description="Estruture identificação, achados, avaliação de riscos e plano de ação em um único relatório."
+        description="Registre identificação, achados, avaliação de riscos e plano de ação da auditoria."
         icon={<ClipboardCheck className="h-5 w-5" />}
         actions={
           <div className="flex flex-wrap gap-2">
@@ -669,21 +669,21 @@ export function AuditForm({ id }: AuditFormProps) {
               {id ? 'Edição' : 'Novo cadastro'}
             </StatusPill>
             <StatusPill tone="neutral">
-              {activeCompanyId ? 'Tenant ativo' : 'Tenant pendente'}
+              {activeCompanyId ? 'Empresa selecionada' : 'Empresa pendente'}
             </StatusPill>
           </div>
         }
       />
 
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-          Relatório guiado
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+          Preparação da auditoria
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Registre o contexto da auditoria, consolide conformidades e feche o plano de ação com rastreabilidade.
+          Confirme o contexto da auditoria, os achados e o plano de ação.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Revise site, auditor, tipo de auditoria e achados críticos antes de salvar para evitar retrabalho documental.
+          Revise obra, auditor, tipo de auditoria e achados críticos antes de salvar.
         </p>
       </div>
 
@@ -947,7 +947,7 @@ export function AuditForm({ id }: AuditFormProps) {
       <div className="sst-card p-6">
         <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
               Perguntas marcadas
             </p>
             <h2 className="mt-1 text-lg font-bold text-[var(--ds-color-text-primary)]">

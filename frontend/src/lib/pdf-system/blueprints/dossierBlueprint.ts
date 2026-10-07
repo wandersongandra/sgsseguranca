@@ -36,9 +36,9 @@ function isEmployeeContext(
 function buildExecutiveSummary(context: DossierContext) {
   if (isEmployeeContext(context)) {
     return {
-      title: "Leitura executiva do dossiê do colaborador",
+      title: "Resumo do colaborador",
       summary:
-        "Consolidação institucional de capacitações, entregas de EPI, liberações críticas, CATs e rastreabilidade documental do trabalhador.",
+        "Resumo das capacitações, entregas de EPI, liberações, CATs e documentos do colaborador.",
       metrics: [
         {
           label: "Colaborador",
@@ -72,7 +72,7 @@ function buildExecutiveSummary(context: DossierContext) {
   }
 
   return {
-    title: "Leitura executiva do dossiê da obra/setor",
+    title: "Resumo da obra/setor",
     summary:
       "Consolidação institucional de efetivo, treinamentos, EPIs, permissões e CATs vinculados ao escopo operacional da unidade.",
     metrics: [
@@ -329,7 +329,7 @@ export async function drawDossierBlueprint(
         : "Dossiê da obra/setor",
     criticality: "Controlado",
     validity: formatDateTime(context.generatedAt),
-    documentClass: "Executivo",
+    documentClass: "Dossiê",
   });
 
   drawExecutiveSummaryStrip(ctx, buildExecutiveSummary(context));
@@ -448,8 +448,8 @@ export async function drawDossierBlueprint(
             image: null,
           },
         ],
-    title: "Governança e autenticidade",
+    title: "Validação do documento",
     subtitle:
-      "Valide o código público do dossiê para confirmar o escopo institucional desta emissão sob demanda.",
+      "Use o código do dossiê para conferir esta emissão no portal SGS.",
   });
 }

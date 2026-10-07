@@ -7,7 +7,7 @@ const buttonVariants = cva(
   [
     'inline-flex min-h-11 min-w-11 items-center justify-center gap-2 whitespace-nowrap md:min-h-0 md:min-w-0',
     'rounded-[var(--ds-radius-md)] border text-[13px] font-semibold leading-none',
-    'shadow-none transition-colors duration-[120ms] ease-in-out',
+    'shadow-none transition-colors duration-[100ms] ease-out',
     'focus-visible:outline-none focus-visible:ring-2',
     'focus-visible:ring-[var(--ds-color-focus-ring)] focus-visible:ring-offset-2',
     'focus-visible:ring-offset-[var(--ds-color-bg-canvas)]',

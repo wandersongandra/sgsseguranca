@@ -115,34 +115,24 @@ export function drawMetadataGrid(ctx: PdfContext, options: MetadataGridOptions) 
     });
 
     doc.setFillColor(...theme.tone.surface);
+    doc.setDrawColor(...theme.tone.borderStrong);
+    doc.setLineWidth(0.24);
+    doc.rect(margin, ctx.y, contentWidth, totalHeight, "FD");
+    doc.setFillColor(...theme.tone.brandStrong);
+    doc.rect(margin, ctx.y, contentWidth, 2.1, "F");
     doc.setDrawColor(...theme.tone.border);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(
+    doc.setLineWidth(0.18);
+    doc.line(
       margin,
-      ctx.y,
-      contentWidth,
-      totalHeight,
-      theme.spacing.radius,
-      theme.spacing.radius,
-      "FD",
+      ctx.y + titleBarHeight,
+      margin + contentWidth,
+      ctx.y + titleBarHeight,
     );
-    doc.setFillColor(...theme.tone.surfaceMuted);
-    doc.roundedRect(
-      margin + 1.2,
-      ctx.y + 1.2,
-      contentWidth - 2.4,
-      titleBarHeight - 2.4,
-      theme.spacing.radius / 1.5,
-      theme.spacing.radius / 1.5,
-      "F",
-    );
-    doc.setFillColor(...theme.tone.brand);
-    doc.rect(margin, ctx.y, 2.4, titleBarHeight, "F");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(theme.typography.headingSm);
     doc.setTextColor(...theme.tone.textPrimary);
-    doc.text(title, margin + 5, ctx.y + 6.8);
+    doc.text(title, margin + 4, ctx.y + 7);
 
     let cursorY = ctx.y + titleBarHeight;
     chunk.forEach((row, rowIndex) => {
@@ -150,8 +140,8 @@ export function drawMetadataGrid(ctx: PdfContext, options: MetadataGridOptions) 
         const x = margin + colIndex * colWidth;
         const data = row.rowData[colIndex];
         if (!data) return;
-        const baseX = x + 4;
-        const baseY = cursorY + 4.5;
+        const baseX = x + 3.5;
+        const baseY = cursorY + 4.2;
 
         if (colIndex > 0) {
           doc.setDrawColor(...theme.tone.border);

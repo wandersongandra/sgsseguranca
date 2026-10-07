@@ -19,28 +19,28 @@ function PaginationControlsComponent(props: PaginationControlsProps) {
   const totalLabel = `${props.total} item${props.total !== 1 ? 's' : ''}`;
 
   return (
-    <nav aria-label="Paginacao" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <nav aria-label="Paginação" className="ds-pagination flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       {/* Resumo de resultados — lido por leitores de tela ao navegar */}
       <p
         className="text-sm text-[var(--ds-color-text-muted)]"
         aria-live="polite"
         aria-atomic="true"
       >
-        Pagina{' '}
+        Página{' '}
         <span className="font-semibold text-[var(--ds-color-text-primary)]">{props.page}</span>
         {' '}de{' '}
         <span className="font-semibold text-[var(--ds-color-text-primary)]">{props.lastPage}</span>
         {' '}&bull;{' '}
         <span className="font-semibold text-[var(--ds-color-text-primary)]">{totalLabel}</span>
       </p>
-      <div className="flex items-center gap-2">
+      <div className="ds-pagination__actions flex items-center gap-2">
         <Button
           type="button"
           onClick={props.onPrev}
           disabled={!canPrev}
           variant="outline"
           size="sm"
-          aria-label="Pagina anterior"
+          aria-label="Página anterior"
           leftIcon={<ChevronLeft className="h-4 w-4" aria-hidden="true" />}
         >
           Anterior
@@ -60,10 +60,10 @@ function PaginationControlsComponent(props: PaginationControlsProps) {
           disabled={!canNext}
           variant="outline"
           size="sm"
-          aria-label="Proxima pagina"
+          aria-label="Próxima página"
           rightIcon={<ChevronRight className="h-4 w-4" aria-hidden="true" />}
         >
-          Proxima
+          Próxima
         </Button>
       </div>
     </nav>

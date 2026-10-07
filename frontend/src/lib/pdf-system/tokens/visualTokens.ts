@@ -19,21 +19,21 @@ export type PdfTone = {
 };
 
 export const baseTone: PdfTone = {
-  pageBg: [246, 248, 251],
+  pageBg: [255, 255, 255],
   surface: [255, 255, 255],
-  surfaceMuted: [238, 243, 248],
-  border: [211, 220, 230],
-  borderStrong: [134, 148, 166],
-  textPrimary: [17, 24, 39],
-  textSecondary: [55, 65, 81],
-  textMuted: [107, 114, 128],
-  brand: [24, 81, 124],
-  brandStrong: [15, 32, 54],
+  surfaceMuted: [247, 249, 252],
+  border: [214, 220, 228],
+  borderStrong: [148, 163, 184],
+  textPrimary: [15, 23, 42],
+  textSecondary: [51, 65, 85],
+  textMuted: [100, 116, 139],
+  brand: [31, 78, 121],
+  brandStrong: [16, 32, 51],
   brandOn: [255, 255, 255],
-  success: [27, 94, 62],
-  warning: [180, 95, 20],
-  danger: [176, 42, 42],
-  info: [24, 101, 176],
+  success: [22, 101, 52],
+  warning: [180, 83, 9],
+  danger: [185, 28, 28],
+  info: [31, 78, 121],
 };
 
 export type PdfTypography = {
@@ -46,12 +46,12 @@ export type PdfTypography = {
 };
 
 export const typography: PdfTypography = {
-  headingLg: 15.2,
-  headingMd: 11.6,
-  headingSm: 9.5,
-  body: 9.2,
-  bodySm: 8.3,
-  caption: 7,
+  headingLg: 15,
+  headingMd: 11.2,
+  headingSm: 9.2,
+  body: 9.4,
+  bodySm: 8.4,
+  caption: 7.1,
 };
 
 export type PdfSpacing = {
@@ -63,9 +63,9 @@ export type PdfSpacing = {
 };
 
 export const spacing: PdfSpacing = {
-  pageMargin: 16,
-  blockGap: 5,
-  sectionGap: 9,
-  inset: 4.8,
-  radius: 2.8,
+  pageMargin: 15,
+  blockGap: 4.5,
+  sectionGap: 7,
+  inset: 4.5,
+  radius: 1.4,
 };

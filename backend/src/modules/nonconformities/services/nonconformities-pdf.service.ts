@@ -999,7 +999,7 @@ export class NonConformitiesPdfService {
       <div style="width: 100%; font-size: 7.1pt; color: #374151; padding: 0 16mm 2mm; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif;">
         <div style="border-top: 0.25mm solid #D3DCE6; padding-top: 1.3mm; display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
           <div>
-            <div style="font-weight: 700;">SGS &mdash; Sistema de Gestão de Segurança</div>
+            <div style="font-weight: 700;">SGS &middot; Segurança do Trabalho</div>
             <div>Gerado em ${this.escapeHtml(this.formatDisplayDateTime(input.generatedAt))}</div>
           </div>
           <div style="text-align: right;">
@@ -1158,37 +1158,38 @@ export class NonConformitiesPdfService {
               --border: #D3DCE6;
               --border-strong: #8694A6;
               --surface: #FFFFFF;
-              --surface-muted: #EEF3F8;
-              --page-bg: #F6F8FB;
+              --surface-muted: #F7F9FC;
+              --page-bg: #FFFFFF;
               --success: #1B5E3E;
             }
             body { margin: 0; background: var(--page-bg); color: var(--ink); font-family: Arial, Helvetica, sans-serif; font-size: 9.2pt; line-height: 1.45; }
             h1, h2, h3, p { margin: 0; }
             .page-content { padding: 0 16mm 5mm; }
 
-            .header-band { background: var(--brand); padding: 6mm 16mm 5mm; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1.4mm solid var(--brand-strong); }
+            .header-band { background: #fff; padding: 5mm 16mm 4mm; display: flex; align-items: flex-start; justify-content: space-between; border-top: 2.8mm solid var(--brand-strong); border-bottom: .35mm solid var(--border); }
             .header-left { display: flex; align-items: flex-start; gap: 5mm; }
-            .header-logo { max-width: 30mm; max-height: 16mm; object-fit: contain; background: #fff; border-radius: 1.5mm; padding: 1.5mm; }
-            .header-title h1 { font-size: 15.2pt; color: var(--brand-on); font-weight: 700; letter-spacing: .01em; text-transform: uppercase; }
-            .header-title p { font-size: 9pt; color: #DFE7EF; margin-top: 1.6mm; }
-            .header-code-box { background: var(--surface); border: 0.35mm solid var(--border-strong); border-radius: 2.8mm; min-width: 46mm; overflow: hidden; }
-            .header-code-label { background: var(--info); color: #fff; font-size: 7pt; font-weight: 700; text-align: center; padding: 1.3mm 2mm; letter-spacing: .04em; text-transform: uppercase; }
-            .header-code-value { text-align: center; font-weight: 700; font-size: 9.5pt; color: var(--ink); padding: 2.2mm 3mm 1mm; }
-            .header-code-status { text-align: center; font-size: 7pt; color: var(--text-secondary); padding: 0 3mm 2.2mm; }
+            .header-logo { max-width: 30mm; max-height: 16mm; object-fit: contain; background: #fff; border: .25mm solid var(--border); padding: 1.2mm; }
+            .header-title h1 { font-size: 15.2pt; color: var(--ink); font-weight: 700; letter-spacing: 0; text-transform: uppercase; }
+            .header-title p { font-size: 8.7pt; color: var(--text-secondary); margin-top: 1.4mm; }
+            .header-code-box { background: var(--surface); border: 0.26mm solid var(--border-strong); border-top: 1mm solid var(--brand); min-width: 46mm; overflow: hidden; }
+            .header-code-label { color: var(--text-muted); border-bottom: .2mm solid var(--border); font-size: 6.8pt; font-weight: 700; text-align: left; padding: 1.4mm 2.5mm 1.1mm; letter-spacing: .05em; text-transform: uppercase; }
+            .header-code-value { text-align: left; font-weight: 700; font-size: 9.2pt; color: var(--ink); padding: 2.2mm 2.5mm .8mm; }
+            .header-code-status { text-align: left; font-size: 7pt; color: var(--text-secondary); padding: 0 2.5mm 2.2mm; }
 
-            .meta-cards { display: flex; gap: 2.4mm; padding: 4mm 16mm 0; }
-            .meta-card { flex: 1; background: var(--surface); border: 0.3mm solid var(--border); border-radius: 2.8mm; padding: 2.6mm 3.2mm 2.6mm 4.2mm; position: relative; overflow: hidden; }
-            .meta-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2.2mm; background: var(--brand); }
+            .meta-cards { display: flex; gap: 0; padding: 3.5mm 16mm 0; border-bottom: .2mm solid var(--border); }
+            .meta-card { flex: 1; background: var(--surface); border-top: .24mm solid var(--border-strong); border-right: .2mm solid var(--border); padding: 2.6mm 3.2mm; position: relative; overflow: hidden; }
+            .meta-card::before { display: none; }
+            .meta-card:last-child { border-right: 0; }
             .meta-card .label { font-size: 7pt; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
             .meta-card .value { font-size: 9.2pt; font-weight: 700; color: var(--ink); margin-top: 1mm; }
 
-            .section-title { display: flex; align-items: center; gap: 2mm; margin: 7mm 0 3mm; break-inside: avoid-page; page-break-inside: avoid; break-after: avoid-page; page-break-after: avoid; }
-            .section-title .bar { width: 2.4mm; height: 5.5mm; background: var(--brand); border-radius: 1mm; display: inline-block; }
+            .section-title { position: relative; display: block; margin: 7mm 0 3mm; padding-bottom: 2mm; border-bottom: .2mm solid var(--border); break-inside: avoid-page; page-break-inside: avoid; break-after: avoid-page; page-break-after: avoid; }
+            .section-title .bar { position: absolute; left: 0; bottom: -.2mm; width: 28mm; height: .7mm; background: var(--brand); display: block; }
             .section-title h2 { font-size: 9.5pt; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: .02em; }
 
-            .card { background: var(--surface); border: 0.3mm solid var(--border); border-radius: 2.8mm; position: relative; overflow: hidden; margin-bottom: 4mm; break-inside: avoid-page; page-break-inside: avoid; }
-            .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2.4mm; background: var(--brand); }
-            .card-title-strip { background: var(--surface-muted); margin: 1.2mm 1.2mm 0; border-radius: 1.6mm 1.6mm 0 0; padding: 2mm 4mm 2mm 5.5mm; font-size: 9.5pt; font-weight: 700; color: var(--ink); }
+            .card { background: var(--surface); border: 0.22mm solid var(--border); position: relative; overflow: hidden; margin-bottom: 4mm; break-inside: avoid-page; page-break-inside: avoid; }
+            .card::before { display: none; }
+            .card-title-strip { background: var(--surface); margin: 0; border-bottom: .2mm solid var(--border); border-left: .8mm solid var(--brand); padding: 2.2mm 4mm; font-size: 9.5pt; font-weight: 700; color: var(--ink); }
             .card-body { padding: 3mm 4mm 3.5mm 5.5mm; }
             .card-body p { white-space: pre-wrap; font-size: 9.2pt; color: var(--ink); }
 
@@ -1207,7 +1208,7 @@ export class NonConformitiesPdfService {
             .photo-card, .attachment-card { break-inside: auto; page-break-inside: auto; }
             .photo-card::before { display: none; }
             .photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3mm; padding: 3mm 4mm 3.5mm; }
-            .photo-item { margin: 0; min-width: 0; border: 0.3mm solid var(--border); border-radius: 2mm; padding: 1.5mm; background: #fff; break-inside: avoid-page; page-break-inside: avoid; }
+            .photo-item { margin: 0; min-width: 0; border: 0.25mm solid var(--border); border-radius: 1mm; padding: 1.5mm; background: #fff; break-inside: avoid-page; page-break-inside: avoid; }
             .photo-item img { width: 100%; height: 48mm; object-fit: contain; display: block; background: var(--surface-muted); border-radius: 1mm; }
             .photo-item--portrait { grid-column: span 2; }
             .photo-item--portrait img { height: 94mm; }
@@ -1216,25 +1217,25 @@ export class NonConformitiesPdfService {
             .attachment-list { margin: 0; padding-left: 4mm; font-size: 8.8pt; color: var(--ink); }
             .attachment-list li { margin-bottom: 1.2mm; }
 
-            .gov-card { background: var(--surface); border: 0.35mm solid var(--border-strong); border-radius: 2.8mm; position: relative; overflow: hidden; margin-top: 2mm; break-inside: avoid-page; page-break-inside: avoid; }
-            .gov-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2.5mm; background: var(--brand); }
+            .gov-card { background: var(--surface); border: 0.24mm solid var(--border-strong); border-left: 1mm solid var(--brand); position: relative; overflow: hidden; margin-top: 2mm; break-inside: avoid-page; page-break-inside: avoid; }
+            .gov-card::before { display: none; }
             .gov-body { display: flex; gap: 3mm; padding: 3mm 4mm 4mm 5.5mm; }
             .sign-panel { flex: 1; }
             .sign-panel-heading { font-size: 7pt; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .02em; margin-bottom: 1.7mm; }
-            .sign-row { background: #fff; border: 0.25mm solid var(--border); border-radius: 1.6mm; padding: 2mm 3mm; margin-bottom: 2mm; }
+            .sign-row { background: #fff; border-bottom: 0.2mm solid var(--border); padding: 2mm 3mm; margin-bottom: 0; }
             .sign-row .role { font-size: 7pt; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
             .sign-row .name { font-size: 8.8pt; font-weight: 700; color: var(--ink); margin-top: 0.6mm; }
-            .auth-panel { width: 72mm; background: var(--surface-muted); border: 0.25mm solid var(--border); border-radius: 1.8mm; padding: 2.6mm 3mm; position: relative; }
+            .auth-panel { width: 72mm; background: var(--surface); border: 0.24mm solid var(--border); border-left: .8mm solid var(--brand); padding: 2.6mm 3mm; position: relative; }
             .auth-panel .heading { font-size: 7pt; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 1.8mm; }
             .auth-content { display: flex; gap: 2.2mm; align-items: flex-start; }
-            .auth-qr { flex: 0 0 23mm; width: 23mm; height: 23mm; background: #fff; border: 0.25mm solid var(--border); border-radius: 1.2mm; padding: 1mm; }
+            .auth-qr { flex: 0 0 23mm; width: 23mm; height: 23mm; background: #fff; border: 0.22mm solid var(--border); padding: 1mm; }
             .auth-qr img { display: block; width: 100%; height: 100%; }
             .auth-copy { flex: 1; min-width: 0; }
             .auth-panel .code { font-size: 8.8pt; font-weight: 700; color: var(--ink); margin-top: 1mm; }
             .auth-panel .integrity, .auth-panel .validation-note { font-size: 6.8pt; color: var(--text-muted); margin-top: 1.5mm; overflow-wrap: anywhere; }
             .auth-panel .validation-link { display: block; font-size: 6.8pt; color: var(--info); font-weight: 700; margin-top: 1.5mm; text-decoration: none; }
             .auth-panel .validation-unavailable { font-size: 6.8pt; color: var(--text-secondary); margin-top: 1.8mm; }
-            .badge-valid { display: inline-block; margin-top: 2.2mm; background: var(--success); color: #fff; font-size: 7pt; font-weight: 700; border-radius: 1.5mm; padding: 1mm 2.6mm; }
+            .badge-valid { display: inline-block; margin-top: 2.2mm; background: var(--success); color: #fff; font-size: 7pt; font-weight: 700; border-radius: .8mm; padding: 1mm 2.6mm; }
           </style>
         </head>
         <body>
@@ -1243,7 +1244,7 @@ export class NonConformitiesPdfService {
               ${logoDataUri ? `<img class="header-logo" src="${esc(logoDataUri)}" alt="Logo da empresa" />` : ''}
               <div class="header-title">
                 <h1>Relatório de Não Conformidade</h1>
-                <p>Documento oficial de registro, tratativa e encerramento do desvio</p>
+                <p>Registro do desvio, ações corretivas e encerramento</p>
               </div>
             </div>
             <div class="header-code-box">
@@ -1388,7 +1389,7 @@ export class NonConformitiesPdfService {
             ${photosHtml}
             ${unembeddedAttachmentsHtml}
 
-            <div class="section-title"><span class="bar"></span><h2>Governança, autenticidade e rastreabilidade</h2></div>
+            <div class="section-title"><span class="bar"></span><h2>Validação do documento</h2></div>
             <div class="gov-card">
               <div class="gov-body">
                 <div class="sign-panel">

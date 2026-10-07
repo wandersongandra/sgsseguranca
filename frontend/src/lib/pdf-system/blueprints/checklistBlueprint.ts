@@ -133,9 +133,9 @@ export async function drawChecklistBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Resumo executivo de conformidade",
+    title: "Resumo do checklist",
     summary:
-      "Leitura rápida para operação e gestão, com destaque para score, pendências e não conformidades.",
+      "Resumo dos itens avaliados, pendências e não conformidades identificadas.",
     metrics: [
       {
         label: "Status",
@@ -251,7 +251,7 @@ export async function drawChecklistBlueprint(
     })),
     code,
     url: validationUrl,
-    title: "Governança e autenticidade",
-    subtitle: "Valide por QR Code ou código no portal público.",
+    title: "Validação do documento",
+    subtitle: "Use o QR Code ou o código do documento para conferência no portal SGS.",
   });
 }

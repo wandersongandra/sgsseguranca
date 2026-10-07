@@ -1467,7 +1467,7 @@ export class AprsPdfService {
             </table>`
                 : `<p style="margin-top:6px;font-size:9px;color:#4a6572;">Nenhuma advertência registrada no momento da aprovação.</p>`
             }
-            <p style="margin-top:6px;font-size:7px;color:#7a8f9c;">Validado pelo motor de regras SST — SGS ${ruleVersions}</p>
+            <p style="margin-top:6px;font-size:7px;color:#7a8f9c;">Regras SST aplicadas: ${ruleVersions}</p>
           </div>
         </section>`;
     })();
@@ -1516,21 +1516,21 @@ export class AprsPdfService {
               color-scheme: light;
               --paper: #ffffff;
               --ink: #0f172a;
-              --muted: #2a455e;
-              --line: #0d3457;
-              --soft-line: #9cbdd8;
-              --teal: #1d5b8d;
-              --teal-soft: #eaf4fb;
-              --header-gray: #d7e6f3;
+              --muted: #64748b;
+              --line: #94a3b8;
+              --soft-line: #d6dce4;
+              --teal: #1f4e79;
+              --teal-soft: #f7f9fc;
+              --header-gray: #eef2f7;
               --group-yellow: #fef3c7;
               --acceptable: #15803d;
               --attention: #1d5b8d;
               --substantial: #d97706;
               --critical: #b3261e;
-              --neutral: #edf4fa;
-              --prevention-soft: #f3f9ff;
-              --row-soft: #f8fbff;
-              --score-soft: #f8fbff;
+              --neutral: #f7f9fc;
+              --prevention-soft: #f6faf7;
+              --row-soft: #fafbfd;
+              --score-soft: #f8fafc;
               --success-soft: #e8f5e9;
               --critical-soft: #fef2f2;
             }
@@ -1551,10 +1551,9 @@ export class AprsPdfService {
 
             .tech-header {
               border: 1px solid var(--soft-line);
-              border-radius: 12px;
-              background: linear-gradient(180deg, #1865B0 0px, #1865B0 5px, #18517C 5px, #18517C 7px, #ffffff 7px, #ffffff 100%);
+              border-top: 4px solid #102033;
+              background: #fff;
               overflow: hidden;
-              box-shadow: 0 2px 6px rgba(9,30,66,0.08), 0 0 1px rgba(9,30,66,0.08);
             }
             .logo-box {
               width: 14%;
@@ -1591,18 +1590,19 @@ export class AprsPdfService {
             }
             .doc-title-table td:last-child { border-right: 0; }
             .doc-title-main {
-              text-align: center;
+              text-align: left;
               font-weight: 800;
               font-size: 15px;
-              letter-spacing: .05em;
-              color: var(--teal);
+              letter-spacing: .015em;
+              color: var(--ink);
               text-transform: uppercase;
             }
             .doc-code-box {
               width: 16%;
               font-size: 8px;
-              text-align: center;
-              background: linear-gradient(180deg, #eef6fd 0%, #e4f0f9 100%);
+              text-align: left;
+              background: #fff;
+              border-top: 3px solid var(--teal);
             }
             .tech-table td,
             .tech-table th,
@@ -1622,8 +1622,8 @@ export class AprsPdfService {
               word-break: break-word;
             }
             .teal-cell {
-              background: var(--teal);
-              color: #fff;
+              background: var(--teal-soft);
+              color: var(--ink);
               font-weight: 700;
               width: 13%;
             }
@@ -1634,7 +1634,7 @@ export class AprsPdfService {
               display: inline-block;
               padding: 2px 8px;
               border: 1px solid var(--soft-line);
-              border-radius: 999px;
+              border-radius: 3px;
               font-size: 8px;
               font-weight: 700;
             }
@@ -1649,27 +1649,26 @@ export class AprsPdfService {
             .metrics-grid {
               display: grid;
               grid-template-columns: repeat(7, minmax(0, 1fr));
-              gap: 6px;
+              gap: 0;
               margin-bottom: 2px;
+              border: 1px solid var(--soft-line);
+              border-top: 3px solid #102033;
             }
             .metric-card {
-              border: 1px solid var(--soft-line);
-              border-radius: 10px;
-              background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
+              border-right: 1px solid var(--soft-line);
+              background: #fff;
               padding: 8px 10px;
-              box-shadow: 0 1px 3px rgba(9,30,66,0.05);
             }
+            .metric-card:last-child { border-right: 0; }
             .metric-bar {
-              height: 4px;
-              border-radius: 999px;
+              height: 2px;
               margin-bottom: 7px;
               background: var(--teal);
-              box-shadow: 0 1px 2px rgba(29,91,141,0.25);
             }
-            .metric-card--acceptable .metric-bar { background: var(--acceptable); box-shadow: 0 1px 2px rgba(21,128,61,0.25); }
-            .metric-card--attention .metric-bar { background: var(--attention); box-shadow: 0 1px 2px rgba(29,91,141,0.25); }
-            .metric-card--substantial .metric-bar { background: var(--substantial); box-shadow: 0 1px 2px rgba(217,119,6,0.25); }
-            .metric-card--critical .metric-bar { background: var(--critical); box-shadow: 0 1px 2px rgba(179,38,30,0.25); }
+            .metric-card--acceptable .metric-bar { background: var(--acceptable); }
+            .metric-card--attention .metric-bar { background: var(--attention); }
+            .metric-card--substantial .metric-bar { background: var(--substantial); }
+            .metric-card--critical .metric-bar { background: var(--critical); }
             .metric-card--info .metric-bar { background: #2563eb; }
             .metric-label {
               font-size: 7.5px;
@@ -1688,29 +1687,27 @@ export class AprsPdfService {
 
             .section-card {
               border: 1px solid var(--soft-line);
-              border-radius: 12px;
               background: #fff;
               padding: 0;
               overflow: hidden;
               break-inside: avoid;
-              box-shadow: 0 1px 4px rgba(9,30,66,0.06), 0 0 1px rgba(9,30,66,0.07);
             }
             .section-banner {
-              padding: 7px 12px;
+              padding: 8px 12px 7px;
               font-size: 10px;
               font-weight: 700;
               border-bottom: 1px solid var(--soft-line);
-              color: var(--teal);
-              letter-spacing: .04em;
+              color: var(--ink);
+              letter-spacing: .025em;
             }
             .section-banner--teal {
-              background: linear-gradient(90deg, #ddf0fa 0%, #eef8fd 100%);
-              border-left: 6px solid var(--teal);
+              background: #fff;
+              border-left: 4px solid var(--teal);
             }
             .section-banner--amber {
-              background: linear-gradient(90deg, #fef3e2 0%, #fffcf7 100%);
-              border-left: 6px solid var(--substantial);
-              color: var(--substantial);
+              background: #fff;
+              border-left: 4px solid var(--substantial);
+              color: var(--ink);
             }
             .section-body {
               padding: 8px 10px 10px;
@@ -1723,12 +1720,10 @@ export class AprsPdfService {
             .kv-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
             .kv-box {
               min-height: 46px;
-              border: 1px solid #dbe7f2;
-              border-left: 3px solid #b0cfe8;
+              border: 1px solid var(--soft-line);
+              border-left: 3px solid var(--teal);
               padding: 7px 8px 7px 10px;
-              background: linear-gradient(180deg, #ffffff 0%, #f6fbff 100%);
-              border-radius: 8px;
-              box-shadow: 0 1px 2px rgba(9,30,66,0.04);
+              background: #fff;
             }
             .kv-label {
               font-size: 7.5px;
@@ -1807,11 +1802,11 @@ export class AprsPdfService {
             .risk-level--incomplete { background: #e5e7eb !important; color: #111; }
 
             .support-table th {
-              background: linear-gradient(180deg, #e4f0f9 0%, #edf4fa 100%);
+              background: #102033;
               text-transform: uppercase;
               font-size: 8px;
-              letter-spacing: .05em;
-              color: var(--teal);
+              letter-spacing: .045em;
+              color: #fff;
               font-weight: 700;
             }
             .support-table tbody tr:nth-child(even) td,
@@ -1819,11 +1814,11 @@ export class AprsPdfService {
               background: #f8fbff;
             }
             .signature-table th {
-              background: linear-gradient(180deg, #e4f0f9 0%, #edf4fa 100%);
-              color: var(--teal);
+              background: #102033;
+              color: #fff;
               text-transform: uppercase;
               font-size: 8px;
-              letter-spacing: .06em;
+              letter-spacing: .045em;
               font-weight: 700;
             }
             .signature-proof {
@@ -1843,7 +1838,7 @@ export class AprsPdfService {
               height: 42px;
               object-fit: contain;
               border: 1px solid #dbe7f2;
-              border-radius: 6px;
+              border-radius: 2px;
               background: #fff;
               padding: 3px;
             }
@@ -2186,7 +2181,7 @@ export class AprsPdfService {
             </section>
 
             <div class="footer">
-              Documento técnico governado — emitido pela esteira oficial do SGS ·
+              APR emitida pelo SGS ·
               Código: ${this.escapeHtml(documentCode)} ·
               Última atualização: ${this.escapeHtml(this.formatAprDisplayDateTime(apr.updated_at, '-'))}
             </div>

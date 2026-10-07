@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { loadBrowserSentry } from '@/lib/sentry/browser-client';
 import { logger } from '@/lib/logger';
 
@@ -27,6 +29,7 @@ export class AppErrorBoundary extends React.Component<
         contexts: { react: { componentStack: errorInfo.componentStack } },
       });
     });
+
     if (process.env.NODE_ENV !== 'production') {
       logger.error('[UI Boundary Error]', error, errorInfo);
     }
@@ -41,21 +44,28 @@ export class AppErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div role="alert" aria-live="assertive" className="mx-auto mt-10 max-w-lg rounded-2xl border border-[color:var(--ds-color-danger)]/20 bg-[color:var(--ds-color-danger-subtle)] p-5 text-center shadow-[var(--ds-shadow-sm)]">
-          <h2 className="text-base font-semibold text-[var(--ds-color-danger)]">
-            Ocorreu um erro inesperado na interface.
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="mx-auto mt-10 max-w-lg rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-surface-base)] p-5 text-center shadow-[var(--ds-shadow-xs)]"
+        >
+          <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-[var(--ds-radius-md)] bg-[var(--ds-color-danger-subtle)] text-[var(--ds-color-danger)]">
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <h2 className="mt-3 text-base font-semibold text-[var(--ds-color-text-primary)]">
+            A interface encontrou um erro
           </h2>
-          <p className="mt-2 text-[13px] text-[var(--ds-color-text-secondary)]">
-            Recarregue a página. Se persistir, contate o suporte com o horário
-            do erro.
+          <p className="mt-2 text-[13px] leading-5 text-[var(--ds-color-text-secondary)]">
+            Recarregue a página. Se o erro continuar, informe ao suporte o horário em que ocorreu.
           </p>
-          <button
+          <Button
             type="button"
-            className="mt-4 rounded-xl bg-[var(--ds-color-danger)] px-4 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ds-color-danger-hover)]"
+            variant="danger"
+            className="mt-4"
             onClick={() => window.location.reload()}
           >
-            Recarregar
-          </button>
+            Recarregar página
+          </Button>
         </div>
       );
     }

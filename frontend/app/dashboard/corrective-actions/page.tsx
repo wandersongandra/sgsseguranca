@@ -377,9 +377,9 @@ export default function CorrectiveActionsPage() {
           empty={<p className="p-6 text-center text-sm text-[var(--ds-color-text-secondary)]">Nenhuma ação corretiva cadastrada.</p>}
           mobileClassName="space-y-3 p-3"
           mobile={(action) => (
-            <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3"><h3 className="font-semibold">{action.title}</h3><Badge variant={priorityVariant(action.priority) as 'danger' | 'warning' | 'accent' | 'neutral'}>{action.priority}</Badge></div>
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Prazo</dt><dd>{safeToLocaleDateString(action.due_date, 'pt-BR', undefined, '—')}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Responsável</dt><dd>{action.responsible_user?.nome || action.responsible_name || '-'}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Escalonamento</dt><dd>Nível {action.escalation_level || 0}</dd></div></dl>
+            <article className="ds-mobile-card">
+              <div className="flex min-w-0 items-start justify-between gap-3"><h3 className="min-w-0 break-words font-semibold">{action.title}</h3><Badge variant={priorityVariant(action.priority) as 'danger' | 'warning' | 'accent' | 'neutral'}>{action.priority}</Badge></div>
+              <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-1 gap-3 text-sm min-[360px]:grid-cols-2"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Prazo</dt><dd>{safeToLocaleDateString(action.due_date, 'pt-BR', undefined, '—')}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Responsável</dt><dd>{action.responsible_user?.nome || action.responsible_name || '-'}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Escalonamento</dt><dd>Nível {action.escalation_level || 0}</dd></div></dl>
               <label className="mt-4 block text-xs font-medium" htmlFor={`capa-status-${action.id}`}>Status</label>
               <select id={`capa-status-${action.id}`} className="mt-1 min-h-11 w-full rounded-md border bg-[var(--ds-color-surface-base)] px-3" value={action.status} onChange={(e) => void handleStatusChange(action.id, e.target.value as CorrectiveActionStatus)}>{STATUS_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
             </article>
@@ -466,7 +466,7 @@ export default function CorrectiveActionsPage() {
             {slaBySite.map((item) => (
               <div
                 key={item.site}
-                className="flex items-center justify-between rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-3 py-2 text-sm"
+                className="flex flex-col gap-1 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/18 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
               >
                 <span className="font-medium text-[var(--ds-color-text-primary)]">{item.site}</span>
                 <span className="text-[var(--ds-color-text-secondary)]">

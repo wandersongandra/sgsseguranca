@@ -91,11 +91,11 @@ export function Sidebar({
         tabIndex={isModal ? -1 : undefined}
         inert={isHiddenMobileDrawer ? true : undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex h-full w-60 flex-col border-r border-[color:var(--chrome-sidebar-border)] bg-[var(--chrome-sidebar-bg-solid)] text-[var(--ds-color-sidebar-text)] shadow-[var(--chrome-sidebar-shadow)] transition-transform duration-300 ease-in-out xl:static xl:z-auto xl:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-full w-[min(20rem,88vw)] flex-col border-r border-[color:var(--chrome-sidebar-border)] bg-[var(--chrome-sidebar-bg-solid)] text-[var(--ds-color-sidebar-text)] shadow-[var(--chrome-sidebar-shadow)] transition-transform duration-200 ease-out xl:static xl:z-auto xl:translate-x-0',
           isOpen ? 'translate-x-0' : '-translate-x-full xl:translate-x-0',
         )}
       >
-        <div className="flex items-center gap-3 border-b border-[color:var(--chrome-sidebar-divider)] px-4 py-4">
+        <div className="flex items-center gap-3 border-b border-[color:var(--chrome-sidebar-divider)] px-4 pb-4 pt-[max(1rem,var(--ds-safe-area-top))] xl:pt-4">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-[var(--chrome-sidebar-logo-bg)] ring-1 ring-[var(--chrome-sidebar-logo-ring)]">
             <Image src="/logo-sgs-mark.svg?v=20260425" alt="SGS - Sistema de Gestão de Segurança" width={26} height={26} className="h-6.5 w-6.5 object-contain" priority />
           </div>
@@ -118,7 +118,7 @@ export function Sidebar({
               const sectionActive = items.some((entry) => entry.id === activeItem?.id);
               const expanded = openSections[section.id] || sectionActive;
               return (
-                <section key={section.id} className="pt-5 first:pt-2">
+                <section key={section.id} className="pt-4 first:pt-2">
                   <button
                     type="button"
                     onClick={() => setOpenSections((current) => ({ ...current, [section.id]: !current[section.id] }))}
@@ -141,11 +141,11 @@ export function Sidebar({
                             onClick={onClose}
                             aria-current={active ? 'page' : undefined}
                             className={cn(
-                              'mx-2 flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)]',
+                              'mx-2 flex items-center gap-2.5 rounded-[var(--ds-radius-md)] border px-3 py-2.5 text-[13px] font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-color-focus)]',
                               active ? 'border-[color:var(--chrome-sidebar-item-active-border)] bg-[var(--chrome-sidebar-item-active-bg)] text-[var(--ds-color-sidebar-text)]' : 'border-transparent text-[var(--ds-color-sidebar-muted)] hover:bg-[var(--chrome-sidebar-item-hover-bg)]',
                             )}
                           >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"><Icon aria-hidden="true" className="h-4 w-4" /></span>
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ds-radius-sm)]"><Icon aria-hidden="true" className="h-4 w-4" /></span>
                             <span className="flex-1 truncate">{entry.label}</span>
                           </Link>
                         );
@@ -158,8 +158,8 @@ export function Sidebar({
           </nav>
         </div>
 
-        <div className="border-t border-[color:var(--chrome-sidebar-divider)] px-3.5 py-3.5">
-          <div className="rounded-[1rem] border border-[var(--chrome-sidebar-user-card-border)] bg-[var(--chrome-sidebar-user-card-bg)] p-3">
+        <div className="border-t border-[color:var(--chrome-sidebar-divider)] px-3.5 pb-[max(0.875rem,var(--ds-safe-area-bottom))] pt-3.5">
+          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--chrome-sidebar-user-card-border)] bg-[var(--chrome-sidebar-user-card-bg)] p-3">
             <div className="mb-3 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--chrome-sidebar-item-active-bg)] text-xs font-bold">{user?.nome?.trim()?.slice(0, 2).toUpperCase() || 'SG'}</div>
               <div className="min-w-0"><p className="truncate text-[13px] font-semibold text-[var(--ds-color-sidebar-text)]">{user?.nome}</p><p className="truncate text-xs text-[var(--ds-color-sidebar-muted)]">{user?.profile?.nome}</p></div>

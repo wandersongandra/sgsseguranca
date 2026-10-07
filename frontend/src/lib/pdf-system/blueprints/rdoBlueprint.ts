@@ -177,7 +177,7 @@ export async function drawRdoBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva do dia",
+    title: "Resumo do dia",
     summary:
       "Painel sintético para acompanhamento rápido da obra, com status, liderança responsável e volume operacional registrado no período.",
     metrics: [
@@ -423,8 +423,8 @@ export async function drawRdoBlueprint(
     signatures,
     code,
     url: validationUrl,
-    title: "Fechamento oficial, assinaturas e autenticidade",
+    title: "Validação e assinaturas",
     subtitle:
-      "Documento oficial de obra com validação pública por QR Code e identificador documental.",
+      "Use o QR Code ou o código do RDO para conferência no portal SGS.",
   });
 }

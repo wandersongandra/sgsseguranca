@@ -2967,7 +2967,7 @@ export class ChecklistsService {
     // ALERTA DE PERFORMANCE: A geração de PDFs é uma tarefa síncrona e intensiva em CPU.
     // Em um ambiente com alta concorrência, isso pode bloquear o event loop do Node.js
     // e degradar a performance da aplicação.
-    // RECOMENDA�!ÒO: Mover esta lógica para um job em background (ex: usando BullMQ)
+    // RECOMENDAÇÃO: Mover esta lógica para um job em background (ex: usando BullMQ)
     // para não impactar a responsividade da API.
     let logoBase64: string | null = null;
     let logoFormat: 'PNG' | 'JPEG' = 'PNG';
@@ -3025,7 +3025,7 @@ export class ChecklistsService {
         drawBackendSectionTitle(doc, currentY - 10, 'Evidência do equipamento');
         doc.setFillColor(...backendPdfTheme.surface);
         doc.setDrawColor(...backendPdfTheme.border);
-        doc.roundedRect(16, currentY - 4, 64, 64, 2, 2, 'FD');
+        doc.rect(16, currentY - 4, 64, 64, 'FD');
         doc.addImage(imgData, format, 18, currentY - 2, 60, 60);
         currentY += 70;
       } catch (e) {
@@ -3070,7 +3070,7 @@ export class ChecklistsService {
                   const suffix =
                     subitem.status === undefined || subitem.status === null
                       ? ''
-                      : ` � ${subitemStatus}`;
+                      : ` — ${subitemStatus}`;
                   return `${label}) ${subitem.texto}${suffix}`;
                 })
                 .join('\n')
@@ -3169,10 +3169,7 @@ export class ChecklistsService {
         currentSigY = 20;
       }
       drawBackendSectionTitle(doc, currentSigY - 4, 'Assinaturas');
-      doc.setFontSize(12);
-      doc.setTextColor(...backendPdfTheme.text);
-      doc.text('Assinaturas', 16, currentSigY + 2);
-      currentSigY += 10;
+      currentSigY += 8;
 
       for (const sig of signatures) {
         if (currentSigY + 40 > 280) {

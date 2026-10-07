@@ -85,17 +85,17 @@ export const KpiCard = memo(function KpiCard({
   return (
     <div
       className={cn(
-        'min-h-[118px] focus-within:ring-2 focus-within:ring-[var(--ds-color-action-primary)] focus-within:ring-offset-2',
+        'min-h-[104px] sm:min-h-[118px] focus-within:ring-2 focus-within:ring-[var(--ds-color-action-primary)] focus-within:ring-offset-2',
         t.shell,
       )}
     >
       <div className="relative z-[1] flex items-center justify-between gap-4">
-        <p className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--ds-color-text-secondary)]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--ds-color-text-secondary)]">
           {label}
         </p>
         <span
           className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-lg border',
+            'flex h-8 w-8 items-center justify-center rounded-[var(--ds-radius-md)] border sm:h-9 sm:w-9',
             t.iconShell,
           )}
         >
@@ -103,7 +103,7 @@ export const KpiCard = memo(function KpiCard({
         </span>
       </div>
       <div className="relative z-[1] flex items-end gap-2">
-        <div className={cn('text-[26px] font-extrabold leading-none tabular-nums', t.value)}>
+        <div className={cn('text-[23px] font-bold leading-none tabular-nums sm:text-[26px]', t.value)}>
           {value == null ? (
             <Skeleton className="h-8 w-20" />
           ) : (
@@ -170,7 +170,7 @@ export function DashboardKPIs({
   return (
     <DashboardSectionBoundary fallbackTitle="Indicadores">
       <section aria-label="Indicadores chave de desempenho">
-        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 md:grid-cols-4 md:gap-2.5">
           <KpiCard
             label="Conformidade geral"
             value={loading ? null : `${complianceScore ?? 0}%`}

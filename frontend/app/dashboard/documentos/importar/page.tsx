@@ -708,17 +708,15 @@ export default function DocumentImportPage() {
         }
       />
 
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-          Fluxo guiado
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+          Importação de documento
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Envie o PDF, acompanhe o progresso da fila e valide o resultado sem
-          prender o operador em uma tela de request longa.
+          Envie o PDF, acompanhe o processamento e confira o resultado da importação.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          O objetivo aqui é acelerar entrada documental com rastreabilidade, não
-          substituir revisão técnica quando houver pendências.
+          Quando houver pendências ou campos duvidosos, revise o documento antes de confirmar os dados.
         </p>
       </div>
 
@@ -730,7 +728,7 @@ export default function DocumentImportPage() {
             onDrop={handleDrop}
             aria-describedby="document-import-instructions document-import-error"
             className={`
-              relative flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed p-6 text-center motion-safe:transition-all motion-safe:duration-200
+              relative flex flex-col items-center justify-center gap-4 rounded-[var(--ds-radius-lg)] border-2 border-dashed p-6 text-center motion-safe:transition-colors
               ${isDragging ? "border-primary bg-primary/5" : "border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-muted)] hover:border-[var(--ds-color-border-strong)]"}
               ${file ? "border-[var(--ds-color-success)] bg-[var(--ds-color-success-subtle)]" : ""}
             `}
@@ -1374,7 +1372,7 @@ export default function DocumentImportPage() {
               )}
             </div>
           ) : (
-            <div className="flex h-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-10 text-[var(--ds-color-text-secondary)]">
+            <div className="flex h-full flex-col items-center justify-center rounded-[var(--ds-radius-lg)] border-2 border-dashed border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] p-10 text-[var(--ds-color-text-secondary)]">
               <FileText size={64} className="mb-4 opacity-20" />
               <p className="text-base font-medium">
                 Aguardando envio de arquivo para análise

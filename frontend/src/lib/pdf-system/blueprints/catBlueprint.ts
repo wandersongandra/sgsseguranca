@@ -97,9 +97,9 @@ export async function drawCatBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva da CAT",
+    title: "Resumo da CAT",
     summary:
-      "Documento institucional de registro de acidente, evolução da apuração, medidas adotadas e rastreabilidade operacional.",
+      "Resumo do acidente, da apuração e das medidas registradas.",
     metrics: [
       { label: "Status", value: CAT_STATUS_LABEL[cat.status] ?? sanitize(cat.status), tone: catStatusTone(cat.status) },
       { label: "Tipo", value: sanitize(cat.tipo), tone: "info" },
@@ -211,8 +211,8 @@ export async function drawCatBlueprint(
     code,
     url: validationUrl,
     signatures: buildResponsibilitySignatures(cat),
-    title: "Governança e autenticidade",
+    title: "Validação do documento",
     subtitle:
-      "Valide a CAT por QR Code ou código público no portal institucional.",
+      "Use o QR Code ou o código da CAT para conferência no portal SGS.",
   });
 }

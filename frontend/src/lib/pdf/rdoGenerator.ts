@@ -202,7 +202,7 @@ export async function generateRdoPdf(
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "RELATÓRIO DIÁRIO DE OBRA",
     subtitle:
-      "Documento oficial de acompanhamento diário de produção, recursos, ocorrências e condições operacionais de campo.",
+      "Registro diário de atividades, recursos, ocorrências e condições de campo.",
     code,
     date:
       typeof rdo.data === "string"

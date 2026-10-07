@@ -241,8 +241,8 @@ export default function RiskMapPage() {
               <div className="h-8 w-8 motion-safe:animate-spin rounded-full border-2 border-[var(--ds-color-accent)] border-t-transparent" />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <div className="mb-1 flex">
+            <div className="ds-table-scroll overflow-x-auto pb-1">
+              <div className="mb-1 flex min-w-[420px]">
                 <div className="w-20" />
                 {[1, 2, 3, 4, 5].map((sev) => (
                   <div key={sev} className="flex-1 text-center text-xs font-semibold text-[var(--ds-color-text-secondary)]">
@@ -250,13 +250,13 @@ export default function RiskMapPage() {
                   </div>
                 ))}
               </div>
-              <div className="mb-3 flex">
+              <div className="mb-3 flex min-w-[420px]">
                 <div className="w-20 pr-2 text-right text-xs text-[var(--ds-color-text-secondary)]">Prob ↓ / Sev →</div>
                 <div className="flex-1" />
               </div>
 
               {[5, 4, 3, 2, 1].map((prob) => (
-                <div key={prob} className="mb-1 flex items-center">
+                <div key={prob} className="mb-1 flex min-w-[420px] items-center">
                   <div className="w-20 pr-3 text-right text-xs font-semibold text-[var(--ds-color-text-secondary)]">P{prob}</div>
                   {[1, 2, 3, 4, 5].map((sev) => {
                     const score = prob * sev;

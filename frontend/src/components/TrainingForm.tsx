@@ -291,11 +291,11 @@ export function TrainingForm({ id }: TrainingFormProps) {
       <PageHeader
         eyebrow="Gestão de treinamentos"
         title={id ? 'Editar treinamento' : 'Novo treinamento'}
-        description="Registre validade, colaborador, certificado e assinatura em um fluxo único."
+        description="Registre colaborador, treinamento, validade, certificado e assinatura."
         icon={
           <Link
             href="/dashboard/trainings"
-            className="rounded-full p-2 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-primary)]"
+            className="rounded-[var(--ds-radius-md)] p-2 text-[var(--ds-color-text-muted)] transition-colors hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-primary)]"
             aria-label="Voltar para a lista de treinamentos"
             title="Voltar"
           >
@@ -315,21 +315,21 @@ export function TrainingForm({ id }: TrainingFormProps) {
         }
       />
 
-      <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4 shadow-[var(--ds-shadow-xs)]">
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4 shadow-[var(--ds-shadow-xs)]">
         <p className={sectionEyebrowClassName}>
-          Cadastro guiado
+          Dados do treinamento
         </p>
         <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-          Estruture o treinamento com vínculo empresarial, validade documental e assinatura do colaborador.
+          Informe empresa, colaborador, treinamento, datas e assinatura.
         </p>
         <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-          Revise empresa, colaborador, nome do treinamento e datas antes de salvar para evitar vencimentos inconsistentes.
+          Confira as datas e o colaborador antes de salvar.
         </p>
       </div>
 
       <form
         onSubmit={handleSubmit(onSubmit)}
-        className="space-y-5 rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]"
+        className="space-y-5 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]"
       >
         <section className={sectionCardClassName}>
           <div className={sectionHeaderClassName}>
@@ -337,7 +337,7 @@ export function TrainingForm({ id }: TrainingFormProps) {
               Contexto e certificação
             </p>
             <p className={sectionDescriptionClassName}>
-              Defina empresa, colaborador, treinamento e vigência para manter a trilha de conformidade atualizada.
+              Defina empresa, colaborador, treinamento e período de vigência.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">

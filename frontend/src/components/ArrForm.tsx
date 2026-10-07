@@ -95,7 +95,7 @@ type ArrFormProps = {
 };
 
 const inputClassName =
-  'mt-1 block w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border-subtle)] bg-[var(--component-field-bg)] px-3 py-2.5 text-sm text-[var(--component-field-text)] transition-all duration-[var(--ds-motion-base)] focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';
+  'mt-1 block w-full rounded-[var(--ds-radius-md)] border border-[var(--component-field-border-subtle)] bg-[var(--component-field-bg)] px-3 py-2.5 text-sm text-[var(--component-field-text)] transition-colors duration-[var(--ds-motion-fast)] focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';
 
 const textareaClassName = `${inputClassName} min-h-[128px]`;
 const labelClassName =
@@ -659,21 +659,21 @@ export function ArrForm({ id }: ArrFormProps) {
         }
         summary={
           <>
-            <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-                Fluxo guiado
+            <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+                Preparação da ARR
               </p>
               <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-                Consolide risco, probabilidade, severidade e equipe antes de fechar a análise rápida.
+                Confirme risco, probabilidade, severidade e equipe antes de concluir a análise.
               </p>
               <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-                O objetivo é registrar resposta curta e operacional, sem perder leitura técnica do risco observado.
+                Registre a condição observada, os controles imediatos e a ação recomendada de forma objetiva.
               </p>
             </div>
             {readOnlyMessage ? (
               <div
                 role="alert"
-                className="rounded-[var(--ds-radius-xl)] border border-[color:var(--ds-color-warning)]/30 bg-[color:var(--ds-color-warning-subtle)] px-5 py-4 text-sm text-[var(--ds-color-text-secondary)]"
+                className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-warning-border)] bg-[color:var(--ds-color-warning-subtle)] px-5 py-4 text-sm text-[var(--ds-color-text-secondary)]"
               >
                 <p className="font-semibold text-[var(--ds-color-text-primary)]">
                   Documento travado para edição
@@ -1084,7 +1084,7 @@ export function ArrForm({ id }: ArrFormProps) {
                       type="button"
                       onClick={() => toggleParticipant(user.id)}
                       className={cn(
-                        'flex min-h-[86px] items-center justify-between rounded-[var(--ds-radius-lg)] border px-4 py-3 text-left text-sm transition-all duration-[var(--ds-motion-base)]',
+                        'flex min-h-[86px] items-center justify-between rounded-[var(--ds-radius-lg)] border px-4 py-3 text-left text-sm transition-colors duration-[var(--ds-motion-fast)]',
                         selected
                           ? 'border-[var(--ds-color-action-primary)] bg-[var(--ds-color-primary-subtle)] text-[var(--ds-color-text-primary)] shadow-[var(--component-card-shadow)]'
                           : 'border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] text-[var(--ds-color-text-secondary)] hover:border-[var(--ds-color-border-default)] hover:bg-[var(--ds-color-surface-muted)]',

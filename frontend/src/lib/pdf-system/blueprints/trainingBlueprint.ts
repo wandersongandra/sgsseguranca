@@ -145,7 +145,7 @@ export async function drawTrainingBlueprint(
     })),
     code,
     url: validationUrl,
-    title: "Governança e comprovação documental",
-    subtitle: "Valide a autenticidade por QR Code ou código no portal público.",
+    title: "Validação do documento",
+    subtitle: "Use o QR Code ou o código do treinamento para conferência no portal SGS.",
   });
 }

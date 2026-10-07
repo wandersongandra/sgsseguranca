@@ -73,29 +73,46 @@ export function applyDocumentFooter(
 
   for (let page = 1; page <= pages; page++) {
     ctx.doc.setPage(page);
+    ctx.doc.setDrawColor(...ctx.theme.tone.brand);
+    ctx.doc.setLineWidth(0.4);
+    ctx.doc.line(ctx.margin, 283.5, ctx.margin + 24, 283.5);
     ctx.doc.setDrawColor(...ctx.theme.tone.border);
-    ctx.doc.setLineWidth(0.25);
-    ctx.doc.line(ctx.margin, 283.5, ctx.pageWidth - ctx.margin, 283.5);
+    ctx.doc.setLineWidth(0.16);
+    ctx.doc.line(
+      ctx.margin + 26,
+      283.5,
+      ctx.pageWidth - ctx.margin,
+      283.5,
+    );
 
     ctx.doc.setFont("helvetica", "bold");
     ctx.doc.setFontSize(ctx.theme.typography.caption);
     ctx.doc.setTextColor(...ctx.theme.tone.textSecondary);
     ctx.doc.text(issuer, ctx.margin, 288.7);
 
-    ctx.doc.setFont("helvetica", "normal");
-    ctx.doc.setTextColor(...ctx.theme.tone.textSecondary);
-    ctx.doc.text(`Gerado em ${generatedAt}`, ctx.margin, 292.7);
+    ctx.doc.setFont("courier", "normal");
+    ctx.doc.setFontSize(Math.max(5.8, ctx.theme.typography.caption - 0.4));
+    ctx.doc.setTextColor(...ctx.theme.tone.textMuted);
+    ctx.doc.text(
+      `ID ${options.code}`,
+      ctx.pageWidth / 2,
+      288.7,
+      { align: "center" },
+    );
 
-    ctx.doc.setFont("helvetica", "bold");
-    ctx.doc.setTextColor(...ctx.theme.tone.textSecondary);
-    ctx.doc.text(`ID: ${options.code}`, ctx.pageWidth - ctx.margin, 288.7, {
-      align: "right",
-    });
-
     ctx.doc.setFont("helvetica", "normal");
-    ctx.doc.setTextColor(...ctx.theme.tone.textSecondary);
+    ctx.doc.setFontSize(ctx.theme.typography.caption);
+    ctx.doc.setTextColor(...ctx.theme.tone.textMuted);
     ctx.doc.text(
       `Página ${page} de ${pages}`,
+      ctx.pageWidth - ctx.margin,
+      288.7,
+      { align: "right" },
+    );
+
+    ctx.doc.text(`Gerado em ${generatedAt}`, ctx.margin, 292.7);
+    ctx.doc.text(
+      options.draft === true ? "Prévia — documento não oficial" : "Documento eletrônico SGS",
       ctx.pageWidth - ctx.margin,
       292.7,
       { align: "right" },

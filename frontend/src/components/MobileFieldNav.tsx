@@ -18,13 +18,13 @@ export function MobileFieldNav() {
   const activeItem = getActiveNavigationItem(pathname, items);
 
   return (
-    <nav aria-label="Navegação mobile" className="ds-mobile-nav xl:hidden" data-sophie-reserved-zone="bottom">
+    <nav aria-label="Navegação principal mobile" className="ds-mobile-nav xl:hidden" data-sophie-reserved-zone="bottom">
       {items.map((entry) => {
         const Icon = entry.icon;
         const active = entry.id === activeItem?.id;
         return (
-          <Link key={entry.id} href={entry.href} aria-current={active ? 'page' : undefined} className={cn('ds-mobile-nav__item', active && 'ds-mobile-nav__item--active')}>
-            <Icon aria-hidden="true" className="h-4 w-4" />
+          <Link key={entry.id} href={entry.href} aria-label={entry.label} aria-current={active ? 'page' : undefined} className={cn('ds-mobile-nav__item touch-manipulation', active && 'ds-mobile-nav__item--active')}>
+            <Icon aria-hidden="true" className="h-[18px] w-[18px]" />
             <span>{entry.label}</span>
           </Link>
         );
