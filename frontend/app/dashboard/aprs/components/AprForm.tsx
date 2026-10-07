@@ -3685,7 +3685,7 @@ export function AprForm({ id }: AprFormProps) {
               </div>
               <nav aria-label="Etapas da APR">
                 <div
-                  className="grid gap-3 px-5 py-4 lg:grid-cols-3"
+                  className="apr-mobile-step-list grid gap-3 px-5 py-4 lg:grid-cols-3"
                   role="list"
                 >
                   {APR_STEPS.map((step) => {
@@ -3707,7 +3707,7 @@ export function AprForm({ id }: AprFormProps) {
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }
                         }}
-                        className={`w-full rounded-[var(--ds-radius-lg)] border px-3.5 py-3 text-left motion-safe:transition-colors ${
+                        className={`apr-mobile-step-item w-full rounded-[var(--ds-radius-lg)] border px-3.5 py-3 text-left motion-safe:transition-colors ${
                           isActive
                             ? "border-[var(--ds-color-action-primary)] bg-[color:var(--ds-color-info-subtle)] shadow-[var(--ds-shadow-xs)]"
                             : isCompleted
@@ -3744,7 +3744,7 @@ export function AprForm({ id }: AprFormProps) {
                                     : `Etapa ${step.id}`}
                               </span>
                             </div>
-                            <p className="mt-0.5 text-xs leading-5 text-[var(--ds-color-text-secondary)]">
+                            <p className="apr-mobile-step-description mt-0.5 text-xs leading-5 text-[var(--ds-color-text-secondary)]">
                               {step.description}
                             </p>
                           </div>
