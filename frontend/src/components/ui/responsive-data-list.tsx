@@ -78,11 +78,15 @@ export function ResponsiveDataList<T>({
   }
 
   return (
-    <div className={cn(mobileClassName)}>
+    <div role="list" className={cn('ds-responsive-mobile-list', mobileClassName)}>
       {items.map((item, index) => (
-        <React.Fragment key={getKey(item, index)}>
+        <div
+          key={getKey(item, index)}
+          role="listitem"
+          className="ds-responsive-mobile-list__item min-w-0"
+        >
           {mobile(item, index)}
-        </React.Fragment>
+        </div>
       ))}
     </div>
   );
