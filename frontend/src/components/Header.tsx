@@ -217,10 +217,11 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
               type="button"
               onClick={openCommandPalette}
               className="ds-topbar-chip lg:hidden"
-              title="Abrir command palette"
+              title="Abrir pesquisa"
+              aria-label="Abrir pesquisa"
             >
               <Command className="h-4 w-4 text-[var(--ds-color-info)]" />
-              Buscar
+              <span className="hidden min-[400px]:inline">Buscar</span>
             </button>
 
             {aiEnabled ? (
@@ -253,15 +254,18 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
                 disabled={syncingOfflineQueue || offlineQueueCount === 0}
                 className="ds-topbar-chip disabled:cursor-not-allowed disabled:opacity-60"
                 title="Sincronizar itens salvos offline"
+                aria-label={syncingOfflineQueue ? "Sincronizando itens offline" : `${offlineQueueCount} item(ns) offline. Sincronizar`}
               >
                 {syncingOfflineQueue ? (
                   <RefreshCw className="h-4 w-4 text-[var(--ds-color-warning)]" />
                 ) : (
                   <WifiOff className="h-4 w-4 text-[var(--ds-color-warning)]" />
                 )}
-                {syncingOfflineQueue
-                  ? "Sincronizando"
-                  : `${offlineQueueCount} offline`}
+                <span className="hidden min-[430px]:inline">
+                  {syncingOfflineQueue
+                    ? "Sincronizando"
+                    : `${offlineQueueCount} offline`}
+                </span>
               </button>
             ) : null}
 
