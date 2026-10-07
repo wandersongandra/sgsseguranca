@@ -186,3 +186,20 @@ Auditoria estática final desta rodada:
 - zero resíduos encontrados de `Fechar palette`, `Proxima`, `item(ns)` ou caractere de substituição nos arquivos auditados.
 
 A execução real de Jest/Playwright e a validação visual em navegador continuam pendentes enquanto o ambiente de CI/runtime não executar os jobs.
+
+
+## Rodada cirúrgica adicional
+
+Ajustes aplicados após a primeira implementação:
+
+- filtros de PT e APR deixam de impor largura mínima no mobile;
+- filtros avançados de APR agora funcionam como bottom sheet no mobile e drawer lateral no desktop;
+- footer dos filtros avançados usa grade de ações adequada à largura disponível;
+- navegação por seções da Não Conformidade recebeu labels acessíveis completos;
+- navegação horizontal de etapas ganhou overscroll controlado e scrollbar oculta no mobile;
+- sticky da navegação interna foi reposicionado dentro do scroll container do dashboard;
+- launcher flutuante da SOPHIE é ocultado quando existe barra de ação mobile crítica; acesso permanece pela topbar;
+- grids de detalhes colapsam para uma coluna abaixo de 360px;
+- paginação recebe tratamento específico para telas extremamente estreitas;
+- filtros e painéis revisados para evitar min-width rígido e colisão com teclado/safe area;
+- CSS desta rodada permaneceu estruturalmente balanceado.
