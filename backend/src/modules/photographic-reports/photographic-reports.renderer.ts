@@ -1073,7 +1073,7 @@ export function buildPhotographicReportHtml(
         font-size: 8.3pt;
         font-weight: 400;
         color: var(--text-secondary);
-        margin: 1.1mm 2.6mm 2.1mm;
+        margin-top: 1.4mm;
         line-height: 1.3;
       }
       .doc-code {
@@ -1086,14 +1086,12 @@ export function buildPhotographicReportHtml(
         text-align: left;
       }
       .doc-code-pill {
-        background: var(--info);
-        border-radius: calc(var(--radius) / 2);
-        padding: 0.7mm 0;
-        /* typography.caption = 7 */
-        font-size: 7pt;
+        padding: 1.4mm 2.6mm 1.1mm;
+        border-bottom: 0.2mm solid var(--border);
+        font-size: 6.7pt;
         font-weight: 700;
-        color: var(--text-primary);
-        letter-spacing: .08em;
+        color: var(--text-muted);
+        letter-spacing: .06em;
       }
       .doc-code-value {
         /* typography.headingSm = 9.5 */
@@ -1283,7 +1281,7 @@ export function buildPhotographicReportHtml(
       .meta-value {
         font-size: 9.2pt;
         color: var(--text-primary);
-        margin: 1.1mm 2.6mm 2.1mm;
+        margin-top: 1.4mm;
         word-break: break-word;
       }
 
@@ -1468,7 +1466,7 @@ export function buildPhotographicReportHtml(
       .empty-note {
         font-size: 8.3pt;
         color: var(--text-secondary);
-        margin: 1.1mm 2.6mm 2.1mm;
+        margin-top: 1.4mm;
         line-height: 1.45;
       }
 
@@ -1598,7 +1596,7 @@ export function buildPhotographicReportHtml(
       .sig-proof {
         font-size: 7pt;
         color: var(--text-muted);
-        margin: 1.1mm 2.6mm 2.1mm;
+        margin-top: 1.4mm;
         letter-spacing: .04em;
       }
       .sig-hash {
@@ -1615,7 +1613,7 @@ export function buildPhotographicReportHtml(
       .gov-subtitle {
         font-size: 8.3pt;
         color: var(--text-secondary);
-        margin: 1.1mm 2.6mm 2.1mm;
+        margin-top: 1.4mm;
         line-height: 1.45;
       }
       .gov-code {
