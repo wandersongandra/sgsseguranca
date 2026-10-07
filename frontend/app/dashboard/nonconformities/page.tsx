@@ -658,7 +658,7 @@ export default function NonConformitiesPage() {
                 setStatusFilter(event.target.value as NcStatus | "");
                 setPage(1);
               }}
-              className={cn(inputClassName, "min-w-[11rem]")}
+              className={cn(inputClassName, "w-full sm:w-auto sm:min-w-[11rem]")}
             >
               <option value="">Todos os status</option>
               <option value={NcStatus.ABERTA}>{NC_STATUS_LABEL[NcStatus.ABERTA]}</option>
@@ -735,10 +735,10 @@ export default function NonConformitiesPage() {
               getKey={(item) => item.id}
               mobileClassName="space-y-3 p-3"
               mobile={(item) => (
-                <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
-                  <div className="flex items-start justify-between gap-3"><div><h3 className="font-semibold">{item.codigo_nc}</h3><p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">{item.tipo}</p></div><div className="flex flex-wrap justify-end gap-1"><StatusPill tone={getNcRiskTone(item.risco_nivel)}>{item.risco_nivel}</StatusPill><StatusPill tone={getNcStatusTone(item.status as NcStatus)}>{NC_STATUS_LABEL[item.status as NcStatus] ?? item.status}</StatusPill></div></div>
-                  <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Local / setor</dt><dd>{item.local_setor_area}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Data</dt><dd>{safeFormatDate(item.data_identificacao, "dd/MM/yyyy", { locale: ptBR })}</dd></div><div className="col-span-2"><dt className="text-xs text-[var(--ds-color-text-muted)]">Responsável</dt><dd>{item.responsavel_area}</dd></div></dl>
-                  {canManageNc ? <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3">
+                <article className="ds-mobile-card">
+                  <div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold">{item.codigo_nc}</h3><p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">{item.tipo}</p></div><div className="flex flex-wrap justify-end gap-1"><StatusPill tone={getNcRiskTone(item.risco_nivel)}>{item.risco_nivel}</StatusPill><StatusPill tone={getNcStatusTone(item.status as NcStatus)}>{NC_STATUS_LABEL[item.status as NcStatus] ?? item.status}</StatusPill></div></div>
+                  <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-1 gap-3 text-sm min-[360px]:grid-cols-2"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Local / setor</dt><dd>{item.local_setor_area}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Data</dt><dd>{safeFormatDate(item.data_identificacao, "dd/MM/yyyy", { locale: ptBR })}</dd></div><div className="col-span-2"><dt className="text-xs text-[var(--ds-color-text-muted)]">Responsável</dt><dd>{item.responsavel_area}</dd></div></dl>
+                  {canManageNc ? <div className="ds-mobile-card__actions mt-4 grid grid-cols-1 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3 min-[360px]:grid-cols-2">
                     {getAvailableNcTransitions(item, finalPdfByNcId).length > 0 ? <StatusSelect title="Mover status" className="col-span-2 min-h-11 w-full" value="" onChange={(event) => { if (event.target.value) void handleStatusChange(item.id, event.target.value as NcStatus); }}><option value="">Mover status...</option>{getAvailableNcTransitions(item, finalPdfByNcId).map((status) => <option key={status} value={status}>{NC_STATUS_LABEL[status]}</option>)}</StatusSelect> : null}
                     {item.status === NcStatus.ENCERRADA ? <Button type="button" variant="outline" className="col-span-2 min-h-11" onClick={() => void handleGenerateFinalPdf(item)}><FileText className="mr-2 h-4 w-4" />Emitir PDF oficial</Button> : null}
                     <Button type="button" variant="outline" className="min-h-11" onClick={() => handleCreateCapa(item)}><Plus className="mr-2 h-4 w-4" />CAPA</Button>{item.status === NcStatus.ENCERRADA ? <Button type="button" variant="outline" className="min-h-11" onClick={() => handleSendEmail(item)}><Mail className="mr-2 h-4 w-4" />E-mail</Button> : null}
