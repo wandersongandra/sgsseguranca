@@ -14,16 +14,16 @@ const PAGE = {
   safeBottom: 24,
 };
 const TONE = {
-  pageBg: [246, 248, 251] as Rgb,
+  pageBg: [255, 255, 255] as Rgb,
   surface: [255, 255, 255] as Rgb,
-  surfaceMuted: [238, 243, 248] as Rgb,
-  border: [211, 220, 230] as Rgb,
-  borderStrong: [134, 148, 166] as Rgb,
-  textPrimary: [17, 24, 39] as Rgb,
-  textSecondary: [55, 65, 81] as Rgb,
-  textMuted: [107, 114, 128] as Rgb,
-  brand: [24, 81, 124] as Rgb,
-  brandStrong: [15, 32, 54] as Rgb,
+  surfaceMuted: [247, 249, 252] as Rgb,
+  border: [214, 220, 228] as Rgb,
+  borderStrong: [148, 163, 184] as Rgb,
+  textPrimary: [15, 23, 42] as Rgb,
+  textSecondary: [51, 65, 85] as Rgb,
+  textMuted: [100, 116, 139] as Rgb,
+  brand: [31, 78, 121] as Rgb,
+  brandStrong: [16, 32, 51] as Rgb,
   success: [27, 94, 62] as Rgb,
   warning: [180, 95, 20] as Rgb,
   info: [24, 101, 176] as Rgb,
@@ -146,7 +146,7 @@ function rounded(
   h: number,
   mode: 'F' | 'S' | 'FD',
 ) {
-  doc.roundedRect(x, y, w, h, 2.8, 2.8, mode);
+  doc.roundedRect(x, y, w, h, 1.2, 1.2, mode);
 }
 
 function pageBackground(ctx: PdfContext) {
@@ -169,18 +169,18 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
   const codeX = margin + width - codeW;
   const topH = 35;
 
-  fill(doc, TONE.brand);
-  doc.rect(0, 0, PAGE.width, topH, 'F');
   fill(doc, TONE.brandStrong);
-  doc.rect(0, topH - 1.4, PAGE.width, 1.4, 'F');
+  doc.rect(0, 0, PAGE.width, 2.8, 'F');
+  fill(doc, TONE.brand);
+  doc.rect(0, 2.8, PAGE.width, 0.8, 'F');
 
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(15.2);
-  text(doc, [255, 255, 255]);
+  text(doc, TONE.textPrimary);
   doc.text('ANÁLISE DE RISCO RÁPIDA', margin, 10.2);
   doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(8.3);
-  text(doc, [223, 231, 239]);
+  text(doc, TONE.textSecondary);
   doc.text(
     'Registro simplificado para formalização de condição observada, risco e ação imediata em campo',
     margin,
@@ -333,7 +333,7 @@ function drawExecutiveSummary(ctx: PdfContext, arr: Arr) {
   doc.setFontSize(8.3);
   text(doc, TONE.textSecondary);
   doc.text(
-    'Registro enxuto para formalizar uma análise rápida de risco, a condição observada em campo e o tratamento imediato definido pela equipe.',
+    'Resumo do risco observado, da avaliação realizada e da ação imediata definida em campo.',
     margin + 4,
     ctx.y + 13.5,
     { maxWidth: width - 8 },
