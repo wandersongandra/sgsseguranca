@@ -399,7 +399,7 @@ function PendingQueueFiltersComponent({
           {siteDropdownOpen && (
             <div
               id={siteDropdownId}
-              className="absolute left-0 top-full z-50 mt-1 max-h-80 min-w-[240px] overflow-hidden rounded-xl border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)] focus:outline-none"
+              className="absolute left-0 top-full z-50 mt-1 max-h-[min(50dvh,20rem)] w-[min(20rem,calc(100vw-2rem))] min-w-0 overflow-hidden rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-lg)] focus:outline-none"
             >
               <div className="border-b border-[var(--ds-color-border-subtle)] p-2 bg-[var(--ds-color-surface-muted)]/30">
                 <input
