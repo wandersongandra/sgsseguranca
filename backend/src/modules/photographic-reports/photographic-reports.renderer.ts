@@ -1016,7 +1016,7 @@ export function buildPhotographicReportHtml(
         --page-margin: 16mm;
         --block-gap:   5mm;
         --section-gap: 9mm;
-        --radius:      2.8mm;
+        --radius:      1.4mm;
       }
 
       * { box-sizing: border-box; }
@@ -1038,9 +1038,10 @@ export function buildPhotographicReportHtml(
 
       /* ── DocumentHeader: faixa de marca full-bleed ───────────────── */
       .doc-header {
-        background: var(--brand);
-        border-bottom: 1.4mm solid var(--brand-strong);
-        padding: 6mm var(--page-margin) 5mm;
+        background: var(--surface);
+        border-top: 2.8mm solid var(--brand-strong);
+        border-bottom: 0.25mm solid var(--border);
+        padding: 5mm var(--page-margin) 4mm;
       }
       .doc-header-row {
         display: flex;
@@ -1063,7 +1064,7 @@ export function buildPhotographicReportHtml(
         /* typography.headingLg = 15.2 */
         font-size: 15.2pt;
         font-weight: 700;
-        color: var(--brand-on);
+        color: var(--text-primary);
         letter-spacing: .02em;
         line-height: 1.15;
       }
@@ -1071,18 +1072,18 @@ export function buildPhotographicReportHtml(
         /* typography.bodySm = 8.3 */
         font-size: 8.3pt;
         font-weight: 400;
-        color: #dfe7ef;
-        margin-top: 1.4mm;
+        color: var(--text-secondary);
+        margin: 1.1mm 2.6mm 2.1mm;
         line-height: 1.3;
       }
       .doc-code {
-        flex: 0 0 58mm;
-        width: 58mm;
+        flex: 0 0 54mm;
+        width: 54mm;
         background: var(--surface);
-        border: 0.35mm solid var(--border-strong);
-        border-radius: var(--radius);
-        padding: 1.8mm;
-        text-align: center;
+        border: 0.26mm solid var(--border-strong);
+        border-top: 1mm solid var(--brand);
+        padding: 0;
+        text-align: left;
       }
       .doc-code-pill {
         background: var(--info);
@@ -1091,7 +1092,7 @@ export function buildPhotographicReportHtml(
         /* typography.caption = 7 */
         font-size: 7pt;
         font-weight: 700;
-        color: var(--brand-on);
+        color: var(--text-primary);
         letter-spacing: .08em;
       }
       .doc-code-value {
@@ -1099,30 +1100,31 @@ export function buildPhotographicReportHtml(
         font-size: 9.5pt;
         font-weight: 700;
         color: var(--text-primary);
-        margin-top: 2mm;
+        margin: 2.2mm 2.6mm 0;
         word-break: break-all;
       }
       .doc-code-status {
         font-size: 7pt;
         color: var(--text-primary);
-        margin-top: 1.4mm;
+        margin: 1.1mm 2.6mm 2.1mm;
       }
 
       /* Cartões de metadados do cabeçalho (barra de marca à esquerda) */
       .doc-meta {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 2.4mm;
-        margin-top: 4mm;
+        gap: 0;
+        margin-top: 3.5mm;
+        border-top: 0.24mm solid var(--border-strong);
+        border-bottom: 0.2mm solid var(--border);
       }
       .doc-meta--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .doc-meta-card {
         background: var(--surface);
-        border: 0.24mm solid var(--border);
-        border-left: 2.2mm solid var(--brand);
-        border-radius: var(--radius);
+        border-right: 0.2mm solid var(--border);
         padding: 2mm 3mm 2.4mm;
       }
+      .doc-meta-card:last-child { border-right: 0; }
       .doc-meta-value {
         font-size: 8.3pt;
         font-weight: 700;
@@ -1153,14 +1155,16 @@ export function buildPhotographicReportHtml(
       .rail {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 3mm;
+        gap: 0;
+        border: 0.24mm solid var(--border-strong);
+        border-left: 1mm solid var(--brand);
       }
       .rail-card {
         background: var(--surface);
-        border: 0.24mm solid var(--border);
-        border-radius: var(--radius);
+        border-right: 0.2mm solid var(--border);
         padding: 1.6mm 1.6mm 2.6mm;
       }
+      .rail-card:last-child { border-right: 0; }
       .rail-value {
         font-size: 8.3pt;
         font-weight: 700;
@@ -1172,8 +1176,7 @@ export function buildPhotographicReportHtml(
 
       /* Pílula de acento (largura total do cartão) */
       .pill {
-        height: 3.2mm;
-        border-radius: calc(var(--radius) / 2);
+        height: 0.9mm;
         background: var(--brand);
       }
       .pill--brand   { background: var(--brand); }
@@ -1185,23 +1188,18 @@ export function buildPhotographicReportHtml(
 
       /* ── ExecutiveSummaryStrip ───────────────────────────────────── */
       .exec-strip {
-        background: var(--surface-muted);
-        border: 0.3mm solid var(--border);
-        border-radius: var(--radius);
-        padding: 1.6mm 4mm 4mm;
+        background: var(--surface);
+        border: 0.24mm solid var(--border);
+        border-top: 0.9mm solid var(--brand-strong);
+        padding: 3mm 4mm 3.5mm;
         break-inside: avoid;
       }
-      .exec-tab {
-        width: 30mm;
-        height: 3.1mm;
-        background: var(--brand);
-        border-radius: calc(var(--radius) / 2);
-      }
+      .exec-tab { display: none; }
       .exec-title {
         font-size: 11.6pt;
         font-weight: 700;
         color: var(--text-primary);
-        margin-top: 2.2mm;
+        margin-top: 0;
       }
       .exec-summary {
         font-size: 8.3pt;
@@ -1211,18 +1209,19 @@ export function buildPhotographicReportHtml(
       }
       .metric-grid {
         display: grid;
-        gap: 3mm;
+        gap: 0;
         margin-top: 3.4mm;
+        border-top: 0.2mm solid var(--border);
       }
       .metric-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .metric-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .metric-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .metric-card {
         background: var(--surface);
-        border: 0.22mm solid var(--border);
-        border-radius: 1.8mm;
-        padding: 1.3mm 1.4mm 2.6mm;
+        border-right: 0.2mm solid var(--border);
+        padding: 1.6mm 2.2mm 2.4mm;
       }
+      .metric-card:last-child { border-right: 0; }
       .metric-card .ds-label { padding: 0 1.2mm; margin-top: 1.6mm; }
       .metric-value {
         font-size: 15.2pt;
@@ -1235,25 +1234,24 @@ export function buildPhotographicReportHtml(
       /* ── MetadataGrid / NarrativeSection: cartão padrão ──────────── */
       .ds-card {
         background: var(--surface);
-        border: 0.3mm solid var(--border);
-        border-radius: var(--radius);
+        border: 0.24mm solid var(--border);
         overflow: hidden;
         break-inside: avoid;
       }
       .ds-card-head {
         position: relative;
-        background: var(--surface-muted);
-        margin: 1.2mm;
-        border-radius: calc(var(--radius) / 1.5);
-        padding: 2.2mm 3mm 2.2mm 5mm;
+        background: var(--surface);
+        margin: 0;
+        border-bottom: 0.2mm solid var(--border);
+        padding: 2.8mm 3mm 2.6mm 4mm;
       }
       /* Acento lateral de 2.4mm colado à borda do cartão */
       .ds-card-accent {
         position: absolute;
-        left: -1.2mm;
-        top: -1.2mm;
-        width: 2.4mm;
-        height: 10.5mm;
+        left: 0;
+        bottom: -0.2mm;
+        width: 28mm;
+        height: 0.7mm;
         background: var(--brand);
       }
       .ds-card-title {
@@ -1285,7 +1283,7 @@ export function buildPhotographicReportHtml(
       .meta-value {
         font-size: 9.2pt;
         color: var(--text-primary);
-        margin-top: 1.4mm;
+        margin: 1.1mm 2.6mm 2.1mm;
         word-break: break-word;
       }
 
@@ -1295,7 +1293,7 @@ export function buildPhotographicReportHtml(
         position: relative;
         background: var(--surface);
         border: 0.3mm solid var(--border);
-        border-radius: 2mm;
+        border-radius: var(--radius);
         padding: 2.6mm 3mm 2.6mm 6mm;
         overflow: hidden;
       }
@@ -1313,7 +1311,7 @@ export function buildPhotographicReportHtml(
         gap: 5mm;
         background: var(--surface);
         border: 0.28mm solid var(--border);
-        border-radius: 2mm;
+        border-radius: var(--radius);
         padding: 5mm;
         break-inside: avoid;
         page-break-inside: avoid;
@@ -1396,7 +1394,7 @@ export function buildPhotographicReportHtml(
       .badge {
         display: inline-block;
         padding: 0.6mm 2mm;
-        border-radius: 999px;
+        border-radius: 1mm;
         border: 0.22mm solid var(--border);
         font-size: 7pt;
         font-weight: 700;
@@ -1418,7 +1416,7 @@ export function buildPhotographicReportHtml(
       .chip {
         display: inline-block;
         padding: 0.6mm 2mm;
-        border-radius: 999px;
+        border-radius: 1mm;
         background: var(--surface-muted);
         border: 0.22mm solid var(--border);
         color: var(--text-secondary);
@@ -1434,8 +1432,8 @@ export function buildPhotographicReportHtml(
         font-size: 8.3pt;
       }
       .data-table thead th {
-        background: var(--surface-muted);
-        color: var(--text-secondary);
+        background: var(--brand-strong);
+        color: #fff;
         font-size: 7pt;
         font-weight: 700;
         text-transform: uppercase;
@@ -1470,7 +1468,7 @@ export function buildPhotographicReportHtml(
       .empty-note {
         font-size: 8.3pt;
         color: var(--text-secondary);
-        margin-top: 1.4mm;
+        margin: 1.1mm 2.6mm 2.1mm;
         line-height: 1.45;
       }
 
@@ -1497,8 +1495,8 @@ export function buildPhotographicReportHtml(
       /* ── governança / rodapé ────────────────────────────────────── */
       .gov {
         background: var(--surface);
-        border: 0.3mm solid var(--border);
-        border-radius: var(--radius);
+        border: 0.24mm solid var(--border);
+        border-left: 1mm solid var(--brand);
         padding: 4mm;
         break-inside: avoid;
       }
@@ -1562,7 +1560,7 @@ export function buildPhotographicReportHtml(
       }
       .sig-card {
         border: 0.24mm solid var(--border);
-        border-radius: 1.8mm;
+        border-radius: var(--radius);
         padding: 3mm 4mm 3.4mm;
         background: var(--surface);
         break-inside: avoid;
@@ -1600,7 +1598,7 @@ export function buildPhotographicReportHtml(
       .sig-proof {
         font-size: 7pt;
         color: var(--text-muted);
-        margin-top: 1.4mm;
+        margin: 1.1mm 2.6mm 2.1mm;
         letter-spacing: .04em;
       }
       .sig-hash {
@@ -1617,19 +1615,19 @@ export function buildPhotographicReportHtml(
       .gov-subtitle {
         font-size: 8.3pt;
         color: var(--text-secondary);
-        margin-top: 1.4mm;
+        margin: 1.1mm 2.6mm 2.1mm;
         line-height: 1.45;
       }
       .gov-code {
         display: inline-block;
         margin-top: 3mm;
-        background: var(--surface-muted);
-        border: 0.24mm solid var(--border-strong);
-        border-radius: calc(var(--radius) / 1.5);
-        padding: 2mm 4mm;
-        font-size: 9.5pt;
+        border-top: 0.24mm solid var(--border-strong);
+        border-bottom: 0.24mm solid var(--border-strong);
+        padding: 1.7mm 0;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 9pt;
         font-weight: 700;
-        letter-spacing: .1em;
+        letter-spacing: .06em;
         color: var(--text-primary);
       }
       .doc-footer {
