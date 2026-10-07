@@ -3591,6 +3591,61 @@ body {
    ============================================================ */
 
 @media (max-width: 767px) {
+  .pt-stepper-card {
+    border-radius: var(--ds-radius-md);
+  }
+
+  .pt-stepper-intro {
+    padding: 0.75rem 0.9rem !important;
+  }
+
+  .pt-stepper-intro h2 {
+    margin-top: 0.25rem !important;
+    font-size: 0.95rem !important;
+  }
+
+  .pt-stepper-intro p:last-child {
+    display: none;
+  }
+
+  .pt-stepper-list,
+  .apr-mobile-step-list {
+    display: flex !important;
+    grid-template-columns: none !important;
+    gap: 0.5rem !important;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pt-stepper-list::-webkit-scrollbar,
+  .apr-mobile-step-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pt-stepper-list {
+    padding: 0.65rem !important;
+  }
+
+  .apr-mobile-step-list {
+    padding: 0.75rem !important;
+  }
+
+  .pt-stepper-item,
+  .apr-mobile-step-item {
+    flex: 0 0 auto;
+    width: min(78vw, 17rem) !important;
+    min-height: 3.5rem;
+    scroll-snap-align: start;
+  }
+
+  .pt-stepper-description,
+  .apr-mobile-step-description {
+    display: none;
+  }
+
   .ds-action-menu-panel {
     position: fixed !important;
     left: max(0.75rem, var(--ds-safe-area-left)) !important;
