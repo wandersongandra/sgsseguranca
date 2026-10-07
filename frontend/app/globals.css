@@ -3500,6 +3500,94 @@ body {
 }
 
 /* ============================================================
+   Surgical mobile pass — 2026-10-07
+   Narrow-screen fixes found after the first responsive rollout.
+   ============================================================ */
+
+@media (max-width: 767px) {
+  .rdo-editor-footer {
+    align-items: stretch !important;
+  }
+
+  .rdo-editor-footer > button {
+    width: 100%;
+  }
+
+  .rdo-editor-footer__actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.5rem !important;
+  }
+
+  .rdo-editor-footer__actions > button,
+  .rdo-editor-footer__actions > a {
+    min-width: 0;
+    min-height: 2.875rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .checklists-filters__primary,
+  .checklists-filters__views {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .checklists-filters__primary > *,
+  .checklists-filters__views > * {
+    min-width: 0;
+  }
+
+  .checklists-filters__model {
+    width: 100%;
+  }
+
+  .checklists-filters__model select {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .checklists-filters__columns {
+    flex: 1 1 auto;
+  }
+
+  .checklists-filters__columns > summary {
+    min-height: 2.75rem;
+    justify-content: center;
+  }
+
+  .checklists-filters__columns-menu {
+    position: fixed !important;
+    right: max(0.75rem, var(--ds-safe-area-right)) !important;
+    left: max(0.75rem, var(--ds-safe-area-left)) !important;
+    bottom: calc(var(--ds-mobile-nav-total-height) + 0.75rem);
+    width: auto !important;
+    max-height: min(26rem, calc(100dvh - var(--ds-mobile-nav-total-height) - 6rem));
+    overflow-y: auto;
+    margin-top: 0 !important;
+    overscroll-behavior: contain;
+  }
+
+  .checklists-filters__views > select {
+    flex-basis: 100%;
+  }
+}
+
+@media (max-width: 399px) {
+  .rdo-editor-footer__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .checklists-filters__primary > button,
+  .checklists-filters__primary > .checklists-filters__columns,
+  .checklists-filters__views > button {
+    width: 100%;
+    flex-basis: 100%;
+  }
+}
+
+/* ============================================================
    Global Tailwind Text Overrides
    Força texto escuro e legível em toda a interface clara.
    ============================================================ */
