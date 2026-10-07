@@ -242,7 +242,7 @@ export async function drawPhotographicReportBlueprint(
   });
 
   drawExecutiveSummaryStrip(ctx, {
-    title: "Leitura executiva",
+    title: "Resumo do relatório",
     summary: buildExecutiveSummary(report, totalPhotos, totalDays || 1),
     metrics: [
       { label: "Cliente", value: sanitize(report.client_name), tone: "info" },
