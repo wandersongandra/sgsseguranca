@@ -1388,7 +1388,7 @@ export class NonConformitiesPdfService {
             ${photosHtml}
             ${unembeddedAttachmentsHtml}
 
-            <div class="section-title"><span class="bar"></span><h2>Governança, autenticidade e rastreabilidade</h2></div>
+            <div class="section-title"><span class="bar"></span><h2>Validação do documento</h2></div>
             <div class="gov-card">
               <div class="gov-body">
                 <div class="sign-panel">
