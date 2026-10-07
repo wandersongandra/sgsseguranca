@@ -64,7 +64,7 @@ export async function generatePtPdf(
 
   ctx.y = applyInstitutionalDocumentHeader(ctx, {
     title: "PERMISSÃO DE TRABALHO",
-    subtitle: "Documento oficial de liberação operacional em SST",
+    subtitle: "Liberação de atividade e controles de segurança",
     code,
     codeLabel: "Número da PT",
     date: formatDate(pt.data_hora_inicio),
