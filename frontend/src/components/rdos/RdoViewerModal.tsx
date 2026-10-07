@@ -311,7 +311,7 @@ export function RdoViewerModal({
                 trabalhadores)
               </p>
               <div className="overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)]">
-                <table className="min-w-[620px] w-full text-sm">
+                <table className="ds-mobile-stack-table w-full text-sm sm:min-w-[620px]">
                   <thead>
                     <tr className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/40">
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
@@ -334,16 +334,16 @@ export function RdoViewerModal({
                         key={index}
                         className="border-b border-[var(--ds-color-border-subtle)] last:border-0"
                       >
-                        <td className="px-3 py-2 text-[var(--ds-color-text-primary)]">
+                        <td data-label="Função" className="px-3 py-2 text-[var(--ds-color-text-primary)]">
                           {item.funcao}
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="Qtd" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.quantidade}
                         </td>
-                        <td className="px-3 py-2 text-center capitalize text-[var(--ds-color-text-secondary)]">
+                        <td data-label="Turno" className="px-3 py-2 text-center capitalize text-[var(--ds-color-text-secondary)]">
                           {item.turno}
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="Horas" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.horas}h
                         </td>
                       </tr>
@@ -360,7 +360,7 @@ export function RdoViewerModal({
                 <Wrench className="h-3.5 w-3.5" /> Equipamentos
               </p>
               <div className="overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)]">
-                <table className="min-w-[760px] w-full text-sm">
+                <table className="ds-mobile-stack-table w-full text-sm sm:min-w-[760px]">
                   <thead>
                     <tr className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/40">
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
@@ -383,16 +383,16 @@ export function RdoViewerModal({
                         key={index}
                         className="border-b border-[var(--ds-color-border-subtle)] last:border-0"
                       >
-                        <td className="px-3 py-2 text-[var(--ds-color-text-primary)]">
+                        <td data-label="Equipamento" className="px-3 py-2 text-[var(--ds-color-text-primary)]">
                           {item.nome}
                         </td>
                         <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.quantidade}
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="H. trabalhadas" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.horas_trabalhadas}h
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="H. ociosas" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.horas_ociosas}h
                         </td>
                       </tr>
@@ -409,7 +409,7 @@ export function RdoViewerModal({
                 <Package className="h-3.5 w-3.5" /> Materiais Recebidos
               </p>
               <div className="overflow-x-auto rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)]">
-                <table className="min-w-[520px] w-full text-sm">
+                <table className="ds-mobile-stack-table w-full text-sm sm:min-w-[520px]">
                   <thead>
                     <tr className="border-b border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/40">
                       <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
@@ -429,13 +429,13 @@ export function RdoViewerModal({
                         key={index}
                         className="border-b border-[var(--ds-color-border-subtle)] last:border-0"
                       >
-                        <td className="px-3 py-2 text-[var(--ds-color-text-primary)]">
+                        <td data-label="Descrição" className="px-3 py-2 text-[var(--ds-color-text-primary)]">
                           {item.descricao}
                         </td>
                         <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.quantidade}
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="Unidade" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.unidade}
                         </td>
                       </tr>
