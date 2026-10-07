@@ -524,7 +524,7 @@ async function drawGovernance(
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
-  doc.text('Governança e autenticidade', margin + 5, ctx.y + 6.5);
+  doc.text('Validação do documento', margin + 5, ctx.y + 6.5);
   fill(doc, TONE.surfaceMuted);
   stroke(doc, TONE.border);
   rounded(doc, margin + 3, ctx.y + 12, width - 6, height - 15, 'FD');
