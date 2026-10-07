@@ -150,10 +150,10 @@ export function AprAdvancedFiltersDrawer({
         role="dialog"
         aria-modal="true"
         aria-label="Filtros avançados de APR"
-        className="ml-auto flex h-full w-full max-w-md flex-col border-l border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-md)]"
+        className="apr-advanced-filters-drawer ml-auto flex h-full w-full max-w-md flex-col border-l border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-md)]"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--ds-color-border-default)] px-5 py-4">
+        <div className="apr-advanced-filters-header flex items-start justify-between gap-4 border-b border-[var(--ds-color-border-default)] px-5 py-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-[var(--ds-color-text-primary)]">
               <SlidersHorizontal className="h-4 w-4" />
@@ -301,7 +301,7 @@ export function AprAdvancedFiltersDrawer({
             </select>
           </div>
 
-          <div className="space-y-2">
+          <div className="hidden space-y-2 md:block">
             <span id="apr-advanced-density-label">Densidade da tabela</span>
             <div
               role="group"
@@ -346,7 +346,7 @@ export function AprAdvancedFiltersDrawer({
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-[var(--ds-color-border-default)] px-5 py-4">
+        <div className="apr-advanced-filters-footer flex items-center justify-between gap-3 border-t border-[var(--ds-color-border-default)] px-5 py-4">
           <Button
             type="button"
             variant="ghost"
@@ -357,7 +357,7 @@ export function AprAdvancedFiltersDrawer({
           >
             Limpar tudo
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="apr-advanced-filters-footer__actions flex items-center gap-2">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
