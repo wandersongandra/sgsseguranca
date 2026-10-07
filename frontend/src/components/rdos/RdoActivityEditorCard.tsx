@@ -52,7 +52,7 @@ export function RdoActivityEditorCard({
   const observationId = `rdo-activity-observation-${item.__rowKey}`;
 
   return (
-    <div className="space-y-4 rounded-2xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4">
+    <div className="space-y-4 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -122,7 +122,7 @@ export function RdoActivityEditorCard({
         />
       </div>
 
-      <div className="rounded-xl border border-dashed border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/80 p-3">
+      <div className="rounded-[var(--ds-radius-md)] border border-dashed border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]/80 p-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--ds-color-text-secondary)]">
@@ -174,7 +174,7 @@ export function RdoActivityEditorCard({
               {(item.fotos ?? []).map((photo, photoIndex) => (
                 <div
                   key={`${photo}-${photoIndex}`}
-                  className="relative h-20 w-20 overflow-hidden rounded-xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
+                  className="relative h-20 w-20 overflow-hidden rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
                 >
                   <Image
                     src={
@@ -209,7 +209,7 @@ export function RdoActivityEditorCard({
               {pendingPhotos.map((photo, photoIndex) => (
                 <div
                   key={`${photo.previewUrl}-${photoIndex}`}
-                  className="relative h-20 w-20 overflow-hidden rounded-xl border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
+                  className="relative h-20 w-20 overflow-hidden rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)]"
                 >
                   <Image
                     src={photo.previewUrl}
