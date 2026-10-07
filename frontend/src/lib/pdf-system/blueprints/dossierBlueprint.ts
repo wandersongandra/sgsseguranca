@@ -329,7 +329,7 @@ export async function drawDossierBlueprint(
         : "Dossiê da obra/setor",
     criticality: "Controlado",
     validity: formatDateTime(context.generatedAt),
-    documentClass: "Executivo",
+    documentClass: "Dossiê",
   });
 
   drawExecutiveSummaryStrip(ctx, buildExecutiveSummary(context));
