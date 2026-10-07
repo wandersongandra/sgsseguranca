@@ -386,7 +386,7 @@ export function RdoViewerModal({
                         <td data-label="Equipamento" className="px-3 py-2 text-[var(--ds-color-text-primary)]">
                           {item.nome}
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="Qtd" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.quantidade}
                         </td>
                         <td data-label="H. trabalhadas" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
@@ -432,7 +432,7 @@ export function RdoViewerModal({
                         <td data-label="Descrição" className="px-3 py-2 text-[var(--ds-color-text-primary)]">
                           {item.descricao}
                         </td>
-                        <td className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
+                        <td data-label="Qtd" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
                           {item.quantidade}
                         </td>
                         <td data-label="Unidade" className="px-3 py-2 text-center text-[var(--ds-color-text-secondary)]">
