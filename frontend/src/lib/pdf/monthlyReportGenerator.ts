@@ -308,8 +308,8 @@ export function generateMonthlyReportPdf(
   });
 
   drawNarrativeSection(ctx, {
-    title: "Governança documental",
-    content: `Documento ${code} emitido pelo sistema SGS para ${companyName}, consolidando o período ${buildReportPeriod(report)} com leitura executiva e rastreabilidade institucional.`,
+    title: "Emissão do relatório",
+    content: `Relatório ${code} emitido para ${companyName}, referente ao período ${buildReportPeriod(report)}.`,
   });
 
   applyFooterGovernance(ctx, {
