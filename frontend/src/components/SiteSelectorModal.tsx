@@ -113,9 +113,8 @@ export default function SiteSelectorModal({
     onSelect(site);
     onClose?.();
 
-    // Feedback visual
-    toast.success(`Obra "${site.nome}" selecionada`, {
-      description: 'Contexto de trabalho atualizado',
+    toast.success('Obra selecionada', {
+      description: site.nome,
     });
   };
 
