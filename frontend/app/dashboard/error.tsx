@@ -19,7 +19,7 @@ export default function DashboardError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[var(--ds-color-bg-canvas)] px-6 text-center text-[var(--ds-color-text-primary)]">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--ds-color-bg-canvas)] px-6 text-center text-[var(--ds-color-text-primary)]">
       <div className="w-full max-w-md rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-danger-border)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-xs)]">
         <span className="mx-auto flex h-10 w-10 items-center justify-center rounded-[var(--ds-radius-md)] bg-[var(--ds-color-danger-subtle)] text-[var(--ds-color-danger)]">
           <AlertTriangle className="h-5 w-5" aria-hidden="true" />
