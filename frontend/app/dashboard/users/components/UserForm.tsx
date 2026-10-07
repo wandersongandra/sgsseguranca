@@ -332,14 +332,14 @@ export function UserForm({ id }: UserFormProps) {
             }
             description={
               isEmployeePath
-                ? 'Estruture identificação, vínculo com empresa e lotação operacional em um fluxo curto.'
+                ? 'Informe identificação, empresa, lotação e função do funcionário.'
                 : 'Defina identidade, vínculo organizacional e permissões de acesso com clareza.'
             }
             icon={
               <Link
                 href={backPath}
                 aria-label="Voltar para a listagem"
-                className="rounded-full p-2 text-[var(--ds-color-text-muted)] motion-safe:transition-colors hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-secondary)]"
+                className="rounded-[var(--ds-radius-md)] p-2 text-[var(--ds-color-text-muted)] motion-safe:transition-colors hover:bg-[var(--ds-color-primary-subtle)] hover:text-[var(--ds-color-text-secondary)]"
                 title="Voltar"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -356,25 +356,25 @@ export function UserForm({ id }: UserFormProps) {
               </div>
             }
           />
-          <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-              Cadastro guiado
+          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+              Dados do cadastro
             </p>
             <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
               {isEmployeePath
                 ? 'Dados essenciais do funcionário e lotação operacional.'
-                : 'Identidade, vínculo organizacional e acesso em um único fluxo.'}
+                : 'Identidade, vínculo organizacional e permissões de acesso.'}
             </p>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
               {canSelectCompany
-                ? 'Revise empresa, obra e perfil antes de salvar para evitar retrabalho de acesso.'
+                ? 'Confira empresa, obra e perfil de acesso antes de salvar.'
                 : 'Selecione a obra/setor quando o cadastro precisar de lotação operacional.'}
             </p>
           </div>
 
           <form
             onSubmit={formSubmit(onSubmit)}
-            className="space-y-5 rounded-xl border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]"
+            className="space-y-5 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-6 shadow-[var(--ds-shadow-sm)]"
           >
             {!canSelectCompany ? <input type="hidden" {...register('company_id')} /> : null}
             <input type="hidden" {...register('identity_type')} />
