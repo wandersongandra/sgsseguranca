@@ -2257,19 +2257,19 @@ useEffect(() => {
                 const deletionBlocked = rdo.status === "aprovado" || rdo.status === "cancelado";
                 const editBlocked = Boolean(rdo.pdf_file_key) || rdo.status === "cancelado";
                 return (
-                  <article className="min-w-0 rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm" aria-label={`RDO ${rdo.numero}`}>
+                  <article className="ds-mobile-card min-w-0" aria-label={`RDO ${rdo.numero}`}>
                     <div className="flex min-w-0 items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-mono text-sm font-semibold text-[var(--ds-color-action-primary)]">{rdo.numero}</p>
-                        <h3 className="mt-1 truncate font-semibold text-[var(--ds-color-text-primary)]">{rdo.site?.nome ?? "Obra não informada"}</h3>
+                        <h3 className="mt-1 break-words font-semibold text-[var(--ds-color-text-primary)] sm:truncate">{rdo.site?.nome ?? "Obra não informada"}</h3>
                       </div>
                       <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium ${RDO_STATUS_COLORS[rdo.status] ?? "border-[color:var(--ds-color-text-secondary)]/30 bg-[color:var(--ds-color-text-secondary)]/12 text-[var(--ds-color-text-secondary)]"}`}>
                         {RDO_STATUS_LABEL[rdo.status] ?? rdo.status}
                       </span>
                     </div>
-                    <dl className="mt-4 grid min-w-0 grid-cols-2 gap-3 text-sm">
+                    <dl className="ds-mobile-detail-grid mt-4 grid min-w-0 grid-cols-1 gap-3 text-sm min-[360px]:grid-cols-2">
                       <div><dt className="text-xs text-[var(--ds-color-text-secondary)]">Data</dt><dd>{safeToLocaleDateString(rdo.data, "pt-BR", undefined, "—")}</dd></div>
-                      <div className="min-w-0"><dt className="text-xs text-[var(--ds-color-text-secondary)]">Responsável</dt><dd className="truncate">{rdo.responsavel?.nome ?? "—"}</dd></div>
+                      <div className="min-w-0"><dt className="text-xs text-[var(--ds-color-text-secondary)]">Responsável</dt><dd className="break-words sm:truncate">{rdo.responsavel?.nome ?? "—"}</dd></div>
                       <div><dt className="text-xs text-[var(--ds-color-text-secondary)]">Trabalhadores</dt><dd>{totalTrabalhadores(rdo) || "—"}</dd></div>
                       <div><dt className="text-xs text-[var(--ds-color-text-secondary)]">Acidente</dt><dd className={rdo.houve_acidente ? "font-medium text-[var(--ds-color-danger)]" : ""}>{rdo.houve_acidente ? "Sim" : "Não"}</dd></div>
                     </dl>
@@ -2279,7 +2279,7 @@ useEffect(() => {
                         {statusTransitions.map((status) => <option key={status} value={status}>{RDO_STATUS_LABEL[status]}</option>)}
                       </select>
                     ) : null}
-                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label={`Ações do RDO ${rdo.numero}`}>
+                    <div className="ds-mobile-card__actions mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3" aria-label={`Ações do RDO ${rdo.numero}`}>
                       <Button type="button" variant="outline" className="min-h-11" data-offline-action="read" onClick={() => tenantPageIsolation.isActiveCompany(rdo.company_id) && setViewRdo(rdo)}><Eye className="h-4 w-4" /> Visualizar</Button>
                       {canManageRdo ? <Button type="button" variant="outline" className="min-h-11" data-offline-action="write" disabled={editBlocked} onClick={() => handleOpenEdit(rdo)}><Pencil className="h-4 w-4" /> Editar</Button> : null}
                       {canManageRdo ? <Button type="button" variant="outline" className="min-h-11 text-[var(--ds-color-danger)]" data-offline-action="write" disabled={deletionBlocked} onClick={() => handleDelete(rdo.id)}><Trash2 className="h-4 w-4" /> Excluir</Button> : null}
