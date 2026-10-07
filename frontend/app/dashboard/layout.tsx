@@ -233,13 +233,13 @@ function DashboardShell({
       >
         <Header onOpenMobileNav={openSidebar} />
         {isAdminGeral && (
-          <div className="sticky top-0 z-40 flex min-h-12 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-3">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
+          <div className="ds-context-banner ds-context-banner--warning sticky top-0 z-40 flex min-h-12 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-3">
+            <div className="ds-context-banner__content flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)]">
                 <Building2 className="h-4 w-4 text-[var(--ds-color-warning-fg)]" />
               </span>
               {selectedTenant ? (
-                <span className="min-w-0 whitespace-nowrap">
+                <span className="ds-context-banner__label min-w-0">
                   Operando em:{' '}
                   <AlertTriangle
                     size={14}
@@ -259,7 +259,7 @@ function DashboardShell({
             <button
               type="button"
               onClick={() => setSelectorOpen(true)}
-              className="ml-3 flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ds-color-warning-fg)] motion-safe:transition-colors hover:bg-[var(--ds-color-warning-subtle)]"
+              className="ds-context-banner__action ml-3 flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1.5 text-[11px] font-semibold text-[var(--ds-color-warning-fg)] motion-safe:transition-colors hover:bg-[var(--ds-color-warning-subtle)]"
             >
               <ChevronsUpDown className="h-3.5 w-3.5" />
               Trocar empresa
@@ -268,8 +268,8 @@ function DashboardShell({
         )}
         {/* Banner de obra selecionada - para todos os usuários */}
         {activeCompanyId && !selectedSite && (
-          <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-info-border)] bg-[var(--ds-color-info-subtle)] px-5 py-2">
-            <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-info-fg)]">
+          <div className="ds-context-banner ds-context-banner--info sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-info-border)] bg-[var(--ds-color-info-subtle)] px-5 py-2">
+            <div className="ds-context-banner__content flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-info-fg)]">
               <span className="min-w-0 truncate font-medium">
                 Nenhuma obra selecionada
               </span>
@@ -277,7 +277,7 @@ function DashboardShell({
             <button
               type="button"
               onClick={() => setSiteSelectorOpen(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-info-border)] bg-[var(--ds-color-info)] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-color-info-hover)]"
+              className="ds-context-banner__action flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-info-border)] bg-[var(--ds-color-info)] px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-[var(--ds-color-info-hover)]"
             >
               Selecionar obra
             </button>
@@ -285,10 +285,10 @@ function DashboardShell({
         )}
         {/* Banner de obra ativa */}
         {activeCompanyId && selectedSite && (
-          <div className="sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-2">
+          <div className="ds-context-banner ds-context-banner--warning sticky top-0 z-30 flex min-h-10 items-center justify-between border-b border-[var(--ds-color-warning-border)] bg-[var(--ds-color-warning-subtle)] px-5 py-2">
             <div className="flex min-w-0 items-center gap-2 text-sm text-[var(--ds-color-warning-fg)]">
               <HardHat className="h-4 w-4 shrink-0" />
-              <span className="min-w-0 whitespace-nowrap">
+              <span className="ds-context-banner__label min-w-0">
                 Obra:{' '}
                 <span className="font-semibold">{selectedSite.siteName}</span>
               </span>
@@ -296,7 +296,7 @@ function DashboardShell({
             <button
               type="button"
               onClick={() => setSiteSelectorOpen(true)}
-              className="flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1 text-xs font-semibold text-[var(--ds-color-warning-fg)] transition-colors hover:bg-[var(--ds-color-warning-subtle)]"
+              className="ds-context-banner__action flex shrink-0 items-center gap-1.5 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-warning-border)] bg-[var(--ds-color-surface-base)] px-3 py-1 text-xs font-semibold text-[var(--ds-color-warning-fg)] transition-colors hover:bg-[var(--ds-color-warning-subtle)]"
             >
               <ChevronsUpDown className="h-3 w-3" />
               Trocar obra
@@ -308,7 +308,7 @@ function DashboardShell({
         <main
           id="main-content"
           className={cn(
-            'ds-dashboard-content flex-1 overflow-y-auto px-4 py-4 sm:px-5 md:px-6 md:py-5 xl:px-8',
+            'ds-dashboard-content min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5 md:px-6 md:py-5 xl:px-8',
             isAdminGeral && 'pt-12 md:pt-12',
             selectedSite && 'pt-10 md:pt-10',
           )}
