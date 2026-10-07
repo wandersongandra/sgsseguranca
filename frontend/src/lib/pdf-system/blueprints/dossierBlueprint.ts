@@ -36,7 +36,7 @@ function isEmployeeContext(
 function buildExecutiveSummary(context: DossierContext) {
   if (isEmployeeContext(context)) {
     return {
-      title: "Leitura executiva do dossiê do colaborador",
+      title: "Resumo do colaborador",
       summary:
         "Resumo das capacitações, entregas de EPI, liberações, CATs e documentos do colaborador.",
       metrics: [
@@ -72,7 +72,7 @@ function buildExecutiveSummary(context: DossierContext) {
   }
 
   return {
-    title: "Leitura executiva do dossiê da obra/setor",
+    title: "Resumo da obra/setor",
     summary:
       "Consolidação institucional de efetivo, treinamentos, EPIs, permissões e CATs vinculados ao escopo operacional da unidade.",
     metrics: [
