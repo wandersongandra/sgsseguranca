@@ -140,7 +140,7 @@ describe('CommandPalette', () => {
 
     await runDebounce();
     expect(requestSignal?.aborted).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Fechar palette' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Fechar busca' }));
     expect(requestSignal?.aborted).toBe(true);
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Paleta de comandos' })).not.toBeInTheDocument());
   });
