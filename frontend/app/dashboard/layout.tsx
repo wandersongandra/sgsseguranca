@@ -24,7 +24,6 @@ import {
   isHiddenRoute,
   getRoutePermissionException,
 } from '@/lib/route-config';
-import { cn } from '@/lib/utils';
 
 const CompanySelectorModal = dynamic(
   () => import('@/components/CompanySelectorModal'),
