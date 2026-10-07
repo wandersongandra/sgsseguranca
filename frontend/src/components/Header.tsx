@@ -310,7 +310,7 @@ export function Header({ onOpenMobileNav }: { onOpenMobileNav?: () => void }) {
                     aria-label="Notificações"
                     aria-describedby="notifications-desc"
                     tabIndex={-1}
-                    className="absolute right-0 z-50 mt-3 flex max-h-[calc(100dvh-var(--ds-safe-area-top)-var(--ds-mobile-nav-total-height)-1rem)] w-[calc(100vw-1.5rem)] max-w-[320px] origin-top-right flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--chrome-topbar-border)] bg-[var(--chrome-topbar-bg)] shadow-[var(--ds-shadow-md)] sm:w-[calc(100vw-2rem)]"
+                    className="ds-notification-panel absolute right-0 z-50 mt-3 flex max-h-[calc(100dvh-var(--ds-safe-area-top)-var(--ds-mobile-nav-total-height)-1rem)] w-[calc(100vw-1.5rem)] max-w-[320px] origin-top-right flex-col overflow-hidden rounded-[var(--ds-radius-lg)] border border-[var(--chrome-topbar-border)] bg-[var(--chrome-topbar-bg)] shadow-[var(--ds-shadow-md)] sm:w-[calc(100vw-2rem)]"
                   >
                     <p id="notifications-desc" className="sr-only">
                       {unreadCount > 0
