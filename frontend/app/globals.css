@@ -3591,6 +3591,20 @@ body {
    ============================================================ */
 
 @media (max-width: 767px) {
+  .dds-form-stack {
+    gap: 1.25rem !important;
+  }
+
+  .dds-mobile-card {
+    padding: 1rem !important;
+    border-radius: var(--ds-radius-md) !important;
+    box-shadow: none !important;
+  }
+
+  .dds-mobile-context {
+    border-radius: var(--ds-radius-md) !important;
+  }
+
   .pt-stepper-card {
     border-radius: var(--ds-radius-md);
   }
