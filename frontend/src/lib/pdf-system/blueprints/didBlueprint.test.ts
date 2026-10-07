@@ -27,7 +27,7 @@ describe('drawDidBlueprint', () => {
     jest.clearAllMocks();
   });
 
-  it('organiza o PDF do DID com leitura rapida, contexto do turno e participantes', async () => {
+  it('organiza o PDF do DID com resumo do turno, contexto e participantes', async () => {
     await drawDidBlueprint(
       {} as never,
       jest.fn() as never,
@@ -73,7 +73,7 @@ describe('drawDidBlueprint', () => {
     expect(drawExecutiveSummaryStrip).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        title: 'Leitura rápida do turno',
+        title: 'Resumo do turno',
         metrics: expect.arrayContaining([
           expect.objectContaining({
             label: 'Frente de trabalho',
