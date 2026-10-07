@@ -505,7 +505,7 @@ useEffect(() => {
         toolbarDescription={`${filteredTrainings.length} resultado(s) exibidos nesta página.`}
         toolbarContent={
           <div className="flex w-full flex-col gap-3 md:flex-row md:items-center md:justify-end">
-            <div className="ds-list-search ds-list-search--wide min-w-[240px] flex-1 md:flex-none">
+            <div className="ds-list-search ds-list-search--wide min-w-0 w-full flex-1 md:w-auto md:min-w-[240px] md:flex-none">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ds-color-text-muted)]" />
               <input
                 type="text"
