@@ -166,10 +166,9 @@ export default function ExecutiveDashboardPage() {
               Visão executiva
             </Badge>
             <div>
-              <CardTitle className="text-xl">Cockpit Executivo SST</CardTitle>
+              <CardTitle className="text-xl">Visão Executiva de SST</CardTitle>
               <CardDescription className="mt-1">
-                Indicadores leading e lagging por obra, com leitura rápida de
-                tendência, desvios e saturação de risco.
+                Indicadores por obra para acompanhar tendências, desvios e concentração de riscos.
               </CardDescription>
             </div>
           </div>
