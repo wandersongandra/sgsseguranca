@@ -280,9 +280,9 @@ export async function drawGovernanceClosingBlock(
   const { doc, margin, contentWidth, theme } = ctx;
   currentAccent = options.accentColor ?? null;
   currentAccentSoft = options.accentSoftColor ?? null;
-  const title = options.title || "Governança, autenticidade e rastreabilidade";
+  const title = options.title || "Validação do documento";
   const subtitle =
-    options.subtitle || "Valide o documento por QR Code ou pelo identificador público.";
+    options.subtitle || "Use o QR Code ou o código do documento para conferência no portal SGS.";
   const signatures = (options.signatures || []).filter(
     (signature) => signature.name || signature.role || signature.image,
   );
