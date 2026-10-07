@@ -361,7 +361,7 @@ export default function PublicDdsSignaturePage() {
   const nonce = getBodyNonce();
 
   return (
-    <main className="min-h-screen bg-[var(--ds-color-bg-subtle)] px-4 py-8">
+    <main className="min-h-[100dvh] bg-[var(--ds-color-bg-subtle)] px-4 py-8">
       {turnstileEnabled && (
         <Script
           src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
