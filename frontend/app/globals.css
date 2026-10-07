@@ -2950,6 +2950,427 @@ body {
 }
 
 /* ============================================================
+   Mobile refinement contract — 2026-10-07
+   Field-first ergonomics for phones and compact tablets.
+   ============================================================ */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.ds-context-banner {
+  gap: 0.75rem;
+  padding-left: max(1rem, var(--ds-safe-area-left));
+  padding-right: max(1rem, var(--ds-safe-area-right));
+}
+
+.ds-context-banner__content {
+  flex: 1 1 auto;
+}
+
+.ds-context-banner__label {
+  overflow: hidden;
+  display: inline-block;
+  max-width: min(52vw, 28rem);
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.ds-context-banner__action {
+  min-height: 2.75rem;
+  touch-action: manipulation;
+}
+
+.ds-mobile-card {
+  min-width: 0;
+  border: 1px solid var(--ds-color-border-subtle);
+  border-radius: var(--ds-radius-lg);
+  background: var(--ds-color-surface-base);
+  padding: 1rem;
+  box-shadow: var(--ds-shadow-xs);
+}
+
+.ds-mobile-card__actions {
+  align-items: stretch;
+}
+
+.ds-mobile-card__actions > button,
+.ds-mobile-card__actions > a {
+  min-height: 2.75rem;
+  min-width: 0;
+}
+
+.ds-mobile-detail-grid dd,
+.ds-mobile-detail-grid p,
+.ds-mobile-detail-grid span {
+  overflow-wrap: anywhere;
+}
+
+.ds-pagination__actions {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --ds-mobile-action-gap: 0.5rem;
+    --ds-sophie-clearance: 0rem;
+  }
+
+  .ds-dashboard-content {
+    padding-top: 0.875rem;
+    padding-bottom: calc(var(--ds-mobile-nav-total-height) + 1.25rem);
+    scroll-padding-top: 1rem;
+    scroll-padding-bottom: calc(var(--ds-mobile-nav-total-height) + 7rem);
+  }
+
+  .ds-topbar {
+    min-height: calc(3.75rem + var(--ds-safe-area-top));
+    padding-left: max(0.75rem, var(--ds-safe-area-left));
+    padding-right: max(0.75rem, var(--ds-safe-area-right));
+  }
+
+  .ds-topbar-actions-shell {
+    gap: 0.2rem;
+    border-radius: var(--ds-radius-md);
+    padding: 0.2rem;
+  }
+
+  .ds-topbar-chip {
+    min-height: 2.75rem;
+    padding-inline: 0.65rem;
+  }
+
+  .ds-page-header {
+    gap: 0.65rem;
+    padding: 0.85rem 0 0.7rem;
+  }
+
+  .ds-page-header__main,
+  .ds-crud-hero__header {
+    gap: 0.8rem;
+  }
+
+  .ds-page-header__lead,
+  .ds-crud-hero__lead {
+    gap: 0.65rem;
+  }
+
+  .ds-page-header__icon,
+  .ds-crud-hero__icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .ds-page-header__title {
+    font-size: clamp(1.3rem, 6vw, 1.55rem);
+    line-height: 1.16;
+  }
+
+  .ds-page-header__description {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .ds-page-header__actions,
+  .ds-crud-hero__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .ds-page-header__actions > *,
+  .ds-crud-hero__actions > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ds-list-shell,
+  .ds-crud-filter-card {
+    border-radius: var(--ds-radius-md);
+    box-shadow: none;
+  }
+
+  .ds-list-toolbar,
+  .ds-crud-filter-header {
+    gap: 0.75rem;
+    padding: 0.8rem;
+  }
+
+  .ds-list-toolbar__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+
+  .ds-list-toolbar__actions > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ds-list-toolbar__surface {
+    border-radius: var(--ds-radius-sm);
+  }
+
+  .ds-list-body {
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ds-list-footer {
+    padding: 0.8rem;
+  }
+
+  .ds-form-shell {
+    gap: 0.8rem;
+  }
+
+  .ds-form-section {
+    border-radius: var(--ds-radius-md);
+    padding: 0.9rem;
+    box-shadow: none;
+  }
+
+  .ds-form-section__header {
+    gap: 0.65rem;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.85rem;
+  }
+
+  .ds-form-section__header > div:last-child:not(:first-child) {
+    width: 100%;
+  }
+
+  .ds-form-section__header > div:last-child:not(:first-child) > * {
+    min-height: 2.75rem;
+  }
+
+  .ds-form-array-item {
+    border-radius: var(--ds-radius-md);
+    padding: 0.8rem;
+    box-shadow: none;
+  }
+
+  .ds-form-field-group {
+    gap: 0.75rem;
+    padding-left: 0.75rem;
+  }
+
+  .ds-mobile-action-bar {
+    bottom: calc(var(--ds-mobile-nav-total-height) + 0.45rem);
+    display: flex;
+    width: 100%;
+    margin-top: 1rem;
+    margin-right: 0;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border-radius: var(--ds-radius-md);
+    padding: 0.6rem;
+    box-shadow: var(--ds-shadow-md);
+    backdrop-filter: blur(8px);
+  }
+
+  .ds-mobile-action-bar > button,
+  .ds-mobile-action-bar > a {
+    flex: 1 1 calc(50% - 0.25rem);
+    min-width: min(9rem, 100%);
+    min-height: 2.875rem;
+  }
+
+  .ds-dashboard-shell:has(.ds-mobile-action-bar) .ds-sophie-launcher {
+    bottom: calc(var(--ds-mobile-nav-total-height) + 6.25rem);
+  }
+
+  .ds-modal-shell {
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    width: 100%;
+    max-width: none !important;
+    max-height: calc(100dvh - max(0.75rem, var(--ds-safe-area-top))) !important;
+    transform: none;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--ds-radius-lg) var(--ds-radius-lg) 0 0;
+  }
+
+  .ds-modal-header {
+    padding: 0.9rem 1rem 0.8rem;
+  }
+
+  .ds-modal-header__icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .ds-modal-body {
+    padding: 1rem;
+    overscroll-behavior: contain;
+  }
+
+  .ds-modal-footer {
+    padding: 0.75rem 1rem max(0.75rem, var(--ds-safe-area-bottom));
+  }
+
+  .ds-modal-footer > div {
+    width: 100%;
+  }
+
+  .ds-modal-footer button,
+  .ds-modal-footer a {
+    min-height: 2.75rem;
+  }
+
+  .ds-mobile-card {
+    border-radius: var(--ds-radius-md);
+    padding: 0.9rem;
+    box-shadow: none;
+  }
+
+  .ds-mobile-card__actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem !important;
+  }
+
+  .ds-mobile-card__actions > button,
+  .ds-mobile-card__actions > a {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .ds-pagination {
+    align-items: stretch;
+  }
+
+  .ds-pagination > p {
+    text-align: center;
+  }
+
+  .ds-pagination__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    width: 100%;
+  }
+
+  .ds-pagination__actions button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    scroll-margin-top: 5rem;
+    scroll-margin-bottom: calc(var(--ds-mobile-nav-total-height) + 7rem);
+  }
+}
+
+@media (max-width: 639px) {
+  .ds-mobile-nav {
+    min-height: calc(4rem + var(--ds-safe-area-bottom));
+    padding-top: 0.25rem;
+  }
+
+  .ds-mobile-nav__item {
+    position: relative;
+    min-height: 3.6rem;
+    gap: 0.2rem;
+    padding: 0.35rem 0.2rem;
+    font-size: 0.65rem;
+    line-height: 1.15;
+    touch-action: manipulation;
+  }
+
+  .ds-mobile-nav__item--active {
+    background: transparent;
+    box-shadow: inset 0 2px 0 var(--ds-color-action-primary);
+  }
+
+  .ds-mobile-nav__item span {
+    max-width: 4.5rem;
+  }
+
+  .ds-context-banner {
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+    padding: 0.6rem max(0.75rem, var(--ds-safe-area-right)) 0.6rem
+      max(0.75rem, var(--ds-safe-area-left));
+  }
+
+  .ds-context-banner__content {
+    min-width: 0;
+  }
+
+  .ds-context-banner__label {
+    max-width: calc(100vw - 10rem);
+  }
+
+  .ds-context-banner__action {
+    min-height: 2.5rem;
+    margin-left: 0;
+  }
+
+  .ds-page-header__actions,
+  .ds-crud-hero__actions,
+  .ds-list-toolbar__actions {
+    grid-template-columns: 1fr;
+  }
+
+  .ds-form-grid {
+    gap: 0.8rem;
+  }
+
+  .ds-mobile-card__actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 399px) {
+  .ds-context-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ds-context-banner__content,
+  .ds-context-banner__action {
+    width: 100%;
+  }
+
+  .ds-context-banner__label {
+    max-width: calc(100vw - 4rem);
+  }
+
+  .ds-context-banner__action {
+    justify-content: center;
+  }
+
+  .ds-page-header__lead,
+  .ds-crud-hero__lead {
+    gap: 0.55rem;
+  }
+
+  .ds-page-header__icon,
+  .ds-crud-hero__icon {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .ds-mobile-action-bar > button,
+  .ds-mobile-action-bar > a {
+    flex-basis: 100%;
+  }
+
+  .ds-mobile-card__actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
    Global Tailwind Text Overrides
    Força texto escuro e legível em toda a interface clara.
    ============================================================ */
