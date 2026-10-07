@@ -53,6 +53,9 @@ export function buildEpiAssignmentPdfHtml(
     `<div class="field"><span>${escapeInstitutionalPdfHtml(label)}</span><strong>${escapeInstitutionalPdfHtml(value)}</strong></div>`;
 
   const signature = assignment.assinatura_entrega;
+  const workerName = assignment.user?.nome || '-';
+  const epiName = assignment.epi?.nome || '-';
+  const companyName = assignment.company?.razao_social || assignment.company_id;
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -67,12 +70,21 @@ export function buildEpiAssignmentPdfHtml(
     site: assignment.site?.nome,
     referenceDate: formatDate(assignment.entregue_em, true),
   })}
+  <section class="executive-summary">
+    <h2>Resumo da entrega</h2>
+    <p>Registro individual do equipamento entregue ao trabalhador na data indicada abaixo.</p>
+    <div class="metrics">
+      <div class="metric"><span class="metric-label">Trabalhador</span><strong class="metric-value">${escapeInstitutionalPdfHtml(workerName)}</strong></div>
+      <div class="metric"><span class="metric-label">EPI</span><strong class="metric-value">${escapeInstitutionalPdfHtml(epiName)}</strong></div>
+      <div class="metric"><span class="metric-label">Quantidade</span><strong class="metric-value">${escapeInstitutionalPdfHtml(assignment.quantidade)}</strong></div>
+    </div>
+  </section>
   <div class="section-title">Dados da entrega</div>
   <div class="grid">
-    ${field('Empresa', assignment.company?.razao_social || assignment.company_id)}
+    ${field('Empresa', companyName)}
     ${field('Obra', assignment.site?.nome)}
-    ${field('Trabalhador', assignment.user?.nome)}
-    ${field('Equipamento', assignment.epi?.nome)}
+    ${field('Trabalhador', workerName)}
+    ${field('Equipamento', epiName)}
     ${field('Quantidade', assignment.quantidade)}
     ${field('C.A.', assignment.ca)}
     ${field('Validade do C.A.', formatDate(assignment.validade_ca))}
@@ -85,11 +97,12 @@ export function buildEpiAssignmentPdfHtml(
     ${field('Signatário', signature?.signer_name || assignment.user?.nome)}
     ${field('Tipo de assinatura', signature?.signature_type)}
     ${field('Hash da assinatura', signature?.signature_hash)}
-    ${field('Carimbo emitido em', signature?.timestamp_issued_at)}
+    ${field('Carimbo emitido em', formatDate(signature?.timestamp_issued_at, true))}
     ${field('Autoridade do carimbo', signature?.timestamp_authority)}
     ${field('Versão do carimbo', signature?.timestamp_token_version)}
   </div>
-  <div class="governance">Registro emitido a partir dos dados armazenados no SGS. A assinatura é referenciada pelo hash e pelo carimbo de tempo; o dado bruto da assinatura não é incorporado ao PDF.</div>
+  <div class="receipt-note">Este registro identifica a entrega realizada ao trabalhador e os dados do EPI no momento da emissão. Confira equipamento, quantidade, C.A. e validade antes do arquivamento.</div>
+  <div class="governance"><div class="governance-title">Integridade da assinatura</div>O SGS referencia a assinatura pelo hash e pelo carimbo de tempo. O dado bruto da assinatura não é incorporado ao PDF.</div>
   <div class="integrity">Empresa: ${escapeInstitutionalPdfHtml(assignment.company_id)} · Ficha: ${escapeInstitutionalPdfHtml(assignment.id)}</div>
 </body></html>`;
 }
