@@ -113,7 +113,7 @@ export default function DidsPage() {
     <ListPageLayout
       eyebrow="Formalização operacional"
       title="Diálogo do Início do Dia"
-      description="Um visual mais limpo para acompanhar DIDs, equipe, status e PDFs finais. O DID continua sendo um registro simples de formalização diária."
+      description="Acompanhe os alinhamentos diários, participantes, status e PDFs finais do turno."
       icon={<ClipboardList className="h-5 w-5" />}
       className="pb-6"
       panelClassName="overflow-hidden"
