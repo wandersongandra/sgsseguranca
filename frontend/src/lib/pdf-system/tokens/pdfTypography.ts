@@ -9,11 +9,11 @@ export type PdfTypographyScale = {
 };
 
 export const pdfTypography: PdfTypographyScale = {
-  title: 16.4,
-  subtitle: 9.2,
-  section: 11,
-  label: 7.8,
-  body: 10,
-  technicalCaption: 8,
-  footer: 7.3,
+  title: 15.5,
+  subtitle: 8.9,
+  section: 10.6,
+  label: 7.6,
+  body: 9.5,
+  technicalCaption: 7.8,
+  footer: 7,
 };
