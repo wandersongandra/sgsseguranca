@@ -2967,7 +2967,7 @@ export class ChecklistsService {
     // ALERTA DE PERFORMANCE: A geração de PDFs é uma tarefa síncrona e intensiva em CPU.
     // Em um ambiente com alta concorrência, isso pode bloquear o event loop do Node.js
     // e degradar a performance da aplicação.
-    // RECOMENDA�!ÒO: Mover esta lógica para um job em background (ex: usando BullMQ)
+    // RECOMENDAÇÃO: Mover esta lógica para um job em background (ex: usando BullMQ)
     // para não impactar a responsividade da API.
     let logoBase64: string | null = null;
     let logoFormat: 'PNG' | 'JPEG' = 'PNG';
