@@ -683,7 +683,7 @@ export default function DocumentPendenciesPage() {
             ))}
           </select>
 
-          <div className="grid grid-cols-2 gap-3 xl:col-span-2">
+          <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 xl:col-span-2">
             <input
               type="date"
               value={dateFrom}
@@ -778,10 +778,10 @@ export default function DocumentPendenciesPage() {
             mobile={(item) => {
               const actions = [...item.allowedActions];
               if (item.publicValidationUrl && !actions.some((action) => action.key === "open_public_validation")) actions.push({ key: "open_public_validation", label: "Validar documento", kind: "route", enabled: true, href: item.publicValidationUrl });
-              return <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
+              return <article className="ds-mobile-card">
                 <div className="flex flex-wrap items-center gap-2"><Badge variant={getTypeBadgeVariant(item.type)}>{item.typeLabel}</Badge>{item.documentCode ? <Badge variant="neutral">{item.documentCode}</Badge> : null}<Badge variant={getCriticalityBadgeVariant(item.criticality)}>{criticalityOptions.find((option) => option.value === item.criticality)?.label || item.criticality}</Badge></div>
                 <h3 className="mt-3 font-semibold">{item.title || "Documento sem título operacional"}</h3><p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">{item.message}</p>
-                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Módulo</dt><dd>{item.moduleLabel}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Status</dt><dd>{item.status || "Sem status"}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Empresa / site</dt><dd>{item.companyName || item.companyId}<br />{item.siteName || "Sem site vinculado"}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Data relevante</dt><dd>{formatRelevantDate(item.relevantDate)}</dd></div></dl>
+                <dl className="ds-mobile-detail-grid mt-3 grid grid-cols-1 gap-3 text-sm min-[360px]:grid-cols-2"><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Módulo</dt><dd>{item.moduleLabel}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Status</dt><dd>{item.status || "Sem status"}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Empresa / site</dt><dd>{item.companyName || item.companyId}<br />{item.siteName || "Sem site vinculado"}</dd></div><div><dt className="text-xs text-[var(--ds-color-text-muted)]">Data relevante</dt><dd>{formatRelevantDate(item.relevantDate)}</dd></div></dl>
                 <div className="mt-4 grid gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3">{actions.map((action) => {
                   const key = `${item.id}:${action.key}`;
                   const safeHref = action.key === "open_public_validation" ? safeExternalArtifactUrl(action.href) : safeInternalHref(action.href);
