@@ -241,15 +241,14 @@ export function DdsApprovalPanel({
       <div className="space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
               Aprovação
             </p>
             <h2 className="text-lg font-bold text-[var(--ds-color-text-primary)]">
-              Aprovação e Governança
+              Fluxo de aprovação
             </h2>
             <p className="max-w-2xl text-sm text-[var(--ds-color-text-secondary)]">
-              Fluxo técnico, decisão operacional e trilha de auditoria em um
-              painel com leitura rápida.
+              Acompanhe etapas, decisões e o histórico de aprovação do DDS.
             </p>
           </div>
           <StatusPill tone={flow ? FLOW_TONE[flow.status] : "neutral"}>
@@ -262,24 +261,24 @@ export function DdsApprovalPanel({
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/35 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)]">
+          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--ds-color-text-secondary)]">
               Ciclo atual
             </p>
             <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
               {flowStats.activeCycleLabel}
             </p>
           </div>
-          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/35 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)]">
+          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--ds-color-text-secondary)]">
               Etapa ativa
             </p>
             <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
               {flowStats.activeStepLabel}
             </p>
           </div>
-          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/35 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--ds-color-text-secondary)]">
+          <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.04em] text-[var(--ds-color-text-secondary)]">
               Progresso
             </p>
             <p className="mt-1 text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -417,8 +416,8 @@ export function DdsApprovalPanel({
       {canManage ? (
         <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/20 p-4">
           <div className="mb-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-              Ações de governança
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+              Registrar decisão
             </p>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
               Informe o motivo e o PIN antes de iniciar, aprovar, reprovar ou reabrir.
@@ -438,7 +437,7 @@ export function DdsApprovalPanel({
                 onChange={(event) => setReason(event.target.value)}
                 rows={3}
                 aria-label="Motivo da decisão do fluxo de aprovação do DDS"
-                className="w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[color:var(--component-field-bg-subtle)] px-3 py-2.5 text-sm text-[var(--component-field-text)] motion-safe:transition-all motion-safe:duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-action-primary)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]"
+                className="w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[color:var(--component-field-bg-subtle)] px-3 py-2.5 text-sm text-[var(--component-field-text)] motion-safe:transition-colors focus:border-[var(--ds-color-action-primary)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]"
                 placeholder="Motivo opcional para aprovação; obrigatório para reprovação ou reabertura."
                 disabled={locked || acting !== null}
               />
@@ -460,18 +459,17 @@ export function DdsApprovalPanel({
                 inputMode="numeric"
                 maxLength={6}
                 aria-label="PIN para assinatura da decisão DDS"
-                className="w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[color:var(--component-field-bg-subtle)] px-3 py-2.5 text-sm text-[var(--component-field-text)] motion-safe:transition-all motion-safe:duration-[var(--ds-motion-base)] focus:border-[var(--ds-color-action-primary)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]"
+                className="w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[color:var(--component-field-bg-subtle)] px-3 py-2.5 text-sm text-[var(--component-field-text)] motion-safe:transition-colors focus:border-[var(--ds-color-action-primary)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]"
                 placeholder="4 a 6 dígitos"
                 disabled={locked || acting !== null}
               />
             </div>
             <div className="rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-3 py-3 text-xs text-[var(--ds-color-text-muted)] md:col-span-1">
               <p className="font-semibold text-[var(--ds-color-text-secondary)]">
-                Regra de leitura
+                Regras da decisão
               </p>
               <p className="mt-1">
-                Aprovação é rápida; reprovação e reabertura exigem justificativa
-                explícita para manter a trilha de auditoria clara.
+                Reprovação e reabertura exigem justificativa. O PIN confirma a autoria da decisão.
               </p>
             </div>
           </div>
