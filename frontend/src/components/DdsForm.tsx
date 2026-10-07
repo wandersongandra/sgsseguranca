@@ -1814,7 +1814,7 @@ export function DdsForm({ id }: DdsFormProps) {
             onDdsChanged={setCurrentDds}
           />
 
-          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/20 px-4 py-4">
+          <div className="ds-mobile-form-actions rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)]/20 px-4 py-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-2xl">
                 <p className="text-sm font-semibold text-[var(--ds-color-text-primary)]">
@@ -1825,7 +1825,7 @@ export function DdsForm({ id }: DdsFormProps) {
                   gravação governada do documento.
                 </p>
               </div>
-              <div className="flex flex-wrap justify-end gap-3">
+              <div className="ds-mobile-form-actions__buttons flex flex-wrap justify-end gap-3">
                 <Button
                   type="button"
                   variant="outline"
