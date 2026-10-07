@@ -563,7 +563,7 @@ useEffect(() => {
             />
           </div>
           <select
-            className={cn(inputClassName, 'min-w-[180px]')}
+            className={cn(inputClassName, 'w-full sm:w-auto sm:min-w-[180px]')}
             value={statusFilter}
             onChange={(event) =>
               setStatusFilter(event.target.value as 'all' | ArrStatus)
@@ -632,12 +632,12 @@ useEffect(() => {
               hasStatusTransitions: transitions.length > 0,
             });
             return (
-              <article className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] p-4 shadow-sm">
+              <article className="ds-mobile-card">
                 <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold text-[var(--ds-color-text-primary)]">{arr.titulo}</h3><p className="mt-1 text-sm text-[var(--ds-color-text-muted)]">{safeFormatDate(arr.data, 'dd/MM/yyyy', { locale: ptBR })} · {arr.site?.nome || arr.site_id}</p></div><span className={cn('shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold', ARR_STATUS_COLORS[arr.status])}>{ARR_STATUS_LABEL[arr.status]}</span></div>
                 <div className="mt-3"><p className="text-xs text-[var(--ds-color-text-muted)]">Risco identificado</p><p className="text-sm">{arr.risco_identificado}</p><div className="mt-2 flex gap-2"><span className="ds-badge ds-badge--warning">{ARR_RISK_LEVEL_LABEL[arr.nivel_risco]}</span><span className="ds-badge">{ARR_SEVERITY_LABEL[arr.severidade]}</span></div></div>
                 <p className="mt-3 text-sm text-[var(--ds-color-text-secondary)]"><Users className="mr-1 inline h-4 w-4" />{arr.participants?.length || 0} · {arr.responsavel?.nome || 'Sem responsável'}</p>
                 {actions.canChangeStatus ? <select aria-label={`Mover status de ${arr.titulo}`} className={cn(inputClassName, 'mt-3')} value="" disabled={isBusy} onChange={(event) => event.target.value && void handleStatusChange(arr, event.target.value as ArrStatus)}><option value="">Mover para...</option>{transitions.map((status) => <option key={status} value={status}>{ARR_STATUS_LABEL[status]}</option>)}</select> : null}
-                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3"><Button type="button" size="sm" variant="outline" onClick={() => void handleOpenGovernedPdf(arr)} disabled={isBusy || !actions.canOpenOrEmitFinalPdf} leftIcon={<ShieldCheck className="h-4 w-4" />}>{arr.pdf_file_key ? 'Abrir PDF final' : 'Emitir PDF final'}</Button><Button type="button" size="sm" variant="outline" onClick={() => void handlePrint(arr)} disabled={isBusy || !actions.canPrintPdf} leftIcon={<Printer className="h-4 w-4" />}>Imprimir</Button><Button type="button" size="sm" variant="outline" onClick={() => void handleEmail(arr)} disabled={isBusy || !actions.canEmailPdf} leftIcon={<Mail className="h-4 w-4" />}>Enviar</Button>{actions.canEdit && !isEditLocked ? <Link href={`/dashboard/arrs/edit/${arr.id}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'justify-center')}><Pencil className="mr-2 h-4 w-4" />Editar</Link> : null}{actions.canDelete ? <Button type="button" size="sm" variant="destructive" onClick={() => handleDelete(arr.id)} disabled={isBusy} leftIcon={<Trash2 className="h-4 w-4" />}>Excluir</Button> : null}</div>
+                <div className="ds-mobile-card__actions mt-4 grid grid-cols-1 gap-2 border-t border-[var(--ds-color-border-subtle)] pt-3 min-[360px]:grid-cols-2"><Button type="button" size="sm" variant="outline" onClick={() => void handleOpenGovernedPdf(arr)} disabled={isBusy || !actions.canOpenOrEmitFinalPdf} leftIcon={<ShieldCheck className="h-4 w-4" />}>{arr.pdf_file_key ? 'Abrir PDF final' : 'Emitir PDF final'}</Button><Button type="button" size="sm" variant="outline" onClick={() => void handlePrint(arr)} disabled={isBusy || !actions.canPrintPdf} leftIcon={<Printer className="h-4 w-4" />}>Imprimir</Button><Button type="button" size="sm" variant="outline" onClick={() => void handleEmail(arr)} disabled={isBusy || !actions.canEmailPdf} leftIcon={<Mail className="h-4 w-4" />}>Enviar</Button>{actions.canEdit && !isEditLocked ? <Link href={`/dashboard/arrs/edit/${arr.id}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }), 'justify-center')}><Pencil className="mr-2 h-4 w-4" />Editar</Link> : null}{actions.canDelete ? <Button type="button" size="sm" variant="destructive" onClick={() => handleDelete(arr.id)} disabled={isBusy} leftIcon={<Trash2 className="h-4 w-4" />}>Excluir</Button> : null}</div>
               </article>
             );
           }}
