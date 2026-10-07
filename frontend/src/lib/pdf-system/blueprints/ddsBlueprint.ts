@@ -585,9 +585,9 @@ export async function drawDdsBlueprint(
     code,
     url: validationUrl,
     hash: dds.final_pdf_hash_sha256 || undefined,
-    title: "Governança e autenticidade",
+    title: "Validação do documento",
     subtitle:
-      "Valide o DDS, o fluxo de aprovação e a assinatura final no portal público.",
+      "Use o QR Code ou o código do DDS para conferir aprovação e assinatura no portal SGS.",
   });
 }
 
