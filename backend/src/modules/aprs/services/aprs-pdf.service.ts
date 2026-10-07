@@ -1661,11 +1661,9 @@ export class AprsPdfService {
             }
             .metric-card:last-child { border-right: 0; }
             .metric-bar {
-              height: 4px;
-              border-radius: 3px;
+              height: 2px;
               margin-bottom: 7px;
               background: var(--teal);
-              box-shadow: 0 1px 2px rgba(29,91,141,0.25);
             }
             .metric-card--acceptable .metric-bar { background: var(--acceptable); }
             .metric-card--attention .metric-bar { background: var(--attention); }
