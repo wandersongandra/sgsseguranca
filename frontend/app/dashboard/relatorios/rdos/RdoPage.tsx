@@ -2450,12 +2450,12 @@ useEffect(() => {
       {cancelTarget && (
         <div
           ref={cancelDialogRef}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+          className="ds-legacy-modal-overlay fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
           aria-labelledby="rdo-cancel-title"
         >
-          <div className="w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
+          <div className="ds-legacy-modal-shell w-full max-w-sm rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] shadow-[var(--ds-shadow-sm)]">
             <div className="flex items-center justify-between border-b border-[var(--ds-color-border-subtle)] px-5 py-4">
               <h2 id="rdo-cancel-title" className="text-base font-semibold text-[var(--ds-color-text-primary)]">
                 Cancelar RDO
@@ -2469,7 +2469,7 @@ useEffect(() => {
                 <span aria-hidden="true" className="text-lg leading-none">×</span>
               </button>
             </div>
-            <div className="p-5">
+            <div className="ds-legacy-modal-body p-5">
               <label htmlFor="rdo-cancel-reason" className="mb-2 block text-sm font-semibold text-[var(--ds-color-text-primary)]">
                 Motivo do cancelamento <span className="text-[var(--ds-color-danger)]">*</span>
               </label>
@@ -2483,7 +2483,7 @@ useEffect(() => {
                 className={`${formInputClassName} resize-none`}
               />
             </div>
-            <div className="flex justify-end gap-3 border-t border-[var(--ds-color-border-subtle)] px-5 py-4">
+            <div className="ds-legacy-modal-footer flex justify-end gap-3 border-t border-[var(--ds-color-border-subtle)] px-5 py-4">
               <button
                 type="button"
                 onClick={() => { setCancelTarget(null); setCancelReason(""); }}
