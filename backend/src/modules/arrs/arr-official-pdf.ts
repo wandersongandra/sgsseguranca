@@ -26,7 +26,8 @@ const TONE = {
   brandStrong: [16, 32, 51] as Rgb,
   success: [27, 94, 62] as Rgb,
   warning: [180, 95, 20] as Rgb,
-  info: [24, 101, 176] as Rgb,
+  danger: [185, 28, 28] as Rgb,
+  info: [31, 78, 121] as Rgb,
 };
 
 const STATUS: Record<string, string> = {
@@ -190,25 +191,27 @@ function drawHeader(ctx: PdfContext, arr: Arr, code: string) {
   fill(doc, TONE.surface);
   rounded(doc, codeX, 5.5, codeW, 20, 'F');
   stroke(doc, TONE.borderStrong);
-  doc.setLineWidth(0.35);
+  doc.setLineWidth(0.26);
   rounded(doc, codeX, 5.5, codeW, 20, 'S');
-  fill(doc, TONE.info);
-  rounded(doc, codeX + 1.8, 7.1, codeW - 3.6, 4.2, 'F');
+  fill(doc, TONE.brand);
+  doc.rect(codeX, 5.5, codeW, 1.2, 'F');
+  stroke(doc, TONE.border);
+  doc.setLineWidth(0.16);
+  doc.line(codeX, 11, codeX + codeW, 11);
   doc.setFont(PDF_FONT, 'bold');
-  doc.setFontSize(7);
-  text(doc, [255, 255, 255]);
-  doc.text('IDENTIFICADOR', codeX + codeW / 2, 10, { align: 'center' });
-  doc.setFontSize(9.5);
+  doc.setFontSize(6.8);
+  text(doc, TONE.textMuted);
+  doc.text('IDENTIFICADOR', codeX + 3, 9.4);
+  doc.setFontSize(9.2);
   text(doc, TONE.textPrimary);
-  doc.text(clean(code), codeX + codeW / 2, 16.4, { align: 'center' });
+  doc.text(clean(code), codeX + 3, 16.3);
   doc.setFont(PDF_FONT, 'normal');
   doc.setFontSize(7);
   text(doc, TONE.textSecondary);
   doc.text(
-    `Status: ${clean(STATUS[arr.status] || arr.status)} | V1`,
-    codeX + codeW / 2,
+    `Status: ${clean(STATUS[arr.status] || arr.status)} · v1`,
+    codeX + 3,
     21.5,
-    { align: 'center' },
   );
 
   const metadata = [
@@ -391,13 +394,14 @@ function drawMetadata(
   const height = titleH + Math.ceil(fields.length / cols) * rowH;
   ensure(ctx, height + 5);
   fill(doc, TONE.surface);
-  stroke(doc, TONE.border);
-  doc.setLineWidth(0.3);
+  stroke(doc, TONE.borderStrong);
+  doc.setLineWidth(0.24);
   rounded(doc, margin, ctx.y, width, height, 'FD');
-  fill(doc, TONE.surface);
-  rounded(doc, margin + 1.2, ctx.y + 1.2, width - 2.4, titleH - 2.4, 'F');
-  fill(doc, TONE.brand);
-  doc.rect(margin, ctx.y, 2.4, titleH, 'F');
+  fill(doc, TONE.brandStrong);
+  doc.rect(margin, ctx.y, width, 2.1, 'F');
+  stroke(doc, TONE.border);
+  doc.setLineWidth(0.18);
+  doc.line(margin, ctx.y + titleH, margin + width, ctx.y + titleH);
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(9.5);
   text(doc, TONE.textPrimary);
@@ -447,12 +451,10 @@ function drawNarrative(ctx: PdfContext, title: string, value: unknown) {
     ensure(ctx, height + 4);
     fill(doc, TONE.surface);
     stroke(doc, TONE.border);
-    doc.setLineWidth(0.3);
+    doc.setLineWidth(0.22);
     rounded(doc, margin, ctx.y, width, height, 'FD');
-    fill(doc, TONE.surface);
-    rounded(doc, margin + 1.2, ctx.y + 1.1, width - 2.4, 7.1, 'F');
     fill(doc, TONE.brand);
-    doc.rect(margin, ctx.y, 2.5, 10, 'F');
+    doc.rect(margin, ctx.y, 1.4, height, 'F');
     doc.setFont(PDF_FONT, 'bold');
     doc.setFontSize(9.5);
     text(doc, TONE.textPrimary);
@@ -507,8 +509,8 @@ function drawParticipants(ctx: PdfContext, arr: Arr) {
       cellPadding: 2.2,
     },
     headStyles: {
-      fillColor: TONE.surfaceMuted,
-      textColor: TONE.textMuted,
+      fillColor: TONE.brandStrong,
+      textColor: [255, 255, 255],
       fontStyle: 'bold',
       fontSize: 7,
     },
@@ -569,11 +571,11 @@ async function drawGovernance(
     doc.text(`Hash: ${clean(hash).slice(0, 32)}...`, margin + 34, ctx.y + 40);
   }
   fill(doc, TONE.success);
-  doc.rect(margin + width - 24, ctx.y + height - 10.5, 18, 6.4, 'F');
+  doc.rect(margin + width - 37, ctx.y + height - 10.5, 31, 6.4, 'F');
   doc.setFont(PDF_FONT, 'bold');
   doc.setFontSize(7);
   text(doc, [255, 255, 255]);
-  doc.text('DOCUMENTO VÁLIDO', margin + width - 15, ctx.y + height - 6, {
+  doc.text('DOCUMENTO VÁLIDO', margin + width - 21.5, ctx.y + height - 6, {
     align: 'center',
   });
   ctx.y += height + 9;
@@ -598,7 +600,7 @@ function drawFooter(
     doc.setFontSize(7);
     text(doc, TONE.textSecondary);
     doc.text(
-      clean(issuer || 'SGS - Sistema de Gestão de Segurança'),
+      clean(issuer || 'SGS · Segurança do Trabalho'),
       PAGE.margin,
       288.7,
     );
