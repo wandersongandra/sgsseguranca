@@ -37,3 +37,36 @@ Revisar alvos de toque, foco visível, contraste, overflow de tabelas, barras de
 
 ### Fase 7 — QA
 Executar TypeScript, lint, testes unitários relevantes e build. A validação de ambiente deve seguir `docs/OPERACAO-CANONICA-SGS.md`: primeiro na VPS de teste isolada; produção somente após gates verdes e autorização explícita.
+
+
+## Status de execução
+
+### Fase 1 — Fundação visual — CONCLUÍDA
+Tokens de cor, borda, raio, sombra, tipografia e densidade foram refinados. O frontend passou a usar superfícies mais neutras, azul institucional mais sóbrio, cantos menores e sombras discretas.
+
+### Fase 2 — Shell e navegação — CONCLUÍDA
+Topbar, sidebar, seletores de empresa/obra e navegação mobile foram refinados. O shell preserva safe areas, foco e escopo de empresa/obra.
+
+### Fase 3 — Componentes compartilhados — CONCLUÍDA
+Cards, botões, inputs, selects, textareas, tabelas, métricas, estados, callouts, modais e barra de ações mobile foram alinhados ao mesmo padrão visual.
+
+### Fase 4 — Layouts e formulários — CONCLUÍDA
+Page headers, listas, formulários e telas de cadastro foram simplificados. Textos que comentavam o próprio design, como “fluxo guiado”, “leitura rápida”, “ruído visual” e equivalentes, foram substituídos por instruções operacionais.
+
+### Fase 5 — Dashboard e módulos operacionais — CONCLUÍDA
+Dashboard principal, visão TST, DDS, DID, APR, ARR, PT, NC, auditoria, importação, usuários, atividades, treinamentos, RDO e superfícies auxiliares receberam refinamento visual e de copy.
+
+### Fase 6 — Responsividade e acessibilidade — CONCLUÍDA
+Safe areas, navegação inferior, alvos de toque, foco visível e `prefers-reduced-motion` foram preservados. Animações foram reduzidas e priorizam mudança de cor/estado em vez de movimento decorativo.
+
+### Fase 7 — QA — PARCIALMENTE CONCLUÍDA
+- branch: `improve/pdf-frontend-polish-20261007`;
+- PR draft: #446;
+- branch 0 commits atrás de `main`;
+- PR reportado pelo GitHub como mergeable;
+- Snyk: PASS;
+- CodeRabbit status: PASS;
+- revisão do patch: sem marcadores de conflito, sem novos `rounded-2xl`, `transition-all`, blur pesado ou textos meta de interface;
+- GitHub Actions: BLOQUEADO por `startup_failure` antes da criação de jobs, inclusive em workflows do `main` anteriores a esta branch;
+- lint, type-check, build e suítes completas continuam sem evidência de execução enquanto o Actions não iniciar os jobs;
+- merge/deploy de produção não realizado.
