@@ -190,7 +190,7 @@ function DashboardShell({
 
   if (loading || !isMounted || (user && !isCurrentRouteAuthorized)) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex min-h-[100dvh] items-center justify-center">
         <div className="h-12 w-12 motion-safe:animate-spin rounded-full border-4 border-[var(--ds-color-action-primary)] border-t-transparent" />
       </div>
     );
@@ -198,7 +198,7 @@ function DashboardShell({
 
   if (!user) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[var(--ds-color-bg-canvas)] px-6 text-center text-[var(--ds-color-text-primary)]">
+      <div className="flex min-h-[100dvh] items-center justify-center bg-[var(--ds-color-bg-canvas)] px-6 text-center text-[var(--ds-color-text-primary)]">
         <div className="max-w-md rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] p-5 shadow-[var(--ds-shadow-xs)]">
           <h2 className="text-lg font-bold text-[var(--ds-color-text-primary)]">
             Sessão não encontrada
