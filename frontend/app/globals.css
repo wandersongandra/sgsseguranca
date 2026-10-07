@@ -3039,6 +3039,20 @@ body {
     padding: 0.2rem;
   }
 
+  .ds-notification-panel {
+    position: fixed !important;
+    left: max(0.75rem, var(--ds-safe-area-left)) !important;
+    right: max(0.75rem, var(--ds-safe-area-right)) !important;
+    bottom: calc(var(--ds-mobile-nav-total-height) + 0.65rem) !important;
+    top: auto !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: min(32rem, calc(100dvh - var(--ds-safe-area-top) - var(--ds-mobile-nav-total-height) - 5rem)) !important;
+    margin-top: 0 !important;
+    z-index: 70 !important;
+    transform-origin: bottom center;
+  }
+
   .ds-topbar-chip {
     min-height: 2.75rem;
     padding-inline: 0.65rem;
