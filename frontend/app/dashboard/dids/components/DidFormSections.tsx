@@ -26,7 +26,7 @@ import { DID_TURNO_LABEL } from '../didMeta';
 import type { DidFormData } from '../didForm.schema';
 
 export const inputClassName =
-  'mt-2 block min-h-12 w-full rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-default)] bg-[var(--component-field-bg)] px-3.5 py-3 text-sm font-medium leading-6 text-[var(--ds-color-text-primary)] shadow-[0_1px_2px_rgba(15,23,42,0.05)] placeholder:text-[color:var(--ds-color-text-secondary)] motion-safe:transition-all motion-safe:duration-[var(--ds-motion-base)] focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';
+  'mt-2 block min-h-12 w-full rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--component-field-bg)] px-3.5 py-3 text-sm font-medium leading-6 text-[var(--ds-color-text-primary)] shadow-[var(--component-field-shadow)] placeholder:text-[color:var(--ds-color-text-secondary)] motion-safe:transition-colors focus:border-[var(--component-field-border-focus)] focus:outline-none focus:shadow-[var(--component-field-shadow-focus)]';
 
 export const textareaClassName = `${inputClassName} min-h-[152px] resize-y align-top`;
 export const labelClassName =
@@ -110,21 +110,21 @@ export function DidFormPageShell({
       }
       summary={
         <>
-          <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-muted)]/22 px-5 py-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--ds-color-text-secondary)]">
-              Fluxo guiado
+          <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-muted)] px-5 py-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.05em] text-[var(--ds-color-text-secondary)]">
+              Preparação do DID
             </p>
             <p className="mt-2 text-sm font-semibold text-[var(--ds-color-text-primary)]">
-              Estruture empresa, frente, atividade e equipe antes de consolidar os combinados do dia.
+              Defina empresa, frente, atividade e equipe antes de registrar os combinados do dia.
             </p>
             <p className="mt-1 text-sm text-[var(--ds-color-text-secondary)]">
-              O foco aqui é dar leitura rápida para o campo sem perder rastreabilidade do alinhamento diário.
+              Revise local, participantes e orientações antes de concluir o registro.
             </p>
           </div>
           {readOnlyMessage ? (
             <div
               role="alert"
-              className="rounded-[var(--ds-radius-xl)] border border-[color:var(--ds-color-warning)]/30 bg-[color:var(--ds-color-warning-subtle)] px-5 py-4 text-sm text-[color:var(--ds-color-warning)]"
+              className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-warning-border)] bg-[color:var(--ds-color-warning-subtle)] px-5 py-4 text-sm text-[color:var(--ds-color-warning)]"
             >
               <p className="font-semibold text-[color:var(--ds-color-warning)]">
                 Documento travado para edição
@@ -178,7 +178,7 @@ export function DidFormPageShell({
         className={cn('space-y-7', isReadOnly && 'opacity-90')}
       >
         {children}
-        <div className="rounded-[var(--ds-radius-xl)] border border-[var(--ds-color-border-subtle)] bg-[color:var(--ds-color-surface-base)] px-5 py-5 shadow-[var(--ds-shadow-sm)]">
+        <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-color-border-subtle)] bg-[var(--ds-color-surface-base)] px-5 py-5 shadow-[var(--component-card-shadow)]">
           {footer}
         </div>
       </fieldset>
@@ -212,7 +212,7 @@ export function DidContextSection({
   return (
     <FormSection
       title="Contexto do dia"
-      description="Defina o contexto do documento com mais contraste e menos ruído visual."
+      description="Defina empresa, obra ou frente, data, turno e responsáveis do registro."
       icon={<CalendarDays className="h-4 w-4" />}
       badge="Etapa 1"
       className="border-l-4 border-l-[var(--ds-color-info)]"
@@ -527,7 +527,7 @@ export function DidParticipantsSection({
   return (
     <FormSection
       title="Participantes"
-      description="A seleção da equipe usa contraste mais forte para facilitar a conferência antes do fechamento do DID."
+      description="Selecione os participantes e confira a equipe antes de concluir o DID."
       icon={<Users className="h-4 w-4" />}
       badge="Etapa 3"
       actions={<StatusPill tone="info">{selectedParticipantIds.length} selecionado(s)</StatusPill>}
