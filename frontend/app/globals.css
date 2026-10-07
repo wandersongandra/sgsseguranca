@@ -3339,6 +3339,15 @@ body {
     scroll-margin-bottom: calc(var(--ds-mobile-nav-total-height) + 7rem);
   }
 
+  input:not([type="checkbox"]):not([type="radio"]),
+  select {
+    min-height: 2.75rem;
+  }
+
+  textarea {
+    min-height: 6rem;
+  }
+
   .ds-mobile-form-actions {
     position: sticky !important;
     z-index: 30;
