@@ -3070,7 +3070,7 @@ export class ChecklistsService {
                   const suffix =
                     subitem.status === undefined || subitem.status === null
                       ? ''
-                      : ` � ${subitemStatus}`;
+                      : ` — ${subitemStatus}`;
                   return `${label}) ${subitem.texto}${suffix}`;
                 })
                 .join('\n')
