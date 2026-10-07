@@ -141,7 +141,7 @@ export function FormSection({
       <div className="ds-form-section__header">
         <div className="flex gap-3">
           {icon ? (
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[var(--ds-color-border-default)] text-[var(--ds-color-text-secondary)]">
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] text-[var(--ds-color-text-secondary)]">
               {icon}
             </div>
           ) : null}
