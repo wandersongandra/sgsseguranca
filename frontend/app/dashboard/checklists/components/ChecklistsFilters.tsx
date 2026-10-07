@@ -72,7 +72,7 @@ export const ChecklistsFilters = React.memo(({
               <option value="all">Todos</option>
             </select>
           </div>
-          <details className="checklists-filters__columns relative">
+          <details className="checklists-filters__columns relative hidden md:block">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-[var(--ds-radius-md)] border border-[var(--ds-color-border-default)] bg-[var(--ds-color-surface-base)] px-3 py-2 text-sm text-[var(--ds-color-text-secondary)] hover:text-[var(--ds-color-text-primary)]">
               <Columns3 className="h-4 w-4" />
               Colunas
