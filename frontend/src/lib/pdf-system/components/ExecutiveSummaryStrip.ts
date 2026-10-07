@@ -22,133 +22,132 @@ function toneColor(ctx: PdfContext, tone: ExecutiveMetric["tone"]) {
   return ctx.theme.tone.brand;
 }
 
+function clampLines(lines: string[], maxLines: number) {
+  if (lines.length <= maxLines) return lines;
+  const next = lines.slice(0, maxLines);
+  next[next.length - 1] = `${next[next.length - 1]}...`;
+  return next;
+}
+
 export function drawExecutiveSummaryStrip(
   ctx: PdfContext,
   options: ExecutiveSummaryOptions,
 ) {
   const { doc, margin, contentWidth, theme } = ctx;
-  const labelLineHeight = 3.1;
-  const valueLineHeight = 5.2;
-  const maxValueLines = 3;
-  const summaryLines = options.summary
-    ? (doc.splitTextToSize(options.summary, contentWidth - 10) as string[])
-    : [];
   const columns = options.metrics.length <= 4 ? 2 : 3;
-  const gap = 3;
-  const colWidth =
-    (contentWidth - 8 - gap * Math.max(0, columns - 1)) / columns;
+  const colWidth = contentWidth / columns;
+  const labelLineHeight = 3.1;
+  const valueLineHeight = 4.8;
+  const summaryLines = options.summary
+    ? clampLines(
+        doc.splitTextToSize(
+          sanitize(options.summary),
+          contentWidth - 10,
+        ) as string[],
+        4,
+      )
+    : [];
 
   const metricBlocks = options.metrics.map((metric) => {
-    const labelLines = doc.splitTextToSize(
-      metric.label.toUpperCase(),
-      colWidth - 7,
-    ) as string[];
-    const rawValueLines = doc.splitTextToSize(
-      sanitize(metric.value),
-      colWidth - 7,
-    ) as string[];
-    const valueLines =
-      rawValueLines.length > maxValueLines
-        ? [
-            ...rawValueLines.slice(0, maxValueLines - 1),
-            `${rawValueLines[maxValueLines - 1]}...`,
-          ]
-        : rawValueLines;
-    const blockHeight =
-      8 +
+    const labelLines = clampLines(
+      doc.splitTextToSize(metric.label.toUpperCase(), colWidth - 9) as string[],
+      2,
+    );
+    const valueLines = clampLines(
+      doc.splitTextToSize(sanitize(metric.value), colWidth - 9) as string[],
+      3,
+    );
+    const height =
+      8.3 +
       labelLines.length * labelLineHeight +
-      valueLines.length * valueLineHeight +
-      3.4;
-    return { metric, labelLines, valueLines, blockHeight };
+      valueLines.length * valueLineHeight;
+    return { metric, labelLines, valueLines, height };
   });
 
-  let metricsHeight = 0;
+  const rowHeights: number[] = [];
   for (let i = 0; i < metricBlocks.length; i += columns) {
-    const rowHeight = Math.max(
-      ...metricBlocks.slice(i, i + columns).map((x) => x.blockHeight),
-      11,
+    rowHeights.push(
+      Math.max(...metricBlocks.slice(i, i + columns).map((item) => item.height), 16),
     );
-    metricsHeight += rowHeight + 2.2;
   }
 
-  const summaryHeight = summaryLines.length ? summaryLines.length * 4.2 + 4 : 0;
-  const height = 14 + summaryHeight + metricsHeight + 2;
-  ensureSpace(ctx, height + 5);
+  const headingHeight = 11;
+  const summaryHeight = summaryLines.length
+    ? summaryLines.length * 4.1 + 6
+    : 1.5;
+  const metricsHeight = rowHeights.reduce((sum, height) => sum + height, 0);
+  const totalHeight = headingHeight + summaryHeight + metricsHeight;
 
-  doc.setFillColor(...theme.tone.surfaceMuted);
-  doc.setDrawColor(...theme.tone.border);
-  doc.setLineWidth(0.3);
-  doc.roundedRect(
-    margin,
-    ctx.y,
-    contentWidth,
-    height,
-    theme.spacing.radius,
-    theme.spacing.radius,
-    "FD",
-  );
-  doc.setFillColor(...theme.tone.brand);
-  doc.roundedRect(
-    margin + 1.8,
-    ctx.y + 1.6,
-    30,
-    3.1,
-    theme.spacing.radius / 2,
-    theme.spacing.radius / 2,
-    "F",
-  );
+  ensureSpace(ctx, totalHeight + 5);
+
+  doc.setFillColor(...theme.tone.surface);
+  doc.setDrawColor(...theme.tone.borderStrong);
+  doc.setLineWidth(0.25);
+  doc.rect(margin, ctx.y, contentWidth, totalHeight, "FD");
+
+  doc.setFillColor(...theme.tone.brandStrong);
+  doc.rect(margin, ctx.y, contentWidth, 2.2, "F");
 
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(...theme.tone.textPrimary);
   doc.setFontSize(theme.typography.headingSm);
-  doc.text(options.title, margin + 4, ctx.y + 8.2);
+  doc.setTextColor(...theme.tone.textPrimary);
+  doc.text(options.title, margin + 4, ctx.y + 7.4);
 
-  let cursorY = ctx.y + 13.5;
+  let cursorY = ctx.y + headingHeight;
+
   if (summaryLines.length) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(theme.typography.bodySm);
     doc.setTextColor(...theme.tone.textSecondary);
-    doc.text(summaryLines, margin + 4, cursorY);
-    cursorY += summaryLines.length * 4.2 + 2.5;
+    doc.text(summaryLines, margin + 4, cursorY + 1);
+    cursorY += summaryHeight;
+  } else {
+    cursorY += summaryHeight;
   }
 
-  const rowOffsets: number[] = [];
-  let cumulativeY = cursorY;
-  for (let i = 0; i < metricBlocks.length; i += columns) {
-    rowOffsets.push(cumulativeY);
-    const rowHeight = Math.max(
-      ...metricBlocks.slice(i, i + columns).map((x) => x.blockHeight),
-      11,
-    );
-    cumulativeY += rowHeight + 2.2;
-  }
+  let blockIndex = 0;
+  rowHeights.forEach((rowHeight, rowIndex) => {
+    if (rowIndex > 0) {
+      doc.setDrawColor(...theme.tone.border);
+      doc.setLineWidth(0.18);
+      doc.line(margin, cursorY, margin + contentWidth, cursorY);
+    }
 
-  metricBlocks.forEach((entry, index) => {
-    const row = Math.floor(index / columns);
-    const col = index % columns;
-    const x = margin + 4 + col * (colWidth + gap);
-    const y = rowOffsets[row]!;
-    const cardH = Math.max(entry.blockHeight, 11);
-    const tone = toneColor(ctx, entry.metric.tone);
+    for (let col = 0; col < columns; col += 1) {
+      const entry = metricBlocks[blockIndex];
+      if (!entry) break;
+      const x = margin + col * colWidth;
 
-    doc.setFillColor(...theme.tone.surface);
-    doc.setDrawColor(...theme.tone.border);
-    doc.setLineWidth(0.22);
-    doc.roundedRect(x, y, colWidth, cardH, 1.8, 1.8, "FD");
-    doc.setFillColor(...tone);
-    doc.roundedRect(x + 1.4, y + 1.3, colWidth - 2.8, 3.1, 1, 1, "F");
+      if (col > 0) {
+        doc.setDrawColor(...theme.tone.border);
+        doc.setLineWidth(0.18);
+        doc.line(x, cursorY + 3, x, cursorY + rowHeight - 3);
+      }
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(theme.typography.caption);
-    doc.setTextColor(...theme.tone.textMuted);
-    doc.text(entry.labelLines, x + 2.6, y + 8.4);
+      const marker = toneColor(ctx, entry.metric.tone);
+      doc.setFillColor(...marker);
+      doc.rect(x + 3.2, cursorY + 3.2, 1.2, rowHeight - 6.4, "F");
 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(theme.typography.headingSm);
-    doc.setTextColor(...theme.tone.textPrimary);
-    const valueY = y + 4.1 + entry.labelLines.length * labelLineHeight + 5.4;
-    doc.text(entry.valueLines, x + 2.6, valueY);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(theme.typography.caption);
+      doc.setTextColor(...theme.tone.textMuted);
+      doc.text(entry.labelLines, x + 7, cursorY + 6.4);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(theme.typography.headingSm);
+      doc.setTextColor(...theme.tone.textPrimary);
+      const valueY =
+        cursorY +
+        7.2 +
+        entry.labelLines.length * labelLineHeight +
+        3.3;
+      doc.text(entry.valueLines, x + 7, valueY);
+
+      blockIndex += 1;
+    }
+
+    cursorY += rowHeight;
   });
 
-  moveY(ctx, height + theme.spacing.sectionGap);
+  moveY(ctx, totalHeight + theme.spacing.sectionGap);
 }
