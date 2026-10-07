@@ -231,7 +231,7 @@ export function MetricCard({
       >
         <p
           className={cn(
-            'text-xs font-semibold uppercase tracking-[0.16em]',
+            'text-[11px] font-semibold uppercase tracking-[0.06em]',
             compactStyles.label,
           )}
         >
@@ -239,7 +239,7 @@ export function MetricCard({
         </p>
         <p
           className={cn(
-            'mt-1.5 text-lg font-black leading-none',
+            'mt-1.5 text-lg font-bold leading-none',
             compactStyles.value,
           )}
         >
