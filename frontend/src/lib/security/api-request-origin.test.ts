@@ -5,6 +5,16 @@ import {
 
 const API = 'https://app.sgsseguranca.com.br/proxy';
 
+function expectBlocked(url: string, baseURL?: string) {
+  let caught: unknown;
+  try {
+    assertTrustedApiTarget(url, API, baseURL);
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toMatchObject({ code: UNTRUSTED_API_TARGET_CODE });
+}
+
 describe('API request destination security', () => {
   it.each([
     '/users',
@@ -24,24 +34,14 @@ describe('API request destination security', () => {
     '/users\\data',
     '',
   ])('rejects a destination outside the configured API surface: %s', (url) => {
-    expect(() => assertTrustedApiTarget(url, API)).toThrow(
-      expect.objectContaining({ code: UNTRUSTED_API_TARGET_CODE }),
-    );
+    expectBlocked(url);
   });
 
   it('rejects a per-request baseURL pointing outside the API origin', () => {
-    expect(() =>
-      assertTrustedApiTarget('/users', API, 'https://external.example'),
-    ).toThrow(
-      expect.objectContaining({ code: UNTRUSTED_API_TARGET_CODE }),
-    );
+    expectBlocked('/users', 'https://external.example');
   });
 
   it('rejects a baseURL on the same host but outside the proxy path', () => {
-    expect(() =>
-      assertTrustedApiTarget('/users', API, 'https://app.sgsseguranca.com.br/other'),
-    ).toThrow(
-      expect.objectContaining({ code: UNTRUSTED_API_TARGET_CODE }),
-    );
+    expectBlocked('/users', 'https://app.sgsseguranca.com.br/other');
   });
 });
