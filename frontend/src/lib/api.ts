@@ -9,6 +9,7 @@ import { sessionStore } from './sessionStore';
 import { authRefreshHint } from './authRefreshHint';
 import { selectedTenantStore } from './selectedTenantStore';
 import { normalizePublicApiBaseUrl } from './public-api-url';
+import { assertTrustedApiTarget } from './security/api-request-origin';
 import { isAdminGeralAccount } from './auth-session-state';
 import { matchesPathSegment } from './route-config';
 import { getBrowserSentrySync } from './sentry/browser-client';
@@ -526,6 +527,8 @@ api.interceptors.request.use(async (config) => {
   if (!API_BASE_URL) {
     return Promise.reject(new Error(API_BASE_URL_ERROR_MESSAGE));
   }
+  // Validate the destination before attaching credentials or tenant metadata.
+  assertTrustedApiTarget(config.url, API_BASE_URL, config.baseURL);
   const method = (config.method || 'get').toLowerCase();
   const isReadMethod =
     method === 'get' || method === 'head' || method === 'options';

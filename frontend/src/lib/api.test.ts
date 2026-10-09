@@ -20,6 +20,29 @@ describe('api client', () => {
     });
   });
 
+  it('rejects an external URL before sending credentials or tenant headers', async () => {
+    tokenStore.set('access-token');
+    const adapter = jest.fn();
+
+    await expect(
+      api.get('https://external.example/collect', { adapter }),
+    ).rejects.toMatchObject({ code: 'ERR_UNTRUSTED_API_TARGET' });
+    expect(adapter).not.toHaveBeenCalled();
+  });
+
+  it('rejects a per-request baseURL override pointing to another origin', async () => {
+    tokenStore.set('access-token');
+    const adapter = jest.fn();
+
+    await expect(
+      api.get('/users', {
+        baseURL: 'https://external.example',
+        adapter,
+      }),
+    ).rejects.toMatchObject({ code: 'ERR_UNTRUSTED_API_TARGET' });
+    expect(adapter).not.toHaveBeenCalled();
+  });
+
   describe('barreira central de mutações offline', () => {
     const setOfflineRoute = (pathname: string) => {
       window.history.replaceState({}, '', pathname);
