@@ -283,7 +283,7 @@
     "brace-expansion": "^5.0.8",
     "minimatch": "^10.2.5",
     "yaml": "^2.8.3",
-    "handlebars": "^4.7.9",
+    "handlebars": "^4.7.10",
     "picomatch": "^4.0.4",
     "protobufjs": ">=8.6.4",
     "ws": "^8.21.0",
