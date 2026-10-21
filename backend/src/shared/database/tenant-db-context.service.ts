@@ -59,7 +59,6 @@ export class TenantDbContextService
   private readonly logger = new Logger(TenantDbContextService.name);
   private readonly patchedPools = new WeakSet<PgPool>();
   private readonly patchedQuerySymbol = Symbol.for('db_timings_patched_query');
-  private readonly tenantContextKeySymbol = Symbol.for('tenant_db_context_key');
   private readonly pgTimeouts = resolvePgSessionTimeouts();
   private bootstrapWaitInterval?: NodeJS.Timeout;
 
@@ -229,98 +228,57 @@ export class TenantDbContextService
         ctx?.siteScope ?? (ctx?.isSuperAdmin ? 'all' : 'single');
       const siteIds = this.serializeSiteIds(ctx);
       const allowRlsBypass = Boolean(ctx?.isSuperAdmin && !ctx.companyId);
-      const contextKey = this.buildContextKey(ctx);
-      const anyClient = client as unknown as Record<string | symbol, unknown>;
-      const previousContextKey = anyClient[this.tenantContextKeySymbol];
-
+      // A identidade do cliente JS nao prova que o estado de sessao do Postgres
+      // continua igual. RESET/DISCARD, reconnects e poolers podem invalida-lo.
+      // Aplicar o contexto a CADA emprestimo evita reusar um contexto RLS obsoleto.
       try {
-        if (previousContextKey !== contextKey) {
-          /**
-           * Usa set_config com parâmetros para evitar SQL injection.
-           * is_local = false → nível de sessão (persiste pela conexão até que seja
-           * sobrescrito no próximo pool.connect() para esta conexão).
-           *
-           * Combina os dois SET em uma única query para minimizar round-trips.
-           *
-           * empty string → current_company() lança exceção → capturada → retorna NULL
-           * → RLS bloqueia. Isso é o comportamento correto para rotas sem tenant.
-           */
-          const setStart = process.hrtime.bigint();
-          await client.query(
-            `SELECT
-               set_config('app.current_company',                     $1, false),
-               set_config('app.current_company_id',                  $1, false),
-               set_config('app.is_super_admin',                      $2, false),
-               set_config('app.current_user_id',                     $3, false),
-               set_config('app.current_site_id',                     $4, false),
-               set_config('app.current_site_ids',                    $5, false),
-               set_config('app.current_site_scope',                  $6, false),
-               set_config('statement_timeout',                       $7, false),
-               set_config('lock_timeout',                            $8, false),
-               set_config('idle_in_transaction_session_timeout',     $9, false)`,
-            [
-              ctx?.companyId ?? '',
-              String(allowRlsBypass),
-              ctx?.userId ?? '',
-              ctx?.siteId ?? '',
-              siteIds,
-              siteScope,
-              String(this.pgTimeouts.statementTimeoutMs),
-              String(this.pgTimeouts.lockTimeoutMs),
-              String(this.pgTimeouts.idleInTransactionTimeoutMs),
-            ],
-          );
-          anyClient[this.tenantContextKeySymbol] = contextKey;
-          const setMs = Number(process.hrtime.bigint() - setStart) / 1_000_000;
-          this.dbTimings.recordRlsContextSet(setMs);
-        }
+        const setStart = process.hrtime.bigint();
+        await client.query(
+          `SELECT
+             set_config('app.current_company',                     $1, false),
+             set_config('app.current_company_id',                  $1, false),
+             set_config('app.is_super_admin',                      $2, false),
+             set_config('app.current_user_id',                     $3, false),
+             set_config('app.current_site_id',                     $4, false),
+             set_config('app.current_site_ids',                    $5, false),
+             set_config('app.current_site_scope',                  $6, false),
+             set_config('statement_timeout',                       $7, false),
+             set_config('lock_timeout',                            $8, false),
+             set_config('idle_in_transaction_session_timeout',     $9, false)`,
+          [
+            ctx?.companyId ?? '',
+            String(allowRlsBypass),
+            ctx?.userId ?? '',
+            ctx?.siteId ?? '',
+            siteIds,
+            siteScope,
+            String(this.pgTimeouts.statementTimeoutMs),
+            String(this.pgTimeouts.lockTimeoutMs),
+            String(this.pgTimeouts.idleInTransactionTimeoutMs),
+          ],
+        );
+        const setMs = Number(process.hrtime.bigint() - setStart) / 1_000_000;
+        this.dbTimings.recordRlsContextSet(setMs);
       } catch (err) {
-        // Fail-closed: se não conseguir setar o contexto, zera o tenant para
-        // evitar vazamento cross-tenant em conexões reaproveitadas do pool.
+        // Falha de SET nao e uma resposta de negocio vazia. A conexao pode
+        // conter configuracao parcial: descarta-la e propagar a falha.
         logger.error(
-          `TenantDbContextService: falha ao injetar contexto RLS na conexão ${label} (fail-closed)`,
+          `TenantDbContextService: falha ao injetar contexto RLS na conexao ${label} (fail-closed)`,
           err,
         );
         try {
-          await client.query(
-            `SELECT
-               set_config('app.current_company',                     $1, false),
-               set_config('app.current_company_id',                  $1, false),
-               set_config('app.is_super_admin',                      $2, false),
-               set_config('app.current_user_id',                     $3, false),
-               set_config('app.current_site_id',                     $4, false),
-               set_config('app.current_site_ids',                    $5, false),
-               set_config('app.current_site_scope',                  $6, false),
-               set_config('statement_timeout',                       $7, false),
-               set_config('lock_timeout',                            $8, false),
-               set_config('idle_in_transaction_session_timeout',     $9, false)`,
-            [
-              '',
-              'false',
-              '',
-              '',
-              '',
-              'single',
-              String(this.pgTimeouts.statementTimeoutMs),
-              String(this.pgTimeouts.lockTimeoutMs),
-              String(this.pgTimeouts.idleInTransactionTimeoutMs),
-            ],
+          client.release(
+            err instanceof Error
+              ? err
+              : new Error('Falha ao configurar contexto RLS no PostgreSQL.'),
           );
-          anyClient[this.tenantContextKeySymbol] = this.buildContextKey({
-            companyId: '',
-            isSuperAdmin: false,
-            userId: '',
-            siteId: '',
-            siteScope: 'single',
-          });
-        } catch (resetErr) {
-          try {
-            client.release(resetErr as Error);
-          } catch {
-            // ignore
-          }
-          throw resetErr;
+        } catch (releaseError) {
+          logger.error(
+            'TenantDbContextService: falha ao descartar conexao sem contexto RLS',
+            releaseError,
+          );
         }
+        throw err;
       }
 
       this.patchClientQuery(client);
@@ -376,29 +334,6 @@ export class TenantDbContextService
         this.dbTimings.recordQuery(ms);
       }
     };
-  }
-
-  private buildContextKey(ctx?: {
-    companyId?: string;
-    isSuperAdmin?: boolean;
-    userId?: string;
-    siteId?: string;
-    siteIds?: string[];
-    siteScope?: string;
-  }): string {
-    const siteScope = ctx?.siteScope ?? (ctx?.isSuperAdmin ? 'all' : 'single');
-    const allowRlsBypass = Boolean(ctx?.isSuperAdmin && !ctx.companyId);
-    return [
-      ctx?.companyId ?? '',
-      String(allowRlsBypass),
-      ctx?.userId ?? '',
-      ctx?.siteId ?? '',
-      this.serializeSiteIds(ctx),
-      siteScope,
-      String(this.pgTimeouts.statementTimeoutMs),
-      String(this.pgTimeouts.lockTimeoutMs),
-      String(this.pgTimeouts.idleInTransactionTimeoutMs),
-    ].join('|');
   }
 
   private serializeSiteIds(ctx?: {
