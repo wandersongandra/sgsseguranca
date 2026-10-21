@@ -26,7 +26,8 @@ Documento subordinado a `docs/OPERACAO-CANONICA-SGS.md`.
   #377 (sessão/tenant frontend), #381/#383/#388 (APR/PT/DDS) e #429
   (DR/upload). Avaliar sobreposição de #341, #342, #339 e #343 antes
   de reaplicar patches antigos. #344 (deduplicação atômica de
-  notificações) exige revisão própria contra o schema da `main`.
+  notificações) traz a migration **0406** em sua branch; a `main` contém
+  até a **0405**. Exige testes PG17/concorrência antes de integrar.
 - A política de operação exige VPS de teste isolada, fixtures sintéticas,
   evidências por SHA e aprovação explícita para produção.
 
@@ -37,12 +38,12 @@ Documento subordinado a `docs/OPERACAO-CANONICA-SGS.md`.
 | #455, #453, #454, #445, #444, #443, #448, #447 | Correções de dependências com relevância de segurança | **P1:** validar integridade dos lockfiles e `npm ci`; priorizar correção sem pular gates |
 | #452, #457 | NestJS/core e toolchain (inclui TypeScript major em #457) | **P1:** homologação separada; não combinar upgrades grandes às cegas |
 | #449, #417, #451, #438, #436, #410, #408, #406 | Upgrade de runtime/tooling com potencial incompatibilidade | **P1/P2:** teste de integração por grupo; checar supersedência entre #449/#417 |
-| #456, #451, #439, #432, #420, #418, #437, #407, #404, #397 | Dependências variadas | **P2:** reconciliar e testar por camada |
+| #456, #439, #432, #420, #418, #437, #407, #404, #397 | Dependências variadas | **P2:** reconciliar e testar por camada |
 | #426, #425, #424, #422, #415 | Actions de segurança | **P1:** revisar pins, permissões e workflows como conjunto |
 | #450 | Restrição de origem no cliente autenticado | **Draft/NO-GO:** testar login, proxy, upload externo, troca de tenant e regresões |
 | #446 | 155 arquivos de PDF/design | **Draft/NO-GO:** dividir revisão por emissor e superfície; golden PDFs + comparação visual |
 | #378, #346, #345, #340, #339, #343 | Frontend/produto/contratos | Revisar contra `main`, especialmente regressões já tratadas em #377 |
-| #344 | Notificação com deduplicação no PostgreSQL | Validar migration 0403/0404 e impacto com histórico atual |
+| #344 | Notificação com deduplicação no PostgreSQL | Validar migration 0406 e impacto com histórico atual |
 | #342, #341 | Imutabilidade CAT/fotos/EPI | Comparar contra #374 já integrada; fechar só se totalmente cobertas |
 
 ## 2. Correção isolada implementada nesta branch
@@ -101,7 +102,7 @@ transação/mesma conexão, com testes integrados específicos.
 2. Executar em PG17 sintético subida, rollback onde seguro, reaplicação;
    verificar `migration:pending:check`, constraints, índices, FKs e
    nulidade; classificar migrations destrutivas separadamente.
-3. Auditar migrations 0392–0404, inclusive conflitos sobre dedupe key,
+3. Auditar migrations 0392–0406 (0406 ainda na PR #344), inclusive conflitos sobre dedupe key,
    constraints parciais e colunas de assinatura.
 4. Testar upgrade sobre cópia **anonimizada** de dados, com backup íntegro,
    `EXPLAIN (ANALYZE, BUFFERS)` e janela de lock controlada.
