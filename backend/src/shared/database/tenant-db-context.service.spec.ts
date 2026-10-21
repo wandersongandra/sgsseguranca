@@ -213,6 +213,73 @@ describe('TenantDbContextService', () => {
     );
   });
 
+  it('reaplica o contexto RLS ao emprestar a mesma conexao novamente', async () => {
+    const client = createClient();
+    const pool = createPool(client);
+    const service = buildService(
+      { master: pool },
+      {
+        companyId: '11111111-1111-4111-8111-111111111111',
+        isSuperAdmin: false,
+        siteScope: 'single',
+      },
+    );
+    await service.onApplicationBootstrap();
+
+    const borrowAndRelease = () =>
+      new Promise<void>((resolve, reject) => {
+        pool.connect((err, pgClient, release) => {
+          if (err || !pgClient || !release) {
+            reject(err ?? new Error('client ausente'));
+            return;
+          }
+          release();
+          resolve();
+        });
+      });
+
+    await borrowAndRelease();
+    await borrowAndRelease();
+
+    expect(client.query).toHaveBeenCalledTimes(2);
+    expect(client.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining("set_config('app.current_company_id'"),
+      expect.arrayContaining(['11111111-1111-4111-8111-111111111111']),
+    );
+  });
+
+  it('descarta e rejeita a conexao quando o SET do contexto RLS falha', async () => {
+    const client = createClient();
+    client.query.mockRejectedValueOnce(new Error('falha simulada no SET'));
+    const pool = createPool(client);
+    const service = buildService(
+      { master: pool },
+      {
+        companyId: '11111111-1111-4111-8111-111111111111',
+        isSuperAdmin: false,
+      },
+    );
+    await service.onApplicationBootstrap();
+
+    await expect(
+      new Promise<void>((resolve, reject) => {
+        pool.connect((err, pgClient, release) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+          if (pgClient && release) release();
+          resolve();
+        });
+      }),
+    ).rejects.toThrow('falha simulada no SET');
+
+    expect(client.release).toHaveBeenCalledTimes(1);
+    expect(client.release).toHaveBeenCalledWith(expect.any(Error));
+    expect(client.query).toHaveBeenCalledTimes(1);
+  });
+
   it('falha fechado quando PostgreSQL não expõe nenhum pool para patch', async () => {
     const service = buildService({});
 
